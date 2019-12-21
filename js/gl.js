@@ -529,11 +529,25 @@ var importObject = {
 
 
 function load(wasm_path) {
-    WebAssembly.instantiateStreaming(fetch(wasm_path), importObject)
-        .then(obj => {
-            memory = obj.instance.exports.memory;
-            wasm_exports = obj.instance.exports;
+    var req = fetch(wasm_path);
 
-            obj.instance.exports.main();
-        });
+    if (typeof WebAssembly.instantiateStreaming === 'function') {
+        WebAssembly.instantiateStreaming(req, importObject)
+            .then(obj => {
+                memory = obj.instance.exports.memory;
+                wasm_exports = obj.instance.exports;
+
+                obj.instance.exports.main();
+            });
+    } else {
+        req
+            .then(function (x) { return x.arrayBuffer(); })
+            .then(function (bytes) { return WebAssembly.instantiate(bytes, importObject); })
+            .then(function (obj) {
+                memory = obj.instance.exports.memory;
+                wasm_exports = obj.instance.exports;
+
+                obj.instance.exports.main();
+            });
+    }
 }
