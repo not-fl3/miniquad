@@ -1,0 +1,9 @@
+[package]
+name = "miniquad"
+version = "0.1.0"
+authors = ["not-fl3 <not.fl3@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+sokol_app_sys = { path = "./sokol-app-sys" }
+
