@@ -7,10 +7,26 @@
 // TODO: split to gl.js and loader.js 
 
 const canvas = document.querySelector("#glcanvas");
-const gl = canvas.getContext("webgl2");
+const gl = canvas.getContext("webgl");
 if (gl === null) {
     alert("Unable to initialize WebGL. Your browser or machine may not support it.");
 }
+
+function acquireVertexArrayObjectExtension(ctx) {
+    // Extension available in WebGL 1 from Firefox 25 and WebKit 536.28/desktop Safari 6.0.3 onwards. Core feature in WebGL 2.
+    var ext = ctx.getExtension('OES_vertex_array_object');
+    if (ext) {
+        ctx['createVertexArray'] = function () { return ext['createVertexArrayOES'](); };
+        ctx['deleteVertexArray'] = function (vao) { ext['deleteVertexArrayOES'](vao); };
+        ctx['bindVertexArray'] = function (vao) { ext['bindVertexArrayOES'](vao); };
+        ctx['isVertexArray'] = function (vao) { return ext['isVertexArrayOES'](vao); };
+    }
+    else {
+        alert("Unable to get OES_vertex_array_object extension");
+    }
+}
+
+acquireVertexArrayObjectExtension(gl);
 
 function getArray(ptr, arr, n) {
     return new arr(memory.buffer, ptr, n);
