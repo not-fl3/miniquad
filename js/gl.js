@@ -12,6 +12,12 @@ if (gl === null) {
     alert("Unable to initialize WebGL. Your browser or machine may not support it.");
 }
 
+function assert(flag, message) {
+    if (flag == false) {
+        alert(message)
+    }
+}
+
 function acquireVertexArrayObjectExtension(ctx) {
     // Extension available in WebGL 1 from Firefox 25 and WebKit 536.28/desktop Safari 6.0.3 onwards. Core feature in WebGL 2.
     var ext = ctx.getExtension('OES_vertex_array_object');
@@ -234,25 +240,25 @@ var importObject = {
         },
         glUniform1fv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform1fv', 'location');
-            console.assert((value & 3) == 0, 'Pointer to float data passed to glUniform1fv must be aligned to four bytes!');
+            assert((value & 3) == 0, 'Pointer to float data passed to glUniform1fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 1);
             gl.uniform1fv(GL.uniforms[location], view);
         },
         glUniform2fv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform2fv', 'location');
-            console.assert((value & 3) == 0, 'Pointer to float data passed to glUniform2fv must be aligned to four bytes!');
+            assert((value & 3) == 0, 'Pointer to float data passed to glUniform2fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 2);
             gl.uniform2fv(GL.uniforms[location], view);
         },
         glUniform3fv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform3fv', 'location');
-            console.assert((value & 3) == 0, 'Pointer to float data passed to glUniform3fv must be aligned to four bytes!');
+            assert((value & 3) == 0, 'Pointer to float data passed to glUniform3fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 3);
             gl.uniform3fv(GL.uniforms[location], view);
         },
         glUniform4fv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform4fv', 'location');
-            console.assert((value & 3) == 0, 'Pointer to float data passed to glUniform4fv must be aligned to four bytes!');
+            assert((value & 3) == 0, 'Pointer to float data passed to glUniform4fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 4);
             gl.uniform4fv(GL.uniforms[location], view);
         },
@@ -308,7 +314,7 @@ var importObject = {
         },
         glUniformMatrix4fv: function (location, count, transpose, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniformMatrix4fv', 'location');
-            console.assert((value & 3) == 0, 'Pointer to float data passed to glUniformMatrix4fv must be aligned to four bytes!');
+            assert((value & 3) == 0, 'Pointer to float data passed to glUniformMatrix4fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 16);
             gl.uniformMatrix4fv(GL.uniforms[location], !!transpose, view);
         },
@@ -318,7 +324,7 @@ var importObject = {
         },
         glUniform4fv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniformMatrix4fv', 'location');
-            console.assert((value & 3) == 0, 'Pointer to float data passed to glUniformMatrix4fv must be aligned to four bytes!');
+            assert((value & 3) == 0, 'Pointer to float data passed to glUniformMatrix4fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 4);
             gl.uniform4fv(GL.uniforms[location], view);
         },
@@ -374,7 +380,7 @@ var importObject = {
             GL.populateUniformTable(program);
         },
         glGetProgramiv: function (program, pname, p) {
-            console.assert(p);
+            assert(p);
             GL.validateGLObjectID(GL.programs, program, 'glGetProgramiv', 'program');
             if (program >= GL.counter) {
                 console.error("GL_INVALID_VALUE in glGetProgramiv");
@@ -445,7 +451,7 @@ var importObject = {
         glGetProgramInfoLog: function (program, maxLength, length, infoLog) {
             GL.validateGLObjectID(GL.programs, program, 'glGetProgramInfoLog', 'program');
             var log = gl.getProgramInfoLog(GL.programs[program]);
-            console.assert(log !== null);
+            assert(log !== null);
             let array = getArray(infoLog, Uint8Array, maxLength);
             for (var i = 0; i < maxLength; i++) {
                 array[i] = log.charCodeAt(i);
@@ -456,11 +462,11 @@ var importObject = {
             gl.compileShader(GL.shaders[shader]);
         },
         glGetShaderiv: function (shader, pname, p) {
-            console.assert(p);
+            assert(p);
             GL.validateGLObjectID(GL.shaders, shader, 'glGetShaderiv', 'shader');
             if (pname == 0x8B84) { // GL_INFO_LOG_LENGTH
                 var log = gl.getShaderInfoLog(GL.shaders[shader]);
-                console.assert(log !== null);
+                assert(log !== null);
 
                 getArray(p, Int32Array, 1)[0] = log.length + 1;
 
@@ -475,7 +481,7 @@ var importObject = {
         glGetShaderInfoLog: function (shader, maxLength, length, infoLog) {
             GL.validateGLObjectID(GL.shaders, shader, 'glGetShaderInfoLog', 'shader');
             var log = gl.getShaderInfoLog(GL.shaders[shader]);
-            console.assert(log !== null);
+            assert(log !== null);
             let array = getArray(infoLog, Uint8Array, maxLength);
             for (var i = 0; i < maxLength; i++) {
                 array[i] = log.charCodeAt(i);
