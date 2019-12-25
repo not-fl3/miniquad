@@ -9,9 +9,101 @@ pub const NEAREST_FILTER: i32 = GL_NEAREST as i32;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Texture {
     texture: GLuint,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PixelFormat {
+    RGBA8,
+    Depth,
+}
+
+impl From<PixelFormat> for (GLenum, GLenum, GLenum) {
+    fn from(format: PixelFormat) -> Self {
+        match format {
+            PixelFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
+            PixelFormat::Depth => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT),
+        }
+    }
+}
+
+/// Sets the wrap parameter for texture.
+#[repr(u8)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum TextureWrap {
+    /// Samples at coord x + 1 map to coord x.
+    Repeat,
+    /// Samples at coord x + 1 map to coord 1 - x.
+    Mirror,
+    /// Samples at coord x + 1 map to coord 1.
+    Clamp,
+    /// Same as Mirror, but only for one repetition.
+    MirrorClamp,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum FilterMode {
+    Linear = LINEAR_FILTER as isize,
+    Nearest = NEAREST_FILTER as isize,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct RenderTextureParams {
+    pub format: PixelFormat,
+    pub wrap: TextureWrap,
+    pub filter: FilterMode,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Default for RenderTextureParams {
+    fn default() -> Self {
+        RenderTextureParams {
+            format: PixelFormat::RGBA8,
+            wrap: TextureWrap::Clamp,
+            filter: FilterMode::Linear,
+            width: 0,
+            height: 0,
+        }
+    }
 }
 
 impl Texture {
+    pub fn new_render_texture(params: RenderTextureParams) -> Texture {
+        let mut texture: GLuint = 0;
+
+        let (internal_format, format, pixel_type) = params.format.into();
+
+        unsafe {
+            glGenTextures(1, &mut texture as *mut _);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                internal_format as i32,
+                params.width as i32,
+                params.height as i32,
+                0,
+                format,
+                pixel_type,
+                std::ptr::null(),
+            );
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR as i32);
+        }
+
+        Texture {
+            texture,
+            width: params.width,
+            height: params.height,
+        }
+    }
+
     pub fn from_rgba8(width: u16, height: u16, bytes: &[u8]) -> Texture {
         unsafe {
             let mut texture: GLuint = 0;
@@ -35,7 +127,11 @@ impl Texture {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR as i32);
 
-            Texture { texture }
+            Texture {
+                texture,
+                width: width as u32,
+                height: height as u32,
+            }
         }
     }
 
@@ -101,6 +197,7 @@ pub enum VertexFormat {
     Float1,
     Float2,
     Float3,
+    Float4,
 }
 
 impl VertexFormat {
@@ -109,6 +206,7 @@ impl VertexFormat {
             VertexFormat::Float1 => 1,
             VertexFormat::Float2 => 2,
             VertexFormat::Float3 => 3,
+            VertexFormat::Float4 => 4,
         }
     }
 }
@@ -124,13 +222,20 @@ pub enum VertexAttribute {
 #[derive(Clone)]
 pub struct VertexLayout {
     pub attributes: &'static [(VertexAttribute, VertexFormat)],
-    len: i32,
+    stride: i32,
 }
 impl VertexLayout {
     pub fn new(attributes: &'static [(VertexAttribute, VertexFormat)]) -> Self {
-        let len = attributes.iter().map(|(_, f)| f.size()).sum();
+        let stride = attributes.iter().map(|(_, f)| f.size() * 4).sum();
 
-        VertexLayout { attributes, len }
+        VertexLayout { attributes, stride }
+    }
+
+    pub fn with_stride(
+        attributes: &'static [(VertexAttribute, VertexFormat)],
+        stride: i32,
+    ) -> Self {
+        VertexLayout { attributes, stride }
     }
 }
 
@@ -143,7 +248,7 @@ impl Shader {
         fragment_shader: &str,
         meta: ShaderMeta,
     ) -> Shader {
-        let shader = load_shader_Internal(vertex_shader, fragment_shader, meta);
+        let shader = load_shader_internal(vertex_shader, fragment_shader, meta);
         ctx.shaders.push(shader);
         Shader(ctx.shaders.len() - 1)
     }
@@ -178,13 +283,91 @@ pub struct GlCache {
     blend: BlendState,
 }
 
+pub enum PassAction {
+    Nothing,
+    Clear {
+        color: Option<(f32, f32, f32, f32)>,
+        depth: Option<f32>,
+        stencil: Option<i32>,
+    },
+}
+
+impl PassAction {
+    pub fn clear_color(r: f32, g: f32, b: f32, a: f32) -> PassAction {
+        PassAction::Clear {
+            color: Some((r, g, b, a)),
+            depth: Some(1.),
+            stencil: None,
+        }
+    }
+}
+
+impl Default for PassAction {
+    fn default() -> PassAction {
+        PassAction::Clear {
+            color: Some((0.0, 0.0, 0.0, 0.0)),
+            depth: Some(1.),
+            stencil: None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RenderPass(usize);
+
+pub struct RenderPassInternal {
+    gl_fb: GLuint,
+    texture: Texture,
+}
+
+impl RenderPass {
+    pub fn new(
+        context: &mut Context,
+        color_img: Texture,
+        depth_img: impl Into<Option<Texture>>,
+    ) -> RenderPass {
+        let mut gl_fb = 0;
+
+        unsafe {
+            glGenFramebuffers(1, &mut gl_fb as *mut _);
+            glBindTexture(GL_TEXTURE_2D, color_img.texture);
+            glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
+            glFramebufferTexture2D(
+                GL_FRAMEBUFFER,
+                GL_COLOR_ATTACHMENT0,
+                GL_TEXTURE_2D,
+                color_img.texture,
+                0,
+            );
+            if let Some(depth_img) = depth_img.into() {
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER,
+                    GL_DEPTH_ATTACHMENT,
+                    GL_TEXTURE_2D,
+                    depth_img.texture,
+                    0,
+                );
+            }
+            glBindFramebuffer(GL_FRAMEBUFFER, context.default_framebuffer);
+        }
+        let pass = RenderPassInternal {
+            gl_fb,
+            texture: color_img,
+        };
+
+        context.passes.push(pass);
+
+        RenderPass(context.passes.len() - 1)
+    }
+}
+
 pub const MAX_VERTEX_ATTRIBUTES: usize = 16;
 
 pub struct Context {
-    pub screen_rect: (f32, f32, f32, f32),
     shaders: Vec<ShaderInternal>,
     pipelines: Vec<PipelineInternal>,
-    //default_framebuffer: GLint,
+    passes: Vec<RenderPassInternal>,
+    default_framebuffer: GLuint,
     cache: GlCache,
     attributes: [Option<VertexAttributeInternal>; MAX_VERTEX_ATTRIBUTES],
 }
@@ -192,10 +375,12 @@ pub struct Context {
 impl Context {
     pub fn new() -> Context {
         unsafe {
-            let screen_rect = (-1., -1., 2., 2.);
-            //let mut default_framebuffer: GLint = 0;
+            let mut default_framebuffer: GLuint = 0;
             unsafe {
-                //glGetIntegerv(GL_FRAMEBUFFER_BINDING, &mut default_framebuffer as *mut _);
+                glGetIntegerv(
+                    GL_FRAMEBUFFER_BINDING,
+                    &mut default_framebuffer as *mut _ as *mut _,
+                );
             }
 
             let mut vao = 0;
@@ -205,10 +390,10 @@ impl Context {
             }
 
             Context {
-                screen_rect,
-                //default_framebuffer,
+                default_framebuffer,
                 shaders: vec![],
                 pipelines: vec![],
+                passes: vec![],
                 cache: GlCache {
                     stored_index_buffer: 0,
                     stored_vertex_buffer: 0,
@@ -275,6 +460,17 @@ impl Context {
             glUseProgram(shader.program);
         }
 
+        if pipeline.params.depth_write {
+            unsafe {
+                glEnable(GL_DEPTH_TEST);
+                glDepthFunc(pipeline.params.depth_test.into())
+            }
+        } else {
+            unsafe {
+                glDisable(GL_DEPTH_TEST);
+            }
+        }
+
         if self.cache.blend != pipeline.params.color_blend {
             unsafe {
                 if let Some((equation, src, dst)) = pipeline.params.color_blend {
@@ -297,11 +493,15 @@ impl Context {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let shader = &self.shaders[pip.shader.0];
 
-        for (n, image) in shader.images.iter().enumerate() {
+        for (n, shader_image) in shader.images.iter().enumerate() {
+            let bindings_image = bindings
+                .images
+                .get(n)
+                .unwrap_or_else(|| panic!("Image count in bindings and shader did not match!"));
             unsafe {
                 glActiveTexture(GL_TEXTURE0 + n as u32);
-                glBindTexture(GL_TEXTURE_2D, bindings.images[n].texture);
-                glUniform1i(image.gl_loc, n as i32);
+                glBindTexture(GL_TEXTURE_2D, bindings_image.texture);
+                glUniform1i(shader_image.gl_loc, n as i32);
             }
         }
 
@@ -326,18 +526,18 @@ impl Context {
                 (None, Some(new)) | (Some(_), Some(new)) => {
                     unsafe {
                         glVertexAttribPointer(
-                            new.gl_loc,
+                            new.attr_loc,
                             new.size,
                             GL_FLOAT,
                             GL_FALSE as u8,
-                            new.stride as i32,
+                            new.stride,
                             new.offset as *mut _,
                         );
-                        glEnableVertexAttribArray(new.gl_loc);
+                        glEnableVertexAttribArray(new.attr_loc);
                     };
                 }
                 (Some(attr), None) => unsafe {
-                    glDisableVertexAttribArray(attr.gl_loc);
+                    glDisableVertexAttribArray(attr.attr_loc);
                 },
                 // attributes are always consecutive in the cache, so its safe to just break from the loop when both
                 // cached and the new attributes are None
@@ -381,17 +581,84 @@ impl Context {
         }
     }
 
-    pub fn clear(&self, color: (f32, f32, f32, f32)) {
-        unsafe {
-            glClearColor(color.0, color.1, color.2, color.3);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    pub fn clear(
+        &self,
+        color: Option<(f32, f32, f32, f32)>,
+        depth: Option<f32>,
+        stencil: Option<i32>,
+    ) {
+        let mut bits = 0;
+        if let Some((r, g, b, a)) = color {
+            bits |= GL_COLOR_BUFFER_BIT;
+            unsafe {
+                glClearColor(r, g, b, a);
+            }
+        }
+
+        if let Some(v) = depth {
+            bits |= GL_DEPTH_BUFFER_BIT;
+            unsafe {
+                glClearDepthf(v);
+            }
+        }
+
+        if let Some(v) = stencil {
+            bits |= GL_STENCIL_BUFFER_BIT;
+            unsafe {
+                glClearStencil(v);
+            }
+        }
+
+        if bits != 0 {
+            unsafe {
+                glClear(bits);
+            }
         }
     }
 
-    pub fn begin_render_pass(&self) {
+    /// start rendering to the default frame buffer
+    pub fn begin_default_pass(&mut self, action: PassAction) {
+        self.begin_pass(None, action);
     }
 
-    pub fn end_render_pass(&self) {}
+    /// start rendering to an offscreen framebuffer
+    pub fn begin_pass(&mut self, pass: impl Into<Option<RenderPass>>, action: PassAction) {
+        let (framebuffer, w, h) = match pass.into() {
+            None => (
+                self.default_framebuffer,
+                unsafe { sapp_width() } as i32,
+                unsafe { sapp_height() } as i32,
+            ),
+            Some(pass) => {
+                let pass = &self.passes[pass.0];
+                (
+                    pass.gl_fb,
+                    pass.texture.width as i32,
+                    pass.texture.height as i32,
+                )
+            }
+        };
+        unsafe {
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+            glViewport(0, 0, w, h);
+        }
+        match action {
+            PassAction::Nothing => {}
+            PassAction::Clear {
+                color,
+                depth,
+                stencil,
+            } => {
+                self.clear(color, depth, stencil);
+            }
+        }
+    }
+
+    pub fn end_render_pass(&self) {
+        unsafe {
+            glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
+        }
+    }
 
     pub fn commit_frame(&self) {}
 
@@ -403,7 +670,7 @@ impl Context {
     }
 }
 
-fn load_shader_Internal(
+fn load_shader_internal(
     vertex_shader: &str,
     fragment_shader: &str,
     meta: ShaderMeta,
@@ -496,12 +763,6 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> GLuint {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum FilterMode {
-    Linear = LINEAR_FILTER as isize,
-    Nearest = NEAREST_FILTER as isize,
-}
-
 /// Specify whether front- or back-facing polygons can be culled.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CullFace {
@@ -529,6 +790,22 @@ pub enum Comparison {
     NotEqual,
     Always,
 }
+
+impl From<Comparison> for GLenum {
+    fn from(cmp: Comparison) -> Self {
+        match cmp {
+            Comparison::Never => GL_NEVER,
+            Comparison::Less => GL_LESS,
+            Comparison::LessOrEqual => GL_LEQUAL,
+            Comparison::Greater => GL_GREATER,
+            Comparison::GreaterOrEqual => GL_GEQUAL,
+            Comparison::Equal => GL_EQUAL,
+            Comparison::NotEqual => GL_NOTEQUAL,
+            Comparison::Always => GL_ALWAYS,
+        }
+    }
+}
+
 /// Specifies how incoming RGBA values (source) and the RGBA in framebuffer (destination)
 /// are combined.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -634,7 +911,7 @@ impl Pipeline {
             .attributes
             .iter()
             .scan(0, |mut offset, (attribute, format)| {
-                let gl_loc = match attribute {
+                let attr_loc = match attribute {
                     VertexAttribute::Position => unimplemented!(),
                     VertexAttribute::Normal => unimplemented!(),
                     VertexAttribute::TexCoord0 => unimplemented!(),
@@ -649,10 +926,10 @@ impl Pipeline {
                     }
                 };
                 let attr = VertexAttributeInternal {
-                    gl_loc,
+                    attr_loc,
                     size: format.size(),
                     offset: *offset,
-                    stride: std::mem::size_of::<f32>() as i32 * layout.len,
+                    stride: layout.stride,
                 };
 
                 *offset += (std::mem::size_of::<f32>() as i32 * format.size()) as i64;
@@ -663,7 +940,6 @@ impl Pipeline {
 
         let pipeline = PipelineInternal {
             layout: attributes,
-            layout_len: layout.len,
             shader,
             params,
         };
@@ -674,7 +950,7 @@ impl Pipeline {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct VertexAttributeInternal {
-    gl_loc: GLuint,
+    attr_loc: GLuint,
     size: i32,
     offset: i64,
     stride: i32,
@@ -682,7 +958,6 @@ struct VertexAttributeInternal {
 
 struct PipelineInternal {
     layout: Vec<VertexAttributeInternal>,
-    layout_len: i32,
     shader: Shader,
     params: PipelineParams,
 }

@@ -7,3 +7,5 @@ edition = "2018"
 [dependencies]
 sokol_app_sys = { path = "./sokol-app-sys" }
 
+[dev-dependencies]
+glam = "*"

@@ -68,7 +68,7 @@ impl EventHandler for Stage {
     fn draw(&mut self, ctx: &mut Context) {
         let t = date::now();
 
-        ctx.begin_render_pass();
+        ctx.begin_default_pass(Default::default());
 
         ctx.apply_pipeline(&self.pipeline);
         ctx.apply_bindings(&self.bindings);

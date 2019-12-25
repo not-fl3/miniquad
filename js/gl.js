@@ -34,6 +34,11 @@ function acquireVertexArrayObjectExtension(ctx) {
 
 acquireVertexArrayObjectExtension(gl);
 
+// https://developer.mozilla.org/en-US/docs/Web/API/WEBGL_depth_texture
+if (gl.getExtension('WEBGL_depth_texture') == null) {
+    alert("Cant initialize WEBGL_depth_texture extension");
+}
+
 function getArray(ptr, arr, n) {
     return new arr(memory.buffer, ptr, n);
 }
@@ -61,6 +66,7 @@ function UTF8ToString(ptr, len) {
     }
     return string;
 }
+
 var GL = {
     counter: 1,
     buffers: [],
@@ -92,7 +98,6 @@ var GL = {
             }
         }
     },
-
     getSource: function (shader, count, string, length) {
         var source = '';
         for (var i = 0; i < count; ++i) {
@@ -165,6 +170,117 @@ _glGenObject = function (n, buffers, createFunction, objectTable, functionName) 
     }
 }
 
+_webglGet = function (name_, p, type) {
+    // Guard against user passing a null pointer.
+    // Note that GLES2 spec does not say anything about how passing a null pointer should be treated.
+    // Testing on desktop core GL 3, the application crashes on glGetIntegerv to a null pointer, but
+    // better to report an error instead of doing anything random.
+    if (!p) {
+        console.error('GL_INVALID_VALUE in glGet' + type + 'v(name=' + name_ + ': Function called with null out pointer!');
+        GL.recordError(0x501 /* GL_INVALID_VALUE */);
+        return;
+    }
+    var ret = undefined;
+    switch (name_) { // Handle a few trivial GLES values
+        case 0x8DFA: // GL_SHADER_COMPILER
+            ret = 1;
+            break;
+        case 0x8DF8: // GL_SHADER_BINARY_FORMATS    
+            if (type != 'EM_FUNC_SIG_PARAM_I' && type != 'EM_FUNC_SIG_PARAM_I64') {
+                GL.recordError(0x500); // GL_INVALID_ENUM
+
+                err('GL_INVALID_ENUM in glGet' + type + 'v(GL_SHADER_BINARY_FORMATS): Invalid parameter type!');
+            }
+            return; // Do not write anything to the out pointer, since no binary formats are supported.
+        case 0x87FE: // GL_NUM_PROGRAM_BINARY_FORMATS
+        case 0x8DF9: // GL_NUM_SHADER_BINARY_FORMATS
+            ret = 0;
+            break;
+        case 0x86A2: // GL_NUM_COMPRESSED_TEXTURE_FORMATS
+            // WebGL doesn't have GL_NUM_COMPRESSED_TEXTURE_FORMATS (it's obsolete since GL_COMPRESSED_TEXTURE_FORMATS returns a JS array that can be queried for length),
+            // so implement it ourselves to allow C++ GLES2 code get the length.
+            var formats = gl.getParameter(0x86A3 /*GL_COMPRESSED_TEXTURE_FORMATS*/);
+            ret = formats ? formats.length : 0;
+            break;
+        case 0x821D: // GL_NUM_EXTENSIONS
+            assert(false, "unimplemented");
+            break;
+        case 0x821B: // GL_MAJOR_VERSION
+        case 0x821C: // GL_MINOR_VERSION
+            assert(false, "unimplemented");
+            break;
+    }
+
+    if (ret === undefined) {
+        var result = gl.getParameter(name_);
+        switch (typeof (result)) {
+            case "number":
+                ret = result;
+                break;
+            case "boolean":
+                ret = result ? 1 : 0;
+                break;
+            case "string":
+                GL.recordError(0x500); // GL_INVALID_ENUM
+                console.error('GL_INVALID_ENUM in glGet' + type + 'v(' + name_ + ') on a name which returns a string!');
+                return;
+            case "object":
+                if (result === null) {
+                    // null is a valid result for some (e.g., which buffer is bound - perhaps nothing is bound), but otherwise
+                    // can mean an invalid name_, which we need to report as an error
+                    switch (name_) {
+                        case 0x8894: // ARRAY_BUFFER_BINDING
+                        case 0x8B8D: // CURRENT_PROGRAM
+                        case 0x8895: // ELEMENT_ARRAY_BUFFER_BINDING
+                        case 0x8CA6: // FRAMEBUFFER_BINDING
+                        case 0x8CA7: // RENDERBUFFER_BINDING
+                        case 0x8069: // TEXTURE_BINDING_2D
+                        case 0x85B5: // WebGL 2 GL_VERTEX_ARRAY_BINDING, or WebGL 1 extension OES_vertex_array_object GL_VERTEX_ARRAY_BINDING_OES
+                        case 0x8919: // GL_SAMPLER_BINDING
+                        case 0x8E25: // GL_TRANSFORM_FEEDBACK_BINDING
+                        case 0x8514: { // TEXTURE_BINDING_CUBE_MAP
+                            ret = 0;
+                            break;
+                        }
+                        default: {
+                            GL.recordError(0x500); // GL_INVALID_ENUM
+                            console.error('GL_INVALID_ENUM in glGet' + type + 'v(' + name_ + ') and it returns null!');
+                            return;
+                        }
+                    }
+                } else if (result instanceof Float32Array ||
+                    result instanceof Uint32Array ||
+                    result instanceof Int32Array ||
+                    result instanceof Array) {
+                    for (var i = 0; i < result.length; ++i) {
+                        assert(false, "unimplemented")
+                    }
+                    return;
+                } else {
+                    try {
+                        ret = result.name | 0;
+                    } catch (e) {
+                        GL.recordError(0x500); // GL_INVALID_ENUM
+                        console.error('GL_INVALID_ENUM in glGet' + type + 'v: Unknown object returned from WebGL getParameter(' + name_ + ')! (error: ' + e + ')');
+                        return;
+                    }
+                }
+                break;
+            default:
+                GL.recordError(0x500); // GL_INVALID_ENUM
+                console.error('GL_INVALID_ENUM in glGet' + type + 'v: Native code calling glGet' + type + 'v(' + name_ + ') and it returns ' + result + ' of type ' + typeof (result) + '!');
+                return;
+        }
+    }
+
+    switch (type) {
+        case 'EM_FUNC_SIG_PARAM_I64': getArray(p, Int32Array, 1)[0] = ret;
+        case 'EM_FUNC_SIG_PARAM_I': getArray(p, Int32Array, 1)[0] = ret; break;
+        case 'EM_FUNC_SIG_PARAM_F': getArray(p, Float32Array, 1)[0] = ret; break;
+        case 'EM_FUNC_SIG_PARAM_B': getArray(p, Int8Array, 1)[0] = ret ? 1 : 0; break;
+        default: throw 'internal glGet error, bad type: ' + type;
+    }
+}
 
 var Module;
 var wasm_exports;
@@ -218,6 +334,10 @@ var importObject = {
         glClearColor: function (r, g, b, a) {
             gl.clearColor(r, g, b, a);
         },
+        glClearStencil: function (s) {
+            gl.clearColorStencil(s);
+        },
+
         glClear: function (mask) {
             gl.clear(mask);
         },
@@ -233,7 +353,7 @@ var importObject = {
         },
         glTexImage2D: function (target, level, internalFormat, width, height, border, format, type, pixels) {
             gl.texImage2D(target, level, internalFormat, width, height, border, format, type,
-                getArray(pixels, Uint8Array, width * height * 4));
+                pixels ? getArray(pixels, Uint8Array, width * height * 4) : null);
         },
         glTexParameteri: function (target, pname, param) {
             gl.texParameteri(target, pname, param);
@@ -273,6 +393,9 @@ var importObject = {
         },
         glDrawElements: function (mode, count, type, indices) {
             gl.drawElements(mode, count, type, indices);
+        },
+        glGetIntegerv: function (name_, p) {
+            _webglGet(name_, p, 'EM_FUNC_SIG_PARAM_I');
         },
         glUniform1f: function (location, v0) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform1f', 'location');
@@ -331,9 +454,18 @@ var importObject = {
         glGenVertexArrays: function (n, arrays) {
             _glGenObject(n, arrays, 'createVertexArray', GL.vaos, 'glGenVertexArrays');
         },
+        glGenFramebuffers: function (n, ids) {
+            _glGenObject(n, ids, 'createFramebuffer', GL.framebuffers, 'glGenFramebuffers');
+        },
         glBindVertexArray: function (vao) {
             gl.bindVertexArray(GL.vaos[vao]);
         },
+        glBindFramebuffer: function (target, framebuffer) {
+            GL.validateGLObjectID(GL.framebuffers, framebuffer, 'glBindFramebuffer', 'framebuffer');
+
+            gl.bindFramebuffer(target, GL.framebuffers[framebuffer]);
+        },
+
         glGenBuffers: function (n, buffers) {
             _glGenObject(n, buffers, 'createBuffer', GL.buffers, 'glGenBuffers');
         },
@@ -378,6 +510,10 @@ var importObject = {
             GL.validateGLObjectID(GL.programs, program, 'glLinkProgram', 'program');
             gl.linkProgram(GL.programs[program]);
             GL.populateUniformTable(program);
+        },
+        glFramebufferTexture2D: function (target, attachment, textarget, texture, level) {
+            GL.validateGLObjectID(GL.textures, texture, 'glFramebufferTexture2D', 'texture');
+            gl.framebufferTexture2D(target, attachment, textarget, GL.textures[texture], level);
         },
         glGetProgramiv: function (program, pname, p) {
             assert(p);
