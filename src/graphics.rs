@@ -515,9 +515,9 @@ impl Context {
 
         let mut offset = 0;
 
-        for i in 0..MAX_VERTEX_ATTRIBUTES {
-            let mut cached_attribute = &mut self.attributes[i];
-            let pip_attribute = pip.layout.get(i).copied();
+        for attr_index in 0..MAX_VERTEX_ATTRIBUTES {
+            let mut cached_attribute = &mut self.attributes[attr_index];
+            let pip_attribute = pip.layout.get(attr_index).copied();
 
             match (&cached_attribute, pip_attribute) {
                 // cached and the new one are the same
@@ -526,18 +526,18 @@ impl Context {
                 (None, Some(new)) | (Some(_), Some(new)) => {
                     unsafe {
                         glVertexAttribPointer(
-                            new.attr_loc,
+                            attr_index as GLuint,
                             new.size,
                             GL_FLOAT,
                             GL_FALSE as u8,
                             new.stride,
                             new.offset as *mut _,
                         );
-                        glEnableVertexAttribArray(new.attr_loc);
+                        glEnableVertexAttribArray(attr_index as GLuint);
                     };
                 }
                 (Some(attr), None) => unsafe {
-                    glDisableVertexAttribArray(attr.attr_loc);
+                    glDisableVertexAttribArray(attr_index as GLuint);
                 },
                 // attributes are always consecutive in the cache, so its safe to just break from the loop when both
                 // cached and the new attributes are None
@@ -907,42 +907,52 @@ impl Pipeline {
     ) -> Pipeline {
         let program = ctx.shaders[shader.0].program;
 
-        let attributes = layout
-            .attributes
-            .iter()
-            .scan(0, |mut offset, (attribute, format)| {
-                let attr_loc = match attribute {
-                    VertexAttribute::Position => unimplemented!(),
-                    VertexAttribute::Normal => unimplemented!(),
-                    VertexAttribute::TexCoord0 => unimplemented!(),
-                    VertexAttribute::Custom(name) => {
-                        let cname = CString::new(*name).unwrap_or_else(|e| panic!(e));
-                        let attrib =
-                            unsafe { glGetAttribLocation(program, cname.as_ptr() as *const _) };
-                        if attrib == -1 {
-                            panic!();
-                        }
-                        attrib as u32
+        let mut attributes: Vec<VertexAttributeInternal> = vec![
+            VertexAttributeInternal {
+                attr_loc: 0,
+                size: 0,
+                offset: 0,
+                stride: layout.stride
+            };
+            layout.attributes.len()
+        ];
+        let mut offset = 0;
+        for (attribute, format) in layout.attributes {
+            let attr_loc = match attribute {
+                VertexAttribute::Position => unimplemented!(),
+                VertexAttribute::Normal => unimplemented!(),
+                VertexAttribute::TexCoord0 => unimplemented!(),
+                VertexAttribute::Custom(name) => {
+                    let cname = CString::new(*name).unwrap_or_else(|e| panic!(e));
+                    let attrib =
+                        unsafe { glGetAttribLocation(program, cname.as_ptr() as *const _) };
+                    if attrib == -1 {
+                        panic!();
                     }
-                };
-                let attr = VertexAttributeInternal {
-                    attr_loc,
-                    size: format.size(),
-                    offset: *offset,
-                    stride: layout.stride,
-                };
+                    attrib as u32
+                }
+            };
+            let attr = VertexAttributeInternal {
+                attr_loc,
+                size: format.size(),
+                offset: offset,
+                stride: layout.stride,
+            };
+            attributes[attr_loc as usize] = attr;
 
-                *offset += (std::mem::size_of::<f32>() as i32 * format.size()) as i64;
+            offset += (std::mem::size_of::<f32>() as i32 * format.size()) as i64;
+        }
 
-                Some(attr)
-            })
-            .collect::<Vec<_>>();
+        // TODO: it should be possible to express a "holes" in the attribute layout in the api
+        // so empty attributes will be fine. But right now empty attribute is always a bug
+        assert!(attributes.iter().any(|attr| attr.size == 0) == false);
 
         let pipeline = PipelineInternal {
             layout: attributes,
             shader,
             params,
         };
+
         ctx.pipelines.push(pipeline);
         Pipeline(ctx.pipelines.len() - 1)
     }
