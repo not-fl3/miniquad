@@ -323,10 +323,10 @@ var importObject = {
             return (Date.now() - start) / 1000.0;
         },
         canvas_width: function () {
-            return Math.floor(canvas.width);
+            return Math.floor(canvas.clientWidth);
         },
         canvas_height: function () {
-            return Math.floor(canvas.height);
+            return Math.floor(canvas.clientHeight);
         },
         glClearDepthf: function (depth) {
             gl.clearDepth(depth);
@@ -657,7 +657,9 @@ var importObject = {
                 if (event.code == "KeyW") wasm_exports.key_up(87);
             };
 
-
+            window.onresize = function () {
+                resize(canvas, wasm_exports.resize);
+            };
             window.requestAnimationFrame(animation);
         }
     }
@@ -687,3 +689,5 @@ function load(wasm_path) {
             });
     }
 }
+
+resize(canvas);
