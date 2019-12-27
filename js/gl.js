@@ -285,7 +285,6 @@ _webglGet = function (name_, p, type) {
 var Module;
 var wasm_exports;
 
-
 function resize(canvas, on_resize) {
     var displayWidth = canvas.clientWidth;
     var displayHeight = canvas.clientHeight;
@@ -300,10 +299,22 @@ function resize(canvas, on_resize) {
 }
 
 animation = function () {
-    resize(canvas, function (w, h) { wasm_exports.resize(w, h); });
-
     wasm_exports.frame();
     window.requestAnimationFrame(animation);
+}
+
+into_sapp_keycode = function (key_code) {
+    switch (event.code) {
+        case "KeyA": return 65;
+        case "KeyS": return 83;
+        case "KeyD": return 68;
+        case "KeyW": return 87;
+        case "ArrowRight": return 262;
+        case "ArrowLeft": return 263;
+        case "ArrowDown": return 264;
+        case "ArrowUp": return 265;
+        case "Space": return 32;
+    }
 }
 
 var emscripten_shaders_hack = false;
@@ -644,17 +655,12 @@ var importObject = {
                 wasm_exports.mouse_up(x, y, btn);
             };
             canvas.onkeydown = function (event) {
-                if (event.code == "KeyA") wasm_exports.key_down(65);
-                if (event.code == "KeyS") wasm_exports.key_down(83);
-                if (event.code == "KeyD") wasm_exports.key_down(68);
-                if (event.code == "KeyW") wasm_exports.key_down(87);
-
+                var sapp_key_code = into_sapp_keycode()
+                wasm_exports.key_down(sapp_key_code);
             };
             canvas.onkeyup = function (event) {
-                if (event.code == "KeyA") wasm_exports.key_up(65);
-                if (event.code == "KeyS") wasm_exports.key_up(83);
-                if (event.code == "KeyD") wasm_exports.key_up(68);
-                if (event.code == "KeyW") wasm_exports.key_up(87);
+                var sapp_key_code = into_sapp_keycode()
+                wasm_exports.key_up(sapp_key_code);
             };
 
             window.onresize = function () {

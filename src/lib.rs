@@ -108,44 +108,19 @@ extern "C" fn event(event: *const sokol_app::sapp_event, user_data: *mut ::std::
                 event.mouse_y,
             );
         }
-        sokol_app::sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN => match event.key_code {
-            sokol_app::sapp_keycode_SAPP_KEYCODE_W => {
-                data.event_handler
-                    .key_down_event(&mut data.context, KeyCode::W, KeyMods::No, false)
-            }
-            sokol_app::sapp_keycode_SAPP_KEYCODE_A => {
-                data.event_handler
-                    .key_down_event(&mut data.context, KeyCode::A, KeyMods::No, false)
-            }
-            sokol_app::sapp_keycode_SAPP_KEYCODE_S => {
-                data.event_handler
-                    .key_down_event(&mut data.context, KeyCode::S, KeyMods::No, false)
-            }
-            sokol_app::sapp_keycode_SAPP_KEYCODE_D => {
-                data.event_handler
-                    .key_down_event(&mut data.context, KeyCode::D, KeyMods::No, false)
-            }
-            _ => {}
-        },
-        sokol_app::sapp_event_type_SAPP_EVENTTYPE_KEY_UP => match event.key_code {
-            sokol_app::sapp_keycode_SAPP_KEYCODE_W => {
-                data.event_handler
-                    .key_up_event(&mut data.context, KeyCode::W, KeyMods::No)
-            }
-            sokol_app::sapp_keycode_SAPP_KEYCODE_A => {
-                data.event_handler
-                    .key_up_event(&mut data.context, KeyCode::A, KeyMods::No)
-            }
-            sokol_app::sapp_keycode_SAPP_KEYCODE_S => {
-                data.event_handler
-                    .key_up_event(&mut data.context, KeyCode::S, KeyMods::No)
-            }
-            sokol_app::sapp_keycode_SAPP_KEYCODE_D => {
-                data.event_handler
-                    .key_up_event(&mut data.context, KeyCode::D, KeyMods::No)
-            }
-            _ => {}
-        },
+
+        sokol_app::sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN => {
+            let keycode = KeyCode::from(event.key_code);
+
+            data.event_handler
+                .key_down_event(&mut data.context, keycode, KeyMods::No, false)
+        }
+        sokol_app::sapp_event_type_SAPP_EVENTTYPE_KEY_UP => {
+            let keycode = KeyCode::from(event.key_code);
+
+            data.event_handler
+                .key_up_event(&mut data.context, keycode, KeyMods::No)
+        }
         sokol_app::sapp_event_type_SAPP_EVENTTYPE_RESIZED => {
             data.context
                 .resize(event.window_width as u32, event.window_height as u32);
