@@ -2,7 +2,7 @@
 
 Cross platform context managment and OpenGL wrapper.   
 
-API is highly inspired by [sokol-gfx](https://github.com/floooh/sokol). Implementation influenced by [crayon](https://docs.rs/crayon/0.7.1/crayon/video/index.html).
+API is highly inspired by [sokol-gfx](https://github.com/floooh/sokol) ([sokol overview](https://floooh.github.io/2017/07/29/sokol-gfx-tour.html), [2019 update](https://floooh.github.io/2019/01/12/sokol-apply-pipeline.html)). Implementation influenced by [crayon](https://docs.rs/crayon/0.7.1/crayon/video/index.html).
 
 For context management and input on Windows/Linux(and potentially mobiles) "sokol-app" was used. And no external dependencies for WASM. 
 
