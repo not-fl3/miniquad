@@ -21,7 +21,7 @@ For context management and input on Windows/Linux(and potentially mobiles) "soko
 
 ![Imgur](https://i.imgur.com/xp5xc7j.gif)
 
-[examples/quad.rs](https://github.com/not-fl3/miniquad/blob/master/): [web](https://not-fl3.github.io/miniquad-samples/quad.html)   
+[examples/quad.rs](https://github.com/not-fl3/miniquad/blob/master/examples/quad.rs): [web](https://not-fl3.github.io/miniquad-samples/quad.html)   
 [examples/offscreen.rs](https://github.com/not-fl3/miniquad/blob/master/examples/offscreen.rs): [web](https://not-fl3.github.io/miniquad-samples/offscreen.html)
 
 Worth to mention [zemeroth port](https://not-fl3.github.io/miniquad-samples/zemeroth.html) and [astroblasto](https://not-fl3.github.io/miniquad-samples/astroblasto.html), built with miniquad-powered 
