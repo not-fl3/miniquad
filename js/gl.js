@@ -32,7 +32,19 @@ function acquireVertexArrayObjectExtension(ctx) {
     }
 }
 
+
+function acquireInstancedArraysExtension(ctx) {
+    // Extension available in WebGL 1 from Firefox 26 and Google Chrome 30 onwards. Core feature in WebGL 2.
+    var ext = ctx.getExtension('ANGLE_instanced_arrays');
+    if (ext) {
+        ctx['vertexAttribDivisor'] = function (index, divisor) { ext['vertexAttribDivisorANGLE'](index, divisor); };
+        ctx['drawArraysInstanced'] = function (mode, first, count, primcount) { ext['drawArraysInstancedANGLE'](mode, first, count, primcount); };
+        ctx['drawElementsInstanced'] = function (mode, count, type, indices, primcount) { ext['drawElementsInstancedANGLE'](mode, count, type, indices, primcount); };
+    }
+}
+
 acquireVertexArrayObjectExtension(gl);
+acquireInstancedArraysExtension(gl);
 
 // https://developer.mozilla.org/en-US/docs/Web/API/WEBGL_depth_texture
 if (gl.getExtension('WEBGL_depth_texture') == null) {
@@ -633,6 +645,15 @@ var importObject = {
             for (var i = 0; i < maxLength; i++) {
                 array[i] = log.charCodeAt(i);
             }
+        },
+        glVertexAttribDivisor: function (index, divisor) {
+            gl.vertexAttribDivisor(index, divisor);
+        },
+        glDrawArraysInstanced: function (mode, first, count, primcount) {
+            gl.drawArraysInstanced(mode, first, count, primcount);
+        },
+        glDrawElementsInstanced: function (mode, count, type, indices, primcount) {
+            gl.drawElementsInstanced(mode, count, type, indices, primcount);
         },
         glDeleteShader: function () { },
         init_opengl: function (ptr) {

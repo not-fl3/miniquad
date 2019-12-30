@@ -8,4 +8,4 @@ edition = "2018"
 sokol_app_sys = { path = "./sokol-app-sys", version = "0.1.0" }
 
 [dev-dependencies]
-glam = "0.8"
+glam = {version = "0.8", features = ["scalar-math"] }

@@ -1,4 +1,3 @@
-#![allow(warnings)]
 pub mod conf;
 mod event;
 pub mod graphics;

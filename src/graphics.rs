@@ -178,11 +178,6 @@ impl UniformType {
     }
 }
 
-struct Uniform {
-    gl_loc: GLint,
-    uniform_type: UniformType,
-}
-
 pub struct UniformBlockLayout {
     pub uniforms: &'static [(&'static str, UniformType)],
 }
@@ -192,12 +187,13 @@ pub struct ShaderMeta {
     pub images: &'static [&'static str],
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum VertexFormat {
     Float1,
     Float2,
     Float3,
     Float4,
+    Mat4,
 }
 
 impl VertexFormat {
@@ -207,36 +203,69 @@ impl VertexFormat {
             VertexFormat::Float2 => 2,
             VertexFormat::Float3 => 3,
             VertexFormat::Float4 => 4,
+            VertexFormat::Mat4 => 16,
         }
     }
 }
 
-#[derive(Clone)]
-pub enum VertexAttribute {
-    Position,
-    Normal,
-    TexCoord0,
-    Custom(&'static str),
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum VertexStep {
+    PerVertex,
+    PerInstance,
 }
 
-#[derive(Clone)]
-pub struct VertexLayout {
-    pub attributes: &'static [(VertexAttribute, VertexFormat)],
-    stride: i32,
+impl Default for VertexStep {
+    fn default() -> VertexStep {
+        VertexStep::PerVertex
+    }
 }
-impl VertexLayout {
-    pub fn new(attributes: &'static [(VertexAttribute, VertexFormat)]) -> Self {
-        let stride = attributes.iter().map(|(_, f)| f.size() * 4).sum();
 
-        VertexLayout { attributes, stride }
+#[derive(Clone, Debug)]
+pub struct BufferLayout {
+    pub stride: i32,
+    pub step_func: VertexStep,
+    pub step_rate: i32,
+}
+
+impl Default for BufferLayout {
+    fn default() -> BufferLayout {
+        BufferLayout {
+            stride: 0,
+            step_func: VertexStep::PerVertex,
+            step_rate: 1,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct VertexAttribute {
+    pub name: &'static str,
+    pub format: VertexFormat,
+    pub buffer_index: usize,
+}
+
+impl VertexAttribute {
+    pub fn new(name: &'static str, format: VertexFormat) -> VertexAttribute {
+        Self::with_buffer(name, format, 0)
     }
 
-    pub fn with_stride(
-        attributes: &'static [(VertexAttribute, VertexFormat)],
-        stride: i32,
-    ) -> Self {
-        VertexLayout { attributes, stride }
+    pub fn with_buffer(
+        name: &'static str,
+        format: VertexFormat,
+        buffer_index: usize,
+    ) -> VertexAttribute {
+        VertexAttribute {
+            name,
+            format,
+            buffer_index,
+        }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct PipelineLayout {
+    pub buffers: &'static [BufferLayout],
+    pub attributes: &'static [VertexAttribute],
 }
 
 pub struct Shader(usize);
@@ -274,6 +303,12 @@ pub struct ShaderInternal {
 
 type BlendState = Option<(Equation, BlendFactor, BlendFactor)>;
 
+#[derive(Default, Copy, Clone)]
+pub struct CachedAttribute {
+    attribute: VertexAttributeInternal,
+    gl_vbuf: GLuint,
+}
+
 pub struct GlCache {
     stored_index_buffer: GLuint,
     stored_vertex_buffer: GLuint,
@@ -281,8 +316,44 @@ pub struct GlCache {
     vertex_buffer: GLuint,
     cur_pipeline: Option<Pipeline>,
     blend: BlendState,
+    attributes: [Option<CachedAttribute>; MAX_VERTEX_ATTRIBUTES],
 }
 
+impl GlCache {
+    fn bind_buffer(&mut self, target: GLenum, buffer: GLuint) {
+        if target == GL_ARRAY_BUFFER {
+            if self.vertex_buffer != buffer {
+                self.vertex_buffer = buffer;
+                unsafe {
+                    glBindBuffer(target, buffer);
+                }
+            }
+        } else {
+            if self.index_buffer != buffer {
+                self.index_buffer = buffer;
+                unsafe {
+                    glBindBuffer(target, buffer);
+                }
+            }
+        }
+    }
+
+    fn store_buffer_binding(&mut self, target: GLenum) {
+        if target == GL_ARRAY_BUFFER {
+            self.stored_vertex_buffer = self.vertex_buffer;
+        } else {
+            self.stored_index_buffer = self.index_buffer;
+        }
+    }
+
+    fn restore_buffer_binding(&mut self, target: GLenum) {
+        if target == GL_ARRAY_BUFFER {
+            self.bind_buffer(target, self.stored_vertex_buffer);
+        } else {
+            self.bind_buffer(target, self.stored_index_buffer);
+        }
+    }
+}
 pub enum PassAction {
     Nothing,
     Clear {
@@ -369,26 +440,20 @@ pub struct Context {
     passes: Vec<RenderPassInternal>,
     default_framebuffer: GLuint,
     cache: GlCache,
-    attributes: [Option<VertexAttributeInternal>; MAX_VERTEX_ATTRIBUTES],
 }
 
 impl Context {
     pub fn new() -> Context {
         unsafe {
             let mut default_framebuffer: GLuint = 0;
-            unsafe {
-                glGetIntegerv(
-                    GL_FRAMEBUFFER_BINDING,
-                    &mut default_framebuffer as *mut _ as *mut _,
-                );
-            }
-
+            glGetIntegerv(
+                GL_FRAMEBUFFER_BINDING,
+                &mut default_framebuffer as *mut _ as *mut _,
+            );
             let mut vao = 0;
-            unsafe {
-                glGenVertexArrays(1, &mut vao as *mut _);
-                glBindVertexArray(vao);
-            }
 
+            glGenVertexArrays(1, &mut vao as *mut _);
+            glBindVertexArray(vao);
             Context {
                 default_framebuffer,
                 shaders: vec![],
@@ -401,8 +466,9 @@ impl Context {
                     vertex_buffer: 0,
                     cur_pipeline: None,
                     blend: None,
+                    attributes: [None; MAX_VERTEX_ATTRIBUTES],
                 },
-                attributes: [None; 16],
+                //attributes: [None; 16],
             }
         }
     }
@@ -415,40 +481,6 @@ impl Context {
 
     pub fn screen_size(&self) -> (f32, f32) {
         unsafe { (sapp_width() as f32, sapp_height() as f32) }
-    }
-
-    fn bind_buffer(&mut self, target: GLenum, buffer: GLuint) {
-        if target == GL_ARRAY_BUFFER {
-            if self.cache.vertex_buffer != buffer {
-                self.cache.vertex_buffer = buffer;
-                unsafe {
-                    glBindBuffer(target, buffer);
-                }
-            }
-        } else {
-            if self.cache.index_buffer != buffer {
-                self.cache.index_buffer = buffer;
-                unsafe {
-                    glBindBuffer(target, buffer);
-                }
-            }
-        }
-    }
-
-    fn store_buffer_binding(&mut self, target: GLenum) {
-        if target == GL_ARRAY_BUFFER {
-            self.cache.stored_vertex_buffer = self.cache.vertex_buffer;
-        } else {
-            self.cache.stored_index_buffer = self.cache.index_buffer;
-        }
-    }
-
-    fn restore_buffer_binding(&mut self, target: GLenum) {
-        if target == GL_ARRAY_BUFFER {
-            self.bind_buffer(target, self.cache.stored_vertex_buffer);
-        } else {
-            self.bind_buffer(target, self.cache.stored_index_buffer);
-        }
     }
 
     pub fn apply_pipeline(&mut self, pipeline: &Pipeline) {
@@ -505,45 +537,51 @@ impl Context {
             }
         }
 
-        let vb_dirty = self.cache.vertex_buffer != bindings.vertex_buffer.gl_buf;
-
-        self.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, bindings.index_buffer.gl_buf);
-        self.bind_buffer(GL_ARRAY_BUFFER, bindings.vertex_buffer.gl_buf);
+        self.cache
+            .bind_buffer(GL_ELEMENT_ARRAY_BUFFER, bindings.index_buffer.gl_buf);
 
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
-        let shader = &self.shaders[pip.shader.0];
-
-        let mut offset = 0;
 
         for attr_index in 0..MAX_VERTEX_ATTRIBUTES {
-            let mut cached_attribute = &mut self.attributes[attr_index];
+            let cached_attr = &mut self.cache.attributes[attr_index];
+
             let pip_attribute = pip.layout.get(attr_index).copied();
 
-            match (&cached_attribute, pip_attribute) {
-                // cached and the new one are the same
-                (Some(old), Some(new)) if *old == new && vb_dirty == false => {}
-                // there was no cached attribute or cached and the new are different
-                (None, Some(new)) | (Some(_), Some(new)) => {
+            if let Some(attribute) = pip_attribute {
+                let vb = bindings.vertex_buffers[attribute.buffer_index];
+
+                if cached_attr.map_or(true, |cached_attr| {
+                    attribute != cached_attr.attribute || cached_attr.gl_vbuf != vb.gl_buf
+                }) {
+                    self.cache.bind_buffer(GL_ARRAY_BUFFER, vb.gl_buf);
+
                     unsafe {
                         glVertexAttribPointer(
                             attr_index as GLuint,
-                            new.size,
+                            attribute.size,
                             GL_FLOAT,
                             GL_FALSE as u8,
-                            new.stride,
-                            new.offset as *mut _,
+                            attribute.stride,
+                            attribute.offset as *mut _,
                         );
+                        glVertexAttribDivisor(attr_index as GLuint, attribute.divisor as u32);
                         glEnableVertexAttribArray(attr_index as GLuint);
                     };
+
+                    let cached_attr = &mut self.cache.attributes[attr_index];
+                    *cached_attr = Some(CachedAttribute {
+                        attribute,
+                        gl_vbuf: vb.gl_buf,
+                    });
                 }
-                (Some(attr), None) => unsafe {
-                    glDisableVertexAttribArray(attr_index as GLuint);
-                },
-                // attributes are always consecutive in the cache, so its safe to just break from the loop when both
-                // cached and the new attributes are None
-                (None, None) => break,
+            } else {
+                if cached_attr.is_some() {
+                    unsafe {
+                        glDisableVertexAttribArray(attr_index as GLuint);
+                    }
+                    *cached_attr = None;
+                }
             }
-            *cached_attribute = pip_attribute;
         }
     }
 
@@ -553,31 +591,29 @@ impl Context {
 
         let mut offset = 0;
 
-        for (n, uniform) in shader.uniforms.iter().enumerate() {
+        for (_, uniform) in shader.uniforms.iter().enumerate() {
             use UniformType::*;
 
-            unsafe {
-                let data = (uniforms as *const _ as *const f32).offset(offset / 4);
+            let data = (uniforms as *const _ as *const f32).offset(offset / 4);
 
-                match uniform.uniform_type {
-                    Float1 => {
-                        glUniform1fv(uniform.gl_loc, 1, data);
-                    }
-                    Float2 => {
-                        glUniform2fv(uniform.gl_loc, 1, data);
-                    }
-                    Float3 => {
-                        glUniform3fv(uniform.gl_loc, 1, data);
-                    }
-                    Float4 => {
-                        glUniform4fv(uniform.gl_loc, 1, data);
-                    }
-                    Mat4 => {
-                        glUniformMatrix4fv(uniform.gl_loc, 1, 0, data);
-                    }
+            match uniform.uniform_type {
+                Float1 => {
+                    glUniform1fv(uniform.gl_loc, 1, data);
                 }
-                offset += uniform.uniform_type.size(1) as isize;
+                Float2 => {
+                    glUniform2fv(uniform.gl_loc, 1, data);
+                }
+                Float3 => {
+                    glUniform3fv(uniform.gl_loc, 1, data);
+                }
+                Float4 => {
+                    glUniform4fv(uniform.gl_loc, 1, data);
+                }
+                Mat4 => {
+                    glUniformMatrix4fv(uniform.gl_loc, 1, 0, data);
+                }
             }
+            offset += uniform.uniform_type.size(1) as isize;
         }
     }
 
@@ -654,18 +690,25 @@ impl Context {
         }
     }
 
-    pub fn end_render_pass(&self) {
+    pub fn end_render_pass(&mut self) {
         unsafe {
             glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
+            self.cache.bind_buffer(GL_ARRAY_BUFFER, 0);
+            self.cache.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         }
     }
 
     pub fn commit_frame(&self) {}
 
-    pub fn draw(&self, num_elements: i32) {
-        let p_type = GL_TRIANGLES;
+    pub fn draw(&self, _base_element: i32, num_elements: i32, num_instances: i32) {
         unsafe {
-            glDrawElements(p_type, num_elements, GL_UNSIGNED_SHORT, std::ptr::null());
+            glDrawElementsInstanced(
+                GL_TRIANGLES,
+                num_elements,
+                GL_UNSIGNED_SHORT,
+                std::ptr::null(),
+                num_instances,
+            );
         }
     }
 }
@@ -895,60 +938,124 @@ impl Default for PipelineParams {
 }
 
 impl Pipeline {
-    pub fn new(ctx: &mut Context, layout: VertexLayout, shader: Shader) -> Pipeline {
-        Self::with_params(ctx, layout, shader, Default::default())
+    pub fn new(
+        ctx: &mut Context,
+        buffer_layout: &[BufferLayout],
+        attributes: &[VertexAttribute],
+        shader: Shader,
+    ) -> Pipeline {
+        Self::with_params(ctx, buffer_layout, attributes, shader, Default::default())
     }
 
     pub fn with_params(
         ctx: &mut Context,
-        layout: VertexLayout,
+        buffer_layout: &[BufferLayout],
+        attributes: &[VertexAttribute],
         shader: Shader,
         params: PipelineParams,
     ) -> Pipeline {
+        #[derive(Clone, Copy, Default)]
+        struct BufferCacheData {
+            stride: i32,
+            offset: i64,
+        }
+
+        let mut buffer_cache: Vec<BufferCacheData> =
+            vec![BufferCacheData::default(); buffer_layout.len()];
+
+        for VertexAttribute {
+            format,
+            buffer_index,
+            ..
+        } in attributes
+        {
+            let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());
+            let mut cache = buffer_cache
+                .get_mut(*buffer_index)
+                .unwrap_or_else(|| panic!());
+
+            if layout.stride == 0 {
+                cache.stride += format.size() * 4;
+            } else {
+                cache.stride = layout.stride;
+            }
+        }
+
         let program = ctx.shaders[shader.0].program;
 
-        let mut attributes: Vec<VertexAttributeInternal> = vec![
-            VertexAttributeInternal {
-                attr_loc: 0,
-                size: 0,
-                offset: 0,
-                stride: layout.stride
-            };
-            layout.attributes.len()
-        ];
-        let mut offset = 0;
-        for (attribute, format) in layout.attributes {
-            let attr_loc = match attribute {
-                VertexAttribute::Position => unimplemented!(),
-                VertexAttribute::Normal => unimplemented!(),
-                VertexAttribute::TexCoord0 => unimplemented!(),
-                VertexAttribute::Custom(name) => {
-                    let cname = CString::new(*name).unwrap_or_else(|e| panic!(e));
-                    let attrib =
-                        unsafe { glGetAttribLocation(program, cname.as_ptr() as *const _) };
-                    if attrib == -1 {
-                        panic!();
-                    }
-                    attrib as u32
-                }
-            };
-            let attr = VertexAttributeInternal {
-                attr_loc,
-                size: format.size(),
-                offset: offset,
-                stride: layout.stride,
-            };
-            attributes[attr_loc as usize] = attr;
+        let attributes_len = attributes
+            .iter()
+            .map(|layout| match layout.format {
+                VertexFormat::Mat4 => 4,
+                _ => 1,
+            })
+            .sum();
 
-            offset += (std::mem::size_of::<f32>() as i32 * format.size()) as i64;
+        let mut vertex_layout: Vec<VertexAttributeInternal> =
+            vec![VertexAttributeInternal::default(); attributes_len];
+
+        for VertexAttribute {
+            name,
+            format,
+            buffer_index,
+        } in attributes
+        {
+            let mut buffer_data = &mut buffer_cache
+                .get_mut(*buffer_index)
+                .unwrap_or_else(|| panic!());
+            let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());
+
+            let cname = CString::new(*name).unwrap_or_else(|e| panic!(e));
+            let attr_loc = unsafe { glGetAttribLocation(program, cname.as_ptr() as *const _) };
+            if attr_loc == -1 {
+                panic!();
+            }
+            let divisor = if layout.step_func == VertexStep::PerVertex {
+                0
+            } else {
+                layout.step_rate
+            };
+
+            let mut attributes_count: usize = 1;
+            let mut format = *format;
+
+            if format == VertexFormat::Mat4 {
+                format = VertexFormat::Float4;
+                attributes_count = 4;
+            }
+            for i in 0..attributes_count {
+                let attr_loc = attr_loc as GLuint + i as GLuint;
+
+                let attr = VertexAttributeInternal {
+                    attr_loc,
+                    size: format.size(),
+                    offset: buffer_data.offset,
+                    stride: buffer_data.stride,
+                    buffer_index: *buffer_index,
+                    divisor,
+                };
+                //println!("{}: {:?}", name, attr);
+
+                assert!(
+                    attr_loc < vertex_layout.len() as u32,
+                    format!(
+                        "attribute: {} outside of allocated attributes array len: {}",
+                        name,
+                        vertex_layout.len()
+                    )
+                );
+                vertex_layout[attr_loc as usize] = attr;
+
+                buffer_data.offset += (std::mem::size_of::<f32>() as i32 * format.size()) as i64
+            }
         }
 
         // TODO: it should be possible to express a "holes" in the attribute layout in the api
         // so empty attributes will be fine. But right now empty attribute is always a bug
-        assert!(attributes.iter().any(|attr| attr.size == 0) == false);
+        assert!(vertex_layout.iter().any(|attr| attr.size == 0) == false);
 
         let pipeline = PipelineInternal {
-            layout: attributes,
+            layout: vertex_layout,
             shader,
             params,
         };
@@ -958,12 +1065,14 @@ impl Pipeline {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 struct VertexAttributeInternal {
     attr_loc: GLuint,
     size: i32,
     offset: i64,
     stride: i32,
+    buffer_index: usize,
+    divisor: i32,
 }
 
 struct PipelineInternal {
@@ -974,7 +1083,7 @@ struct PipelineInternal {
 
 #[derive(Clone, Debug)]
 pub struct Bindings {
-    pub vertex_buffer: Buffer,
+    pub vertex_buffers: Vec<Buffer>,
     pub index_buffer: Buffer,
     pub images: Vec<Texture>,
 }
@@ -1007,38 +1116,66 @@ fn gl_usage(usage: &Usage) -> GLenum {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Buffer {
     gl_buf: GLuint,
 }
 
 impl Buffer {
-    pub unsafe fn new<T>(
-        ctx: &mut Context,
-        buffer_type: BufferType,
-        usage: Usage,
-        data: &[T],
-    ) -> Buffer {
-        if usage != Usage::Immutable {
-            unimplemented!();
-        }
+    /// Create an immutable buffer resource object.
+    /// Notice that data array is untyped and unchecked, so passing invalid data array is highly unsafe!
+    /// ```no_run
+    /// #[repr(C)]
+    /// struct Vertex {
+    ///     pos: Vec2,
+    ///     uv: Vec2,
+    /// }
+    /// let vertices: [Vertex; 4] = [
+    ///     Vertex { pos : Vec2 { x: -0.5, y: -0.5 }, uv: Vec2 { x: 0., y: 0. } },
+    ///     Vertex { pos : Vec2 { x:  0.5, y: -0.5 }, uv: Vec2 { x: 1., y: 0. } },
+    ///     Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 1. } },
+    ///     Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 1. } },
+    /// ];
+    /// let buffer = unsafe { Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices) };
+    /// ```
+    pub unsafe fn immutable<T>(ctx: &mut Context, buffer_type: BufferType, data: &[T]) -> Buffer {
         //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
         let gl_target = gl_buffer_target(&buffer_type);
-        let gl_usage = gl_usage(&usage);
+        let gl_usage = gl_usage(&Usage::Immutable);
         let size = mem::size_of_val(data) as i64;
+        let mut gl_buf: u32 = 0;
+
+        glGenBuffers(1, &mut gl_buf as *mut _);
+        ctx.cache.store_buffer_binding(gl_target);
+        ctx.cache.bind_buffer(gl_target, gl_buf);
+        glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
+        glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _);
+        ctx.cache.restore_buffer_binding(gl_target);
+        Buffer { gl_buf }
+    }
+
+    pub fn stream(ctx: &mut Context, buffer_type: BufferType, size: usize) -> Buffer {
+        let gl_target = gl_buffer_target(&buffer_type);
+        let gl_usage = gl_usage(&Usage::Stream);
         let mut gl_buf: u32 = 0;
 
         unsafe {
             glGenBuffers(1, &mut gl_buf as *mut _);
-            ctx.store_buffer_binding(gl_target);
-            ctx.bind_buffer(gl_target, gl_buf);
+            ctx.cache.store_buffer_binding(gl_target);
+            ctx.cache.bind_buffer(gl_target, gl_buf);
             glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
-            if usage == Usage::Immutable {
-                glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _)
-            }
-            ctx.restore_buffer_binding(gl_target);
+            ctx.cache.restore_buffer_binding(gl_target);
         }
 
         Buffer { gl_buf }
+    }
+
+    pub unsafe fn update<T>(&self, ctx: &mut Context, data: &[T]) {
+        //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
+        let size = mem::size_of_val(data) as i64;
+        let gl_target = gl_buffer_target(&BufferType::VertexBuffer);
+        ctx.cache.bind_buffer(gl_target, self.gl_buf);
+        glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _);
+        ctx.cache.restore_buffer_binding(gl_target);
     }
 }

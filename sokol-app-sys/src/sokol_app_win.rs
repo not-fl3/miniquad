@@ -42082,6 +42082,9 @@ pub type PFN_glVertexAttribDivisor =
 extern "C" {
     pub static mut _sapp_glVertexAttribDivisor: PFN_glVertexAttribDivisor;
 }
+extern "C" {
+    pub fn glVertexAttribDivisor(index: GLuint, divisor: GLuint);
+}
 pub type PFN_glBufferSubData = ::std::option::Option<
     unsafe extern "C" fn(
         target: GLenum,
@@ -42387,6 +42390,15 @@ pub type PFN_glDrawElementsInstanced = ::std::option::Option<
 >;
 extern "C" {
     pub static mut _sapp_glDrawElementsInstanced: PFN_glDrawElementsInstanced;
+}
+extern "C" {
+    pub fn glDrawElementsInstanced(
+        mode: GLenum,
+        count: GLsizei,
+        type_: GLenum,
+        indices: *const ::std::os::raw::c_void,
+        instancecount: GLsizei,
+    );
 }
 pub type PFN_glVertexAttribPointer = ::std::option::Option<
     unsafe extern "C" fn(

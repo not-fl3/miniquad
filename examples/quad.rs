@@ -25,12 +25,10 @@ impl Stage {
             Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 1. } },
             Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 1. } },
         ];
-        let vertex_buffer =
-            unsafe { Buffer::new(ctx, BufferType::VertexBuffer, Usage::Immutable, &vertices) };
+        let vertex_buffer = unsafe { Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices) };
 
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
-        let index_buffer =
-            unsafe { Buffer::new(ctx, BufferType::IndexBuffer, Usage::Immutable, &indices) };
+        let index_buffer = unsafe { Buffer::immutable(ctx, BufferType::IndexBuffer, &indices) };
 
         let pixels: [u8; 4 * 4 * 4] = [
             0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00,
@@ -42,7 +40,7 @@ impl Stage {
         let texture = Texture::from_rgba8(4, 4, &pixels);
 
         let bindings = Bindings {
-            vertex_buffer: vertex_buffer,
+            vertex_buffers: vec![vertex_buffer],
             index_buffer: index_buffer,
             images: vec![texture],
         };
@@ -51,10 +49,11 @@ impl Stage {
 
         let pipeline = Pipeline::new(
             ctx,
-            VertexLayout::new(&[
-                (VertexAttribute::Custom("pos"), VertexFormat::Float2),
-                (VertexAttribute::Custom("uv"), VertexFormat::Float2),
-            ]),
+            &[BufferLayout::default()],
+            &[
+                VertexAttribute::new("pos", VertexFormat::Float2),
+                VertexAttribute::new("uv", VertexFormat::Float2),
+            ],
             shader,
         );
 
@@ -80,7 +79,7 @@ impl EventHandler for Stage {
                     offset: (t.sin() as f32 * 0.5, (t * 3.).cos() as f32 * 0.5),
                 });
             }
-            ctx.draw(6);
+            ctx.draw(0, 6, 1);
         }
         ctx.end_render_pass();
 

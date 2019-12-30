@@ -64,7 +64,7 @@ impl Stage {
         ];
 
         let vertex_buffer =
-            unsafe { Buffer::new(ctx, BufferType::VertexBuffer, Usage::Immutable, &vertices) };
+            unsafe { Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices) };
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
@@ -77,16 +77,16 @@ impl Stage {
         ];
 
         let index_buffer =
-            unsafe { Buffer::new(ctx, BufferType::IndexBuffer, Usage::Immutable, &indices) };
+            unsafe { Buffer::immutable(ctx, BufferType::IndexBuffer, &indices) };
 
         let offscreen_bind = Bindings {
-            vertex_buffer: vertex_buffer.clone(),
+            vertex_buffers: vec![vertex_buffer.clone()],
             index_buffer: index_buffer.clone(),
             images: vec![],
         };
 
         let display_bind = Bindings {
-            vertex_buffer: vertex_buffer,
+            vertex_buffers: vec![vertex_buffer],
             index_buffer: index_buffer,
             images: vec![color_img],
         };
@@ -100,14 +100,13 @@ impl Stage {
 
         let display_pipeline = Pipeline::with_params(
             ctx,
-            VertexLayout::with_stride(
-                &[
-                    (VertexAttribute::Custom("pos"), VertexFormat::Float3),
-                    (VertexAttribute::Custom("color0"), VertexFormat::Float4),
-                    (VertexAttribute::Custom("uv0"), VertexFormat::Float2),
-                ],
-                36,
-            ),
+            &[BufferLayout::default()],
+            &[
+                VertexAttribute::new("pos", VertexFormat::Float3),
+                VertexAttribute::new("color0", VertexFormat::Float4),
+                VertexAttribute::new("uv0", VertexFormat::Float2),
+            ]
+            ,
             default_shader,
             PipelineParams {
                 depth_test: Comparison::LessOrEqual,
@@ -125,13 +124,12 @@ impl Stage {
 
         let offscreen_pipeline = Pipeline::with_params(
             ctx,
-            VertexLayout::with_stride(
+            &[BufferLayout {stride: 36, ..Default::default()}],
+            
                 &[
-                    (VertexAttribute::Custom("pos"), VertexFormat::Float3),
-                    (VertexAttribute::Custom("color0"), VertexFormat::Float4),
+                    VertexAttribute::new("pos", VertexFormat::Float3),
+                    VertexAttribute::new("color0", VertexFormat::Float4),
                 ],
-                36,
-            ),
             offscreen_shader,
             PipelineParams {
                 depth_test: Comparison::LessOrEqual,
@@ -183,7 +181,7 @@ impl EventHandler for Stage {
         unsafe {
             ctx.apply_uniforms(&vs_params);
         }
-        ctx.draw(36);
+        ctx.draw(0, 36, 1);
         ctx.end_render_pass();
 
         // and the display-pass, rendering a rotating, textured cube, using the
@@ -194,7 +192,7 @@ impl EventHandler for Stage {
         unsafe {
             ctx.apply_uniforms(&vs_params);
         }
-        ctx.draw(36);
+        ctx.draw(0, 36, 1);
         ctx.end_render_pass();
         ctx.commit_frame();
     }

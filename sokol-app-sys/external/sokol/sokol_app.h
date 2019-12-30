@@ -3239,6 +3239,9 @@ typedef void  (GL_APIENTRY *PFN_glDrawBuffers)(GLsizei n, const GLenum * bufs);
 static PFN_glDrawBuffers _sapp_glDrawBuffers;
 typedef void  (GL_APIENTRY *PFN_glVertexAttribDivisor)(GLuint index, GLuint divisor);
 static PFN_glVertexAttribDivisor _sapp_glVertexAttribDivisor;
+void glVertexAttribDivisor(GLuint index, GLuint divisor) {
+    _sapp_glVertexAttribDivisor(index, divisor);
+}
 typedef void  (GL_APIENTRY *PFN_glBufferSubData)(GLenum target, GLintptr offset, GLsizeiptr size, const void * data);
 static PFN_glBufferSubData _sapp_glBufferSubData;
 void glBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, const void * data) {
@@ -3348,6 +3351,9 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
 
 typedef void  (GL_APIENTRY *PFN_glDrawElementsInstanced)(GLenum mode, GLsizei count, GLenum type, const void * indices, GLsizei instancecount);
 static PFN_glDrawElementsInstanced _sapp_glDrawElementsInstanced;
+void glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void * indices, GLsizei instancecount) {
+    _sapp_glDrawElementsInstanced(mode, count, type, indices, instancecount);
+}
 typedef void  (GL_APIENTRY *PFN_glVertexAttribPointer)(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer);
 static PFN_glVertexAttribPointer _sapp_glVertexAttribPointer;
 void  glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer) {
