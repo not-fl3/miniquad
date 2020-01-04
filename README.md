@@ -19,7 +19,7 @@ For context management and input on Windows/Linux(and potentially mobiles) "soko
 
 ## Examples
 
-![Imgur](https://i.imgur.com/xp5xc7j.gif)
+![Imgur](https://i.imgur.com/TRI50rk.gif)
 
 [examples/quad.rs](https://github.com/not-fl3/miniquad/blob/master/examples/quad.rs): [web](https://not-fl3.github.io/miniquad-samples/quad.html)   
 [examples/offscreen.rs](https://github.com/not-fl3/miniquad/blob/master/examples/offscreen.rs): [web](https://not-fl3.github.io/miniquad-samples/offscreen.html)
@@ -31,7 +31,7 @@ Worth to mention [zemeroth port](https://not-fl3.github.io/miniquad-samples/zeme
 ## desktop
 
 ```bash
-rustup target add x86_64-pc-windows-gnu # for windows cross compilation, this is how windows builds was tested
+rustup target add x86_64-pc-windows-gnu # for windows cross compilation, this is how windows builds were tested
 
 cargo run --example quad --target x86_64-unknown-linux-gnu
 cargo run --example quad --target x86_64-pc-windows-gnu
@@ -42,9 +42,44 @@ cargo run --example quad --target x86_64-pc-windows-gnu
 ```bash
 rustup target add wasm32-unknown-unknown
 cargo build --example quad --target wasm32-unknown-unknown
-cp target/wasm32-unknown-unknown/debug/examples/quad.wasm js
-cd js/ #  and launch http server with wasm MIME, maybe check index.html to match wasm name to load
 ```
+
+And then use the following .html to load .wasm:
+
+<details><summary>index.html</summary>
+
+```html
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>TITLE</title>
+    <style>
+        html,
+        body,
+        canvas {
+            margin: 0px;
+            padding: 0px;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: absolute;
+            background: black;
+            z-index: 0;
+        }        
+    </style>
+</head>
+
+<body>
+    <canvas id="glcanvas" tabindex='1'></canvas>
+    <script src="gl.js"></script> <!-- https://github.com/not-fl3/miniquad/blob/master/js/gl.js -->
+    <script>load("quad.wasm");</script> <!-- Your compiled wasm file -->
+</body>
+
+</html>
+```
+</details>
 
 # Goals
 
