@@ -50,13 +50,9 @@ fn build_windows(target: &str) {
 fn main() {
     let target = env::var("TARGET").unwrap_or_else(|e| panic!(e));
 
-    // for linux we are using native rust code, but need to link with GL and X11
-    if target.contains("linux") {
-        println!("cargo:rustc-link-lib=dylib=GL");
-        println!("cargo:rustc-link-lib=dylib=X11");
-    }
+    if target.contains("windows") == false{
+        panic!("Trying to build sapp_linux not for linux!");
+        }
 
-    if target.contains("windows") {
-        build_windows(&target);
-    }
+    build_windows(&target);
 }

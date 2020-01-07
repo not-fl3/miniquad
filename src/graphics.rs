@@ -1,6 +1,7 @@
 use std::{ffi::CString, mem};
 
-use sokol_app_sys::sokol_app::*;
+use crate::sapp::*;
+
 use std::option::Option::None;
 
 pub const LINEAR_FILTER: i32 = GL_LINEAR as i32;
