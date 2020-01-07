@@ -3,9 +3,20 @@ name = "miniquad"
 version = "0.1.0"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
+license = "MIT/Apache-2.0"
+homepage = "https://github.com/not-fl3/miniquad"
+description = """
+Cross-platform window context and rendering library.
+"""
 
-[dependencies]
-sokol_app_sys = { path = "./sokol-app-sys", version = "0.1.0" }
+[target.'cfg(windows)'.dependencies]
+sapp-windows = { path ="./native/sapp-windows", version = "0.1.0" }
+
+[target.'cfg(unix)'.dependencies]
+sapp-linux = { path ="./native/sapp-linux", version = "0.1.0" }
+
+[target.wasm32-unknown-unknown.dependencies]
+sapp-wasm = { path ="./native/sapp-wasm", version = "0.1.0" }
 
 [dev-dependencies]
 glam = {version = "0.8", features = ["scalar-math"] }
