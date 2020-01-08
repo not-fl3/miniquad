@@ -25,10 +25,10 @@ impl Stage {
             Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 1. } },
             Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 1. } },
         ];
-        let vertex_buffer = unsafe { Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices) };
+        let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
 
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
-        let index_buffer = unsafe { Buffer::immutable(ctx, BufferType::IndexBuffer, &indices) };
+        let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
 
         let pixels: [u8; 4 * 4 * 4] = [
             0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00,
@@ -74,11 +74,9 @@ impl EventHandler for Stage {
         for i in 0..10 {
             let t = t + i as f64 * 0.3;
 
-            unsafe {
-                ctx.apply_uniforms(&shader::Uniforms {
-                    offset: (t.sin() as f32 * 0.5, (t * 3.).cos() as f32 * 0.5),
-                });
-            }
+            ctx.apply_uniforms(&shader::Uniforms {
+                offset: (t.sin() as f32 * 0.5, (t * 3.).cos() as f32 * 0.5),
+            });
             ctx.draw(0, 6, 1);
         }
         ctx.end_render_pass();

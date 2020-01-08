@@ -93,7 +93,7 @@ And then use the following .html to load .wasm:
 
 # Non goals
 
-* Ultimate safety. Safe functions should be safe in Rust's definition of safe, but some things may be unsafe and will be marked with "unsafe". Fill free to provide safety abstraction in the user code than! 
+* Ultimate type safety. Library should be entirely safe in Rust's definition of safe - no UB or memory unsafety. But correct GPU state is not type guaranteed. Feel free to provide safety abstraction in the user code than! 
 
 * High end API, like Vulkan/DirectX 12. Take a look on [gfx-rs](https://github.com/gfx-rs/gfx) or [vulkano](https://github.com/vulkano-rs/vulkano) instead!
 

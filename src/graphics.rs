@@ -585,7 +585,7 @@ impl Context {
         }
     }
 
-    pub unsafe fn apply_uniforms<U>(&mut self, uniforms: &U) {
+    pub fn apply_uniforms<U>(&mut self, uniforms: &U) {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let shader = &self.shaders[pip.shader.0];
 
@@ -594,26 +594,30 @@ impl Context {
         for (_, uniform) in shader.uniforms.iter().enumerate() {
             use UniformType::*;
 
-            let data = (uniforms as *const _ as *const f32).offset(offset / 4);
+            assert!(offset < std::mem::size_of::<U>() - 4);
 
-            match uniform.uniform_type {
-                Float1 => {
-                    glUniform1fv(uniform.gl_loc, 1, data);
-                }
-                Float2 => {
-                    glUniform2fv(uniform.gl_loc, 1, data);
-                }
-                Float3 => {
-                    glUniform3fv(uniform.gl_loc, 1, data);
-                }
-                Float4 => {
-                    glUniform4fv(uniform.gl_loc, 1, data);
-                }
-                Mat4 => {
-                    glUniformMatrix4fv(uniform.gl_loc, 1, 0, data);
+            unsafe {
+                let data = (uniforms as *const _ as *const f32).offset(offset as isize);
+
+                match uniform.uniform_type {
+                    Float1 => {
+                        glUniform1fv(uniform.gl_loc, 1, data);
+                    }
+                    Float2 => {
+                        glUniform2fv(uniform.gl_loc, 1, data);
+                    }
+                    Float3 => {
+                        glUniform3fv(uniform.gl_loc, 1, data);
+                    }
+                    Float4 => {
+                        glUniform4fv(uniform.gl_loc, 1, data);
+                    }
+                    Mat4 => {
+                        glUniformMatrix4fv(uniform.gl_loc, 1, 0, data);
+                    }
                 }
             }
-            offset += uniform.uniform_type.size(1) as isize;
+            offset += uniform.uniform_type.size(1) / 4;
         }
     }
 
@@ -1120,11 +1124,11 @@ fn gl_usage(usage: &Usage) -> GLenum {
 pub struct Buffer {
     gl_buf: GLuint,
     buffer_type: BufferType,
+    size: usize,
 }
 
 impl Buffer {
     /// Create an immutable buffer resource object.
-    /// Notice that data array is untyped and unchecked, so passing invalid data array is highly unsafe!
     /// ```no_run
     /// #[repr(C)]
     /// struct Vertex {
@@ -1137,25 +1141,28 @@ impl Buffer {
     ///     Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 1. } },
     ///     Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 1. } },
     /// ];
-    /// let buffer = unsafe { Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices) };
+    /// let buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
     /// ```
-    pub unsafe fn immutable<T>(ctx: &mut Context, buffer_type: BufferType, data: &[T]) -> Buffer {
+    pub fn immutable<T>(ctx: &mut Context, buffer_type: BufferType, data: &[T]) -> Buffer {
         //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
         let gl_target = gl_buffer_target(&buffer_type);
         let gl_usage = gl_usage(&Usage::Immutable);
         let size = mem::size_of_val(data) as i64;
         let mut gl_buf: u32 = 0;
 
-        glGenBuffers(1, &mut gl_buf as *mut _);
-        ctx.cache.store_buffer_binding(gl_target);
-        ctx.cache.bind_buffer(gl_target, gl_buf);
-        glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
-        glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _);
-        ctx.cache.restore_buffer_binding(gl_target);
+        unsafe {
+            glGenBuffers(1, &mut gl_buf as *mut _);
+            ctx.cache.store_buffer_binding(gl_target);
+            ctx.cache.bind_buffer(gl_target, gl_buf);
+            glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
+            glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _);
+            ctx.cache.restore_buffer_binding(gl_target);
+        }
 
         Buffer {
             gl_buf,
             buffer_type,
+            size: size as usize,
         }
     }
 
@@ -1175,16 +1182,20 @@ impl Buffer {
         Buffer {
             gl_buf,
             buffer_type,
+            size,
         }
     }
 
-    pub unsafe fn update<T>(&self, ctx: &mut Context, data: &[T]) {
+    pub fn update<T>(&self, ctx: &mut Context, data: &[T]) {
         //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
-        let size = mem::size_of_val(data) as i64;
+        let size = mem::size_of_val(data);
+
+        assert!(size <= self.size);
+
         let gl_target = gl_buffer_target(&self.buffer_type);
 
         ctx.cache.bind_buffer(gl_target, self.gl_buf);
-        glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _);
+        unsafe { glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _) };
         ctx.cache.restore_buffer_binding(gl_target);
     }
 }

@@ -29,15 +29,14 @@ impl Stage {
              0.0,   r, 0.0,       1.0, 0.0, 1.0, 1.0
         ];
         // vertex buffer for static geometry
-        let geometry_vertex_buffer =
-            unsafe { Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices) };
+        let geometry_vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
             0, 1, 2,    0, 2, 3,    0, 3, 4,    0, 4, 1,
             5, 1, 2,    5, 2, 3,    5, 3, 4,    5, 4, 1
         ];
-        let index_buffer = unsafe { Buffer::immutable(ctx, BufferType::IndexBuffer, &indices) };
+        let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
 
         // empty, dynamic instance-data vertex buffer
         let positions_vertex_buffer = Buffer::stream(
@@ -114,7 +113,7 @@ impl EventHandler for Stage {
         // by default glam-rs can vec3 as u128 or #[reprc(C)](f32, f32, f32). need to ensure that the second option was used
         assert_eq!(std::mem::size_of::<Vec3>(), 12);
 
-        unsafe { self.bindings.vertex_buffers[1].update(ctx, &self.pos[..]) };
+        self.bindings.vertex_buffers[1].update(ctx, &self.pos[..]);
     }
 
     fn draw(&mut self, ctx: &mut Context) {
@@ -135,9 +134,7 @@ impl EventHandler for Stage {
 
         ctx.apply_pipeline(&self.pipeline);
         ctx.apply_bindings(&self.bindings);
-        unsafe {
-            ctx.apply_uniforms(&shader::Uniforms { mvp });
-        }
+        ctx.apply_uniforms(&shader::Uniforms { mvp });
         ctx.draw(0, 24, self.pos.len() as i32);
         ctx.end_render_pass();
 

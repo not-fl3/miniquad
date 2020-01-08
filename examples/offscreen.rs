@@ -63,8 +63,7 @@ impl Stage {
              1.0,  1.0, -1.0,    1.0, 0.0, 0.5, 1.0,     0.0, 1.0
         ];
 
-        let vertex_buffer =
-            unsafe { Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices) };
+        let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
@@ -76,8 +75,7 @@ impl Stage {
             22, 21, 20,  23, 22, 20
         ];
 
-        let index_buffer =
-            unsafe { Buffer::immutable(ctx, BufferType::IndexBuffer, &indices) };
+        let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
 
         let offscreen_bind = Bindings {
             vertex_buffers: vec![vertex_buffer.clone()],
@@ -105,8 +103,7 @@ impl Stage {
                 VertexAttribute::new("pos", VertexFormat::Float3),
                 VertexAttribute::new("color0", VertexFormat::Float4),
                 VertexAttribute::new("uv0", VertexFormat::Float2),
-            ]
-            ,
+            ],
             default_shader,
             PipelineParams {
                 depth_test: Comparison::LessOrEqual,
@@ -124,12 +121,14 @@ impl Stage {
 
         let offscreen_pipeline = Pipeline::with_params(
             ctx,
-            &[BufferLayout {stride: 36, ..Default::default()}],
-            
-                &[
-                    VertexAttribute::new("pos", VertexFormat::Float3),
-                    VertexAttribute::new("color0", VertexFormat::Float4),
-                ],
+            &[BufferLayout {
+                stride: 36,
+                ..Default::default()
+            }],
+            &[
+                VertexAttribute::new("pos", VertexFormat::Float3),
+                VertexAttribute::new("color0", VertexFormat::Float4),
+            ],
             offscreen_shader,
             PipelineParams {
                 depth_test: Comparison::LessOrEqual,
@@ -178,9 +177,7 @@ impl EventHandler for Stage {
         );
         ctx.apply_pipeline(&self.offscreen_pipeline);
         ctx.apply_bindings(&self.offscreen_bind);
-        unsafe {
-            ctx.apply_uniforms(&vs_params);
-        }
+        ctx.apply_uniforms(&vs_params);
         ctx.draw(0, 36, 1);
         ctx.end_render_pass();
 
@@ -189,9 +186,7 @@ impl EventHandler for Stage {
         ctx.begin_default_pass(PassAction::clear_color(0.0, 0., 0.45, 1.));
         ctx.apply_pipeline(&self.display_pipeline);
         ctx.apply_bindings(&self.display_bind);
-        unsafe {
-            ctx.apply_uniforms(&vs_params);
-        }
+        ctx.apply_uniforms(&vs_params);
         ctx.draw(0, 36, 1);
         ctx.end_render_pass();
         ctx.commit_frame();
