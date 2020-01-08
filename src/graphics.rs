@@ -1119,6 +1119,7 @@ fn gl_usage(usage: &Usage) -> GLenum {
 #[derive(Clone, Copy, Debug)]
 pub struct Buffer {
     gl_buf: GLuint,
+    buffer_type: BufferType,
 }
 
 impl Buffer {
@@ -1151,7 +1152,11 @@ impl Buffer {
         glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
         glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _);
         ctx.cache.restore_buffer_binding(gl_target);
-        Buffer { gl_buf }
+
+        Buffer {
+            gl_buf,
+            buffer_type,
+        }
     }
 
     pub fn stream(ctx: &mut Context, buffer_type: BufferType, size: usize) -> Buffer {
@@ -1167,13 +1172,17 @@ impl Buffer {
             ctx.cache.restore_buffer_binding(gl_target);
         }
 
-        Buffer { gl_buf }
+        Buffer {
+            gl_buf,
+            buffer_type,
+        }
     }
 
     pub unsafe fn update<T>(&self, ctx: &mut Context, data: &[T]) {
         //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
         let size = mem::size_of_val(data) as i64;
-        let gl_target = gl_buffer_target(&BufferType::VertexBuffer);
+        let gl_target = gl_buffer_target(&self.buffer_type);
+
         ctx.cache.bind_buffer(gl_target, self.gl_buf);
         glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _);
         ctx.cache.restore_buffer_binding(gl_target);
