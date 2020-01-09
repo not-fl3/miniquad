@@ -2,12 +2,12 @@ use crate::Context;
 
 use sokol_app_sys::sokol_app::{self, sapp_keycode};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub enum MouseButton {
     Right,
     Left,
 }
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub enum KeyCode {
     Space,
     Apostrophe,
