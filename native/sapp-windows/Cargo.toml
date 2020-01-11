@@ -12,7 +12,7 @@ Native bindings to slightly modified sokol-app.
 homepage = "https://github.com/not-fl3/miniquad"
 
 [dependencies]
-libc = "*"
+libc = "0.2"
 
 [build-dependencies]
 cc = "1.0"

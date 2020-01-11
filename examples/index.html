@@ -15,13 +15,6 @@
             overflow: hidden;
             position: absolute;
             background: black;
-        }
-
-        #canvas {
-            z-index: 2;
-        }
-
-        #glcanvas {
             z-index: 0;
         }
     </style>
@@ -29,8 +22,9 @@
 
 <body>
     <canvas id="glcanvas" tabindex='1'></canvas>
-    <script src="gl.js"></script>
-    <script>load("quad.wasm");</script>
+    <!-- Minified and statically hosted version of https://github.com/not-fl3/miniquad/blob/master/native/sapp-wasm/js/gl.js -->
+    <script src="https://not-fl3.github.io/miniquad-samples/gl.js"></script>
+    <script>load("quad.wasm");</script> <!-- Your compiled wasm file -->
 </body>
 
 </html>

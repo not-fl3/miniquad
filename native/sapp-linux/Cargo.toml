@@ -12,5 +12,5 @@ Orignally this was a sokol-app C code transpiled to rust with c2rust and partial
 homepage = "https://github.com/not-fl3/miniquad"
 
 [dependencies]
-libc = "*"
+libc = "0.2"
 

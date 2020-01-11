@@ -1,5 +1,7 @@
 # Miniquad
 
+![crates.io](https://img.shields.io/crates/v/miniquad.svg)
+
 Cross platform context managment and OpenGL wrapper.   
 
 API is highly inspired by [sokol-gfx](https://github.com/floooh/sokol) ([sokol overview](https://floooh.github.io/2017/07/29/sokol-gfx-tour.html), [2019 update](https://floooh.github.io/2019/01/12/sokol-apply-pipeline.html)). Implementation influenced by [crayon](https://docs.rs/crayon/0.7.1/crayon/video/index.html).
@@ -49,9 +51,6 @@ And then use the following .html to load .wasm:
 <details><summary>index.html</summary>
 
 ```html
-<!doctype html>
-<html lang="en">
-
 <head>
     <meta charset="utf-8">
     <title>TITLE</title>
@@ -67,13 +66,14 @@ And then use the following .html to load .wasm:
             position: absolute;
             background: black;
             z-index: 0;
-        }        
+        }
     </style>
 </head>
 
 <body>
     <canvas id="glcanvas" tabindex='1'></canvas>
-    <script src="gl.js"></script> <!-- https://github.com/not-fl3/miniquad/blob/master/js/gl.js -->
+    <!-- Minified and statically hosted version of https://github.com/not-fl3/miniquad/blob/master/native/sapp-wasm/js/gl.js -->
+    <script src="https://not-fl3.github.io/miniquad-samples/gl.js"></script>
     <script>load("quad.wasm");</script> <!-- Your compiled wasm file -->
 </body>
 
