@@ -1,6 +1,6 @@
 # Miniquad
 
-![crates.io](https://img.shields.io/crates/v/miniquad.svg)
+[![Crates.io version](https://img.shields.io/crates/v/miniquad.svg)](https://crates.io/crates/miniquad)
 
 Cross platform context managment and OpenGL wrapper.   
 
