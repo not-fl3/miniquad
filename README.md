@@ -2,11 +2,17 @@
 
 [![Crates.io version](https://img.shields.io/crates/v/miniquad.svg)](https://crates.io/crates/miniquad)
 
-Cross platform context managment and OpenGL wrapper.   
+Miniquad is safe and cross-platform rendering library focused on portability and low-end platforms support
 
 API is highly inspired by [sokol-gfx](https://github.com/floooh/sokol) ([sokol overview](https://floooh.github.io/2017/07/29/sokol-gfx-tour.html), [2019 update](https://floooh.github.io/2019/01/12/sokol-apply-pipeline.html)). Implementation influenced by [crayon](https://docs.rs/crayon/0.7.1/crayon/video/index.html).
 
 For context management and input on Windows/Linux(and potentially mobiles) "sokol-app" was used. And no external dependencies for WASM. 
+
+For higher level API take a look on:
+
+[good-web-game](https://github.com/not-fl3/good-web-game): implementation of some [ggez](https://github.com/ggez/ggez) subset on top of miniquad, made as compatibility layer to run ggez games on wasm
+
+[macroquad](github.com/not-fl3/macroquad/): raylib-like library on top of miniquad. [100loc arkanoid with macroquad](https://github.com/not-fl3/macroquad/blob/master/examples/arkanoid.rs)
 
 ## Supported platforms
 
@@ -26,7 +32,7 @@ For context management and input on Windows/Linux(and potentially mobiles) "soko
 [examples/quad.rs](https://github.com/not-fl3/miniquad/blob/master/examples/quad.rs): [web](https://not-fl3.github.io/miniquad-samples/quad.html)   
 [examples/offscreen.rs](https://github.com/not-fl3/miniquad/blob/master/examples/offscreen.rs): [web](https://not-fl3.github.io/miniquad-samples/offscreen.html)
 
-Worth to mention [zemeroth port](https://not-fl3.github.io/miniquad-samples/zemeroth.html) and [astroblasto](https://not-fl3.github.io/miniquad-samples/astroblasto.html), built with miniquad-powered 
+Worth to mention [zemeroth port](https://not-fl3.github.io/miniquad-samples/zemeroth.html) and [astroblasto](https://not-fl3.github.io/miniquad-samples/astroblasto.html), built with miniquad-powered [good-web-game](https://github.com/not-fl3/good-web-game)
 
 # Building examples
 
