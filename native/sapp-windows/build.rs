@@ -38,6 +38,9 @@ fn build_windows(target: &str) {
         println!("cargo:rustc-link-lib=gdi32");
         println!("cargo:rustc-link-lib=ole32");
         println!("cargo:rustc-link-lib=shell32");
+    } else {
+        println!("cargo:rustc-link-lib=gdi32");
+        println!("cargo:rustc-link-lib=user32");        
     }
 
     if is_debug {

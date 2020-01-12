@@ -11,7 +11,7 @@ Cross-platform window context and rendering library.
 """
 
 [target.'cfg(windows)'.dependencies]
-sapp-windows = { path ="./native/sapp-windows", version = "0.1.0" }
+sapp-windows = { path ="./native/sapp-windows", version = "0.2.0" }
 
 [target.'cfg(unix)'.dependencies]
 sapp-linux = { path ="./native/sapp-linux", version = "0.1.1" }

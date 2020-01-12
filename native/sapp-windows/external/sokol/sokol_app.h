@@ -3125,19 +3125,6 @@ typedef int  GLint;
 
 #define GL_TEXTURE_2D 0x0DE1
 
-typedef void (GL_APIENTRY *PFN_glCreateTextures)(GLenum target, GLsizei n, GLuint *textures);
-static PFN_glCreateTextures _sapp_glCreateTextures;
-void glCreateTextures(GLenum target, GLsizei n, GLuint *textures) {
-    _sapp_glCreateTextures(target, n, textures);
-}
-
-typedef void (GL_APIENTRY *PFN_glCreateBuffers)(GLsizei n, GLuint *buffers);
-static PFN_glCreateBuffers _sapp_glCreateBuffers;
-void glCreateBuffers(GLsizei n, GLuint *buffers) {
-    _sapp_glCreateBuffers(n, buffers);
-}
-
-
 typedef void  (GL_APIENTRY *PFN_glBindVertexArray)(GLuint array);
 static PFN_glBindVertexArray _sapp_glBindVertexArray;
 void glBindVertexArray(GLuint array) {
@@ -3516,14 +3503,12 @@ _SOKOL_PRIVATE  void _sapp_win32_gl_loadfuncs(void) {
     SOKOL_ASSERT(_sapp_wglGetProcAddress);
     SOKOL_ASSERT(_sapp_opengl32);
     
-    _SAPP_GLPROC(glCreateTextures);
-    _SAPP_GLPROC(glCreateBuffers);
+    _SAPP_GLPROC(glGetStringi);
     _SAPP_GLPROC(glBindVertexArray);
     _SAPP_GLPROC(glFramebufferTextureLayer);
     _SAPP_GLPROC(glGenFramebuffers);
     _SAPP_GLPROC(glBindFramebuffer);
     _SAPP_GLPROC(glBindRenderbuffer);
-    _SAPP_GLPROC(glGetStringi);
     _SAPP_GLPROC(glClearBufferfi);
     _SAPP_GLPROC(glClearBufferfv);
     _SAPP_GLPROC(glClearBufferuiv);
