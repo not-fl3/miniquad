@@ -194,6 +194,10 @@ pub enum VertexFormat {
     Float2,
     Float3,
     Float4,
+    Byte1,
+    Byte2,
+    Byte3,
+    Byte4,
     Mat4,
 }
 
@@ -204,7 +208,39 @@ impl VertexFormat {
             VertexFormat::Float2 => 2,
             VertexFormat::Float3 => 3,
             VertexFormat::Float4 => 4,
+            VertexFormat::Byte1 => 1,
+            VertexFormat::Byte2 => 2,
+            VertexFormat::Byte3 => 3,
+            VertexFormat::Byte4 => 4,
             VertexFormat::Mat4 => 16,
+        }
+    }
+
+    pub fn byte_len(&self) -> i32 {
+        match self {
+            VertexFormat::Float1 => 1 * 4,
+            VertexFormat::Float2 => 2 * 4,
+            VertexFormat::Float3 => 3 * 4,
+            VertexFormat::Float4 => 4 * 4,
+            VertexFormat::Byte1 => 1,
+            VertexFormat::Byte2 => 2,
+            VertexFormat::Byte3 => 3,
+            VertexFormat::Byte4 => 4,
+            VertexFormat::Mat4 => 16 * 4,
+        }
+    }
+
+    fn type_(&self) -> GLuint {
+        match self {
+            VertexFormat::Float1 => GL_FLOAT,
+            VertexFormat::Float2 => GL_FLOAT,
+            VertexFormat::Float3 => GL_FLOAT,
+            VertexFormat::Float4 => GL_FLOAT,
+            VertexFormat::Byte1 => GL_UNSIGNED_BYTE,
+            VertexFormat::Byte2 => GL_UNSIGNED_BYTE,
+            VertexFormat::Byte3 => GL_UNSIGNED_BYTE,
+            VertexFormat::Byte4 => GL_UNSIGNED_BYTE,
+            VertexFormat::Mat4 => GL_FLOAT,
         }
     }
 }
@@ -570,7 +606,7 @@ impl Context {
                         glVertexAttribPointer(
                             attr_index as GLuint,
                             attribute.size,
-                            GL_FLOAT,
+                            attribute.type_,
                             GL_FALSE as u8,
                             attribute.stride,
                             attribute.offset as *mut _,
@@ -716,13 +752,13 @@ impl Context {
 
     pub fn commit_frame(&self) {}
 
-    pub fn draw(&self, _base_element: i32, num_elements: i32, num_instances: i32) {
+    pub fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32) {
         unsafe {
             glDrawElementsInstanced(
                 GL_TRIANGLES,
                 num_elements,
                 GL_UNSIGNED_SHORT,
-                std::ptr::null(),
+                (2 * base_element) as *mut _,
                 num_instances,
             );
         }
@@ -991,7 +1027,7 @@ impl Pipeline {
                 .unwrap_or_else(|| panic!());
 
             if layout.stride == 0 {
-                cache.stride += format.size() * 4;
+                cache.stride += format.byte_len();
             } else {
                 cache.stride = layout.stride;
             }
@@ -1045,6 +1081,7 @@ impl Pipeline {
                 let attr = VertexAttributeInternal {
                     attr_loc,
                     size: format.size(),
+                    type_: format.type_(),
                     offset: buffer_data.offset,
                     stride: buffer_data.stride,
                     buffer_index: *buffer_index,
@@ -1085,6 +1122,7 @@ impl Pipeline {
 struct VertexAttributeInternal {
     attr_loc: GLuint,
     size: i32,
+    type_: GLuint,
     offset: i64,
     stride: i32,
     buffer_index: usize,
