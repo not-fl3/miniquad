@@ -3377,6 +3377,9 @@ void glClearStencil(GLint s) {
 }
 typedef void  (GL_APIENTRY *PFN_glScissor)(GLint x, GLint y, GLsizei width, GLsizei height);
 static PFN_glScissor _sapp_glScissor;
+void glScissor(GLint x, GLint y, GLsizei width, GLsizei height) {
+    _sapp_glScissor(x, y, width, height);
+}
 typedef void  (GL_APIENTRY *PFN_glUniform3fv)(GLint location, GLsizei count, const GLfloat * value);
 static PFN_glUniform3fv _sapp_glUniform3fv;
 void glUniform3fv(GLint location, GLsizei count, const GLfloat * value) {

@@ -42482,6 +42482,9 @@ pub type PFN_glScissor = ::std::option::Option<
 extern "C" {
     pub static mut _sapp_glScissor: PFN_glScissor;
 }
+extern "C" {
+    pub fn glScissor(x: GLint, y: GLint, width: GLsizei, height: GLsizei);
+}
 pub type PFN_glUniform3fv = ::std::option::Option<
     unsafe extern "C" fn(location: GLint, count: GLsizei, value: *const GLfloat),
 >;

@@ -493,6 +493,10 @@ impl Context {
             glUseProgram(shader.program);
         }
 
+        unsafe {
+            glEnable(GL_SCISSOR_TEST);
+        }
+
         if pipeline.params.depth_write {
             unsafe {
                 glEnable(GL_DEPTH_TEST);
@@ -519,6 +523,12 @@ impl Context {
 
                 self.cache.blend = pipeline.params.color_blend;
             }
+        }
+    }
+
+    pub fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
+        unsafe {
+            glScissor(x, y, w, h);
         }
     }
 
@@ -682,6 +692,7 @@ impl Context {
         unsafe {
             glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
             glViewport(0, 0, w, h);
+            glScissor(0, 0, w, h);
         }
         match action {
             PassAction::Nothing => {}
@@ -1187,8 +1198,9 @@ impl Buffer {
         }
     }
 
-    pub fn update<T>(&self, ctx: &mut Context, data: &[T]) {
+    pub fn update<T: std::fmt::Debug>(&self, ctx: &mut Context, data: &[T]) {
         //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
+
         let size = mem::size_of_val(data);
 
         assert!(size <= self.size);
