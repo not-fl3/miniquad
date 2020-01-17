@@ -332,21 +332,21 @@ pub struct ShaderUniform {
     uniform_type: UniformType,
 }
 
-pub struct ShaderInternal {
-    pub program: GLuint,
-    pub images: Vec<ShaderImage>,
-    pub uniforms: Vec<ShaderUniform>,
+struct ShaderInternal {
+    program: GLuint,
+    images: Vec<ShaderImage>,
+    uniforms: Vec<ShaderUniform>,
 }
 
 type BlendState = Option<(Equation, BlendFactor, BlendFactor)>;
 
 #[derive(Default, Copy, Clone)]
-pub struct CachedAttribute {
+struct CachedAttribute {
     attribute: VertexAttributeInternal,
     gl_vbuf: GLuint,
 }
 
-pub struct GlCache {
+struct GlCache {
     stored_index_buffer: GLuint,
     stored_vertex_buffer: GLuint,
     index_buffer: GLuint,
@@ -423,7 +423,7 @@ impl Default for PassAction {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderPass(usize);
 
-pub struct RenderPassInternal {
+struct RenderPassInternal {
     gl_fb: GLuint,
     texture: Texture,
 }
