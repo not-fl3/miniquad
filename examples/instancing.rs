@@ -9,7 +9,6 @@ struct Stage {
     pipeline: Pipeline,
     bindings: Bindings,
 
-    cur_num_particles: usize,
     pos: Vec<Vec3>,
     vel: Vec<Vec3>,
     ry: f32,
@@ -73,7 +72,6 @@ impl Stage {
         Stage {
             pipeline,
             bindings,
-            cur_num_particles: 0,
             pos: Vec::with_capacity(MAX_PARTICLES),
             vel: Vec::with_capacity(MAX_PARTICLES),
             ry: 0.,
@@ -87,7 +85,7 @@ impl EventHandler for Stage {
 
         // emit new particles
         for _ in 0..NUM_PARTICLES_EMITTED_PER_FRAME {
-            if self.cur_num_particles < MAX_PARTICLES {
+            if self.pos.len() < MAX_PARTICLES {
                 self.pos.push(vec3(0., 0., 0.));
                 self.vel.push(vec3(
                     ((unsafe { rand() } & 0x7FFF) as f32 / 0x7FFF as f32) - 0.5,
