@@ -87,6 +87,13 @@ And then use the following .html to load .wasm:
 ```
 </details>
 
+One of the ways to server static .wasm and .html:
+
+```
+cargo install basic-http-server
+basic-http-server .
+```
+
 # Goals
 
 * Fast compilation time. Right now it is ~5s from "cargo clean" for both desktop and web.
