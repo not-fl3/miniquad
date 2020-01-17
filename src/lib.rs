@@ -115,7 +115,13 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
                 event.mouse_y,
             );
         }
-
+        sapp::sapp_event_type_SAPP_EVENTTYPE_CHAR => {
+            if let Some(character) = std::char::from_u32(event.char_code) {
+                // TODO: event.modifiers instead of KeyMods::No
+                data.event_handler
+                    .char_event(&mut data.context, character, KeyMods::No, event.key_repeat)
+            }
+        }
         sapp::sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN => {
             let keycode = KeyCode::from(event.key_code);
 

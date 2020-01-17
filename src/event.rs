@@ -7,7 +7,9 @@ pub enum MouseButton {
     Right,
     Left,
 }
+
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
+#[repr(u32)]
 pub enum KeyCode {
     Space,
     Apostrophe,
@@ -129,7 +131,7 @@ pub enum KeyCode {
     RightAlt,
     RightSuper,
     Menu,
-    Unknown(u32),
+    Unknown,
 }
 
 impl From<sapp_keycode> for KeyCode {
@@ -255,7 +257,7 @@ impl From<sapp_keycode> for KeyCode {
             sapp::sapp_keycode_SAPP_KEYCODE_RIGHT_ALT => KeyCode::RightAlt,
             sapp::sapp_keycode_SAPP_KEYCODE_RIGHT_SUPER => KeyCode::RightSuper,
             sapp::sapp_keycode_SAPP_KEYCODE_MENU => KeyCode::Menu,
-            unknown => KeyCode::Unknown(unknown),
+            unknown => KeyCode::Unknown,
         }
     }
 }
@@ -285,6 +287,15 @@ pub trait EventHandler {
         _button: MouseButton,
         _x: f32,
         _y: f32,
+    ) {
+    }
+
+    fn char_event(
+        &mut self,
+        _ctx: &mut Context,
+        _character: char,
+        _keymods: KeyMods,
+        _repeat: bool,
     ) {
     }
 
