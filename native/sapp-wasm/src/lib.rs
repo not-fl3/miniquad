@@ -170,6 +170,12 @@ pub const sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT: sapp_mousebutton = 0;
 pub const sapp_mousebutton_SAPP_MOUSEBUTTON_RIGHT: sapp_mousebutton = 1;
 pub const sapp_mousebutton_SAPP_MOUSEBUTTON_MIDDLE: sapp_mousebutton = 2;
 
+pub const SAPP_MODIFIER_SHIFT: u32 = 1 << 0;
+pub const SAPP_MODIFIER_CTRL: u32 = 1 << 1;
+pub const SAPP_MODIFIER_ALT: u32 = 1 << 2;
+pub const SAPP_MODIFIER_SUPER: u32 = 1 << 3;
+
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sapp_event {

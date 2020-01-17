@@ -183,10 +183,10 @@ pub const sapp_event_type_SAPP_MOUSEBUTTON_RIGHT: sapp_mousebutton = 1;
 pub const sapp_event_type_SAPP_MOUSEBUTTON_LEFT: sapp_mousebutton = 0;
 pub const sapp_event_type_SAPP_MOUSEBUTTON_INVALID: sapp_mousebutton = -1;
 
-pub const sapp_event_type_SAPP_MODIFIER_SHIFT: libc::c_uint = 1 << 0;
-pub const sapp_event_type_SAPP_MODIFIER_CTRL: libc::c_uint = 1 << 1;
-pub const sapp_event_type_SAPP_MODIFIER_ALT: libc::c_uint = 1 << 2;
-pub const sapp_event_type_SAPP_MODIFIER_SUPER: libc::c_uint = 1 << 3;
+pub const SAPP_MODIFIER_SHIFT: libc::c_uint = 1 << 0;
+pub const SAPP_MODIFIER_CTRL: libc::c_uint = 1 << 1;
+pub const SAPP_MODIFIER_ALT: libc::c_uint = 1 << 2;
+pub const SAPP_MODIFIER_SUPER: libc::c_uint = 1 << 3;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -2281,16 +2281,16 @@ pub unsafe extern "C" fn _sapp_x11_mouse_event(
 pub unsafe extern "C" fn _sapp_x11_mod(mut x11_mods: libc::c_int) -> u32 {
     let mut mods = 0 as libc::c_int as u32;
     if x11_mods & ShiftMask != 0 {
-        mods |= sapp_event_type_SAPP_MODIFIER_SHIFT as libc::c_int as libc::c_uint
+        mods |= SAPP_MODIFIER_SHIFT as libc::c_int as libc::c_uint
     }
     if x11_mods & ControlMask != 0 {
-        mods |= sapp_event_type_SAPP_MODIFIER_CTRL as libc::c_int as libc::c_uint
+        mods |= SAPP_MODIFIER_CTRL as libc::c_int as libc::c_uint
     }
     if x11_mods & Mod1Mask != 0 {
-        mods |= sapp_event_type_SAPP_MODIFIER_ALT as libc::c_int as libc::c_uint
+        mods |= SAPP_MODIFIER_ALT as libc::c_int as libc::c_uint
     }
     if x11_mods & Mod4Mask != 0 {
-        mods |= sapp_event_type_SAPP_MODIFIER_SUPER as libc::c_int as libc::c_uint
+        mods |= SAPP_MODIFIER_SUPER as libc::c_int as libc::c_uint
     }
     return mods;
 }

@@ -117,22 +117,29 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_CHAR => {
             if let Some(character) = std::char::from_u32(event.char_code) {
-                // TODO: event.modifiers instead of KeyMods::No
-                data.event_handler
-                    .char_event(&mut data.context, character, KeyMods::No, event.key_repeat)
+                let mut key_mods = KeyMods::from(event.modifiers);
+
+                data.event_handler.char_event(
+                    &mut data.context,
+                    character,
+                    key_mods,
+                    event.key_repeat,
+                )
             }
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN => {
             let keycode = KeyCode::from(event.key_code);
+            let mut key_mods = KeyMods::from(event.modifiers);
 
             data.event_handler
-                .key_down_event(&mut data.context, keycode, KeyMods::No, false)
+                .key_down_event(&mut data.context, keycode, key_mods, false)
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_KEY_UP => {
             let keycode = KeyCode::from(event.key_code);
+            let mut key_mods = KeyMods::from(event.modifiers);
 
             data.event_handler
-                .key_up_event(&mut data.context, keycode, KeyMods::No)
+                .key_up_event(&mut data.context, keycode, key_mods)
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_RESIZED => {
             data.context

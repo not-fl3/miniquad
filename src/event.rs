@@ -262,9 +262,33 @@ impl From<sapp_keycode> for KeyCode {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum KeyMods {
-    No,
+#[derive(Debug, Copy, Clone, PartialEq, Default)]
+pub struct KeyMods {
+    pub shift: bool,
+    pub ctrl: bool,
+    pub alt: bool,
+    pub logo: bool,
+}
+
+impl From<u32> for KeyMods {
+    fn from(value: u32) -> KeyMods {
+        let mut key_mods = KeyMods::default();
+
+        if value & sapp::SAPP_MODIFIER_SHIFT != 0 {
+            key_mods.shift = true;
+        }
+        if value & sapp::SAPP_MODIFIER_CTRL != 0 {
+            key_mods.ctrl = true;
+        }
+        if value & sapp::SAPP_MODIFIER_ALT != 0 {
+            key_mods.alt = true;
+        }
+        if value & sapp::SAPP_MODIFIER_SUPER != 0 {
+            key_mods.logo = true;
+        }
+
+        key_mods
+    }
 }
 
 pub trait EventHandler {
