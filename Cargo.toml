@@ -1,6 +1,6 @@
 [package]
 name = "miniquad"
-version = "0.2.6"
+version = "0.2.8"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -14,11 +14,14 @@ readme="README.md"
 [target.'cfg(windows)'.dependencies]
 sapp-windows = { path ="./native/sapp-windows", version = "0.2.1" }
 
-[target.'cfg(unix)'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 sapp-linux = { path ="./native/sapp-linux", version = "0.1.2" }
 
 [target.wasm32-unknown-unknown.dependencies]
 sapp-wasm = { path ="./native/sapp-wasm", version = "0.1.2" }
+
+[target.'cfg(not(any(target_os="linux", target_arch="wasm32", windows)))'.dependencies]
+sapp-dummy = { path ="./native/sapp-dummy", version = "0.1.1" }
 
 [dev-dependencies]
 glam = {version = "0.8", features = ["scalar-math"] }
