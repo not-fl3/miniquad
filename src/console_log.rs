@@ -14,11 +14,11 @@ fn log_record(record: &Record) {
     console_log(&format!("{}", record.args()));
 }
 
-static LOGGER: SappLogger = SappLogger {};
+static LOGGER: WasmLogger = WasmLogger {};
 
-struct SappLogger {}
+struct WasmLogger {}
 
-impl Log for SappLogger {
+impl Log for WasmLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= log::max_level()
     }
