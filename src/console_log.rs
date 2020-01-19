@@ -43,5 +43,5 @@ pub fn init_with_level(level: Level) -> Result<(), SetLoggerError> {
 
 /// Initializes the global logger with `max_log_level` set to `Level::Info` (a sensible default).
 pub fn init() -> Result<(), SetLoggerError> {
-    init_with_level(Level::Info)
+    init_with_level(Level::Debug)
 }
