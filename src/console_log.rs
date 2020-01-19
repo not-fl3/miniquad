@@ -1,12 +1,7 @@
 use log::{Log, Level, Record, Metadata, SetLoggerError};
 
-#[cfg(target_os = "linux")]
-fn log(record: &Record) { }
-
-#[cfg(target_os = "wasm32")]
 extern crate sapp_wasm;
-#[cfg(target_os = "wasm32")]
-pub fn log(record: &Record) {
+fn log_record(record: &Record) {
     // pick the console.log() variant for the appropriate logging level
     let console_log = match record.level() {
         Level::Error => panic!("console.error not supported"),
@@ -16,15 +11,8 @@ pub fn log(record: &Record) {
         Level::Trace => panic!("console.debug not supported"),
     };
 
-    console_log(&format!("{}", record.args()).into());
+    console_log(&format!("{}", record.args()));
 }
-
-#[cfg(target_os = "wasm32")]
-fn log(record: &Record) { }
-
-#[cfg(not(any(target_os="linux", target_arch="wasm32", windows)))]
-fn log(record: &Record) { }
-
 
 static LOGGER: SappLogger = SappLogger {};
 
@@ -40,7 +28,7 @@ impl Log for SappLogger {
             return;
         }
 
-        log(record);
+        log_record(record);
     }
 
     fn flush(&self) {}
