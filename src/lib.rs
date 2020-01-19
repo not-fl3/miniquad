@@ -10,6 +10,7 @@ extern crate sapp_windows as sapp;
 extern crate sapp_dummy as sapp;
 
 pub mod conf;
+pub mod console_log;
 mod event;
 pub mod graphics;
 
