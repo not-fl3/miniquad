@@ -252,7 +252,7 @@ pub unsafe fn sapp_run(desc: *const sapp_desc) -> ::std::os::raw::c_int {
             let msg = CString::new(format!("{:?}", info)).unwrap_or_else(|_| {
                 CString::new(format!("MALFORMED ERROR MESSAGE {:?}", info.location())).unwrap()
             });
-            test_log(msg.as_ptr());
+            console_log(msg.as_ptr());
         }));
     }
 
@@ -276,21 +276,18 @@ pub unsafe fn sapp_height() -> ::std::os::raw::c_int {
     canvas_height()
 }
 
+#[no_mangle]
 extern "C" {
     pub fn init_opengl();
     pub fn canvas_width() -> i32;
     pub fn canvas_height() -> i32;
-    pub fn test_log(msg: *const ::std::os::raw::c_char);
+    pub fn console_debug(msg: *const ::std::os::raw::c_char);
+    pub fn console_log(msg: *const ::std::os::raw::c_char);
+    pub fn console_info(msg: *const ::std::os::raw::c_char);
+    pub fn console_warn(msg: *const ::std::os::raw::c_char);
+    pub fn console_error(msg: *const ::std::os::raw::c_char);
 }
 
-pub fn console_log(msg: &str) {
-    use std::ffi::CString;
-
-    let string = CString::new(msg).unwrap();
-    unsafe {
-        test_log(string.as_ptr());
-    }
-}
 #[no_mangle]
 pub extern "C" fn frame() {
     unsafe {

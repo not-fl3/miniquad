@@ -333,8 +333,20 @@ var emscripten_shaders_hack = false;
 var start;
 var importObject = {
     env: {
-        test_log: function (ptr) {
+        console_debug: function (ptr) {
+            console.debug(UTF8ToString(ptr));
+        },
+        console_log: function (ptr) {
             console.log(UTF8ToString(ptr));
+        },
+        console_info: function (ptr) {
+            console.info(UTF8ToString(ptr));
+        },
+        console_warn: function (ptr) {
+            console.warn(UTF8ToString(ptr));
+        },
+        console_error: function (ptr) {
+            console.error(UTF8ToString(ptr));
         },
         set_emscripten_shader_hack: function (flag) {
             emscripten_shaders_hack = flag;
