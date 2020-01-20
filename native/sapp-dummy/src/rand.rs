@@ -1,4 +1,4 @@
-pub fn rand() -> ::std::os::raw::c_int {
+pub unsafe fn rand() -> ::std::os::raw::c_int {
     6 //random enough
 }
 
