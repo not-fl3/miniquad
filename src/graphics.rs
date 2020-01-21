@@ -1249,4 +1249,10 @@ impl Buffer {
         unsafe { glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _) };
         ctx.cache.restore_buffer_binding(gl_target);
     }
+
+    /// Size of buffer in bytes
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
 }
