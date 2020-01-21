@@ -669,7 +669,31 @@ var importObject = {
         glDrawElementsInstanced: function (mode, count, type, indices, primcount) {
             gl.drawElementsInstanced(mode, count, type, indices, primcount);
         },
-        glDeleteShader: function () { },
+        glDeleteShader: function (shader) { gl.deleteShader(shader) },
+        glDeleteBuffers: function(n, buffers) {
+            for (var i = 0; i < n; i++) {
+              var id = getArray(buffers + i * 4, Uint32Array, 1)[0];
+              var buffer = GL.buffers[id];
+
+              // From spec: "glDeleteBuffers silently ignores 0's and names that do not
+              // correspond to existing buffer objects."
+              if (!buffer) continue;
+
+              gl.deleteBuffer(buffer);
+              buffer.name = 0;
+              GL.buffers[id] = null;
+            }
+        },
+        glDeleteTextures: function(n, textures) {
+            for (var i = 0; i < n; i++) {
+                var id = getArray(textures + i * 4, Uint32Array, 1)[0];
+                var texture = GL.textures[id];
+                if (!texture) continue; // GL spec: "glDeleteTextures silently ignores 0s and names that do not correspond to existing textures".
+                gl.deleteTexture(texture);
+                texture.name = 0;
+                GL.textures[id] = null;
+              }
+        },
         init_opengl: function (ptr) {
             start = Date.now();
             canvas.onmousemove = function (event) {

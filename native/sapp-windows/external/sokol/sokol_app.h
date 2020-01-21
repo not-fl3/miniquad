@@ -3284,6 +3284,9 @@ void glBlendEquationSeparate(GLenum modeRGB, GLenum modeAlpha) {
 static PFN_glBlendEquationSeparate _sapp_glBlendEquationSeparate;
 typedef void  (GL_APIENTRY *PFN_glDeleteTextures)(GLsizei n, const GLuint * textures);
 static PFN_glDeleteTextures _sapp_glDeleteTextures;
+void glDeleteTextures(GLsizei n, const GLuint * textures) {
+    _sapp_glDeleteTextures(n, textures);
+}
 typedef void  (GL_APIENTRY *PFN_glGetProgramiv)(GLuint program, GLenum pname, GLint * params);
 static PFN_glGetProgramiv _sapp_glGetProgramiv;
 void glGetProgramiv(GLuint program, GLenum pname, GLint * params) {
@@ -3330,6 +3333,9 @@ void glViewport(GLint x, GLint y, GLsizei width, GLsizei height) {
 }
 typedef void  (GL_APIENTRY *PFN_glDeleteBuffers)(GLsizei n, const GLuint * buffers);
 static PFN_glDeleteBuffers _sapp_glDeleteBuffers;
+void glDeleteBuffers(GLsizei n, const GLuint * buffers) {
+    _sapp_glDeleteBuffers(n, buffers);
+}
 typedef void  (GL_APIENTRY *PFN_glDrawArrays)(GLenum mode, GLint first, GLsizei count);
 static PFN_glDrawArrays _sapp_glDrawArrays;
 void glDrawArrays(GLenum mode, GLint first, GLsizei count) {

@@ -14,6 +14,21 @@ pub struct Texture {
     pub height: u32,
 }
 
+impl Texture {
+    /// Delete GPU texture, leaving handle unmodified.
+    ///
+    /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
+    /// more RAII buffer object.
+    ///
+    /// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why
+    /// this function is not marked as unsafe
+    pub fn delete(&self) {
+        unsafe {
+            glDeleteTextures(1, &self.texture as *const _);
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PixelFormat {
     RGBA8,
@@ -1255,4 +1270,16 @@ impl Buffer {
         self.size
     }
 
+    /// Delete GPU buffer, leaving handle unmodified.
+    ///
+    /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
+    /// more RAII buffer object.
+    ///
+    /// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why
+    /// this function is not marked as unsafe
+    pub fn delete(&self) {
+        unsafe {
+            glDeleteBuffers(1, &self.gl_buf as *const _)
+        }
+    }
 }

@@ -42262,6 +42262,9 @@ pub type PFN_glDeleteTextures =
 extern "C" {
     pub static mut _sapp_glDeleteTextures: PFN_glDeleteTextures;
 }
+extern "C" {
+    pub fn glDeleteTextures(n: GLsizei, textures: *const GLuint);
+}
 pub type PFN_glGetProgramiv =
     ::std::option::Option<unsafe extern "C" fn(program: GLuint, pname: GLenum, params: *mut GLint)>;
 extern "C" {
@@ -42373,6 +42376,9 @@ pub type PFN_glDeleteBuffers =
     ::std::option::Option<unsafe extern "C" fn(n: GLsizei, buffers: *const GLuint)>;
 extern "C" {
     pub static mut _sapp_glDeleteBuffers: PFN_glDeleteBuffers;
+}
+extern "C" {
+    pub fn glDeleteBuffers(n: GLsizei, buffers: *const GLuint);
 }
 pub type PFN_glDrawArrays =
     ::std::option::Option<unsafe extern "C" fn(mode: GLenum, first: GLint, count: GLsizei)>;
