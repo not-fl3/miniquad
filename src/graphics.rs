@@ -453,7 +453,6 @@ impl RenderPass {
 
         unsafe {
             glGenFramebuffers(1, &mut gl_fb as *mut _);
-            glBindTexture(GL_TEXTURE_2D, color_img.texture);
             glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
             glFramebufferTexture2D(
                 GL_FRAMEBUFFER,
