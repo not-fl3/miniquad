@@ -86,7 +86,7 @@ impl Default for RenderTextureParams {
 }
 
 impl Texture {
-    pub fn new_render_texture(params: RenderTextureParams) -> Texture {
+    pub fn new_render_texture(ctx: &mut Context, params: RenderTextureParams) -> Texture {
         let mut texture: GLuint = 0;
 
         let (internal_format, format, pixel_type) = params.format.into();
@@ -120,7 +120,7 @@ impl Texture {
         }
     }
 
-    pub fn from_rgba8(width: u16, height: u16, bytes: &[u8]) -> Texture {
+    pub fn from_rgba8(ctx: &mut Context, width: u16, height: u16, bytes: &[u8]) -> Texture {
         unsafe {
             let mut texture: GLuint = 0;
             glGenTextures(1, &mut texture as *mut _);
@@ -151,13 +151,16 @@ impl Texture {
         }
     }
 
-    pub fn set_filter(&self, filter: i32) {
+    pub fn set_filter(&self, ctx: &mut Context, filter: i32) {
+        ctx.cache.store_texture_binding(0);
+        ctx.cache.bind_texture(0, self.texture);
         unsafe {
-            glBindTexture(GL_TEXTURE_2D, self.texture);
-
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
         }
+        ctx.cache.restore_texture_binding(0);
+    }
+
     }
 }
 
@@ -364,8 +367,10 @@ struct CachedAttribute {
 struct GlCache {
     stored_index_buffer: GLuint,
     stored_vertex_buffer: GLuint,
+    stored_texture: GLuint,
     index_buffer: GLuint,
     vertex_buffer: GLuint,
+    textures: [GLuint; MAX_SHADERSTAGE_IMAGES],
     cur_pipeline: Option<Pipeline>,
     blend: BlendState,
     attributes: [Option<CachedAttribute>; MAX_VERTEX_ATTRIBUTES],
@@ -405,7 +410,26 @@ impl GlCache {
             self.bind_buffer(target, self.stored_index_buffer);
         }
     }
+
+    fn bind_texture(&mut self, slot_index: usize, texture: GLuint) {
+        unsafe {
+            glActiveTexture(GL_TEXTURE0 + slot_index as GLuint);
+            if self.textures[slot_index] != texture {
+                glBindTexture(GL_TEXTURE_2D, texture);
+                self.textures[slot_index] = texture;
+            }
+        }
+    }
+
+    fn store_texture_binding(&mut self, slot_index: usize) {
+        self.stored_texture = self.textures[slot_index];
+    }
+
+    fn restore_texture_binding(&mut self, slot_index: usize) {
+        self.bind_texture(slot_index, self.stored_texture);
+    }
 }
+
 pub enum PassAction {
     Nothing,
     Clear {
@@ -484,6 +508,7 @@ impl RenderPass {
 }
 
 pub const MAX_VERTEX_ATTRIBUTES: usize = 16;
+pub const MAX_SHADERSTAGE_IMAGES: usize = 12;
 
 pub struct Context {
     shaders: Vec<ShaderInternal>,
@@ -517,6 +542,8 @@ impl Context {
                     vertex_buffer: 0,
                     cur_pipeline: None,
                     blend: None,
+                    stored_texture: 0,
+                    textures: [0; MAX_SHADERSTAGE_IMAGES],
                     attributes: [None; MAX_VERTEX_ATTRIBUTES],
                 },
                 //attributes: [None; 16],
@@ -592,8 +619,7 @@ impl Context {
                 .get(n)
                 .unwrap_or_else(|| panic!("Image count in bindings and shader did not match!"));
             unsafe {
-                glActiveTexture(GL_TEXTURE0 + n as u32);
-                glBindTexture(GL_TEXTURE_2D, bindings_image.texture);
+                self.cache.bind_texture(n, bindings_image.texture);
                 glUniform1i(shader_image.gl_loc, n as i32);
             }
         }

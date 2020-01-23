@@ -14,18 +14,24 @@ struct Stage {
 
 impl Stage {
     pub fn new(ctx: &mut Context) -> Stage {
-        let color_img = Texture::new_render_texture(RenderTextureParams {
-            width: 256,
-            height: 256,
-            format: PixelFormat::RGBA8,
-            ..Default::default()
-        });
-        let depth_img = Texture::new_render_texture(RenderTextureParams {
-            width: 256,
-            height: 256,
-            format: PixelFormat::Depth,
-            ..Default::default()
-        });
+        let color_img = Texture::new_render_texture(
+            ctx,
+            RenderTextureParams {
+                width: 256,
+                height: 256,
+                format: PixelFormat::RGBA8,
+                ..Default::default()
+            },
+        );
+        let depth_img = Texture::new_render_texture(
+            ctx,
+            RenderTextureParams {
+                width: 256,
+                height: 256,
+                format: PixelFormat::Depth,
+                ..Default::default()
+            },
+        );
 
         let offscreen_pass = RenderPass::new(ctx, color_img, depth_img);
 
