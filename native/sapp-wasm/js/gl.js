@@ -372,7 +372,7 @@ var importObject = {
         glClearStencil: function (s) {
             gl.clearColorStencil(s);
         },
-        glScissor: function(x, y, w, h) {
+        glScissor: function (x, y, w, h) {
             gl.scissor(x, y, w, h);
         },
         glClear: function (mask) {
@@ -674,21 +674,21 @@ var importObject = {
             gl.drawElementsInstanced(mode, count, type, indices, primcount);
         },
         glDeleteShader: function (shader) { gl.deleteShader(shader) },
-        glDeleteBuffers: function(n, buffers) {
+        glDeleteBuffers: function (n, buffers) {
             for (var i = 0; i < n; i++) {
-              var id = getArray(buffers + i * 4, Uint32Array, 1)[0];
-              var buffer = GL.buffers[id];
+                var id = getArray(buffers + i * 4, Uint32Array, 1)[0];
+                var buffer = GL.buffers[id];
 
-              // From spec: "glDeleteBuffers silently ignores 0's and names that do not
-              // correspond to existing buffer objects."
-              if (!buffer) continue;
+                // From spec: "glDeleteBuffers silently ignores 0's and names that do not
+                // correspond to existing buffer objects."
+                if (!buffer) continue;
 
-              gl.deleteBuffer(buffer);
-              buffer.name = 0;
-              GL.buffers[id] = null;
+                gl.deleteBuffer(buffer);
+                buffer.name = 0;
+                GL.buffers[id] = null;
             }
         },
-        glDeleteTextures: function(n, textures) {
+        glDeleteTextures: function (n, textures) {
             for (var i = 0; i < n; i++) {
                 var id = getArray(textures + i * 4, Uint32Array, 1)[0];
                 var texture = GL.textures[id];
@@ -696,7 +696,7 @@ var importObject = {
                 gl.deleteTexture(texture);
                 texture.name = 0;
                 GL.textures[id] = null;
-              }
+            }
         },
         init_opengl: function (ptr) {
             start = Date.now();

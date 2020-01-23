@@ -1335,8 +1335,6 @@ impl Buffer {
     /// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why
     /// this function is not marked as unsafe
     pub fn delete(&self) {
-        unsafe {
-            glDeleteBuffers(1, &self.gl_buf as *const _)
-        }
+        unsafe { glDeleteBuffers(1, &self.gl_buf as *const _) }
     }
 }
