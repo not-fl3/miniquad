@@ -15,6 +15,14 @@ pub struct Texture {
 }
 
 impl Texture {
+    pub fn empty() -> Texture {
+        Texture {
+            texture: 0,
+            width: 0,
+            height: 0,
+        }
+    }
+
     /// Delete GPU texture, leaving handle unmodified.
     ///
     /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
@@ -122,10 +130,11 @@ impl Texture {
 
     pub fn from_rgba8(ctx: &mut Context, width: u16, height: u16, bytes: &[u8]) -> Texture {
         unsafe {
+            ctx.cache.store_texture_binding(0);
+
             let mut texture: GLuint = 0;
             glGenTextures(1, &mut texture as *mut _);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, texture);
+            ctx.cache.bind_texture(0, texture);
             glTexImage2D(
                 GL_TEXTURE_2D,
                 0,
@@ -142,6 +151,8 @@ impl Texture {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR as i32);
+
+            ctx.cache.restore_texture_binding(0);
 
             Texture {
                 texture,
@@ -161,6 +172,27 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
     }
 
+    pub fn update(&self, ctx: &mut Context, bytes: &[u8]) {
+        assert_eq!(self.width as usize * self.height as usize * 4, bytes.len());
+
+        ctx.cache.store_texture_binding(0);
+        ctx.cache.bind_texture(0, self.texture);
+
+        unsafe {
+            glTexSubImage2D(
+                GL_TEXTURE_2D,
+                0,
+                0,
+                0,
+                self.width as _,
+                self.height as _,
+                GL_RGBA,
+                GL_UNSIGNED_BYTE,
+                bytes.as_ptr() as *const _,
+            );
+        }
+
+        ctx.cache.restore_texture_binding(0);
     }
 }
 

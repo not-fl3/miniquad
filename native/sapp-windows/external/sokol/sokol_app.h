@@ -3306,6 +3306,9 @@ GLuint glCreateShader(GLenum type) {
 }
 typedef void  (GL_APIENTRY *PFN_glTexSubImage2D)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void * pixels);
 static PFN_glTexSubImage2D _sapp_glTexSubImage2D;
+void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void * pixels) {
+    _sapp_glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
+}
 typedef void  (GL_APIENTRY *PFN_glClearDepth)(GLdouble depth);
 static PFN_glClearDepth _sapp_glClearDepth;
 void glClearDepth(GLdouble depth) {

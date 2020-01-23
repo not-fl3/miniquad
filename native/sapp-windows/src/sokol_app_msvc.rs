@@ -42228,6 +42228,19 @@ pub type PFN_glTexSubImage2D = ::std::option::Option<
 extern "C" {
     pub static mut _sapp_glTexSubImage2D: PFN_glTexSubImage2D;
 }
+extern "C" {
+    pub fn glTexSubImage2D(
+        target: GLenum,
+        level: GLint,
+        xoffset: GLint,
+        yoffset: GLint,
+        width: GLsizei,
+        height: GLsizei,
+        format: GLenum,
+        type_: GLenum,
+        pixels: *const ::std::os::raw::c_void,
+    );
+}
 pub type PFN_glClearDepth = ::std::option::Option<unsafe extern "C" fn(depth: GLdouble)>;
 extern "C" {
     pub static mut _sapp_glClearDepth: PFN_glClearDepth;
