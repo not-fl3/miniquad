@@ -175,9 +175,9 @@ pub struct sapp_touchpoint {
 }
 
 pub type sapp_mousebutton = libc::c_int;
-pub const sapp_event_type_SAPP_MOUSEBUTTON_MIDDLE: sapp_mousebutton = 2;
-pub const sapp_event_type_SAPP_MOUSEBUTTON_RIGHT: sapp_mousebutton = 1;
-pub const sapp_event_type_SAPP_MOUSEBUTTON_LEFT: sapp_mousebutton = 0;
+pub const sapp_mousebutton_SAPP_MOUSEBUTTON_MIDDLE: sapp_mousebutton = 2;
+pub const sapp_mousebutton_SAPP_MOUSEBUTTON_RIGHT: sapp_mousebutton = 1;
+pub const sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT: sapp_mousebutton = 0;
 pub const sapp_event_type_SAPP_MOUSEBUTTON_INVALID: sapp_mousebutton = -1;
 
 pub const SAPP_MODIFIER_SHIFT: libc::c_uint = 1 << 0;

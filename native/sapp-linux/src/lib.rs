@@ -178,10 +178,10 @@ pub struct sapp_touchpoint {
 }
 
 pub type sapp_mousebutton = libc::c_int;
-pub const sapp_event_type_SAPP_MOUSEBUTTON_MIDDLE: sapp_mousebutton = 2;
-pub const sapp_event_type_SAPP_MOUSEBUTTON_RIGHT: sapp_mousebutton = 1;
-pub const sapp_event_type_SAPP_MOUSEBUTTON_LEFT: sapp_mousebutton = 0;
-pub const sapp_event_type_SAPP_MOUSEBUTTON_INVALID: sapp_mousebutton = -1;
+pub const sapp_mousebutton_SAPP_MOUSEBUTTON_MIDDLE: sapp_mousebutton = 2;
+pub const sapp_mousebutton_SAPP_MOUSEBUTTON_RIGHT: sapp_mousebutton = 1;
+pub const sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT: sapp_mousebutton = 0;
+pub const sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID: sapp_mousebutton = -1;
 
 pub const SAPP_MODIFIER_SHIFT: libc::c_uint = 1 << 0;
 pub const SAPP_MODIFIER_CTRL: libc::c_uint = 1 << 1;
@@ -2258,10 +2258,10 @@ pub unsafe extern "C" fn _sapp_x11_scroll_event(
 }
 pub unsafe extern "C" fn _sapp_x11_translate_button(mut event: *const XEvent) -> sapp_mousebutton {
     match (*event).xbutton.button {
-        1 => return sapp_event_type_SAPP_MOUSEBUTTON_LEFT,
-        2 => return sapp_event_type_SAPP_MOUSEBUTTON_MIDDLE,
-        3 => return sapp_event_type_SAPP_MOUSEBUTTON_RIGHT,
-        _ => return sapp_event_type_SAPP_MOUSEBUTTON_INVALID,
+        1 => return sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT,
+        2 => return sapp_mousebutton_SAPP_MOUSEBUTTON_MIDDLE,
+        3 => return sapp_mousebutton_SAPP_MOUSEBUTTON_RIGHT,
+        _ => return sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
     };
 }
 pub unsafe extern "C" fn _sapp_x11_mouse_event(
@@ -2385,7 +2385,7 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
         4 => {
             let btn = _sapp_x11_translate_button(event);
             let mods_1 = _sapp_x11_mod((*event).xbutton.state as libc::c_int);
-            if btn as libc::c_int != sapp_event_type_SAPP_MOUSEBUTTON_INVALID as libc::c_int {
+            if btn as libc::c_int != sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID as libc::c_int {
                 _sapp_x11_mouse_event(sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN, btn, mods_1);
             } else {
                 match (*event).xbutton.button {
@@ -2407,7 +2407,7 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
         }
         5 => {
             let btn_0 = _sapp_x11_translate_button(event);
-            if btn_0 as libc::c_int != sapp_event_type_SAPP_MOUSEBUTTON_INVALID as libc::c_int {
+            if btn_0 as libc::c_int != sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID as libc::c_int {
                 _sapp_x11_mouse_event(
                     sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP,
                     btn_0,
@@ -2418,14 +2418,14 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
         7 => {
             _sapp_x11_mouse_event(
                 sapp_event_type_SAPP_EVENTTYPE_MOUSE_ENTER,
-                sapp_event_type_SAPP_MOUSEBUTTON_INVALID,
+                sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
                 _sapp_x11_mod((*event).xcrossing.state as libc::c_int),
             );
         }
         8 => {
             _sapp_x11_mouse_event(
                 sapp_event_type_SAPP_EVENTTYPE_MOUSE_LEAVE,
-                sapp_event_type_SAPP_MOUSEBUTTON_INVALID,
+                sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
                 _sapp_x11_mod((*event).xcrossing.state as libc::c_int),
             );
         }
@@ -2434,7 +2434,7 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
             _sapp.mouse_y = (*event).xmotion.y as libc::c_float;
             _sapp_x11_mouse_event(
                 sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE,
-                sapp_event_type_SAPP_MOUSEBUTTON_INVALID,
+                sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
                 _sapp_x11_mod((*event).xmotion.state as libc::c_int),
             );
         }
@@ -2522,7 +2522,7 @@ pub unsafe extern "C" fn _sapp_init_event(mut type_: sapp_event_type) {
     );
     _sapp.event.type_ = type_;
     _sapp.event.frame_count = _sapp.frame_count;
-    _sapp.event.mouse_button = sapp_event_type_SAPP_MOUSEBUTTON_INVALID;
+    _sapp.event.mouse_button = sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID;
     _sapp.event.window_width = _sapp.window_width;
     _sapp.event.window_height = _sapp.window_height;
     _sapp.event.framebuffer_width = _sapp.framebuffer_width;
@@ -2741,7 +2741,7 @@ pub static mut _sapp: _sapp_state = _sapp_state {
         char_code: 0,
         key_repeat: false,
         modifiers: 0,
-        mouse_button: sapp_event_type_SAPP_MOUSEBUTTON_LEFT,
+        mouse_button: sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT,
         mouse_x: 0.,
         mouse_y: 0.,
         scroll_x: 0.,

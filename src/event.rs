@@ -1,11 +1,24 @@
 use crate::Context;
 
-use crate::sapp::{self, sapp_keycode};
+use crate::sapp::{self, sapp_keycode, sapp_mousebutton};
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub enum MouseButton {
     Right,
     Left,
+    Middle,
+    Unknown,
+}
+
+impl From<sapp_mousebutton> for MouseButton {
+    fn from(btn: sapp_mousebutton) -> MouseButton {
+        match btn {
+            sapp::sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT => MouseButton::Left,
+            sapp::sapp_mousebutton_SAPP_MOUSEBUTTON_RIGHT => MouseButton::Right,
+            sapp::sapp_mousebutton_SAPP_MOUSEBUTTON_MIDDLE => MouseButton::Middle,
+            _ => MouseButton::Unknown,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]

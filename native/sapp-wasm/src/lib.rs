@@ -313,10 +313,11 @@ pub extern "C" fn mouse_move(x: i32, y: i32) {
 }
 
 #[no_mangle]
-pub extern "C" fn mouse_down(x: i32, y: i32, _btn: i32) {
+pub extern "C" fn mouse_down(x: i32, y: i32, btn: i32) {
     let mut event: sapp_event = unsafe { std::mem::zeroed() };
 
     event.type_ = sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN;
+    event.mouse_button = btn;
     event.mouse_x = x as f32;
     event.mouse_y = y as f32;
     unsafe {
@@ -328,10 +329,11 @@ pub extern "C" fn mouse_down(x: i32, y: i32, _btn: i32) {
 }
 
 #[no_mangle]
-pub extern "C" fn mouse_up(x: i32, y: i32, _btn: i32) {
+pub extern "C" fn mouse_up(x: i32, y: i32, btn: i32) {
     let mut event: sapp_event = unsafe { std::mem::zeroed() };
 
     event.type_ = sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP;
+    event.mouse_button = btn;
     event.mouse_x = x as f32;
     event.mouse_y = y as f32;
     unsafe {

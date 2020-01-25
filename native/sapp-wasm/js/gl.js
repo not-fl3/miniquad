@@ -315,8 +315,17 @@ animation = function () {
     window.requestAnimationFrame(animation);
 }
 
+into_sapp_mousebutton = function (btn) {
+    switch (btn) {
+        case 0: return 0;
+        case 1: return 2;
+        case 2: return 1;
+        default: return btn;
+    }
+}
+
 into_sapp_keycode = function (key_code) {
-    switch (event.code) {
+    switch (key_code) {
         case "KeyA": return 65;
         case "KeyS": return 83;
         case "KeyD": return 68;
@@ -708,25 +717,26 @@ var importObject = {
             canvas.onmousedown = function (event) {
                 var x = event.clientX;
                 var y = event.clientY;
-                var btn = event.button;
+                var btn = into_sapp_mousebutton(event.button);
                 wasm_exports.mouse_down(x, y, btn);
             };
-            canvas.wheel = function (event) {
-                console.log("WHEEL");
-                console.log(event);
-            };
+            // SO WEB SO CONSISTENT
+            canvas.addEventListener('wheel',
+                function (event) {
+                    wasm_exports.mouse_wheel(-event.deltaX, -event.deltaY);
+                });
             canvas.onmouseup = function (event) {
                 var x = event.clientX;
                 var y = event.clientY;
-                var btn = event.button;
+                var btn = into_sapp_mousebutton(event.button);
                 wasm_exports.mouse_up(x, y, btn);
             };
             canvas.onkeydown = function (event) {
-                var sapp_key_code = into_sapp_keycode()
+                var sapp_key_code = into_sapp_keycode(event.code);
                 wasm_exports.key_down(sapp_key_code);
             };
             canvas.onkeyup = function (event) {
-                var sapp_key_code = into_sapp_keycode()
+                var sapp_key_code = into_sapp_keycode(event.code);
                 wasm_exports.key_up(sapp_key_code);
             };
 

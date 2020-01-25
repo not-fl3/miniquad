@@ -101,18 +101,23 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
                 0.,
             );
         }
+        sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_SCROLL => {
+            data.event_handler
+                .mouse_wheel_event(&mut data.context, event.scroll_x, event.scroll_y);
+        }
         sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN => {
             data.event_handler.mouse_button_down_event(
                 &mut data.context,
-                MouseButton::Left,
+                MouseButton::from(event.mouse_button),
                 event.mouse_x,
                 event.mouse_y,
             );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP => {
+            let btn = MouseButton::from(event.mouse_button);
             data.event_handler.mouse_button_up_event(
                 &mut data.context,
-                MouseButton::Left,
+                MouseButton::from(event.mouse_button),
                 event.mouse_x,
                 event.mouse_y,
             );
