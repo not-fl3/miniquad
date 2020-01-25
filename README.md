@@ -1,5 +1,6 @@
 # Miniquad
 
+[![Github Actions](https://github.com/not-fl3/miniquad/workflows/Cross-compile/badge.svg)](https://github.com/not-fl3/miniquad/actions?query=workflow%3A)
 [![Crates.io version](https://img.shields.io/crates/v/miniquad.svg)](https://crates.io/crates/miniquad)
 
 Miniquad is safe and cross-platform rendering library focused on portability and low-end platforms support
