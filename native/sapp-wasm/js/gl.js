@@ -711,6 +711,10 @@ var importObject = {
                 var btn = event.button;
                 wasm_exports.mouse_down(x, y, btn);
             };
+            canvas.wheel = function (event) {
+                console.log("WHEEL");
+                console.log(event);
+            };
             canvas.onmouseup = function (event) {
                 var x = event.clientX;
                 var y = event.clientY;

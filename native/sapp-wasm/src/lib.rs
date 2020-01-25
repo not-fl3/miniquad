@@ -175,7 +175,6 @@ pub const SAPP_MODIFIER_CTRL: u32 = 1 << 1;
 pub const SAPP_MODIFIER_ALT: u32 = 1 << 2;
 pub const SAPP_MODIFIER_SUPER: u32 = 1 << 3;
 
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sapp_event {
@@ -335,6 +334,21 @@ pub extern "C" fn mouse_up(x: i32, y: i32, _btn: i32) {
     event.type_ = sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP;
     event.mouse_x = x as f32;
     event.mouse_y = y as f32;
+    unsafe {
+        SAPP_DESC
+            .unwrap_or_else(|| panic!())
+            .event_userdata_cb
+            .unwrap_or_else(|| panic!())(&event as *const _, USER_DATA);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn mouse_wheel(delta_x: i32, delta_y: i32) {
+    let mut event: sapp_event = unsafe { std::mem::zeroed() };
+
+    event.type_ = sapp_event_type_SAPP_EVENTTYPE_MOUSE_SCROLL;
+    event.scroll_x = delta_x as f32;
+    event.scroll_y = delta_y as f32;
     unsafe {
         SAPP_DESC
             .unwrap_or_else(|| panic!())
