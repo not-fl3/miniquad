@@ -460,6 +460,23 @@ impl GlCache {
     fn restore_texture_binding(&mut self, slot_index: usize) {
         self.bind_texture(slot_index, self.stored_texture);
     }
+
+    fn clear_buffer_bindings(&mut self) {
+        self.bind_buffer(GL_ARRAY_BUFFER, 0);
+        self.vertex_buffer = 0;
+
+        self.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        self.index_buffer = 0;
+    }
+
+    fn clear_texture_bindings(&mut self) {
+        for ix in 0..MAX_SHADERSTAGE_IMAGES {
+            if self.textures[ix] != 0 {
+                self.bind_texture(ix, 0);
+                self.textures[ix] = 0;
+            }
+        }
+    }
 }
 
 pub enum PassAction {
@@ -822,7 +839,10 @@ impl Context {
         }
     }
 
-    pub fn commit_frame(&self) {}
+    pub fn commit_frame(&mut self) {
+        self.cache.clear_buffer_bindings();
+        self.cache.clear_texture_bindings();
+    }
 
     pub fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32) {
         unsafe {
