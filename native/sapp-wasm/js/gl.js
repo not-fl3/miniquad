@@ -12,6 +12,8 @@ if (gl === null) {
     alert("Unable to initialize WebGL. Your browser or machine may not support it.");
 }
 
+canvas.focus();
+
 function assert(flag, message) {
     if (flag == false) {
         alert(message)
