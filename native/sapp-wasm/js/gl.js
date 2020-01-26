@@ -740,6 +740,27 @@ var importObject = {
                 wasm_exports.key_up(sapp_key_code);
             };
 
+            touch_function = function (event, id) {
+                event.preventDefault();
+                var touches = event.changedTouches;
+                for (touch of touches) {
+                    wasm_exports.push_touch(touch.identifier, Math.floor(touch.clientX), Math.floor(touch.clientY));
+                }
+                wasm_exports.touch_function(id);
+            }
+            canvas.addEventListener("touchstart", function (event) {
+                touch_function(event, 0);
+            });
+            canvas.addEventListener("touchend", function (event) {
+                touch_function(event, 1);
+            });
+            canvas.addEventListener("touchcancel", function (event) {
+                touch_function(event, 2);
+            });
+            canvas.addEventListener("touchmove", function (event) {
+                touch_function(event, 3);
+            });
+
             window.onresize = function () {
                 resize(canvas, wasm_exports.resize);
             };

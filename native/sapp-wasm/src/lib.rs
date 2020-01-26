@@ -241,6 +241,7 @@ pub struct sapp_desc {
 
 static mut SAPP_DESC: Option<sapp_desc> = None;
 static mut USER_DATA: *mut ::std::os::raw::c_void = std::ptr::null_mut();
+static mut TOUCHES: (usize, [sapp_touchpoint; 8usize]) = (0, [sapp_touchpoint { identifier: 0, pos_x: 0.0, pos_y: 0.0, changed: false }; 8]);
 
 pub unsafe fn sapp_run(desc: *const sapp_desc) -> ::std::os::raw::c_int {
     {
@@ -395,6 +396,44 @@ pub extern "C" fn resize(width: i32, height: i32) {
     event.window_width = width;
     event.window_height = height;
     unsafe {
+        SAPP_DESC
+            .unwrap_or_else(|| panic!())
+            .event_userdata_cb
+            .unwrap_or_else(|| panic!())(&event as *const _, USER_DATA);
+    }
+}
+
+
+#[no_mangle]
+pub extern "C" fn push_touch(id: i32, x: i32, y: i32) {
+    unsafe {
+        if TOUCHES.0 < 8 {
+            TOUCHES.1[TOUCHES.0] = sapp_touchpoint {
+                identifier: id as usize,
+                pos_x: x as f32,
+                pos_y: y as f32,
+                changed: true
+            };
+            TOUCHES.0 += 1;
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn touch_function(action: i32) {
+    let mut event: sapp_event = unsafe { std::mem::zeroed() };
+
+    event.type_ = match action {
+        0 => sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN,
+        1 => sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED,
+        2 => sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED,
+        3 => sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED,
+        _ => unreachable!(),
+    };
+    unsafe {
+        event.num_touches = TOUCHES.0 as i32;
+        event.touches = TOUCHES.1;
+        TOUCHES = std::mem::zeroed();
         SAPP_DESC
             .unwrap_or_else(|| panic!())
             .event_userdata_cb

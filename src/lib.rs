@@ -157,8 +157,33 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
                 event.window_height as f32,
             );
         }
+        sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN => {
+            data.event_handler
+                .touch_start_event(&mut data.context, convert_touch(event.num_touches, &event.touches));
+        }
+        sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED => {
+            data.event_handler
+                .touch_end_event(&mut data.context, convert_touch(event.num_touches, &event.touches));
+        }
+        sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED => {
+            data.event_handler
+                .touch_cancel_event(&mut data.context, convert_touch(event.num_touches, &event.touches));
+        }
+        sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED => {
+            data.event_handler
+                .touch_move_event(&mut data.context, convert_touch(event.num_touches, &event.touches));
+        }
         _ => {}
     }
+}
+
+fn convert_touch(num_touches: i32, touches: &[sapp::sapp_touchpoint; 8usize]) -> Vec<Touch> {
+    let mut vec: Vec<Touch> = vec![];
+    for i in 0..num_touches {
+        let touch = &touches[i as usize];
+        vec.push(Touch { id: touch.identifier as u32, x: touch.pos_x, y: touch.pos_y });
+    }
+    vec
 }
 
 pub fn start<F>(_conf: conf::Conf, f: F)

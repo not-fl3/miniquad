@@ -1,6 +1,6 @@
 [package]
 name = "miniquad"
-version = "0.2.18"
+version = "0.2.19"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -18,7 +18,7 @@ sapp-windows = { path ="./native/sapp-windows", version = "0.2.5" }
 sapp-linux = { path ="./native/sapp-linux", version = "0.1.3" }
 
 [target.wasm32-unknown-unknown.dependencies]
-sapp-wasm = { path ="./native/sapp-wasm", version = "0.1.8" }
+sapp-wasm = { path ="./native/sapp-wasm", version = "0.1.9" }
 
 [target.'cfg(not(any(target_os="linux", target_arch="wasm32", windows)))'.dependencies]
 sapp-dummy = { path ="./native/sapp-dummy", version = "0.1.2" }

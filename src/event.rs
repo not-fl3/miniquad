@@ -10,6 +10,13 @@ pub enum MouseButton {
     Unknown,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct Touch {
+    pub id: u32,
+    pub x: f32,
+    pub y: f32,
+}
+
 impl From<sapp_mousebutton> for MouseButton {
     fn from(btn: sapp_mousebutton) -> MouseButton {
         match btn {
@@ -346,4 +353,9 @@ pub trait EventHandler {
     }
 
     fn key_up_event(&mut self, _ctx: &mut Context, _keycode: KeyCode, _keymods: KeyMods) {}
+
+    fn touch_start_event(&mut self, _ctx: &mut Context, _touches: Vec<Touch>) {}
+    fn touch_end_event(&mut self, _ctx: &mut Context, _touches: Vec<Touch>) {}
+    fn touch_cancel_event(&mut self, _ctx: &mut Context, _touches: Vec<Touch>) {}
+    fn touch_move_event(&mut self, _ctx: &mut Context, _touches: Vec<Touch>) {}
 }
