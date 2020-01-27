@@ -749,8 +749,29 @@ var importObject = {
 };
 
 
-function load(wasm_path) {
+function init_plugins(plugins) {
+    if (plugins == undefined)
+        return;
+
+    for (var i = 0; i < plugins.length; i++) {
+        plugins[i].init(importObject);
+    }
+}
+
+function set_mem_plugins(plugins) {
+    if (plugins == undefined)
+        return;
+
+    for (var i = 0; i < plugins.length; i++) {
+        plugins[i].set_mem(memory);
+    }
+}
+
+
+function load(wasm_path, plugins) {
     var req = fetch(wasm_path);
+
+    init_plugins(plugins);
 
     if (typeof WebAssembly.instantiateStreaming === 'function') {
         WebAssembly.instantiateStreaming(req, importObject)
@@ -758,6 +779,7 @@ function load(wasm_path) {
                 memory = obj.instance.exports.memory;
                 wasm_exports = obj.instance.exports;
 
+                set_mem_plugins(plugins);
                 obj.instance.exports.main();
             });
     } else {
@@ -768,6 +790,7 @@ function load(wasm_path) {
                 memory = obj.instance.exports.memory;
                 wasm_exports = obj.instance.exports;
 
+                set_mem_plugins(plugins);
                 obj.instance.exports.main();
             });
     }
