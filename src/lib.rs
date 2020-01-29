@@ -197,15 +197,6 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
     }
 }
 
-fn convert_touch(num_touches: i32, touches: &[sapp::sapp_touchpoint; 8usize]) -> Vec<Touch> {
-    let mut vec: Vec<Touch> = Vec::with_capacity(num_touches as usize);
-    for i in 0..num_touches {
-        let touch = &touches[i as usize];
-        vec.push(Touch { id: touch.identifier as u32, x: touch.pos_x, y: touch.pos_y });
-    }
-    vec
-}
-
 pub fn start<F>(_conf: conf::Conf, f: F)
 where
     F: 'static + FnOnce(&mut Context) -> Box<dyn event::EventHandler>,

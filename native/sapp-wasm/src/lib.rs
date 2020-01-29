@@ -275,10 +275,6 @@ pub struct sapp_desc {
     pub gl_force_gles2: bool,
 }
 
-static mut SAPP_DESC: Option<sapp_desc> = None;
-static mut USER_DATA: *mut ::std::os::raw::c_void = std::ptr::null_mut();
-static mut TOUCHES: (usize, [sapp_touchpoint; 8usize]) = (0, [sapp_touchpoint { identifier: 0, pos_x: 0.0, pos_y: 0.0, changed: false }; 8]);
-
 pub unsafe fn sapp_run(desc: *const sapp_desc) -> ::std::os::raw::c_int {
     {
         use std::ffi::CString;
@@ -294,13 +290,7 @@ pub unsafe fn sapp_run(desc: *const sapp_desc) -> ::std::os::raw::c_int {
 
     init_opengl();
 
-    USER_DATA = (&*desc).user_data;
-
-    SAPP_DESC = Some(*desc);
-    SAPP_DESC
-        .unwrap_or_else(|| panic!())
-        .init_userdata_cb
-        .unwrap_or_else(|| panic!())(USER_DATA);
+    SappContext::init(*desc);
 
     0
 }
@@ -308,6 +298,7 @@ pub unsafe fn sapp_run(desc: *const sapp_desc) -> ::std::os::raw::c_int {
 pub unsafe fn sapp_width() -> ::std::os::raw::c_int {
     canvas_width()
 }
+
 pub unsafe fn sapp_height() -> ::std::os::raw::c_int {
     canvas_height()
 }
@@ -327,10 +318,7 @@ extern "C" {
 #[no_mangle]
 pub extern "C" fn frame() {
     unsafe {
-        SAPP_DESC
-            .unwrap_or_else(|| panic!())
-            .frame_userdata_cb
-            .unwrap_or_else(|| panic!())(USER_DATA);
+        sapp_context().frame();
     }
 }
 
@@ -342,10 +330,7 @@ pub extern "C" fn mouse_move(x: i32, y: i32) {
     event.mouse_x = x as f32;
     event.mouse_y = y as f32;
     unsafe {
-        SAPP_DESC
-            .unwrap_or_else(|| panic!())
-            .event_userdata_cb
-            .unwrap_or_else(|| panic!())(&event as *const _, USER_DATA);
+        sapp_context().event(event);
     }
 }
 
@@ -358,10 +343,7 @@ pub extern "C" fn mouse_down(x: i32, y: i32, btn: i32) {
     event.mouse_x = x as f32;
     event.mouse_y = y as f32;
     unsafe {
-        SAPP_DESC
-            .unwrap_or_else(|| panic!())
-            .event_userdata_cb
-            .unwrap_or_else(|| panic!())(&event as *const _, USER_DATA);
+        sapp_context().event(event);
     }
 }
 
@@ -374,10 +356,7 @@ pub extern "C" fn mouse_up(x: i32, y: i32, btn: i32) {
     event.mouse_x = x as f32;
     event.mouse_y = y as f32;
     unsafe {
-        SAPP_DESC
-            .unwrap_or_else(|| panic!())
-            .event_userdata_cb
-            .unwrap_or_else(|| panic!())(&event as *const _, USER_DATA);
+        sapp_context().event(event);
     }
 }
 
@@ -389,10 +368,7 @@ pub extern "C" fn mouse_wheel(delta_x: i32, delta_y: i32) {
     event.scroll_x = delta_x as f32;
     event.scroll_y = delta_y as f32;
     unsafe {
-        SAPP_DESC
-            .unwrap_or_else(|| panic!())
-            .event_userdata_cb
-            .unwrap_or_else(|| panic!())(&event as *const _, USER_DATA);
+        sapp_context().event(event);
     }
 }
 
@@ -403,10 +379,7 @@ pub extern "C" fn key_down(key: u32) {
     event.type_ = sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN;
     event.key_code = key;
     unsafe {
-        SAPP_DESC
-            .unwrap_or_else(|| panic!())
-            .event_userdata_cb
-            .unwrap_or_else(|| panic!())(&event as *const _, USER_DATA);
+        sapp_context().event(event);
     }
 }
 
@@ -417,10 +390,7 @@ pub extern "C" fn key_up(key: u32) {
     event.type_ = sapp_event_type_SAPP_EVENTTYPE_KEY_UP;
     event.key_code = key;
     unsafe {
-        SAPP_DESC
-            .unwrap_or_else(|| panic!())
-            .event_userdata_cb
-            .unwrap_or_else(|| panic!())(&event as *const _, USER_DATA);
+        sapp_context().event(event);
     }
 }
 
@@ -432,47 +402,19 @@ pub extern "C" fn resize(width: i32, height: i32) {
     event.window_width = width;
     event.window_height = height;
     unsafe {
-        SAPP_DESC
-            .unwrap_or_else(|| panic!())
-            .event_userdata_cb
-            .unwrap_or_else(|| panic!())(&event as *const _, USER_DATA);
-    }
-}
-
-
-#[no_mangle]
-pub extern "C" fn push_touch(id: i32, x: i32, y: i32) {
-    unsafe {
-        if TOUCHES.0 < 8 {
-            TOUCHES.1[TOUCHES.0] = sapp_touchpoint {
-                identifier: id as usize,
-                pos_x: x as f32,
-                pos_y: y as f32,
-                changed: true
-            };
-            TOUCHES.0 += 1;
-        }
+        sapp_context().event(event);
     }
 }
 
 #[no_mangle]
-pub extern "C" fn touch_function(action: i32) {
+pub extern "C" fn touch(event_type: u32, id: u64, x: f32, y: f32) {
     let mut event: sapp_event = unsafe { std::mem::zeroed() };
 
-    event.type_ = match action {
-        0 => sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN,
-        1 => sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED,
-        2 => sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED,
-        3 => sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED,
-        _ => unreachable!(),
-    };
+    event.type_ = event_type;
+    event.touches[0].identifier = id as usize;
+    event.touches[0].pos_x = x;
+    event.touches[0].pos_y = y;
     unsafe {
-        event.num_touches = TOUCHES.0 as i32;
-        event.touches = TOUCHES.1;
-        TOUCHES = std::mem::zeroed();
-        SAPP_DESC
-            .unwrap_or_else(|| panic!())
-            .event_userdata_cb
-            .unwrap_or_else(|| panic!())(&event as *const _, USER_DATA);
+        sapp_context().event(event);
     }
 }
