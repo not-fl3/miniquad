@@ -129,6 +129,8 @@ impl Texture {
     }
 
     pub fn from_rgba8(ctx: &mut Context, width: u16, height: u16, bytes: &[u8]) -> Texture {
+        assert_eq!(width as usize * height as usize * 4, bytes.len());
+
         unsafe {
             ctx.cache.store_texture_binding(0);
 
