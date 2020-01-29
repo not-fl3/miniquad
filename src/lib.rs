@@ -158,20 +158,40 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
             );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN => {
-            data.event_handler
-                .touch_start_event(&mut data.context, convert_touch(event.num_touches, &event.touches));
+            data.event_handler.touch_event(
+                &mut data.context,
+                TouchPhase::Started,
+                event.touches[0].identifier as u64,
+                event.touches[0].pos_x,
+                event.touches[0].pos_y,
+            );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED => {
-            data.event_handler
-                .touch_end_event(&mut data.context, convert_touch(event.num_touches, &event.touches));
+            data.event_handler.touch_event(
+                &mut data.context,
+                TouchPhase::Ended,
+                event.touches[0].identifier as u64,
+                event.touches[0].pos_x,
+                event.touches[0].pos_y,
+            );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED => {
-            data.event_handler
-                .touch_cancel_event(&mut data.context, convert_touch(event.num_touches, &event.touches));
+            data.event_handler.touch_event(
+                &mut data.context,
+                TouchPhase::Cancelled,
+                event.touches[0].identifier as u64,
+                event.touches[0].pos_x,
+                event.touches[0].pos_y,
+            );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED => {
-            data.event_handler
-                .touch_move_event(&mut data.context, convert_touch(event.num_touches, &event.touches));
+            data.event_handler.touch_event(
+                &mut data.context,
+                TouchPhase::Moved,
+                event.touches[0].identifier as u64,
+                event.touches[0].pos_x,
+                event.touches[0].pos_y,
+            );
         }
         _ => {}
     }

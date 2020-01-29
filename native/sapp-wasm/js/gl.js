@@ -315,6 +315,11 @@ animation = function () {
     window.requestAnimationFrame(animation);
 }
 
+const SAPP_EVENTTYPE_TOUCHES_BEGAN = 10;
+const SAPP_EVENTTYPE_TOUCHES_MOVED = 11;
+const SAPP_EVENTTYPE_TOUCHES_ENDED = 12;
+const SAPP_EVENTTYPE_TOUCHES_CANCELLED = 13;
+
 into_sapp_mousebutton = function (btn) {
     switch (btn) {
         case 0: return 0;
@@ -740,25 +745,33 @@ var importObject = {
                 wasm_exports.key_up(sapp_key_code);
             };
 
-            touch_function = function (event, id) {
-                event.preventDefault();
-                var touches = event.changedTouches;
-                for (touch of touches) {
-                    wasm_exports.push_touch(touch.identifier, Math.floor(touch.clientX), Math.floor(touch.clientY));
-                }
-                wasm_exports.touch_function(id);
-            }
             canvas.addEventListener("touchstart", function (event) {
-                touch_function(event, 0);
+                event.preventDefault();
+
+                for (var i = 0; i < changedTouches.length; i++) {
+                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_BEGAN, touch.identifier, i, changedTouches.length, Math.floor(touch.clientX), Math.floor(touch.clientY));
+                }
             });
             canvas.addEventListener("touchend", function (event) {
-                touch_function(event, 1);
+                event.preventDefault();
+
+                for (var i = 0; i < changedTouches.length; i++) {
+                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_END, touch.identifier, i, changedTouches.length, Math.floor(touch.clientX), Math.floor(touch.clientY));
+                }
             });
             canvas.addEventListener("touchcancel", function (event) {
-                touch_function(event, 2);
+                event.preventDefault();
+
+                for (var i = 0; i < changedTouches.length; i++) {
+                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_CANCEL, touch.identifier, i, changedTouches.length, Math.floor(touch.clientX), Math.floor(touch.clientY));
+                }
             });
             canvas.addEventListener("touchmove", function (event) {
-                touch_function(event, 3);
+                event.preventDefault();
+
+                for (var i = 0; i < changedTouches.length; i++) {
+                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_MOVE, touch.identifier, i, changedTouches.length, Math.floor(touch.clientX), Math.floor(touch.clientY));
+                }
             });
 
             window.onresize = function () {

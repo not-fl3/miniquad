@@ -311,6 +311,14 @@ impl From<u32> for KeyMods {
     }
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub enum TouchPhase {
+    Started,
+    Moved,
+    Ended,
+    Cancelled,
+}
+
 pub trait EventHandler {
     fn update(&mut self, _ctx: &mut Context);
     fn draw(&mut self, _ctx: &mut Context);
@@ -354,8 +362,5 @@ pub trait EventHandler {
 
     fn key_up_event(&mut self, _ctx: &mut Context, _keycode: KeyCode, _keymods: KeyMods) {}
 
-    fn touch_start_event(&mut self, _ctx: &mut Context, _touches: Vec<Touch>) {}
-    fn touch_end_event(&mut self, _ctx: &mut Context, _touches: Vec<Touch>) {}
-    fn touch_cancel_event(&mut self, _ctx: &mut Context, _touches: Vec<Touch>) {}
-    fn touch_move_event(&mut self, _ctx: &mut Context, _touches: Vec<Touch>) {}
+    fn touch_event(&mut self, _ctx: &mut Context, _phase: TouchPhase, _id: u64, _x: f32, _y: f32) {}
 }

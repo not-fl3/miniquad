@@ -6,18 +6,45 @@ mod rand;
 pub use gl::*;
 pub use rand::*;
 
+struct SappContext {
+    desc: sapp_desc,
+}
+
+impl SappContext {
+    unsafe fn init(desc: sapp_desc) {
+        let user_data = desc.user_data;
+        SAPP_CONTEXT = Some(SappContext { desc });
+        SAPP_CONTEXT
+            .as_mut()
+            .unwrap()
+            .desc
+            .init_userdata_cb
+            .unwrap_or_else(|| panic!())(user_data);
+    }
+
+    unsafe fn frame(&mut self) {
+        let user_data = self.desc.user_data;
+        self.desc.frame_userdata_cb.unwrap_or_else(|| panic!())(user_data);
+    }
+
+    unsafe fn event(&mut self, mut event: sapp_event) {
+        let user_data = self.desc.user_data;
+        self.desc.event_userdata_cb.unwrap_or_else(|| panic!())(
+            user_data as *const _,
+            &mut event as *mut _ as *mut _,
+        );
+    }
+}
+
+static mut SAPP_CONTEXT: Option<SappContext> = None;
+
+unsafe fn sapp_context() -> &'static mut SappContext {
+    SAPP_CONTEXT.as_mut().unwrap()
+}
+
 pub type sapp_event_type = u32;
 pub type sapp_mousebutton = i32;
 pub type sapp_keycode = u32;
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct sapp_touchpoint {
-    pub identifier: usize,
-    pub pos_x: f32,
-    pub pos_y: f32,
-    pub changed: bool,
-}
 
 pub const sapp_event_type_SAPP_EVENTTYPE_INVALID: sapp_event_type = 0;
 pub const sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN: sapp_event_type = 1;
@@ -195,6 +222,15 @@ pub struct sapp_event {
     pub window_height: ::std::os::raw::c_int,
     pub framebuffer_width: ::std::os::raw::c_int,
     pub framebuffer_height: ::std::os::raw::c_int,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sapp_touchpoint {
+    pub identifier: usize,
+    pub pos_x: f32,
+    pub pos_y: f32,
+    pub changed: bool,
 }
 
 #[repr(C)]
