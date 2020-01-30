@@ -748,25 +748,25 @@ var importObject = {
             canvas.addEventListener("touchstart", function (event) {
                 event.preventDefault();
 
-                changedTouches.forEach(touch =>
+                event.changedTouches.forEach(touch =>
                     wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_BEGAN, touch.identifier, Math.floor(touch.clientX), Math.floor(touch.clientY)));
             });
             canvas.addEventListener("touchend", function (event) {
                 event.preventDefault();
 
-                changedTouches.forEach(touch =>
+                event.changedTouches.forEach(touch =>
                     wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_END, touch.identifier, Math.floor(touch.clientX), Math.floor(touch.clientY)));
             });
             canvas.addEventListener("touchcancel", function (event) {
                 event.preventDefault();
 
-                changedTouches.forEach(touch =>
+                event.changedTouches.forEach(touch =>
                     wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_CANCEL, touch.identifier, Math.floor(touch.clientX), Math.floor(touch.clientY)));
             });
             canvas.addEventListener("touchmove", function (event) {
                 event.preventDefault();
 
-                changedTouches.forEach(touch =>
+                event.changedTouches.forEach(touch =>
                     wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_MOVE, touch.identifier, Math.floor(touch.clientX), Math.floor(touch.clientY)));
             });
 
