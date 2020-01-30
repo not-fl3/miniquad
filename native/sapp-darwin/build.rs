@@ -25,4 +25,7 @@ fn main() {
     }
 
     build.compile("sokol-app-sys");
+
+    println!("cargo:rustc-link-lib=framework=Cocoa");
+    println!("cargo:rustc-link-lib=framework=OpenGL");
 }

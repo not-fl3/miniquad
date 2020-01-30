@@ -1,15 +1,15 @@
 #![allow(warnings)]
 
-#[cfg(not(any(target_os = "linux", target_arch = "wasm32", windows)))]
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_arch = "wasm32", windows)))]
 extern crate sapp_dummy as sapp;
 #[cfg(target_os = "linux")]
 extern crate sapp_linux as sapp;
+#[cfg(target_os = "macos")]
+extern crate sapp_darwin as sapp;
 #[cfg(target_arch = "wasm32")]
 extern crate sapp_wasm as sapp;
 #[cfg(windows)]
 extern crate sapp_windows as sapp;
-#[cfg(target_os = "darwin")]
-extern crate sapp_darwin as sapp;
 
 pub mod conf;
 mod event;
