@@ -724,7 +724,6 @@ var importObject = {
                 var y = event.clientY;
                 var btn = into_sapp_mousebutton(event.button);
                 wasm_exports.mouse_down(x, y, btn);
-                // wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_BEGAN, 0, Math.floor(x), Math.floor(y));
             };
             // SO WEB SO CONSISTENT
             canvas.addEventListener('wheel',
