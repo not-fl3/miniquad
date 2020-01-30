@@ -27,11 +27,11 @@ impl SappContext {
         self.desc.frame_userdata_cb.unwrap_or_else(|| panic!())(user_data);
     }
 
-    unsafe fn event(&mut self, mut event: sapp_event) {
+    unsafe fn event(&mut self, event: sapp_event) {
         let user_data = self.desc.user_data;
         self.desc.event_userdata_cb.unwrap_or_else(|| panic!())(
-            user_data as *const _,
-            &mut event as *mut _ as *mut _,
+            &event as *const _,
+            user_data,
         );
     }
 }
@@ -407,10 +407,10 @@ pub extern "C" fn resize(width: i32, height: i32) {
 }
 
 #[no_mangle]
-pub extern "C" fn touch(event_type: u32, id: u64, x: f32, y: f32) {
+pub extern "C" fn touch(event_type: u32, id: u32, x: f32, y: f32) {
     let mut event: sapp_event = unsafe { std::mem::zeroed() };
 
-    event.type_ = event_type;
+    event.type_ = event_type as u32;
     event.touches[0].identifier = id as usize;
     event.touches[0].pos_x = x;
     event.touches[0].pos_y = y;
