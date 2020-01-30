@@ -411,9 +411,11 @@ pub extern "C" fn touch(event_type: u32, id: u32, x: f32, y: f32) {
     let mut event: sapp_event = unsafe { std::mem::zeroed() };
 
     event.type_ = event_type as u32;
+    event.num_touches = 1;
     event.touches[0].identifier = id as usize;
     event.touches[0].pos_x = x;
     event.touches[0].pos_y = y;
+    event.touches[0].changed = true;
     unsafe {
         sapp_context().event(event);
     }

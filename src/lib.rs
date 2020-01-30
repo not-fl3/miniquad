@@ -158,40 +158,56 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
             );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN => {
-            data.event_handler.touch_event(
-                &mut data.context,
-                TouchPhase::Started,
-                event.touches[0].identifier as u64,
-                event.touches[0].pos_x,
-                event.touches[0].pos_y,
-            );
+            for i in 0..(event.num_touches as usize) {
+                if event.touches[i].changed {
+                    data.event_handler.touch_event(
+                        &mut data.context,
+                        TouchPhase::Started,
+                        event.touches[0].identifier as u64,
+                        event.touches[0].pos_x,
+                        event.touches[0].pos_y,
+                    );
+                }
+            }
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED => {
-            data.event_handler.touch_event(
-                &mut data.context,
-                TouchPhase::Ended,
-                event.touches[0].identifier as u64,
-                event.touches[0].pos_x,
-                event.touches[0].pos_y,
-            );
+            for i in 0..(event.num_touches as usize) {
+                if event.touches[i].changed {
+                    data.event_handler.touch_event(
+                        &mut data.context,
+                        TouchPhase::Ended,
+                        event.touches[0].identifier as u64,
+                        event.touches[0].pos_x,
+                        event.touches[0].pos_y,
+                    );
+                }
+            }
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED => {
-            data.event_handler.touch_event(
-                &mut data.context,
-                TouchPhase::Cancelled,
-                event.touches[0].identifier as u64,
-                event.touches[0].pos_x,
-                event.touches[0].pos_y,
-            );
+            for i in 0..(event.num_touches as usize) {
+                if event.touches[i].changed {
+                    data.event_handler.touch_event(
+                        &mut data.context,
+                        TouchPhase::Cancelled,
+                        event.touches[0].identifier as u64,
+                        event.touches[0].pos_x,
+                        event.touches[0].pos_y,
+                    );
+                }
+            }
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED => {
-            data.event_handler.touch_event(
-                &mut data.context,
-                TouchPhase::Moved,
-                event.touches[0].identifier as u64,
-                event.touches[0].pos_x,
-                event.touches[0].pos_y,
-            );
+            for i in 0..(event.num_touches as usize) {
+                if event.touches[i].changed {
+                    data.event_handler.touch_event(
+                        &mut data.context,
+                        TouchPhase::Moved,
+                        event.touches[i].identifier as u64,
+                        event.touches[i].pos_x,
+                        event.touches[i].pos_y,
+                    );
+                }
+            }
         }
         _ => {}
     }
