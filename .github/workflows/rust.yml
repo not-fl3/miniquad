@@ -5,19 +5,24 @@ name: Cross-compile
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.config.os }}
     strategy:
       matrix:
-        target: [ 'x86_64-unknown-linux-gnu', 'i686-unknown-linux-gnu', 'x86_64-apple-darwin', 'x86_64-pc-windows-gnu', 'wasm32-unknown-unknown' ]
+        config:
+          - { os: ubuntu-latest, target: 'x86_64-unknown-linux-gnu' }
+          - { os: ubuntu-latest, target: 'i686-unknown-linux-gnu' }
+          - { os: ubuntu-latest, target: 'x86_64-pc-windows-gnu' }
+          - { os: ubuntu-latest, target: 'wasm32-unknown-unknown' }
+          - { os: macos-latest, target: 'x86_64-apple-darwin' }
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: ${{ matrix.target }}
+          target: ${{ matrix.config.target }}
           override: true
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: check
-          args: --all-targets --target=${{ matrix.target }}
+          args: --all-targets --target=${{ matrix.config.target }}
