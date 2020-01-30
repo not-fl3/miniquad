@@ -760,12 +760,12 @@ function init_plugins(plugins) {
     }
 }
 
-function set_mem_plugins(plugins) {
+function init_plugins_wasm(plugins) {
     if (plugins == undefined)
         return;
 
     for (var i = 0; i < plugins.length; i++) {
-        plugins[i].set_mem(memory);
+        plugins[i].init_wasm(memory, wasm_exports);
     }
 }
 
@@ -781,7 +781,7 @@ function load(wasm_path, plugins) {
                 memory = obj.instance.exports.memory;
                 wasm_exports = obj.instance.exports;
 
-                set_mem_plugins(plugins);
+                init_plugins_wasm(plugins);
                 obj.instance.exports.main();
             });
     } else {
@@ -792,7 +792,7 @@ function load(wasm_path, plugins) {
                 memory = obj.instance.exports.memory;
                 wasm_exports = obj.instance.exports;
 
-                set_mem_plugins(plugins);
+                init_plugins_wasm(plugins);
                 obj.instance.exports.main();
             });
     }
