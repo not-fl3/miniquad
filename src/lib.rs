@@ -8,6 +8,8 @@ extern crate sapp_linux as sapp;
 extern crate sapp_wasm as sapp;
 #[cfg(windows)]
 extern crate sapp_windows as sapp;
+#[cfg(target_os = "darwin")]
+extern crate sapp_darwin as sapp;
 
 pub mod conf;
 mod event;
