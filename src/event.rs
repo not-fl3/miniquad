@@ -319,6 +319,18 @@ pub enum TouchPhase {
     Cancelled,
 }
 
+impl From<u32> for TouchPhase {
+    fn from(event: u32) -> TouchPhase {
+        match event {
+            sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN => TouchPhase::Started,
+            sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED => TouchPhase::Ended,
+            sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED => TouchPhase::Cancelled,
+            sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED => TouchPhase::Moved,
+            _ => unreachable!(),
+        }
+    }
+}
+
 pub trait EventHandler {
     fn update(&mut self, _ctx: &mut Context);
     fn draw(&mut self, _ctx: &mut Context);
