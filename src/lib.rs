@@ -159,6 +159,22 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
                 event.window_height as f32,
             );
         }
+        sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN |
+        sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED |
+        sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED |
+        sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED => {
+            for i in 0..(event.num_touches as usize) {
+                if event.touches[i].changed {
+                    data.event_handler.touch_event(
+                        &mut data.context,
+                        event.type_.into(),
+                        event.touches[i].identifier as u64,
+                        event.touches[i].pos_x,
+                        event.touches[i].pos_y,
+                    );
+                }
+            }
+        }
         _ => {}
     }
 }

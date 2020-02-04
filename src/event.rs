@@ -10,6 +10,13 @@ pub enum MouseButton {
     Unknown,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct Touch {
+    pub id: u32,
+    pub x: f32,
+    pub y: f32,
+}
+
 impl From<sapp_mousebutton> for MouseButton {
     fn from(btn: sapp_mousebutton) -> MouseButton {
         match btn {
@@ -304,6 +311,26 @@ impl From<u32> for KeyMods {
     }
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub enum TouchPhase {
+    Started,
+    Moved,
+    Ended,
+    Cancelled,
+}
+
+impl From<u32> for TouchPhase {
+    fn from(event: u32) -> TouchPhase {
+        match event {
+            sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN => TouchPhase::Started,
+            sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED => TouchPhase::Ended,
+            sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED => TouchPhase::Cancelled,
+            sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED => TouchPhase::Moved,
+            _ => unreachable!(),
+        }
+    }
+}
+
 pub trait EventHandler {
     fn update(&mut self, _ctx: &mut Context);
     fn draw(&mut self, _ctx: &mut Context);
@@ -346,4 +373,6 @@ pub trait EventHandler {
     }
 
     fn key_up_event(&mut self, _ctx: &mut Context, _keycode: KeyCode, _keymods: KeyMods) {}
+
+    fn touch_event(&mut self, _ctx: &mut Context, _phase: TouchPhase, _id: u64, _x: f32, _y: f32) {}
 }
