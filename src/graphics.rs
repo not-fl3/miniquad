@@ -129,6 +129,8 @@ impl Texture {
     }
 
     pub fn from_rgba8(ctx: &mut Context, width: u16, height: u16, bytes: &[u8]) -> Texture {
+        assert_eq!(width as usize * height as usize * 4, bytes.len());
+
         unsafe {
             ctx.cache.store_texture_binding(0);
 
@@ -172,8 +174,18 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
     }
 
+    /// Update whole texture content
+    /// bytes should be width * height * 4 size - non rgba8 textures are not supported yet anyway
     pub fn update(&self, ctx: &mut Context, bytes: &[u8]) {
         assert_eq!(self.width as usize * self.height as usize * 4, bytes.len());
+
+        self.update_texture_part(ctx, 0 as _, 0 as _, self.width as _, self.height as _, bytes)
+    }
+
+    pub fn update_texture_part(&self, ctx: &mut Context, x_offset: i32, y_offset: i32, width: i32, height: i32, bytes: &[u8]) {
+        assert_eq!(width as usize * height as usize * 4, bytes.len());
+        assert!(x_offset + width <= self.width as _);
+        assert!(y_offset + height <= self.height as _);
 
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
@@ -182,10 +194,10 @@ impl Texture {
             glTexSubImage2D(
                 GL_TEXTURE_2D,
                 0,
-                0,
-                0,
-                self.width as _,
-                self.height as _,
+                x_offset as _,
+                y_offset as _,
+                width as _,
+                height as _,
                 GL_RGBA,
                 GL_UNSIGNED_BYTE,
                 bytes.as_ptr() as *const _,
@@ -194,6 +206,7 @@ impl Texture {
 
         ctx.cache.restore_texture_binding(0);
     }
+
 }
 
 fn get_uniform_location(program: GLuint, name: &str) -> i32 {

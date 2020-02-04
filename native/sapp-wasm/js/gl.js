@@ -12,6 +12,8 @@ if (gl === null) {
     alert("Unable to initialize WebGL. Your browser or machine may not support it.");
 }
 
+canvas.focus();
+
 function assert(flag, message) {
     if (flag == false) {
         alert(message)
@@ -788,19 +790,19 @@ function init_plugins(plugins) {
         return;
 
     for (var i = 0; i < plugins.length; i++) {
-        plugins[i].init(importObject);
+        plugins[i].register_plugin(importObject);
     }
 }
 
-function set_mem_plugins(plugins) {
+function expose_wasm(plugins) {
     if (plugins == undefined)
         return;
 
     for (var i = 0; i < plugins.length; i++) {
-        plugins[i].set_mem(memory);
+        plugins[i].set_wasm_refs(memory, wasm_exports);
     }
 }
-
+    
 
 function load(wasm_path, plugins) {
     var req = fetch(wasm_path);
@@ -813,7 +815,7 @@ function load(wasm_path, plugins) {
                 memory = obj.instance.exports.memory;
                 wasm_exports = obj.instance.exports;
 
-                set_mem_plugins(plugins);
+                expose_wasm(plugins);
                 obj.instance.exports.main();
             });
     } else {
@@ -824,7 +826,7 @@ function load(wasm_path, plugins) {
                 memory = obj.instance.exports.memory;
                 wasm_exports = obj.instance.exports;
 
-                set_mem_plugins(plugins);
+                expose_wasm(plugins);
                 obj.instance.exports.main();
             });
     }
