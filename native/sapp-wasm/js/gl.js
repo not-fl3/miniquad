@@ -81,6 +81,11 @@ function UTF8ToString(ptr, len) {
     return string;
 }
 
+var FS = {
+    loaded_files: [],
+    unique_id: 0
+};
+
 var GL = {
     counter: 1,
     buffers: [],
@@ -780,6 +785,48 @@ var importObject = {
                 resize(canvas, wasm_exports.resize);
             };
             window.requestAnimationFrame(animation);
+        },
+
+        fs_load_file: function (ptr, len) {
+            var url = UTF8ToString(ptr, len);
+            var file_id = FS.unique_id;
+            FS.unique_id += 1;
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.responseType = 'arraybuffer';
+            xhr.onload = function (e) {
+                if (this.status == 200) {
+                    var uInt8Array = new Uint8Array(this.response);
+
+                    FS.loaded_files[file_id] = uInt8Array;
+                    wasm_exports.file_loaded(file_id);
+                }
+            }
+            xhr.onerror = function (e) {
+                FS.loaded_files[file_id] = null;
+                wasm_exports.file_loaded(file_id);
+            };
+
+            xhr.send();
+
+            return file_id;
+        },
+
+        fs_get_buffer_size: function (file_id) {
+            if (FS.loaded_files[file_id] == null) {
+                return -1;
+            } else {
+                return FS.loaded_files[file_id].length;
+            }
+        },
+        fs_take_buffer: function (file_id, ptr, max_length) {
+            var file = FS.loaded_files[file_id];
+            console.assert(file.length <= max_length);
+            var dest = new Uint8Array(memory.buffer, ptr, max_length);
+            for (var i = 0; i < file.length; i++) {
+                dest[i] = file[i];
+            }
+            delete FS.loaded_files[file_id];
         }
     }
 };
@@ -802,7 +849,7 @@ function expose_wasm(plugins) {
         plugins[i].set_wasm_refs(memory, wasm_exports);
     }
 }
-    
+
 
 function load(wasm_path, plugins) {
     var req = fetch(wasm_path);

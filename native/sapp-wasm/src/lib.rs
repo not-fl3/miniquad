@@ -1,5 +1,6 @@
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 
+pub mod fs;
 mod gl;
 mod rand;
 
@@ -29,10 +30,7 @@ impl SappContext {
 
     unsafe fn event(&mut self, event: sapp_event) {
         let user_data = self.desc.user_data;
-        self.desc.event_userdata_cb.unwrap_or_else(|| panic!())(
-            &event as *const _,
-            user_data,
-        );
+        self.desc.event_userdata_cb.unwrap_or_else(|| panic!())(&event as *const _, user_data);
     }
 }
 
