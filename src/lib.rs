@@ -21,6 +21,9 @@ mod event;
 pub mod fs;
 pub mod graphics;
 
+#[cfg(feature = "log-impl")]
+pub mod log;
+
 pub use event::*;
 
 pub use graphics::*;

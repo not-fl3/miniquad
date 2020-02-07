@@ -1,6 +1,6 @@
 [package]
 name = "miniquad"
-version = "0.2.23"
+version = "0.2.25"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -10,6 +10,13 @@ description = """
 Cross-platform window context and rendering library.
 """
 readme="README.md"
+
+[features]
+default = []
+
+# Optional log-rs like macros implementation
+# disabled by default
+log-impl = []
 
 [target.'cfg(windows)'.dependencies]
 sapp-windows = { path ="./native/sapp-windows", version = "0.2.5" }
