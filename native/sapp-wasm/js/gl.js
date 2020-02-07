@@ -351,7 +351,7 @@ into_sapp_keycode = function (key_code) {
 }
 
 var emscripten_shaders_hack = false;
-var start;
+
 var importObject = {
     env: {
         console_debug: function (ptr) {
@@ -376,7 +376,7 @@ var importObject = {
             return Math.floor(Math.random() * 2147483647);
         },
         time: function () {
-            return (Date.now() - start) / 1000.0;
+            return Date.now() / 1000.0;
         },
         canvas_width: function () {
             return Math.floor(canvas.clientWidth);
@@ -720,7 +720,6 @@ var importObject = {
             }
         },
         init_opengl: function (ptr) {
-            start = Date.now();
             canvas.onmousemove = function (event) {
                 var x = event.clientX;
                 var y = event.clientY;
