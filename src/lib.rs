@@ -49,6 +49,46 @@ pub mod date {
     }
 }
 
+impl Context {
+    /// This function simply quits the application without
+    /// giving the user a chance to intervene. Usually this might
+    /// be called when the user clicks the 'Ok' button in a 'Really Quit?'
+    /// dialog box
+    pub fn quit(&self) {
+        // its not possible to quit wasm anyway
+        #[cfg(not(target_arch = "wasm32"))]
+        unsafe {
+            sapp::sapp_quit();
+        }
+    }
+
+    /// Calling request_quit() will trigger "quit_requested_event" event , giving
+    /// the user code a chance to intervene and cancel the pending quit process
+    /// (for instance to show a 'Really Quit?' dialog box).
+    /// If the event handler callback does nothing, the application will be quit as usual.
+    /// To prevent this, call the function "cancel_quit()"" from inside the event handler.
+    pub fn request_quit(&self) {
+        // its not possible to quit wasm anyway
+        #[cfg(not(target_arch = "wasm32"))]
+        unsafe {
+            sapp::sapp_request_quit();
+        }
+    }
+
+    /// Cancels a pending quit request, either initiated
+    /// by the user clicking the window close button, or programmatically
+    /// by calling "request_quit()". The only place where calling this
+    /// function makes sense is from inside the event handler callback when
+    /// the "quit_requested_event" event has been received
+    pub fn cancel_quit(&self) {
+        // its not possible to quit wasm anyway
+        #[cfg(not(target_arch = "wasm32"))]
+        unsafe {
+            sapp::sapp_cancel_quit();
+        }
+    }
+}
+
 struct UserData {
     event_handler: Box<dyn EventHandler>,
     context: Context,
@@ -183,6 +223,9 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
                     );
                 }
             }
+        }
+        sapp::sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED => {
+            data.event_handler.quit_requested_event(&mut data.context);
         }
         _ => {}
     }

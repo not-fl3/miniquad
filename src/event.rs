@@ -375,4 +375,11 @@ pub trait EventHandler {
     fn key_up_event(&mut self, _ctx: &mut Context, _keycode: KeyCode, _keymods: KeyMods) {}
 
     fn touch_event(&mut self, _ctx: &mut Context, _phase: TouchPhase, _id: u64, _x: f32, _y: f32) {}
+
+    /// This event is sent when the userclicks the window's close button
+    /// or application code calls the ctx.request_quit() function. The event
+    /// handler callback code can handle this event by calling
+    /// ctx.cancel_quit() to cancel the quit.
+    /// If the event is ignored, the application will quit as usual.
+    fn quit_requested_event(&mut self, _ctx: &mut Context) {}
 }
