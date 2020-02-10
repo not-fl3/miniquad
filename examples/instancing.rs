@@ -141,7 +141,9 @@ impl EventHandler for Stage {
 }
 
 fn main() {
-    miniquad::start(conf::Conf::default(), |ctx| Box::new(Stage::new(ctx)));
+    miniquad::start(conf::Conf::default(), |mut ctx| {
+        UserData::owning(Stage::new(&mut ctx), ctx)
+    });
 }
 
 mod shader {

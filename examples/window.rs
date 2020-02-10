@@ -8,5 +8,5 @@ impl EventHandler for Stage {
 }
 
 fn main() {
-    miniquad::start(conf::Conf::default(), |_| Box::new(Stage));
+    miniquad::start(conf::Conf::default(), |ctx| UserData::owning(Stage, ctx));
 }
