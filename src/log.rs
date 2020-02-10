@@ -82,13 +82,13 @@ macro_rules! log {
     });
     (target: $target:expr, $lvl:expr, $($arg:tt)+) => ({
         let lvl = $lvl;
-        if lvl <= $crate::STATIC_MAX_LEVEL && lvl <= $crate::max_level() {
-            $crate::log::__private_api_log(
-                __log_format_args!($($arg)+),
+        //if lvl <= $crate::STATIC_MAX_LEVEL && lvl <= $crate::max_level() {
+            $crate::log::__private_api_log_lit(
+                &__log_format_args!($($arg)+),
                 lvl,
                 &($target, __log_module_path!(), __log_file!(), __log_line!()),
             );
-        }
+        //}
     });
     ($lvl:expr, $($arg:tt)+) => (log!(target: __log_module_path!(), $lvl, $($arg)+))
 }
@@ -150,7 +150,7 @@ macro_rules! trace {
 #[macro_export]
 macro_rules! __log_format_args {
     ($($args:tt)*) => {
-        format_args!($($args)*)
+        format!($($args)*)
     };
 }
 
@@ -206,4 +206,22 @@ pub fn __private_api_log_lit(
     let msg = CString::new(message).unwrap_or_else(|_| panic!());
 
     unsafe { log_fn(msg.as_ptr()) };
+}
+
+#[test]
+fn test_logs() {
+    trace!("info");
+    trace!("info: {}", 1);
+
+    debug!("info");
+    debug!("info: {}", 1);
+
+    info!("info");
+    info!("info: {}", 1);
+
+    warn!("info");
+    warn!("info: {}", 1);
+
+    error!("info");
+    error!("info: {}", 1);
 }
