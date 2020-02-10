@@ -331,6 +331,7 @@ impl From<u32> for TouchPhase {
     }
 }
 
+/// A trait defining event callbacks.
 pub trait EventHandler {
     fn update(&mut self, _ctx: &mut Context);
     fn draw(&mut self, _ctx: &mut Context);
@@ -382,4 +383,28 @@ pub trait EventHandler {
     /// ctx.cancel_quit() to cancel the quit.
     /// If the event is ignored, the application will quit as usual.
     fn quit_requested_event(&mut self, _ctx: &mut Context) {}
+}
+
+/// A trait defining event callbacks.
+/// Used for miniquad's setup with user-owned Context.
+/// The only difference from EventHandler - will not receive "&mut Context"
+pub trait EventHandlerFree {
+    fn update(&mut self);
+    fn draw(&mut self);
+    fn resize_event(&mut self, _width: f32, _height: f32) {}
+    fn mouse_motion_event(&mut self, _x: f32, _y: f32, _dx: f32, _dy: f32) {}
+    fn mouse_wheel_event(&mut self, _x: f32, _y: f32) {}
+    fn mouse_button_down_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
+    fn mouse_button_up_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
+    fn char_event(&mut self, _character: char, _keymods: KeyMods, _repeat: bool) {}
+    fn key_down_event(&mut self, _keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {}
+    fn key_up_event(&mut self, _keycode: KeyCode, _keymods: KeyMods) {}
+    fn touch_event(&mut self, _phase: TouchPhase, _id: u64, _x: f32, _y: f32) {}
+
+    /// This event is sent when the userclicks the window's close button
+    /// or application code calls the ctx.request_quit() function. The event
+    /// handler callback code can handle this event by calling
+    /// ctx.cancel_quit() to cancel the quit.
+    /// If the event is ignored, the application will quit as usual.
+    fn quit_requested_event(&mut self) {}
 }

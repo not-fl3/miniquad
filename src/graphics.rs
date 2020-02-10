@@ -1284,7 +1284,7 @@ pub struct Buffer {
 
 impl Buffer {
     /// Create an immutable buffer resource object.
-    /// ```no_run
+    /// ```ignore
     /// #[repr(C)]
     /// struct Vertex {
     ///     pos: Vec2,

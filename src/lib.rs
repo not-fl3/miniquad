@@ -89,13 +89,37 @@ impl Context {
     }
 }
 
-struct UserData {
-    event_handler: Box<dyn EventHandler>,
-    context: Context,
+pub enum UserData {
+    Owning((Box<dyn EventHandler>, Context)),
+    Free(Box<dyn EventHandlerFree>),
+}
+
+impl UserData {
+    pub fn owning(event_handler: impl EventHandler + 'static, ctx: Context) -> UserData {
+        UserData::Owning((Box::new(event_handler), ctx))
+    }
+
+    pub fn free(event_handler: impl EventHandlerFree + 'static) -> UserData {
+        UserData::Free(Box::new(event_handler))
+    }
+}
+
+/// call appropriate event handler function - with or without Context reference
+macro_rules! event_call {
+    ( $event_handler:expr, $fn:ident $(, $args:expr)*) => {{
+        match $event_handler {
+            UserData::Owning((ref mut event_handler, ref mut context)) => {
+                event_handler.$fn(context, $($args,)*);
+            }
+            UserData::Free(ref mut event_handler) => {
+                event_handler.$fn($($args,)*);
+            }
+        }
+    }};
 }
 
 enum UserDataState {
-    Uninitialized(Box<dyn 'static + FnOnce(&mut Context) -> Box<dyn event::EventHandler>>),
+    Uninitialized(Box<dyn 'static + FnOnce(Context) -> UserData>),
     Intialized(UserData),
     Empty,
 }
@@ -112,10 +136,7 @@ extern "C" fn init(user_data: *mut ::std::os::raw::c_void) {
     };
     let mut context = graphics::Context::new();
 
-    let user_data = UserData {
-        event_handler: f(&mut context),
-        context,
-    };
+    let user_data = f(context);
     std::mem::replace(data, UserDataState::Intialized(user_data));
 }
 
@@ -128,8 +149,8 @@ extern "C" fn frame(user_data: *mut ::std::os::raw::c_void) {
         panic!()
     };
 
-    data.event_handler.update(&mut data.context);
-    data.event_handler.draw(&mut data.context);
+    event_call!(data, update);
+    event_call!(data, draw);
 }
 
 extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::raw::c_void) {
@@ -144,68 +165,62 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
 
     match event.type_ {
         sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE => {
-            data.event_handler.mouse_motion_event(
-                &mut data.context,
+            event_call!(
+                data,
+                mouse_motion_event,
                 event.mouse_x,
                 event.mouse_y,
                 0.,
-                0.,
+                0.
             );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_SCROLL => {
-            data.event_handler
-                .mouse_wheel_event(&mut data.context, event.scroll_x, event.scroll_y);
+            event_call!(data, mouse_wheel_event, event.scroll_x, event.scroll_y);
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN => {
-            data.event_handler.mouse_button_down_event(
-                &mut data.context,
+            event_call!(
+                data,
+                mouse_button_down_event,
                 MouseButton::from(event.mouse_button),
                 event.mouse_x,
-                event.mouse_y,
+                event.mouse_y
             );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP => {
             let btn = MouseButton::from(event.mouse_button);
-            data.event_handler.mouse_button_up_event(
-                &mut data.context,
+            event_call!(
+                data,
+                mouse_button_up_event,
                 MouseButton::from(event.mouse_button),
                 event.mouse_x,
-                event.mouse_y,
+                event.mouse_y
             );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_CHAR => {
             if let Some(character) = std::char::from_u32(event.char_code) {
                 let mut key_mods = KeyMods::from(event.modifiers);
 
-                data.event_handler.char_event(
-                    &mut data.context,
-                    character,
-                    key_mods,
-                    event.key_repeat,
-                )
+                event_call!(data, char_event, character, key_mods, event.key_repeat)
             }
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN => {
             let keycode = KeyCode::from(event.key_code);
             let mut key_mods = KeyMods::from(event.modifiers);
 
-            data.event_handler
-                .key_down_event(&mut data.context, keycode, key_mods, false)
+            event_call!(data, key_down_event, keycode, key_mods, false)
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_KEY_UP => {
             let keycode = KeyCode::from(event.key_code);
             let mut key_mods = KeyMods::from(event.modifiers);
 
-            data.event_handler
-                .key_up_event(&mut data.context, keycode, key_mods)
+            event_call!(data, key_up_event, keycode, key_mods);
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_RESIZED => {
-            data.context
-                .resize(event.window_width as u32, event.window_height as u32);
-            data.event_handler.resize_event(
-                &mut data.context,
+            event_call!(
+                data,
+                resize_event,
                 event.window_width as f32,
-                event.window_height as f32,
+                event.window_height as f32
             );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN
@@ -214,26 +229,60 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
         | sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED => {
             for i in 0..(event.num_touches as usize) {
                 if event.touches[i].changed {
-                    data.event_handler.touch_event(
-                        &mut data.context,
+                    event_call!(
+                        data,
+                        touch_event,
                         event.type_.into(),
                         event.touches[i].identifier as u64,
                         event.touches[i].pos_x,
-                        event.touches[i].pos_y,
+                        event.touches[i].pos_y
                     );
                 }
             }
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED => {
-            data.event_handler.quit_requested_event(&mut data.context);
+            event_call!(data, quit_requested_event);
         }
         _ => {}
     }
 }
 
+/// Start miniquad.
+/// Initialization callback will be called when miniquad's Context is ready.
+/// User can take ownership on Context and store it in user Code. Or return it back
+/// to miniquad and give miniquad ownership on Context.
+///
+/// Variant wth EventHandler:
+/// ```no_run
+/// # use miniquad::*;
+/// struct Stage;
+///
+/// impl EventHandler for Stage {
+///     fn update(&mut self, _ctx: &mut Context) {}
+///     fn draw(&mut self, _ctx: &mut Context) {}
+/// }
+/// fn main() {
+///     miniquad::start(conf::Conf::default(), |ctx| UserData::owning(Stage, ctx));
+/// }
+/// ```
+///
+/// Variant wth EventHandlerFree:
+/// ```no_run
+/// # use miniquad::*;
+/// struct Stage {
+///     ctx: Context,
+/// }
+/// impl EventHandlerFree for Stage {
+///     fn update(&mut self) {}
+///     fn draw(&mut self) {}
+/// }
+/// fn main() {
+///     miniquad::start(conf::Conf::default(), |ctx| UserData::free(Stage { ctx }));
+/// }
+/// ```
 pub fn start<F>(_conf: conf::Conf, f: F)
 where
-    F: 'static + FnOnce(&mut Context) -> Box<dyn event::EventHandler>,
+    F: 'static + FnOnce(Context) -> UserData,
 {
     let mut desc: sapp::sapp_desc = unsafe { std::mem::zeroed() };
 
