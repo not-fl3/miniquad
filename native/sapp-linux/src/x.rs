@@ -15,8 +15,9 @@ pub use Xlib_h::{
     XDestroyWindow, XErrorEvent, XErrorHandler, XEvent, XFlush, XFree, XFreeColormap,
     XGetKeyboardMapping, XGetWindowAttributes, XGetWindowProperty, XInitThreads, XInternAtom,
     XKeyEvent, XMapWindow, XNextEvent, XOpenDisplay, XPending, XPointer, XRaiseWindow,
-    XResourceManagerString, XSetErrorHandler, XSetWMProtocols, XSetWindowAttributes, XSync,
-    XUnmapWindow, XWindowAttributes, XrmInitialize, _XEvent, _XPrivDisplay, _XrmHashBucketRec,
+    XResourceManagerString, XSelectionEvent, XSelectionRequestEvent, XSetErrorHandler,
+    XSetWMProtocols, XSetWindowAttributes, XSync, XUnmapWindow, XWindowAttributes, XrmInitialize,
+    _XEvent, _XPrivDisplay, _XrmHashBucketRec,
 };
 pub use Xmd_h::CARD32;
 pub use Xresource_h::{

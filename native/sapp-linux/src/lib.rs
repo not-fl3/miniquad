@@ -15,6 +15,8 @@ mod gl;
 mod rand;
 mod x;
 
+pub mod clipboard;
+
 pub use gl::*;
 pub use rand::*;
 
@@ -2472,6 +2474,15 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
                 }
             }
         }
+        // SelectionRequest
+        30 => {
+            // some other app is waiting for clibpoard content
+            // need to make appropriate XSelectionEvent - response for this request
+            // only UTF8_STRING request is actually supported
+            crate::clipboard::respond_to_clipboard_request(event);
+        }
+        // SelectionClear
+        29 => {}
         17 | _ => {}
     };
 }
