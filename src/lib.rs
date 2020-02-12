@@ -16,6 +16,7 @@ extern crate sapp_wasm as sapp;
 #[cfg(windows)]
 extern crate sapp_windows as sapp;
 
+pub mod clipboard;
 pub mod conf;
 mod event;
 pub mod fs;
