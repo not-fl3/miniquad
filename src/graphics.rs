@@ -1341,7 +1341,7 @@ impl Buffer {
         }
     }
 
-    pub fn update<T: std::fmt::Debug>(&self, ctx: &mut Context, data: &[T]) {
+    pub fn update<T>(&self, ctx: &mut Context, data: &[T]) {
         //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
 
         let size = mem::size_of_val(data);
