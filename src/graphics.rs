@@ -95,14 +95,16 @@ impl Default for RenderTextureParams {
 
 impl Texture {
     pub fn new_render_texture(ctx: &mut Context, params: RenderTextureParams) -> Texture {
-        let mut texture: GLuint = 0;
-
         let (internal_format, format, pixel_type) = params.format.into();
+
+        ctx.cache.store_texture_binding(0);
+
+        let mut texture: GLuint = 0;
 
         unsafe {
             glGenTextures(1, &mut texture as *mut _);
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, texture);
+            ctx.cache.bind_texture(0, texture);
             glTexImage2D(
                 GL_TEXTURE_2D,
                 0,
@@ -120,6 +122,7 @@ impl Texture {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR as i32);
         }
+        ctx.cache.restore_texture_binding(0);
 
         Texture {
             texture,
@@ -624,12 +627,6 @@ impl Context {
                 },
                 //attributes: [None; 16],
             }
-        }
-    }
-
-    pub(crate) fn resize(&mut self, w: u32, h: u32) {
-        unsafe {
-            glViewport(0, 0, w as i32, h as i32);
         }
     }
 

@@ -1,5 +1,3 @@
-#![allow(warnings)]
-
 #[cfg(target_os = "macos")]
 extern crate sapp_darwin as sapp;
 #[cfg(not(any(
@@ -135,7 +133,7 @@ extern "C" fn init(user_data: *mut ::std::os::raw::c_void) {
     } else {
         panic!();
     };
-    let mut context = graphics::Context::new();
+    let context = graphics::Context::new();
 
     let user_data = f(context);
     std::mem::replace(data, UserDataState::Intialized(user_data));
@@ -188,7 +186,6 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
             );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP => {
-            let btn = MouseButton::from(event.mouse_button);
             event_call!(
                 data,
                 mouse_button_up_event,
@@ -199,20 +196,20 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_CHAR => {
             if let Some(character) = std::char::from_u32(event.char_code) {
-                let mut key_mods = KeyMods::from(event.modifiers);
+                let key_mods = KeyMods::from(event.modifiers);
 
                 event_call!(data, char_event, character, key_mods, event.key_repeat)
             }
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN => {
             let keycode = KeyCode::from(event.key_code);
-            let mut key_mods = KeyMods::from(event.modifiers);
+            let key_mods = KeyMods::from(event.modifiers);
 
             event_call!(data, key_down_event, keycode, key_mods, false)
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_KEY_UP => {
             let keycode = KeyCode::from(event.key_code);
-            let mut key_mods = KeyMods::from(event.modifiers);
+            let key_mods = KeyMods::from(event.modifiers);
 
             event_call!(data, key_up_event, keycode, key_mods);
         }

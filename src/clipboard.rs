@@ -9,7 +9,7 @@ pub fn get(ctx: &mut Context) -> Option<String> {
 pub fn set(ctx: &mut Context, data: &str) {}
 
 #[cfg(target_os = "linux")]
-pub fn get(ctx: &mut Context) -> Option<String> {
+pub fn get(_ctx: &mut Context) -> Option<String> {
     use std::ffi::CString;
 
     let bufname = CString::new("CLIPBOARD").unwrap();
@@ -19,7 +19,7 @@ pub fn get(ctx: &mut Context) -> Option<String> {
 }
 
 #[cfg(target_os = "linux")]
-pub fn set(ctx: &mut Context, data: &str) {
+pub fn set(_ctx: &mut Context, data: &str) {
     use std::ffi::CString;
 
     let bufname = CString::new("CLIPBOARD").unwrap();

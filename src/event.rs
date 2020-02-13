@@ -277,7 +277,7 @@ impl From<sapp_keycode> for KeyCode {
             sapp::sapp_keycode_SAPP_KEYCODE_RIGHT_ALT => KeyCode::RightAlt,
             sapp::sapp_keycode_SAPP_KEYCODE_RIGHT_SUPER => KeyCode::RightSuper,
             sapp::sapp_keycode_SAPP_KEYCODE_MENU => KeyCode::Menu,
-            unknown => KeyCode::Unknown,
+            _ => KeyCode::Unknown,
         }
     }
 }
