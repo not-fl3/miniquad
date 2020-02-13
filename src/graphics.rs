@@ -179,10 +179,25 @@ impl Texture {
     pub fn update(&self, ctx: &mut Context, bytes: &[u8]) {
         assert_eq!(self.width as usize * self.height as usize * 4, bytes.len());
 
-        self.update_texture_part(ctx, 0 as _, 0 as _, self.width as _, self.height as _, bytes)
+        self.update_texture_part(
+            ctx,
+            0 as _,
+            0 as _,
+            self.width as _,
+            self.height as _,
+            bytes,
+        )
     }
 
-    pub fn update_texture_part(&self, ctx: &mut Context, x_offset: i32, y_offset: i32, width: i32, height: i32, bytes: &[u8]) {
+    pub fn update_texture_part(
+        &self,
+        ctx: &mut Context,
+        x_offset: i32,
+        y_offset: i32,
+        width: i32,
+        height: i32,
+        bytes: &[u8],
+    ) {
         assert_eq!(width as usize * height as usize * 4, bytes.len());
         assert!(x_offset + width <= self.width as _);
         assert!(y_offset + height <= self.height as _);
@@ -206,7 +221,6 @@ impl Texture {
 
         ctx.cache.restore_texture_binding(0);
     }
-
 }
 
 fn get_uniform_location(program: GLuint, name: &str) -> i32 {
