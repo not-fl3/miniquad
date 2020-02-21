@@ -19,7 +19,8 @@ pub use rand::*;
 
 pub type sapp_event_type = libc::c_uint;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
-pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 21;
+pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 22;
+pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
 pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
 pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
 pub const sapp_event_type_SAPP_EVENTTYPE_RESUMED: sapp_event_type = 18;

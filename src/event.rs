@@ -336,7 +336,7 @@ pub trait EventHandler {
     fn update(&mut self, _ctx: &mut Context);
     fn draw(&mut self, _ctx: &mut Context);
     fn resize_event(&mut self, _ctx: &mut Context, _width: f32, _height: f32) {}
-    fn mouse_motion_event(&mut self, _ctx: &mut Context, _x: f32, _y: f32, _dx: f32, _dy: f32) {}
+    fn mouse_motion_event(&mut self, _ctx: &mut Context, _x: f32, _y: f32) {}
     fn mouse_wheel_event(&mut self, _ctx: &mut Context, _x: f32, _y: f32) {}
     fn mouse_button_down_event(
         &mut self,
@@ -374,8 +374,12 @@ pub trait EventHandler {
     }
 
     fn key_up_event(&mut self, _ctx: &mut Context, _keycode: KeyCode, _keymods: KeyMods) {}
-
     fn touch_event(&mut self, _ctx: &mut Context, _phase: TouchPhase, _id: u64, _x: f32, _y: f32) {}
+
+    /// Represents raw hardware mouse motion event
+    /// Note that these events are delivered regardless of input focus and not in pixels, but in
+    /// hardware units instead. And those units may be different from pixels depending on the target platform
+    fn raw_mouse_motion(&mut self, _ctx: &mut Context, _dx: f32, _dy: f32) {}
 
     /// This event is sent when the userclicks the window's close button
     /// or application code calls the ctx.request_quit() function. The event
@@ -392,7 +396,7 @@ pub trait EventHandlerFree {
     fn update(&mut self);
     fn draw(&mut self);
     fn resize_event(&mut self, _width: f32, _height: f32) {}
-    fn mouse_motion_event(&mut self, _x: f32, _y: f32, _dx: f32, _dy: f32) {}
+    fn mouse_motion_event(&mut self, _x: f32, _y: f32) {}
     fn mouse_wheel_event(&mut self, _x: f32, _y: f32) {}
     fn mouse_button_down_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
     fn mouse_button_up_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
@@ -400,6 +404,11 @@ pub trait EventHandlerFree {
     fn key_down_event(&mut self, _keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {}
     fn key_up_event(&mut self, _keycode: KeyCode, _keymods: KeyMods) {}
     fn touch_event(&mut self, _phase: TouchPhase, _id: u64, _x: f32, _y: f32) {}
+
+    /// Represents raw hardware mouse motion event
+    /// Note that these events are delivered regardless of input focus and not in pixels, but in
+    /// hardware units instead. And those units may be different from pixels depending on the target platform
+    fn raw_mouse_motion(&mut self, _dx: f32, _dy: f32) {}
 
     /// This event is sent when the userclicks the window's close button
     /// or application code calls the ctx.request_quit() function. The event

@@ -14,6 +14,7 @@
 mod gl;
 mod rand;
 mod x;
+mod xi_input;
 
 pub mod clipboard;
 
@@ -24,7 +25,8 @@ use crate::x::*;
 
 pub type sapp_event_type = libc::c_uint;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
-pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 21;
+pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 22;
+pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
 pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
 pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
 pub const sapp_event_type_SAPP_EVENTTYPE_RESUMED: sapp_event_type = 18;
@@ -202,6 +204,8 @@ pub struct sapp_event {
     pub mouse_button: sapp_mousebutton,
     pub mouse_x: libc::c_float,
     pub mouse_y: libc::c_float,
+    pub mouse_dx: libc::c_float,
+    pub mouse_dy: libc::c_float,
     pub scroll_x: libc::c_float,
     pub scroll_y: libc::c_float,
     pub num_touches: libc::c_int,
@@ -274,6 +278,10 @@ pub struct _sapp_state {
     pub desc: sapp_desc,
     pub keycodes: [sapp_keycode; 512],
 }
+
+/// opcode from XQueryExtension("XInputExtension")
+pub static mut _sapp_xi_extension_opcode: i32 = -1;
+
 pub type GLXContext = *mut __GLXcontext;
 pub type PFNGLXDESTROYCONTEXTPROC =
     Option<unsafe extern "C" fn(_: *mut Display, _: GLXContext) -> ()>;
@@ -411,6 +419,7 @@ pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut de
         | LeaveWindowMask
         | PropertyChangeMask;
     _sapp_x11_grab_error_handler();
+
     _sapp_x11_window = XCreateWindow(
         _sapp_x11_display,
         _sapp_x11_root,
@@ -429,6 +438,10 @@ pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut de
     if _sapp_x11_window == 0 {
         _sapp_fail(b"X11: Failed to create window\x00" as *const u8 as *const libc::c_char);
     }
+
+    _sapp_xi_extension_opcode = xi_input::query_xi_extension()
+        .unwrap_or_else(|| panic!("Failed to initialize XInputExtension"));
+
     let mut protocols: [Atom; 1] = [_sapp_x11_WM_DELETE_WINDOW];
     XSetWMProtocols(
         _sapp_x11_display,
@@ -1235,6 +1248,16 @@ pub unsafe extern "C" fn _sapp_x11_char_event(mut chr: u32, mut repeat: bool, mu
         _sapp_call_event(&mut _sapp.event);
     };
 }
+
+pub unsafe extern "C" fn _sapp_x11_raw_device_event(dx: f32, dy: f32) {
+    if _sapp_events_enabled() {
+        _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE);
+        _sapp.event.mouse_dx = dx;
+        _sapp.event.mouse_dy = dy;
+        _sapp_call_event(&mut _sapp.event);
+    };
+}
+
 pub static mut _sapp_x11_keysymtab: [_sapp_x11_codepair; 828] = [
     _sapp_x11_codepair::new(0x01a1, 0x0104),
     _sapp_x11_codepair::new(0x01a2, 0x02d8),
@@ -2483,7 +2506,16 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
         }
         // SelectionClear
         29 => {}
-        17 | _ => {}
+        17 => {}
+
+        // GenericEvent
+        35 if (*event).xcookie.extension == _sapp_xi_extension_opcode => {
+            if (*event).xcookie.evtype == crate::xi_input::XI_RawMotion {
+                let (dx, dy) = crate::xi_input::read_cookie(&mut (*event).xcookie);
+                _sapp_x11_raw_device_event(dx as f32, dy as f32);
+            }
+        }
+        _ => {}
     };
 }
 pub unsafe extern "C" fn _sapp_call_init() {
@@ -2755,6 +2787,8 @@ pub static mut _sapp: _sapp_state = _sapp_state {
         mouse_button: sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT,
         mouse_x: 0.,
         mouse_y: 0.,
+        mouse_dx: 0.,
+        mouse_dy: 0.,
         scroll_x: 0.,
         scroll_y: 0.,
         num_touches: 0,

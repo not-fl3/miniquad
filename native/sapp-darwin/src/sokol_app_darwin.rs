@@ -47,7 +47,8 @@ pub const sapp_event_type_SAPP_EVENTTYPE_SUSPENDED: sapp_event_type = 17;
 pub const sapp_event_type_SAPP_EVENTTYPE_RESUMED: sapp_event_type = 18;
 pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
 pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
-pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 21;
+pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
+pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 22;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
 pub type sapp_event_type = u32;
 pub const sapp_keycode_SAPP_KEYCODE_INVALID: sapp_keycode = 0;
@@ -202,6 +203,8 @@ pub struct sapp_event {
     pub mouse_button: sapp_mousebutton,
     pub mouse_x: f32,
     pub mouse_y: f32,
+    pub mouse_dx: f32,
+    pub mouse_dy: f32,
     pub scroll_x: f32,
     pub scroll_y: f32,
     pub num_touches: ::std::os::raw::c_int,
