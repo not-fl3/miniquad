@@ -2721,6 +2721,39 @@ pub unsafe extern "C" fn sapp_userdata() -> *mut libc::c_void {
 pub unsafe extern "C" fn sapp_mouse_shown() -> bool {
     return false;
 }
+
+pub unsafe extern "C" fn sapp_set_cursor_grab(mut grab: bool) {
+    XUngrabPointer(_sapp_x11_display, 0);
+
+    if grab {
+        XGrabPointer(
+            _sapp_x11_display,
+            _sapp_x11_window,
+            true as _,
+            (ButtonPressMask
+                | ButtonReleaseMask
+                | EnterWindowMask
+                | LeaveWindowMask
+                | PointerMotionMask
+                | PointerMotionHintMask
+                | Button1MotionMask
+                | Button2MotionMask
+                | Button3MotionMask
+                | Button4MotionMask
+                | Button5MotionMask
+                | ButtonMotionMask
+                | KeymapStateMask) as libc::c_uint,
+            GrabModeAsync,
+            GrabModeAsync,
+            _sapp_x11_window,
+            0,
+            0, // CurrentTime
+        );
+    }
+
+    XFlush(_sapp_x11_display);
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn sapp_show_mouse(mut shown: bool) {}
 #[no_mangle]

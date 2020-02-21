@@ -8624,6 +8624,9 @@ extern "C" {
 extern "C" {
     pub fn sapp_keyboard_shown() -> bool;
 }
+
+pub unsafe extern "C" fn sapp_set_cursor_grab(mut _grab: bool) {}
+
 extern "C" {
     pub fn sapp_show_mouse(visible: bool);
 }

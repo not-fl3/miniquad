@@ -86,6 +86,12 @@ impl Context {
             sapp::sapp_cancel_quit();
         }
     }
+
+    pub fn set_cursor_grab(&self, grab: bool) {
+        unsafe {
+            sapp::sapp_set_cursor_grab(grab);
+        }
+    }
 }
 
 pub enum UserData {

@@ -312,8 +312,10 @@ pub unsafe extern "C" fn sapp_userdata() -> *mut libc::c_void {
 pub unsafe extern "C" fn sapp_mouse_shown() -> bool {
     return false;
 }
+pub unsafe extern "C" fn sapp_set_cursor_grab(mut _grab: bool) {}
 #[no_mangle]
 pub unsafe extern "C" fn sapp_show_mouse(mut shown: bool) {}
+
 #[no_mangle]
 pub unsafe extern "C" fn sapp_keyboard_shown() -> bool {
     false

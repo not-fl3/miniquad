@@ -4,20 +4,22 @@ pub use stdlib_h::atof;
 pub use string_h::{memset, strcmp, strlen, strstr};
 pub use XKBlib_h::XkbSetDetectableAutoRepeat;
 pub use X_h::{
-    AllocNone, Atom, ButtonPressMask, ButtonReleaseMask, CWBorderPixel, CWColormap, CWEventMask,
-    Colormap, ControlMask, Cursor, EnterWindowMask, ExposureMask, FocusChangeMask, InputOutput,
-    IsViewable, KeyCode, KeyPressMask, KeyReleaseMask, KeySym, LeaveWindowMask, Mod1Mask, Mod4Mask,
-    Pixmap, PointerMotionMask, PropModeReplace, PropertyChangeMask, PropertyNewValue, ShiftMask,
+    AllocNone, Atom, Button1MotionMask, Button2MotionMask, Button3MotionMask, Button4MotionMask,
+    Button5MotionMask, ButtonMotionMask, ButtonPressMask, ButtonReleaseMask, CWBorderPixel,
+    CWColormap, CWEventMask, Colormap, ControlMask, Cursor, EnterWindowMask, ExposureMask,
+    FocusChangeMask, GrabModeAsync, InputOutput, IsViewable, KeyCode, KeyPressMask, KeyReleaseMask,
+    KeySym, KeymapStateMask, LeaveWindowMask, Mod1Mask, Mod4Mask, Pixmap, PointerMotionHintMask,
+    PointerMotionMask, PropModeReplace, PropertyChangeMask, PropertyNewValue, ShiftMask,
     StaticGravity, StructureNotifyMask, Success, VisibilityChangeMask, Window, XID,
 };
 pub use Xlib_h::{
     Display, Screen, Visual, XChangeProperty, XCloseDisplay, XCreateColormap, XCreateWindow,
     XDestroyWindow, XErrorEvent, XErrorHandler, XEvent, XFlush, XFree, XFreeColormap,
-    XGetKeyboardMapping, XGetWindowAttributes, XGetWindowProperty, XInitThreads, XInternAtom,
-    XKeyEvent, XMapWindow, XNextEvent, XOpenDisplay, XPending, XPointer, XRaiseWindow,
+    XGetKeyboardMapping, XGetWindowAttributes, XGetWindowProperty, XGrabPointer, XInitThreads,
+    XInternAtom, XKeyEvent, XMapWindow, XNextEvent, XOpenDisplay, XPending, XPointer, XRaiseWindow,
     XResourceManagerString, XSelectionEvent, XSelectionRequestEvent, XSetErrorHandler,
-    XSetWMProtocols, XSetWindowAttributes, XSync, XUnmapWindow, XWindowAttributes, XrmInitialize,
-    _XEvent, _XPrivDisplay, _XrmHashBucketRec,
+    XSetWMProtocols, XSetWindowAttributes, XSync, XUngrabPointer, XUnmapWindow, XWindowAttributes,
+    XrmInitialize, _XEvent, _XPrivDisplay, _XrmHashBucketRec,
 };
 pub use Xmd_h::CARD32;
 pub use Xresource_h::{
@@ -781,6 +783,21 @@ pub mod Xlib_h {
         pub fn XFlush(_: *mut Display) -> libc::c_int;
         #[no_mangle]
         pub fn XCloseDisplay(_: *mut Display) -> libc::c_int;
+        #[no_mangle]
+        pub fn XGrabPointer(
+            _: *mut Display,
+            _: Window,
+            _: libc::c_int,
+            _: libc::c_uint,
+            _: libc::c_int,
+            _: libc::c_int,
+            _: Window,
+            _: Cursor,
+            _: Time,
+        ) -> libc::c_int;
+        #[no_mangle]
+        pub fn XUngrabPointer(_: *mut Display, _: Time) -> libc::c_int;
+
     }
 }
 pub mod X_h {
@@ -800,6 +817,17 @@ pub mod X_h {
     pub const KeyPressMask: libc::c_long = (1 as libc::c_long) << 0 as libc::c_int;
     pub const KeyReleaseMask: libc::c_long = (1 as libc::c_long) << 1 as libc::c_int;
     pub const PointerMotionMask: libc::c_long = (1 as libc::c_long) << 6 as libc::c_int;
+    pub const PointerMotionHintMask: libc::c_long = (1 as libc::c_long) << 7 as libc::c_int;
+    pub const Button1MotionMask: libc::c_long = (1 as libc::c_long) << 8 as libc::c_int;
+    pub const Button2MotionMask: libc::c_long = (1 as libc::c_long) << 9 as libc::c_int;
+    pub const Button3MotionMask: libc::c_long = (1 as libc::c_long) << 10 as libc::c_int;
+    pub const Button4MotionMask: libc::c_long = (1 as libc::c_long) << 11 as libc::c_int;
+    pub const Button5MotionMask: libc::c_long = (1 as libc::c_long) << 12 as libc::c_int;
+    pub const ButtonMotionMask: libc::c_long = (1 as libc::c_long) << 13 as libc::c_int;
+    pub const KeymapStateMask: libc::c_long = (1 as libc::c_long) << 14 as libc::c_int;
+
+    pub const GrabModeAsync: libc::c_int = 1 as libc::c_int;
+
     pub const ButtonPressMask: libc::c_long = (1 as libc::c_long) << 2 as libc::c_int;
     pub const ButtonReleaseMask: libc::c_long = (1 as libc::c_long) << 3 as libc::c_int;
     pub const ExposureMask: libc::c_long = (1 as libc::c_long) << 15 as libc::c_int;
