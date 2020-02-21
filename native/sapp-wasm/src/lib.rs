@@ -314,6 +314,13 @@ extern "C" {
     pub fn console_info(msg: *const ::std::os::raw::c_char);
     pub fn console_warn(msg: *const ::std::os::raw::c_char);
     pub fn console_error(msg: *const ::std::os::raw::c_char);
+
+    /// call "requestPointerLock" and "exitPointerLock" internally.
+    /// Will hide cursor and will disable mouse_move events, but instead will
+    /// will make inifinite mouse field for raw_device_input event.
+    /// Notice that this function will works only from "engaging" event callbacks - from
+    /// "mouse_down"/"key_down" event handler functions.    
+    pub fn sapp_set_cursor_grab(grab: bool);
 }
 
 #[no_mangle]
@@ -330,6 +337,18 @@ pub extern "C" fn mouse_move(x: i32, y: i32) {
     event.type_ = sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE;
     event.mouse_x = x as f32;
     event.mouse_y = y as f32;
+    unsafe {
+        sapp_context().event(event);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn raw_mouse_move(dx: i32, dy: i32) {
+    let mut event: sapp_event = unsafe { std::mem::zeroed() };
+
+    event.type_ = sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE;
+    event.mouse_dx = dx as f32;
+    event.mouse_dy = dy as f32;
     unsafe {
         sapp_context().event(event);
     }

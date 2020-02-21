@@ -16,6 +16,11 @@ var plugins = [];
 
 canvas.focus();
 
+canvas.requestPointerLock = canvas.requestPointerLock ||
+    canvas.mozRequestPointerLock;
+document.exitPointerLock = document.exitPointerLock ||
+    document.mozExitPointerLock;
+
 function assert(flag, message) {
     if (flag == false) {
         alert(message)
@@ -72,7 +77,7 @@ function UTF8ToString(ptr, maxBytesToRead) {
         // https://www.ietf.org/rfc/rfc2279.txt
         // https://tools.ietf.org/html/rfc3629
         var u0 = u8Array[idx++];
-    
+
         // If not building with TextDecoder enabled, we don't know the string length, so scan for \0 byte.
         // If building with TextDecoder, we know exactly at what byte index the string ends, so checking for nulls here would be redundant.
         if (!u0) return str;
@@ -82,12 +87,12 @@ function UTF8ToString(ptr, maxBytesToRead) {
         if ((u0 & 0xE0) == 0xC0) { str += String.fromCharCode(((u0 & 31) << 6) | u1); continue; }
         var u2 = u8Array[idx++] & 63;
         if ((u0 & 0xF0) == 0xE0) {
-        u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
+            u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
         } else {
 
-        if ((u0 & 0xF8) != 0xF0) console.warn('Invalid UTF-8 leading byte 0x' + u0.toString(16) + ' encountered when deserializing a UTF-8 string on the asm.js/wasm heap to a JS string!');
+            if ((u0 & 0xF8) != 0xF0) console.warn('Invalid UTF-8 leading byte 0x' + u0.toString(16) + ' encountered when deserializing a UTF-8 string on the asm.js/wasm heap to a JS string!');
 
-        u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (u8Array[idx++] & 63);
+            u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (u8Array[idx++] & 63);
         }
 
         if (u0 < 0x10000) {
@@ -97,7 +102,7 @@ function UTF8ToString(ptr, maxBytesToRead) {
             str += String.fromCharCode(0xD800 | (ch >> 10), 0xDC00 | (ch & 0x3FF));
         }
     }
-      
+
     return str;
 }
 
@@ -743,7 +748,14 @@ var importObject = {
             canvas.onmousemove = function (event) {
                 var x = event.clientX;
                 var y = event.clientY;
+
+                // TODO: do not send mouse_move when cursor is captured
                 wasm_exports.mouse_move(Math.floor(x), Math.floor(y));
+
+                // TODO: check that mouse is captured?
+                if (event.movementX != 0 && event.movementY != 0) {
+                    wasm_exports.raw_mouse_move(Math.floor(event.movementX), Math.floor(event.movementY));
+                }
             };
             canvas.onmousedown = function (event) {
                 var x = event.clientX;
@@ -846,6 +858,13 @@ var importObject = {
                 dest[i] = file[i];
             }
             delete FS.loaded_files[file_id];
+        },
+        sapp_set_cursor_grab: function (grab) {
+            if (grab) {
+                canvas.requestPointerLock();
+            } else {
+                document.exitPointerLock();
+            }
         }
     }
 };
