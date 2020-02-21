@@ -38,7 +38,7 @@ mod wasm {
     use std::thread_local;
 
     thread_local! {
-        static FILES: RefCell<HashMap<u32, Box<Fn(Response)>>> = RefCell::new(HashMap::new());
+        static FILES: RefCell<HashMap<u32, Box<dyn Fn(Response)>>> = RefCell::new(HashMap::new());
     }
 
     #[no_mangle]

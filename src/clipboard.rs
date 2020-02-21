@@ -1,12 +1,12 @@
 use crate::Context;
 
 #[cfg(not(target_os = "linux"))]
-pub fn get(ctx: &mut Context) -> Option<String> {
+pub fn get(_ctx: &mut Context) -> Option<String> {
     None
 }
 
 #[cfg(not(target_os = "linux"))]
-pub fn set(ctx: &mut Context, data: &str) {}
+pub fn set(_ctx: &mut Context, _data: &str) {}
 
 #[cfg(target_os = "linux")]
 pub fn get(_ctx: &mut Context) -> Option<String> {

@@ -181,8 +181,8 @@ macro_rules! __log_line {
 #[cfg(not(target_arch = "wasm32"))]
 pub fn __private_api_log_lit(
     message: &str,
-    level: Level,
-    &(target, module_path, file, line): &(&str, &'static str, &'static str, u32),
+    _level: Level,
+    &(_target, _module_path, _file, _line): &(&str, &'static str, &'static str, u32),
 ) {
     eprintln!("{}", message);
 }
