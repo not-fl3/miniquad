@@ -319,9 +319,12 @@ extern "C" {
     /// Will hide cursor and will disable mouse_move events, but instead will
     /// will make inifinite mouse field for raw_device_input event.
     /// Notice that this function will works only from "engaging" event callbacks - from
-    /// "mouse_down"/"key_down" event handler functions.    
+    /// "mouse_down"/"key_down" event handler functions.
     pub fn sapp_set_cursor_grab(grab: bool);
 }
+
+/// Do nothing on wasm - cursor will be hidden by "sapp_set_cursor_grab" anyway.
+pub fn sapp_show_mouse(_shown: bool) {}
 
 #[no_mangle]
 pub extern "C" fn frame() {

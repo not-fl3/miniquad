@@ -14,6 +14,7 @@
 mod gl;
 mod rand;
 mod x;
+mod x_cursor;
 mod xi_input;
 
 pub mod clipboard;
@@ -280,7 +281,9 @@ pub struct _sapp_state {
 }
 
 /// opcode from XQueryExtension("XInputExtension")
-pub static mut _sapp_xi_extension_opcode: i32 = -1;
+static mut _sapp_xi_extension_opcode: i32 = -1;
+
+static mut _sapp_empty_cursor: x_cursor::Cursor = 0;
 
 pub type GLXContext = *mut __GLXcontext;
 pub type PFNGLXDESTROYCONTEXTPROC =
@@ -441,6 +444,8 @@ pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut de
 
     _sapp_xi_extension_opcode = xi_input::query_xi_extension()
         .unwrap_or_else(|| panic!("Failed to initialize XInputExtension"));
+
+    _sapp_empty_cursor = x_cursor::create_empty_cursor();
 
     let mut protocols: [Atom; 1] = [_sapp_x11_WM_DELETE_WINDOW];
     XSetWMProtocols(
@@ -2755,7 +2760,13 @@ pub unsafe extern "C" fn sapp_set_cursor_grab(mut grab: bool) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sapp_show_mouse(mut shown: bool) {}
+pub unsafe extern "C" fn sapp_show_mouse(mut shown: bool) {
+    if shown {
+        x_cursor::set_cursor(0);
+    } else {
+        x_cursor::set_cursor(_sapp_empty_cursor);
+    }
+}
 #[no_mangle]
 pub unsafe extern "C" fn sapp_keyboard_shown() -> bool {
     return _sapp.onscreen_keyboard_shown;

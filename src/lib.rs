@@ -87,9 +87,22 @@ impl Context {
         }
     }
 
+    /// Capture mouse cursor to the current window
+    /// On WASM this will automatically hide cursor
+    /// On desktop this will bound cursor to windows border
+    /// NOTICE: on desktop cursor will not be automatically released after window lost focus
+    ///         so set_cursor_grab(false) on window's focus lost is recommended.
+    /// TODO: implement window focus events
     pub fn set_cursor_grab(&self, grab: bool) {
         unsafe {
             sapp::sapp_set_cursor_grab(grab);
+        }
+    }
+
+    /// Show or hide the mouse cursor
+    pub fn show_mouse(&self, shown: bool) {
+        unsafe {
+            sapp::sapp_show_mouse(shown);
         }
     }
 }
