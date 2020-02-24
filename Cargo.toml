@@ -19,19 +19,19 @@ default = []
 log-impl = []
 
 [target.'cfg(windows)'.dependencies]
-sapp-windows = { path ="./native/sapp-windows", version = "0.2.5" }
+sapp-windows = { path ="./native/sapp-windows", version = "0.2.6" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-sapp-linux = { path ="./native/sapp-linux", version = "0.1.3" }
+sapp-linux = { path ="./native/sapp-linux", version = "0.1.4" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-sapp-darwin = { path = "./native/sapp-darwin", version = "0.1.0" }
+sapp-darwin = { path = "./native/sapp-darwin", version = "0.1.1" }
 
 [target.wasm32-unknown-unknown.dependencies]
-sapp-wasm = { path ="./native/sapp-wasm", version = "0.1.11" }
+sapp-wasm = { path ="./native/sapp-wasm", version = "0.1.12" }
 
 [target.'cfg(not(any(target_os="linux", target_os="macos", target_arch="wasm32", windows)))'.dependencies]
-sapp-dummy = { path ="./native/sapp-dummy", version = "0.1.2" }
+sapp-dummy = { path ="./native/sapp-dummy", version = "0.1.3" }
 
 [dev-dependencies]
 glam = {version = "0.8", features = ["scalar-math"] }
