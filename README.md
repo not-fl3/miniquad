@@ -41,11 +41,16 @@ Worth to mention [zemeroth port](https://not-fl3.github.io/miniquad-samples/zeme
 ## desktop
 
 ```bash
-rustup target add x86_64-pc-windows-gnu # for windows cross compilation, this is how windows builds were tested
+
+# for windows cross compilation, this is how windows builds were tested
+rustup target add x86_64-pc-windows-gnu 
 
 cargo run --example quad --target x86_64-unknown-linux-gnu
 cargo run --example quad --target x86_64-apple-darwin
 cargo run --example quad --target x86_64-pc-windows-gnu
+
+# ubuntu system dependencies
+apt install libx11-dev libxi-dev libgl1-mesa-dev
 ```
 
 ## wasm
