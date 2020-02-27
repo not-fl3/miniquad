@@ -198,6 +198,8 @@ pub struct sapp_event {
     pub mouse_button: sapp_mousebutton,
     pub mouse_x: libc::c_float,
     pub mouse_y: libc::c_float,
+    pub mouse_dx: libc::c_float,
+    pub mouse_dy: libc::c_float,
     pub scroll_x: libc::c_float,
     pub scroll_y: libc::c_float,
     pub num_touches: libc::c_int,
