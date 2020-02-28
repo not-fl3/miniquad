@@ -374,7 +374,17 @@ pub trait EventHandler {
     }
 
     fn key_up_event(&mut self, _ctx: &mut Context, _keycode: KeyCode, _keymods: KeyMods) {}
-    fn touch_event(&mut self, _ctx: &mut Context, _phase: TouchPhase, _id: u64, _x: f32, _y: f32) {}
+
+    /// Default implementation emulates mouse clicks
+    fn touch_event(&mut self, ctx: &mut Context, phase: TouchPhase, _id: u64, x: f32, y: f32) {
+        if phase == TouchPhase::Started {
+            self.mouse_button_down_event(ctx, MouseButton::Left, x, y);
+        }
+
+        if phase == TouchPhase::Ended {
+            self.mouse_button_up_event(ctx, MouseButton::Left, x, y);
+        }
+    }
 
     /// Represents raw hardware mouse motion event
     /// Note that these events are delivered regardless of input focus and not in pixels, but in
@@ -403,7 +413,17 @@ pub trait EventHandlerFree {
     fn char_event(&mut self, _character: char, _keymods: KeyMods, _repeat: bool) {}
     fn key_down_event(&mut self, _keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {}
     fn key_up_event(&mut self, _keycode: KeyCode, _keymods: KeyMods) {}
-    fn touch_event(&mut self, _phase: TouchPhase, _id: u64, _x: f32, _y: f32) {}
+
+    /// Default implementation emulates mouse clicks
+    fn touch_event(&mut self, phase: TouchPhase, _id: u64, x: f32, y: f32) {
+        if phase == TouchPhase::Started {
+            self.mouse_button_down_event(MouseButton::Left, x, y);
+        }
+
+        if phase == TouchPhase::Ended {
+            self.mouse_button_up_event(MouseButton::Left, x, y);
+        }
+    }
 
     /// Represents raw hardware mouse motion event
     /// Note that these events are delivered regardless of input focus and not in pixels, but in
