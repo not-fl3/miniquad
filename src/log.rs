@@ -178,7 +178,7 @@ macro_rules! __log_line {
     };
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub fn __private_api_log_lit(
     message: &str,
     _level: Level,
@@ -207,6 +207,21 @@ pub fn __private_api_log_lit(
 
     unsafe { log_fn(msg.as_ptr()) };
 }
+
+#[cfg(target_os = "android")]
+pub fn __private_api_log_lit(
+    message: &str,
+    level: Level,
+    &(target, module_path, file, line): &(&str, &'static str, &'static str, u32),
+) {
+    use sapp_android;
+    use std::ffi::CString;
+
+    let msg = CString::new(message).unwrap_or_else(|_| panic!());
+
+    unsafe { sapp_android::sapp_android_log(msg.as_ptr()) };
+}
+
 
 #[test]
 fn test_logs() {

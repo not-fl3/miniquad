@@ -3,6 +3,7 @@ extern crate sapp_darwin as sapp;
 #[cfg(not(any(
     target_os = "linux",
     target_os = "macos",
+    target_os = "android",
     target_arch = "wasm32",
     windows
 )))]
@@ -13,6 +14,8 @@ extern crate sapp_linux as sapp;
 extern crate sapp_wasm as sapp;
 #[cfg(windows)]
 extern crate sapp_windows as sapp;
+#[cfg(target_os = "android")]
+extern crate sapp_android as sapp;
 
 pub mod clipboard;
 pub mod conf;
