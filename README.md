@@ -21,10 +21,11 @@ For higher level API take a look on:
 * Linux, OpenGl 3
 * macOS, OpenGL 3
 * WASM, WebGl1 - tested on ios safari, ff, chrome
+* Android, GLES3
 
 ## Not supported, but desirable platforms
 
-* Android, OpenGl version should be portable enough to run on android, sokol-app code is here and ready, but I just dont have Android phone.
+* Android, GLES2 - work in progress.
 * Metal. For both MacOs and IOS metal rendering backend next to opengl one is highly desirable. But I just dont have any MacOs capable hardware to start working on it :/
 
 ## Examples
@@ -101,6 +102,20 @@ One of the ways to server static .wasm and .html:
 cargo install basic-http-server
 basic-http-server .
 ```
+
+## Android
+
+Recommended way to build for android is using Docker.   
+miniquad use slightly modifed version of `cargo-apk`
+
+```
+docker run --rm -v (pwd)":/root/src" -w /root/src notfl3/cargo-apk cargo apk build --example quad
+```
+
+APK file will be in `target/android-artifacts/(debug|release)/apk`
+
+With "log-impl" enabled all log calls will be forwarded to adb console.
+No code modifications for Android required, everything should just works.
 
 # Goals
 
