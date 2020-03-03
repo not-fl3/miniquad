@@ -1176,7 +1176,7 @@ impl Pipeline {
             let cname = CString::new(*name).unwrap_or_else(|e| panic!(e));
             let attr_loc = unsafe { glGetAttribLocation(program, cname.as_ptr() as *const _) };
             if attr_loc == -1 {
-                panic!();
+                panic!("failed to obtain location of attribute {}", name);
             }
             let divisor = if layout.step_func == VertexStep::PerVertex {
                 0
