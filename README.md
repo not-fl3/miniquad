@@ -13,7 +13,7 @@ For higher level API take a look on:
 
 [good-web-game](https://github.com/not-fl3/good-web-game): implementation of some [ggez](https://github.com/ggez/ggez) subset on top of miniquad, made as compatibility layer to run ggez games on wasm
 
-[macroquad](github.com/not-fl3/macroquad/): raylib-like library on top of miniquad. [100loc arkanoid with macroquad](https://github.com/not-fl3/macroquad/blob/master/examples/arkanoid.rs)
+[macroquad](https://github.com/not-fl3/macroquad): raylib-like library on top of miniquad. [100loc arkanoid with macroquad](https://github.com/not-fl3/macroquad/blob/master/examples/arkanoid.rs)
 
 ## Supported platforms
 
