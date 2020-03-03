@@ -1,6 +1,6 @@
 [package]
 name = "miniquad"
-version = "0.2.34"
+version = "0.2.35"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -22,7 +22,7 @@ log-impl = []
 sapp-windows = { path ="./native/sapp-windows", version = "=0.2.6" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-sapp-linux = { path ="./native/sapp-linux", version = "=0.1.5" }
+sapp-linux = { path ="./native/sapp-linux", version = "=0.1.6" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 sapp-darwin = { path = "./native/sapp-darwin", version = "=0.1.1" }

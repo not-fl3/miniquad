@@ -121,7 +121,7 @@ pub unsafe fn get_clipboard(
 }
 
 // Next message for clipboard request
-static mut MESSAGE: String = String::new();
+static mut MESSAGE: Option<String> = None;
 
 /// Claim that our app is X11 clipboard owner
 /// Now when some other linux app will ask X11 for clipboard content - it will be redirected to our app
@@ -141,7 +141,7 @@ pub unsafe fn claim_clipboard_ownership(mut bufname: *const libc::c_char, messag
         0 as libc::c_int as Time,
     );
 
-    MESSAGE = message;
+    MESSAGE = Some(message);
 }
 
 /// this function is supposed to be called from sapp's event loop
@@ -149,6 +149,9 @@ pub unsafe fn claim_clipboard_ownership(mut bufname: *const libc::c_char, messag
 /// It will parse event and call XSendEvent with event response
 pub(crate) unsafe fn respond_to_clipboard_request(event: *const XEvent) {
     assert!((*event).type_0 == 30); // is it really SelectionRequest
+
+    let empty_message = String::new();
+    let message = MESSAGE.as_ref().unwrap_or(&empty_message);
 
     let UTF8 = XInternAtom(
         _sapp_x11_display,
@@ -177,8 +180,8 @@ pub(crate) unsafe fn respond_to_clipboard_request(event: *const XEvent) {
             UTF8,
             8 as libc::c_int,
             PropModeReplace,
-            MESSAGE.as_bytes().as_ptr() as *const u8 as *const _,
-            MESSAGE.as_bytes().len() as _,
+            message.as_bytes().as_ptr() as *const u8 as *const _,
+            message.as_bytes().len() as _,
         );
 
         XSendEvent(
