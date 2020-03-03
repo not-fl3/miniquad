@@ -109,7 +109,7 @@ Recommended way to build for android is using Docker.
 miniquad use slightly modifed version of `cargo-apk`
 
 ```
-docker run --rm -v (pwd)":/root/src" -w /root/src notfl3/cargo-apk cargo apk build --example quad
+docker run --rm -v $(pwd)":/root/src" -w /root/src notfl3/cargo-apk cargo apk build --example quad
 ```
 
 APK file will be in `target/android-artifacts/(debug|release)/apk`
