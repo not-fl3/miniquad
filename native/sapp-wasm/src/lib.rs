@@ -324,7 +324,7 @@ extern "C" {
 }
 
 /// Do nothing on wasm - cursor will be hidden by "sapp_set_cursor_grab" anyway.
-pub fn sapp_show_mouse(_shown: bool) {}
+pub unsafe fn sapp_show_mouse(_shown: bool) {}
 
 #[no_mangle]
 pub extern "C" fn frame() {
