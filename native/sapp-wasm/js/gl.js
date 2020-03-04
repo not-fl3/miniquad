@@ -753,7 +753,7 @@ var importObject = {
                 wasm_exports.mouse_move(Math.floor(x), Math.floor(y));
 
                 // TODO: check that mouse is captured?
-                if (event.movementX != 0 && event.movementY != 0) {
+                if (event.movementX != 0 || event.movementY != 0) {
                     wasm_exports.raw_mouse_move(Math.floor(event.movementX), Math.floor(event.movementY));
                 }
             };
