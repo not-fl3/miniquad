@@ -1,4 +1,3 @@
-//use crate::goodies::loading_page::LoadingPage;
 
 #[derive(Debug)]
 pub enum Cache {
@@ -26,6 +25,15 @@ pub enum Loading {
 pub struct Conf {
     pub cache: Cache,
     pub loading: Loading,
+    pub window_title: String,
+    /// the preferred width of the window, ignored on wasm/android
+    pub window_width: i32,
+    /// the preferred height of the window, ignored on wasm/android
+    pub window_height: i32,
+    /// whether the rendering canvas is full-resolution on HighDPI displays
+    pub high_dpi: bool,
+    /// whether the window should be created in fullscreen mode, ignored on wasm/android
+    pub fullscreen: bool,
 }
 
 impl Default for Conf {
@@ -33,23 +41,11 @@ impl Default for Conf {
         Conf {
             cache: Cache::No,
             loading: Loading::No,
+            window_title: "".to_owned(),
+            window_width: 800,
+            window_height: 600,
+            high_dpi: false,
+            fullscreen: false
         }
     }
-}
-
-/// The possible number of samples for multisample anti-aliasing.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum NumSamples {
-    /// Multisampling disabled.
-    Zero = 0,
-    /// One sample
-    One = 1,
-    /// Two samples
-    Two = 2,
-    /// Four samples
-    Four = 4,
-    /// Eight samples
-    Eight = 8,
-    /// Sixteen samples
-    Sixteen = 16,
 }

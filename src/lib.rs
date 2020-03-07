@@ -296,18 +296,20 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
 ///     miniquad::start(conf::Conf::default(), |ctx| UserData::free(Stage { ctx }));
 /// }
 /// ```
-pub fn start<F>(_conf: conf::Conf, f: F)
+pub fn start<F>(conf: conf::Conf, f: F)
 where
     F: 'static + FnOnce(Context) -> UserData,
 {
     let mut desc: sapp::sapp_desc = unsafe { std::mem::zeroed() };
 
-    let title = CString::new("").unwrap_or_else(|e| panic!(e));
+    let title = CString::new(conf.window_title.as_bytes()).unwrap_or_else(|e| panic!(e));
 
     let mut user_data = Box::new(UserDataState::Uninitialized(Box::new(f)));
 
-    desc.width = 800;
-    desc.height = 600;
+    desc.width = conf.window_width;
+    desc.height = conf.window_height;
+    desc.fullscreen = conf.fullscreen as _;
+    desc.high_dpi = conf.high_dpi as _;
     desc.window_title = title.as_ptr();
     desc.user_data = &mut *user_data as *mut _ as *mut _;
     desc.init_userdata_cb = Some(init);
