@@ -1258,7 +1258,7 @@ pub struct Bindings {
     pub images: Vec<Texture>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BufferType {
     VertexBuffer,
     IndexBuffer,
@@ -1310,6 +1310,10 @@ impl Buffer {
     /// let buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
     /// ```
     pub fn immutable<T>(ctx: &mut Context, buffer_type: BufferType, data: &[T]) -> Buffer {
+        if buffer_type == BufferType::IndexBuffer {
+            assert!(mem::size_of::<T>() == 2, "Only u16/i16 index buffers are implemented right now");
+        }
+
         //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
         let gl_target = gl_buffer_target(&buffer_type);
         let gl_usage = gl_usage(&Usage::Immutable);
