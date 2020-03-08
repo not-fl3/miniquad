@@ -4,9 +4,6 @@ use crate::sapp::*;
 
 use std::option::Option::None;
 
-pub const LINEAR_FILTER: i32 = GL_LINEAR as i32;
-pub const NEAREST_FILTER: i32 = GL_NEAREST as i32;
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Texture {
     texture: GLuint,
@@ -68,8 +65,8 @@ pub enum TextureWrap {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FilterMode {
-    Linear = LINEAR_FILTER as isize,
-    Nearest = NEAREST_FILTER as isize,
+    Linear = GL_LINEAR as isize,
+    Nearest = GL_NEAREST as isize,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -167,12 +164,12 @@ impl Texture {
         }
     }
 
-    pub fn set_filter(&self, ctx: &mut Context, filter: i32) {
+    pub fn set_filter(&self, ctx: &mut Context, filter: FilterMode) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
         unsafe {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter as i32);
         }
         ctx.cache.restore_texture_binding(0);
     }
