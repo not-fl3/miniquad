@@ -2657,6 +2657,12 @@ pub unsafe extern "C" fn _sapp_run(mut desc: *const sapp_desc) {
         .offset((*(_sapp_x11_display as _XPrivDisplay)).default_screen as isize))
     .root;
     XkbSetDetectableAutoRepeat(_sapp_x11_display, true as _, std::ptr::null_mut());
+
+    // because X11 Xft.dpi may be not presented on the linux system at all
+    // and _sapp_x11_query_system_dpi will keep _sapp_x11_dpi as 0
+    // this hack make final dpi as 1.0 wich probably makes sense for systems without dpi (hm)
+    _sapp_x11_dpi = 96.0f32;
+
     _sapp_x11_query_system_dpi();
     _sapp.dpi_scale = _sapp_x11_dpi / 96.0f32;
     _sapp_x11_init_extensions();
