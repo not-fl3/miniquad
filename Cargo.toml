@@ -1,6 +1,6 @@
 [package]
 name = "miniquad"
-version = "0.2.42"
+version = "0.2.43"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -10,6 +10,8 @@ description = """
 Cross-platform window context and rendering library.
 """
 readme="README.md"
+keywords = ["graphics", "3D", "opengl", "gamedev", "windowing"]
+categories = ["rendering::graphics-api"]
 
 [features]
 default = []
