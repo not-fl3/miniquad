@@ -687,6 +687,8 @@ typedef struct sapp_event {
     sapp_mousebutton mouse_button;
     float mouse_x;
     float mouse_y;
+    float mouse_dx;
+    float mouse_dy;
     float scroll_x;
     float scroll_y;
     int num_touches;
