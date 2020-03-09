@@ -375,6 +375,19 @@ into_sapp_keycode = function (key_code) {
     }
 }
 
+texture_size = function (internalFormat, width, height) {
+    if (internalFormat == gl.ALPHA) {
+        return width * height;
+    }
+    else if (internalFormat == gl.RGB8) {
+        return width * height * 3;
+    } else if (internalFormat == gl.RGBA8) {
+        return width * height * 4;
+    } else { // TextureFormat::RGB565 | TextureFormat::RGBA4 | TextureFormat::RGBA5551
+        return width * height * 3;
+    }
+}
+
 var emscripten_shaders_hack = false;
 
 var importObject = {
@@ -436,11 +449,11 @@ var importObject = {
         },
         glTexImage2D: function (target, level, internalFormat, width, height, border, format, type, pixels) {
             gl.texImage2D(target, level, internalFormat, width, height, border, format, type,
-                pixels ? getArray(pixels, Uint8Array, width * height * 4) : null);
+                pixels ? getArray(pixels, Uint8Array, texture_size(internalFormat, width, height)) : null);
         },
         glTexSubImage2D: function (target, level, xoffset, yoffset, width, height, format, type, pixels) {
             gl.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type,
-                pixels ? getArray(pixels, Uint8Array, width * height * 4) : null);
+                pixels ? getArray(pixels, Uint8Array, texture_size(internalFormat, width, height)) : null);
         },
         glTexParameteri: function (target, pname, param) {
             gl.texParameteri(target, pname, param);

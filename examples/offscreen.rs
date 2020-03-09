@@ -19,7 +19,7 @@ impl Stage {
             RenderTextureParams {
                 width: 256,
                 height: 256,
-                format: PixelFormat::RGBA8,
+                format: RenderTextureFormat::RGBA8,
                 ..Default::default()
             },
         );
@@ -28,7 +28,7 @@ impl Stage {
             RenderTextureParams {
                 width: 256,
                 height: 256,
-                format: PixelFormat::Depth,
+                format: RenderTextureFormat::Depth,
                 ..Default::default()
             },
         );
