@@ -1,3 +1,43 @@
+//! Context creation configuration
+//!
+//! A [`Conf`](struct.Conf.html) struct is used to descrbe a hardware and platform specific setup,
+//! mostly video display settings.
+//!
+//! ## High DPI rendering
+//!
+//! You can set the [`Conf::high_dpi`](struct.Conf.html#structfield.high_dpi) flag during initialization to request
+//! a full-resolution framebuffer on HighDPI displays. The default behaviour
+//! is `high_dpi = false`, this means that the application will
+//! render to a lower-resolution framebuffer on HighDPI displays and the
+//! rendered content will be upscaled by the window system composer.
+//! In a HighDPI scenario, you still request the same window size during
+//! [`miniquad::start`](../fn.start.html), but the framebuffer sizes returned by [`Context::screen_size`](../graphics/struct.Context.html#method.screen_size)
+//! will be scaled up according to the DPI scaling ratio.
+//! You can also get a DPI scaling factor with the function
+//! [`Context::dpi_scale`](../graphics/struct.Context.html#method.dpi_scale).
+//! Here's an example on a Mac with Retina display:
+//! ```
+//! Conf {
+//!   width = 640,
+//!   height = 480,
+//!   high_dpi = true,
+//!   .. Default::default()
+//! };
+//! ```
+//!
+//! The functions [`screen_size`](../graphics/struct.Context.html#method.screen_size) and [`dpi_scale`](../graphics/struct.Context.html#method.dpi_scale) will
+//! return the following values:
+//! ```bash
+//! screen_size -> (1280, 960)
+//! dpi_scale   -> 2.0
+//! ```
+//!
+//! If the high_dpi flag is false, or you're not running on a Retina display,
+//! the values would be:
+//! ```bash
+//! screen_size -> (640, 480)
+//! dpi_scale   -> 1.0
+//! ```
 
 #[derive(Debug)]
 pub enum Cache {
@@ -45,7 +85,7 @@ impl Default for Conf {
             window_width: 800,
             window_height: 600,
             high_dpi: false,
-            fullscreen: false
+            fullscreen: false,
         }
     }
 }

@@ -627,8 +627,22 @@ impl Context {
         }
     }
 
+    /// The current framebuffer size in pixels
+    /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
     pub fn screen_size(&self) -> (f32, f32) {
         unsafe { (sapp_width() as f32, sapp_height() as f32) }
+    }
+
+    /// The dpi scaling factor (window pixels to framebuffer pixels)
+    /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
+    pub fn dpi_scale(&self) -> f32 {
+        unsafe { sapp_dpi_scale() }
+    }
+
+    /// True when high_dpi was requested and actually running in a high-dpi scenario
+    /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
+    pub fn high_dpi(&self) -> bool {
+        unsafe { sapp_high_dpi() }
     }
 
     pub fn apply_pipeline(&mut self, pipeline: &Pipeline) {
@@ -1308,7 +1322,10 @@ impl Buffer {
     /// ```
     pub fn immutable<T>(ctx: &mut Context, buffer_type: BufferType, data: &[T]) -> Buffer {
         if buffer_type == BufferType::IndexBuffer {
-            assert!(mem::size_of::<T>() == 2, "Only u16/i16 index buffers are implemented right now");
+            assert!(
+                mem::size_of::<T>() == 2,
+                "Only u16/i16 index buffers are implemented right now"
+            );
         }
 
         //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
