@@ -1,8 +1,8 @@
 // load wasm module and link with gl functions
 // 
 // this file was made by tons of hacks from emscripten's parseTools and library_webgl 
-// https://github.com/emscripten-core/emscripten/blob/incoming/src/parseTools.js
-// https://github.com/emscripten-core/emscripten/blob/incoming/src/library_webgl.js
+// https://github.com/emscripten-core/emscripten/blob/master/src/parseTools.js
+// https://github.com/emscripten-core/emscripten/blob/master/src/library_webgl.js
 // 
 // TODO: split to gl.js and loader.js 
 
@@ -379,9 +379,9 @@ texture_size = function (internalFormat, width, height) {
     if (internalFormat == gl.ALPHA) {
         return width * height;
     }
-    else if (internalFormat == gl.RGB8) {
+    else if (internalFormat == gl.RGB) {
         return width * height * 3;
-    } else if (internalFormat == gl.RGBA8) {
+    } else if (internalFormat == gl.RGBA) {
         return width * height * 4;
     } else { // TextureFormat::RGB565 | TextureFormat::RGBA4 | TextureFormat::RGBA5551
         return width * height * 3;
