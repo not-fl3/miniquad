@@ -48,26 +48,19 @@ impl From<RenderTextureFormat> for (GLenum, GLenum, GLenum) {
 }
 
 /// List of all the possible formats of input data when uploading to texture.
+/// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TextureFormat {
     RGB8,
     RGBA8,
-    RGBA4,
-    RGBA5551,
-    RGB565,
-    ALPHA,
 }
 
 impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
     fn from(format: TextureFormat) -> Self {
         match format {
-            TextureFormat::ALPHA => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
-            TextureFormat::RGB8 => (GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE),
-            TextureFormat::RGBA8 => (GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE),
-            TextureFormat::RGB565 => (GL_RGB565, GL_RGB, GL_UNSIGNED_SHORT_5_6_5),
-            TextureFormat::RGBA4 => (GL_RGBA4, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4),
-            TextureFormat::RGBA5551 => (GL_RGB5_A1, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1),
+            TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
+            TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
         }
     }
 }
@@ -78,8 +71,6 @@ impl TextureFormat {
         let square = width * height;
 
         match self {
-            TextureFormat::ALPHA => square,
-            TextureFormat::RGB565 | TextureFormat::RGBA4 | TextureFormat::RGBA5551 => 2 * square,
             TextureFormat::RGB8 => 3 * square,
             TextureFormat::RGBA8 => 4 * square,
         }
@@ -188,7 +179,10 @@ impl Texture {
 
     /// Upload texture to GPU with given TextureParams
     pub fn from_data_and_format(ctx: &mut Context, bytes: &[u8], params: TextureParams) -> Texture {
-        assert_eq!(params.format.size(params.width, params.height), bytes.len() as u32);
+        assert_eq!(
+            params.format.size(params.width, params.height),
+            bytes.len() as u32
+        );
 
         let (internal_format, format, pixel_type) = params.format.into();
 
