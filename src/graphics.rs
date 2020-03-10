@@ -4,6 +4,9 @@ mod texture;
 
 use crate::sapp::*;
 
+// workaround sapp::* also contains None on Android
+use std::option::Option::None;
+
 pub use texture::{
     FilterMode, RenderTextureFormat, RenderTextureParams, Texture, TextureFormat, TextureParams,
 };
