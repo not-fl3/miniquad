@@ -60,6 +60,10 @@ pub enum VertexFormat {
     Byte2,
     Byte3,
     Byte4,
+    Short1,
+    Short2,
+    Short3,
+    Short4,
     Mat4,
 }
 
@@ -74,6 +78,10 @@ impl VertexFormat {
             VertexFormat::Byte2 => 2,
             VertexFormat::Byte3 => 3,
             VertexFormat::Byte4 => 4,
+            VertexFormat::Short1 => 1,
+            VertexFormat::Short2 => 2,
+            VertexFormat::Short3 => 3,
+            VertexFormat::Short4 => 4,
             VertexFormat::Mat4 => 16,
         }
     }
@@ -88,6 +96,10 @@ impl VertexFormat {
             VertexFormat::Byte2 => 2,
             VertexFormat::Byte3 => 3,
             VertexFormat::Byte4 => 4,
+            VertexFormat::Short1 => 1 * 2,
+            VertexFormat::Short2 => 2 * 2,
+            VertexFormat::Short3 => 3 * 2,
+            VertexFormat::Short4 => 4 * 2,
             VertexFormat::Mat4 => 16 * 4,
         }
     }
@@ -102,6 +114,10 @@ impl VertexFormat {
             VertexFormat::Byte2 => GL_UNSIGNED_BYTE,
             VertexFormat::Byte3 => GL_UNSIGNED_BYTE,
             VertexFormat::Byte4 => GL_UNSIGNED_BYTE,
+            VertexFormat::Short1 => GL_UNSIGNED_SHORT,
+            VertexFormat::Short2 => GL_UNSIGNED_SHORT,
+            VertexFormat::Short3 => GL_UNSIGNED_SHORT,
+            VertexFormat::Short4 => GL_UNSIGNED_SHORT,
             VertexFormat::Mat4 => GL_FLOAT,
         }
     }
@@ -1011,7 +1027,7 @@ impl Pipeline {
                 );
                 vertex_layout[attr_loc as usize] = attr;
 
-                buffer_data.offset += (std::mem::size_of::<f32>() as i32 * format.size()) as i64
+                buffer_data.offset += format.byte_len() as i64
             }
         }
 
