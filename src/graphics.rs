@@ -5,7 +5,7 @@ mod texture;
 use crate::sapp::*;
 
 pub use texture::{
-    RenderTextureFormat, RenderTextureParams, Texture, TextureFormat, TextureParams,
+    FilterMode, RenderTextureFormat, RenderTextureParams, Texture, TextureFormat, TextureParams,
 };
 
 fn get_uniform_location(program: GLuint, name: &str) -> i32 {
