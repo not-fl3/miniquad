@@ -41,19 +41,24 @@ Worth to mention [zemeroth port](https://not-fl3.github.io/miniquad-samples/zeme
 
 # Building examples
 
-## desktop
+## linux
 
 ```bash
-
-# for windows cross compilation, this is how windows builds were tested
-rustup target add x86_64-pc-windows-gnu 
-
-cargo run --example quad --target x86_64-unknown-linux-gnu
-cargo run --example quad --target x86_64-apple-darwin
-cargo run --example quad --target x86_64-pc-windows-gnu
-
 # ubuntu system dependencies
 apt install libx11-dev libxi-dev libgl1-mesa-dev
+
+cargo run --example quad
+```
+
+## windows 
+
+```bash
+# both MSVC and GNU target is supported:
+rustup target add x86_64-pc-windows-msvc
+# or
+rustup target add x86_64-pc-windows-gnu 
+
+cargo run --example quad
 ```
 
 ## wasm
@@ -105,7 +110,7 @@ cargo install basic-http-server
 basic-http-server .
 ```
 
-## Android
+## android
 
 Recommended way to build for android is using Docker.   
 miniquad use slightly modifed version of `cargo-apk`
@@ -118,6 +123,16 @@ APK file will be in `target/android-artifacts/(debug|release)/apk`
 
 With "log-impl" enabled all log calls will be forwarded to adb console.
 No code modifications for Android required, everything should just works.
+
+## cross compilation
+
+```bash
+
+# windows target from linux host:
+# this is how windows builds are tested from linux machine:
+rustup target add x86_64-pc-windows-gnu 
+cargo run --example quad --target x86_64-pc-windows-gnu
+```
 
 # Goals
 
