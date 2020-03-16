@@ -384,6 +384,10 @@ pub trait EventHandler {
         if phase == TouchPhase::Ended {
             self.mouse_button_up_event(ctx, MouseButton::Left, x, y);
         }
+
+        if phase == TouchPhase::Moved {
+            self.mouse_motion_event(ctx, x, y);
+        }
     }
 
     /// Represents raw hardware mouse motion event
@@ -422,6 +426,10 @@ pub trait EventHandlerFree {
 
         if phase == TouchPhase::Ended {
             self.mouse_button_up_event(MouseButton::Left, x, y);
+        }
+
+        if phase == TouchPhase::Moved {
+            self.mouse_motion_event(x, y);
         }
     }
 
