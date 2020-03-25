@@ -962,6 +962,8 @@ impl Pipeline {
             } else {
                 cache.stride = layout.stride;
             }
+            // WebGL 1 limitation
+            assert!(cache.stride <= 255);
         }
 
         let program = ctx.shaders[shader.0].program;
