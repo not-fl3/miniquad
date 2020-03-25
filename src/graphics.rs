@@ -780,7 +780,7 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> GLuint {
             console_log(error_message.as_ptr() as *const _);
 
             let error_message = std::string::String::from_utf8_lossy(&error_message);
-            eprintln!("{} {:?}", max_length, error_message);
+            eprintln!("Shader error:\n{}", error_message);
             glDeleteShader(shader);
             panic!("cant compile shader!");
         }
