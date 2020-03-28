@@ -8,7 +8,7 @@ use crate::sapp::*;
 use std::option::Option::None;
 
 pub use texture::{
-    FilterMode, RenderTextureFormat, RenderTextureParams, Texture, TextureFormat, TextureParams,
+    FilterMode, TextureParams, Texture, TextureFormat,
 };
 
 fn get_uniform_location(program: GLuint, name: &str) -> i32 {
@@ -780,7 +780,7 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> GLuint {
             console_log(error_message.as_ptr() as *const _);
 
             let error_message = std::string::String::from_utf8_lossy(&error_message);
-            eprintln!("{} {:?}", max_length, error_message);
+            eprintln!("Shader error:\n{}", error_message);
             glDeleteShader(shader);
             panic!("cant compile shader!");
         }
@@ -962,6 +962,8 @@ impl Pipeline {
             } else {
                 cache.stride = layout.stride;
             }
+            // WebGL 1 limitation
+            assert!(cache.stride <= 255);
         }
 
         let program = ctx.shaders[shader.0].program;

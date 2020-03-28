@@ -5,6 +5,7 @@ pub struct Texture {
     pub(crate) texture: GLuint,
     pub width: u32,
     pub height: u32,
+    format: TextureFormat,
 }
 
 impl Texture {
@@ -13,6 +14,7 @@ impl Texture {
             texture: 0,
             width: 0,
             height: 0,
+            format: TextureFormat::RGBA8,
         }
     }
 
@@ -30,23 +32,6 @@ impl Texture {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum RenderTextureFormat {
-    RGBA8,
-    Depth,
-}
-
-impl From<RenderTextureFormat> for (GLenum, GLenum, GLenum) {
-    fn from(format: RenderTextureFormat) -> Self {
-        match format {
-            RenderTextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
-            RenderTextureFormat::Depth => {
-                (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT)
-            }
-        }
-    }
-}
-
 /// List of all the possible formats of input data when uploading to texture.
 /// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
 #[repr(u8)]
@@ -54,6 +39,7 @@ impl From<RenderTextureFormat> for (GLenum, GLenum, GLenum) {
 pub enum TextureFormat {
     RGB8,
     RGBA8,
+    Depth,
 }
 
 impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
@@ -61,6 +47,9 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
         match format {
             TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
             TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
+            TextureFormat::Depth => {
+                (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT)
+            }
         }
     }
 }
@@ -73,6 +62,7 @@ impl TextureFormat {
         match self {
             TextureFormat::RGB8 => 3 * square,
             TextureFormat::RGBA8 => 4 * square,
+            TextureFormat::Depth => 2 * square,
         }
     }
 }
@@ -118,29 +108,8 @@ pub struct TextureParams {
     pub height: u32,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct RenderTextureParams {
-    pub format: RenderTextureFormat,
-    pub wrap: TextureWrap,
-    pub filter: FilterMode,
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Default for RenderTextureParams {
-    fn default() -> Self {
-        RenderTextureParams {
-            format: RenderTextureFormat::RGBA8,
-            wrap: TextureWrap::Clamp,
-            filter: FilterMode::Linear,
-            width: 0,
-            height: 0,
-        }
-    }
-}
-
 impl Texture {
-    pub fn new_render_texture(ctx: &mut Context, params: RenderTextureParams) -> Texture {
+    pub fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
         let (internal_format, format, pixel_type) = params.format.into();
 
         ctx.cache.store_texture_binding(0);
@@ -174,6 +143,7 @@ impl Texture {
             texture,
             width: params.width,
             height: params.height,
+            format: params.format
         }
     }
 
@@ -215,6 +185,7 @@ impl Texture {
                 texture,
                 width: params.width as u32,
                 height: params.height as u32,
+                format: params.format
             }
         }
     }
@@ -277,6 +248,8 @@ impl Texture {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
 
+        let (_, format, pixel_type) = self.format.into();
+
         unsafe {
             glTexSubImage2D(
                 GL_TEXTURE_2D,
@@ -285,8 +258,8 @@ impl Texture {
                 y_offset as _,
                 width as _,
                 height as _,
-                GL_RGBA,
-                GL_UNSIGNED_BYTE,
+                format,
+                pixel_type,
                 bytes.as_ptr() as *const _,
             );
         }
