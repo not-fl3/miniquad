@@ -16,19 +16,19 @@ impl Stage {
     pub fn new(ctx: &mut Context) -> Stage {
         let color_img = Texture::new_render_texture(
             ctx,
-            RenderTextureParams {
+            TextureParams {
                 width: 256,
                 height: 256,
-                format: RenderTextureFormat::RGBA8,
+                format: TextureFormat::RGBA8,
                 ..Default::default()
             },
         );
         let depth_img = Texture::new_render_texture(
             ctx,
-            RenderTextureParams {
+            TextureParams {
                 width: 256,
                 height: 256,
-                format: RenderTextureFormat::Depth,
+                format: TextureFormat::Depth,
                 ..Default::default()
             },
         );

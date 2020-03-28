@@ -8,7 +8,7 @@ use crate::sapp::*;
 use std::option::Option::None;
 
 pub use texture::{
-    FilterMode, RenderTextureFormat, RenderTextureParams, Texture, TextureFormat, TextureParams,
+    FilterMode, TextureParams, Texture, TextureFormat,
 };
 
 fn get_uniform_location(program: GLuint, name: &str) -> i32 {
