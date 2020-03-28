@@ -5,6 +5,7 @@ pub struct Texture {
     pub(crate) texture: GLuint,
     pub width: u32,
     pub height: u32,
+    format: TextureFormat,
 }
 
 impl Texture {
@@ -13,6 +14,7 @@ impl Texture {
             texture: 0,
             width: 0,
             height: 0,
+            format: TextureFormat::RGBA8,
         }
     }
 
@@ -141,6 +143,7 @@ impl Texture {
             texture,
             width: params.width,
             height: params.height,
+            format: params.format
         }
     }
 
@@ -182,6 +185,7 @@ impl Texture {
                 texture,
                 width: params.width as u32,
                 height: params.height as u32,
+                format: params.format
             }
         }
     }
@@ -244,6 +248,8 @@ impl Texture {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
 
+        let (_, format, pixel_type) = self.format.into();
+
         unsafe {
             glTexSubImage2D(
                 GL_TEXTURE_2D,
@@ -252,8 +258,8 @@ impl Texture {
                 y_offset as _,
                 width as _,
                 height as _,
-                GL_RGBA,
-                GL_UNSIGNED_BYTE,
+                format,
+                pixel_type,
                 bytes.as_ptr() as *const _,
             );
         }
