@@ -1118,7 +1118,7 @@ pub fn glStencilMask(_mask: GLuint) {
 extern "C" {
     pub fn glStencilMaskSeparate(face: GLenum, mask: GLuint);
 }
-pub fn glStencilOp(fail: GLenum, zfail: GLenum, zpass: GLenum) {
+pub fn glStencilOp(_fail: GLenum, _zfail: GLenum, _zpass: GLenum) {
     // TODO: not available in WebGL1
 }
 extern "C" {
