@@ -2745,6 +2745,7 @@ _SOKOL_PRIVATE const _sapp_gl_fbconfig* _sapp_gl_choose_fbconfig(const _sapp_gl_
 #include <windowsx.h>
 #include <shellapi.h>
 #pragma comment (lib, "Shell32.lib")
+#pragma comment (lib, "Opengl32.lib")
 
 #if defined(SOKOL_D3D11)
 #ifndef D3D11_NO_HELPERS
