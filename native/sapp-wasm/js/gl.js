@@ -431,6 +431,9 @@ var importObject = {
         glClearStencil: function (s) {
             gl.clearColorStencil(s);
         },
+        glColorMask: function (red, green, blue, alpha) {
+            gl.colorMask(red, green, blue, alpha);
+        },
         glScissor: function (x, y, w, h) {
             gl.scissor(x, y, w, h);
         },

@@ -220,6 +220,7 @@ struct ShaderInternal {
 }
 
 type BlendState = Option<(Equation, BlendFactor, BlendFactor)>;
+type ColorMask = (bool, bool, bool, bool);
 
 #[derive(Default, Copy, Clone)]
 struct CachedAttribute {
@@ -236,6 +237,7 @@ struct GlCache {
     textures: [GLuint; MAX_SHADERSTAGE_IMAGES],
     cur_pipeline: Option<Pipeline>,
     blend: BlendState,
+    color_write: ColorMask,
     attributes: [Option<CachedAttribute>; MAX_VERTEX_ATTRIBUTES],
 }
 
@@ -422,6 +424,7 @@ impl Context {
                     vertex_buffer: 0,
                     cur_pipeline: None,
                     blend: None,
+                    color_write: (true, true, true, true),
                     stored_texture: 0,
                     textures: [0; MAX_SHADERSTAGE_IMAGES],
                     attributes: [None; MAX_VERTEX_ATTRIBUTES],
@@ -488,6 +491,12 @@ impl Context {
 
                 self.cache.blend = pipeline.params.color_blend;
             }
+        }
+
+        if self.cache.color_write != pipeline.params.color_write {
+            let (r, g, b, a) = pipeline.params.color_write;
+            unsafe { glColorMask(r as _, g as _, b as _, a as _) }
+            self.cache.color_write = pipeline.params.color_write;
         }
     }
 
@@ -900,7 +909,7 @@ pub struct PipelineParams {
     pub depth_write: bool,
     pub depth_write_offset: Option<(f32, f32)>,
     pub color_blend: BlendState,
-    pub color_write: (bool, bool, bool, bool),
+    pub color_write: ColorMask,
 }
 
 #[derive(Copy, Clone, Debug)]
