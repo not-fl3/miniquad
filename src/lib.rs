@@ -32,7 +32,7 @@ pub use graphics::*;
 
 use std::ffi::CString;
 
-pub use sapp::{rand, RAND_MAX};
+pub use sapp::*;
 
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
