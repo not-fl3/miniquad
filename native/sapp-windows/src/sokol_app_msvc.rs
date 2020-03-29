@@ -41979,9 +41979,9 @@ pub type PFN_glStencilOpSeparate = ::std::option::Option<
 extern "C" {
     pub static mut _sapp_glStencilOpSeparate: PFN_glStencilOpSeparate;
 }
-// extern "C" { TODO: make this work by linking to library that supports it
-//     pub fn glStencilOpSeparate(face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum);
-// }
+extern "C" {
+    pub fn glStencilOpSeparate(face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum);
+}
 pub type PFN_glRenderbufferStorageMultisample = ::std::option::Option<
     unsafe extern "C" fn(
         target: GLenum,
@@ -42395,19 +42395,15 @@ extern "C" {
 extern "C" {
     pub fn glBindBuffer(target: GLenum, buffer: GLuint);
 }
-
-// TODO: make this work by linking to library that supports it
-// extern "C" {
-//     pub fn glBindBufferRange(
-//         target: GLenum,
-//         index: GLuint,
-//         buffer: GLuint,
-//         offset: GLintptr,
-//         size: GLsizeiptr,
-//     );
-// }
-
-
+extern "C" {
+    pub fn glBindBufferRange(
+        target: GLenum,
+        index: GLuint,
+        buffer: GLuint,
+        offset: GLintptr,
+        size: GLsizeiptr,
+    );
+}
 pub type PFN_glDeleteVertexArrays =
     ::std::option::Option<unsafe extern "C" fn(n: GLsizei, arrays: *const GLuint)>;
 extern "C" {

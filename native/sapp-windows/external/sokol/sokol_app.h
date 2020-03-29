@@ -3223,6 +3223,9 @@ typedef void  (GL_APIENTRY *PFN_glStencilFuncSeparate)(GLenum face, GLenum func,
 static PFN_glStencilFuncSeparate _sapp_glStencilFuncSeparate;
 typedef void  (GL_APIENTRY *PFN_glStencilOpSeparate)(GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass);
 static PFN_glStencilOpSeparate _sapp_glStencilOpSeparate;
+void glStencilOpSeparate(GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass) {
+    _sapp_glStencilFuncSeparate(face, sfail, dpfail, dppass);
+}
 typedef void  (GL_APIENTRY *PFN_glRenderbufferStorageMultisample)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
 static PFN_glRenderbufferStorageMultisample _sapp_glRenderbufferStorageMultisample;
 typedef void  (GL_APIENTRY *PFN_glDrawBuffers)(GLsizei n, const GLenum * bufs);
@@ -3379,6 +3382,11 @@ void glBindBuffer(GLenum target, GLuint buffer) {
     _sapp_glBindBuffer(target, buffer);
 }
 
+typedef void  (GL_APIENTRY *PFN_glBindBufferRange)(GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size);
+static PFN_glBindBuffer _sapp_glBindBufferRange;
+void glBindBufferRange(GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size) {
+    _sapp_glBindBufferRange(target, index, buffer, offset, size);
+}
 typedef void  (GL_APIENTRY *PFN_glDeleteVertexArrays)(GLsizei n, const GLuint * arrays);
 static PFN_glDeleteVertexArrays _sapp_glDeleteVertexArrays;
 typedef void  (GL_APIENTRY *PFN_glDepthMask)(GLboolean flag);
@@ -3583,6 +3591,7 @@ _SOKOL_PRIVATE  void _sapp_win32_gl_loadfuncs(void) {
     _SAPP_GLPROC(glDisable);
     _SAPP_GLPROC(glColorMask);
     _SAPP_GLPROC(glBindBuffer);
+    _SAPP_GLPROC(glBindBufferRange);
     _SAPP_GLPROC(glDeleteVertexArrays);
     _SAPP_GLPROC(glDepthMask);
     _SAPP_GLPROC(glDrawArraysInstanced);
