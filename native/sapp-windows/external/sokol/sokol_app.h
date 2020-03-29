@@ -3383,7 +3383,7 @@ void glBindBuffer(GLenum target, GLuint buffer) {
 }
 
 typedef void  (GL_APIENTRY *PFN_glBindBufferRange)(GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size);
-static PFN_glBindBuffer _sapp_glBindBufferRange;
+static PFN_glBindBufferRange _sapp_glBindBufferRange;
 void glBindBufferRange(GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size) {
     _sapp_glBindBufferRange(target, index, buffer, offset, size);
 }
