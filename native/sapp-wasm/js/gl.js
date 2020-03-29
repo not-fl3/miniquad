@@ -666,6 +666,15 @@ var importObject = {
         glStencilOp: function (fail, zfail, zpass) {
             gl.stencilOp(fail, zfail, zpass);
         },
+        glStencilOpSeparate: function (face, sfail, dpfail, dppass) {
+            gl.stencilOpSeparate(face, sfail, dpfail, dppass);
+        },
+        glBindBufferRange: function (target, index, buffer, offset, size) {
+            // NOTE: this is WebGL 2 function only! 
+            //  not supported in WebGL1: https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14.5
+            //  supported in WebGL2: https://www.khronos.org/registry/webgl/specs/latest/2.0/#3.7.16
+            gl.bindBufferRange(target, index, buffer, offset, size);
+        },
         glShaderSource: function (shader, count, string, length) {
             GL.validateGLObjectID(GL.shaders, shader, 'glShaderSource', 'shader');
             var source = GL.getSource(shader, count, string, length);
