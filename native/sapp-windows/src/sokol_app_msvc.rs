@@ -8147,6 +8147,7 @@ pub const GL_ONE_MINUS_DST_ALPHA: u32 = 773;
 pub const GL_COLOR: u32 = 6144;
 pub const GL_TEXTURE_2D_ARRAY: u32 = 35866;
 pub const GL_TRIANGLES: u32 = 4;
+pub const GL_TRIANGLE_FAN: u32 = 6;
 pub const GL_UNSIGNED_BYTE: u32 = 5121;
 pub const GL_TEXTURE_MAG_FILTER: u32 = 10240;
 pub const GL_ONE_MINUS_CONSTANT_ALPHA: u32 = 32772;
@@ -41976,6 +41977,9 @@ pub type PFN_glStencilOpSeparate = ::std::option::Option<
 extern "C" {
     pub static mut _sapp_glStencilOpSeparate: PFN_glStencilOpSeparate;
 }
+extern "C" {
+    pub fn glStencilOpSeparate(face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum);
+}
 pub type PFN_glRenderbufferStorageMultisample = ::std::option::Option<
     unsafe extern "C" fn(
         target: GLenum,
@@ -42516,6 +42520,9 @@ pub type PFN_glStencilMask = ::std::option::Option<unsafe extern "C" fn(mask: GL
 extern "C" {
     pub static mut _sapp_glStencilMask: PFN_glStencilMask;
 }
+extern "C" {
+    pub fn glStencilMask(mask: GLuint);
+}
 pub type PFN_glAttachShader =
     ::std::option::Option<unsafe extern "C" fn(program: GLuint, shader: GLuint)>;
 extern "C" {
@@ -42585,10 +42592,16 @@ pub type PFN_glStencilOp =
 extern "C" {
     pub static mut _sapp_glStencilOp: PFN_glStencilOp;
 }
+extern "C" {
+    pub fn glStencilOp(fail: GLenum, zfail: GLenum, zpass: GLenum);
+}
 pub type PFN_glStencilFunc =
     ::std::option::Option<unsafe extern "C" fn(func: GLenum, ref_: GLint, mask: GLuint)>;
 extern "C" {
     pub static mut _sapp_glStencilFunc: PFN_glStencilFunc;
+}
+extern "C" {
+    pub fn glStencilFunc(func: GLenum, ref_: GLint, mask: GLuint);
 }
 pub type PFN_glEnableVertexAttribArray = ::std::option::Option<unsafe extern "C" fn(index: GLuint)>;
 extern "C" {
@@ -42686,9 +42699,15 @@ pub type PFN_glFrontFace = ::std::option::Option<unsafe extern "C" fn(mode: GLen
 extern "C" {
     pub static mut _sapp_glFrontFace: PFN_glFrontFace;
 }
+extern "C" {
+    pub fn glFrontFace(mode: GLenum);
+}
 pub type PFN_glCullFace = ::std::option::Option<unsafe extern "C" fn(mode: GLenum)>;
 extern "C" {
     pub static mut _sapp_glCullFace: PFN_glCullFace;
+}
+extern "C" {
+    pub fn glCullFace(mode: GLenum);
 }
 pub type __builtin_va_list = *mut ::std::os::raw::c_char;
 #[repr(C)]
@@ -42700,4 +42719,7 @@ pub struct lconv {
 #[derive(Debug, Copy, Clone)]
 pub struct _ACTIVATION_CONTEXT {
     pub _address: u8,
+}
+extern "C" {
+    pub fn glFinish();
 }
