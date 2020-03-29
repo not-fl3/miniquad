@@ -1,5 +1,5 @@
 #[cfg(target_os = "macos")]
-pub extern crate sapp_darwin as sapp;
+extern crate sapp_darwin as sapp;
 #[cfg(not(any(
     target_os = "linux",
     target_os = "macos",
@@ -7,15 +7,15 @@ pub extern crate sapp_darwin as sapp;
     target_arch = "wasm32",
     windows
 )))]
-pub extern crate sapp_dummy as sapp;
+extern crate sapp_dummy as sapp;
 #[cfg(target_os = "linux")]
-pub extern crate sapp_linux as sapp;
+extern crate sapp_linux as sapp;
 #[cfg(target_arch = "wasm32")]
-pub extern crate sapp_wasm as sapp;
+extern crate sapp_wasm as sapp;
 #[cfg(windows)]
-pub extern crate sapp_windows as sapp;
+extern crate sapp_windows as sapp;
 #[cfg(target_os = "android")]
-pub extern crate sapp_android as sapp;
+extern crate sapp_android as sapp;
 
 pub mod clipboard;
 pub mod conf;
@@ -32,7 +32,7 @@ pub use graphics::*;
 
 use std::ffi::CString;
 
-pub use sapp::{rand, RAND_MAX};
+pub use sapp::*;
 
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
