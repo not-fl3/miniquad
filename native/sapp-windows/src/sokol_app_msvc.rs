@@ -42387,6 +42387,9 @@ extern "C" {
 extern "C" {
     pub static mut _sapp_glColorMask: PFN_glColorMask;
 }
+extern "C" {
+    pub fn glColorMask(red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean);
+}
 pub type PFN_glBindBuffer =
     ::std::option::Option<unsafe extern "C" fn(target: GLenum, buffer: GLuint)>;
 extern "C" {

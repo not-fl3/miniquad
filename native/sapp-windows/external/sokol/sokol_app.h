@@ -3370,6 +3370,9 @@ void glDisable(GLenum cap) {
 }
 typedef void  (GL_APIENTRY *PFN_glColorMask)(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
 static PFN_glColorMask _sapp_glColorMask;
+void glColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha) {
+    _sapp_glColorMask(red, green, blue, alpha);
+}
 typedef void  (GL_APIENTRY *PFN_glBindBuffer)(GLenum target, GLuint buffer);
 static PFN_glBindBuffer _sapp_glBindBuffer;
 void glBindBuffer(GLenum target, GLuint buffer) {
