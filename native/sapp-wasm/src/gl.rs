@@ -739,8 +739,8 @@ extern "C" {
 extern "C" {
     pub fn glClearStencil(s: GLint);
 }
-extern "C" {
-    pub fn glColorMask(red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean);
+pub fn glColorMask(red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean) {
+    // TODO: marking this extern "C" does not work on WASM,  shows: Uncaught (in promise) LinkError: WebAssembly.instantiate(): Import #46 module="env" function="glColorMask" error: function import requires a callable
 }
 extern "C" {
     pub fn glCompileShader(shader: GLuint);
@@ -800,9 +800,9 @@ extern "C" {
 extern "C" {
     pub fn glCreateShader(type_: GLenum) -> GLuint;
 }
-extern "C" {
-    pub fn glCullFace(mode: GLenum);
-}
+    pub fn glCullFace(mode: GLenum) {
+        // TODO: not available in WebGL1
+    }
 extern "C" {
     pub fn glDeleteBuffers(n: GLsizei, buffers: *const GLuint);
 }
@@ -879,8 +879,8 @@ extern "C" {
         level: GLint,
     );
 }
-extern "C" {
-    pub fn glFrontFace(mode: GLenum);
+pub fn glFrontFace(mode: GLenum) {
+    // TODO: not available in WebGL1
 }
 extern "C" {
     pub fn glGenBuffers(n: GLsizei, buffers: *mut GLuint);
@@ -1106,20 +1106,20 @@ extern "C" {
         length: *const GLint,
     );
 }
-extern "C" {
-    pub fn glStencilFunc(func: GLenum, ref_: GLint, mask: GLuint);
+pub fn glStencilFunc(func: GLenum, ref_: GLint, mask: GLuint) {
+    // TODO: not available in WebGL1
 }
 extern "C" {
     pub fn glStencilFuncSeparate(face: GLenum, func: GLenum, ref_: GLint, mask: GLuint);
 }
-extern "C" {
-    pub fn glStencilMask(mask: GLuint);
+pub fn glStencilMask(mask: GLuint) {
+    // TODO: not available in WebGL1
 }
 extern "C" {
     pub fn glStencilMaskSeparate(face: GLenum, mask: GLuint);
 }
-extern "C" {
-    pub fn glStencilOp(fail: GLenum, zfail: GLenum, zpass: GLenum);
+pub fn glStencilOp(fail: GLenum, zfail: GLenum, zpass: GLenum) {
+    // TODO: not available in WebGL1
 }
 extern "C" {
     pub fn glStencilOpSeparate(face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum);
