@@ -652,19 +652,19 @@ var importObject = {
             return id;
         },
         glCullFace: function (mode) {
-            gl.glCullFace(mode);
+            gl.cullFace(mode);
         },
         glFrontFace: function (mode) {
-            gl.glFrontFace(mode);
+            gl.frontFace(mode);
         },
         glStencilFunc: function (func, ref_, mask) {
-            gl.glStencilFunc(func, ref_, mask);
+            gl.stencilFunc(func, ref_, mask);
         },
         glStencilMask: function (mask) {
-            gl.glStencilMask(mask);
+            gl.stencilMask(mask);
         },
         glStencilOp: function (fail, zfail, zpass) {
-            gl.glStencilOp(fail, zfail, zpass);
+            gl.stencilOp(fail, zfail, zpass);
         },
         glShaderSource: function (shader, count, string, length) {
             GL.validateGLObjectID(GL.shaders, shader, 'glShaderSource', 'shader');
