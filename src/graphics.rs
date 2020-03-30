@@ -29,6 +29,7 @@ pub enum UniformType {
     Float2,
     Float3,
     Float4,
+    Int,
     Mat4,
 }
 
@@ -39,6 +40,7 @@ impl UniformType {
             UniformType::Float2 => 8 * count,
             UniformType::Float3 => 12 * count,
             UniformType::Float4 => 16 * count,
+            UniformType::Int => 4 * count,
             UniformType::Mat4 => 64 * count,
         }
     }
@@ -595,6 +597,9 @@ impl Context {
                     }
                     Float4 => {
                         glUniform4fv(uniform.gl_loc, 1, data);
+                    }
+                    Int => {
+                        glUniform1iv(uniform.gl_loc, 1, data as *const GLint);
                     }
                     Mat4 => {
                         glUniformMatrix4fv(uniform.gl_loc, 1, 0, data);
