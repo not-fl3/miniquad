@@ -42617,6 +42617,15 @@ extern "C" {
 extern "C" {
     pub fn glUniform1iv(location: GLint, count: GLsizei, value: *const GLint);
 }
+extern "C" {
+    pub fn glUniform2iv(location: GLint, count: GLsizei, value: *const GLint);
+}
+extern "C" {
+    pub fn glUniform3iv(location: GLint, count: GLsizei, value: *const GLint);
+}
+extern "C" {
+    pub fn glUniform4iv(location: GLint, count: GLsizei, value: *const GLint);
+}
 pub type PFN_glUniform1f =
     ::std::option::Option<unsafe extern "C" fn(location: GLint, value: GLfloat)>;
 extern "C" {
