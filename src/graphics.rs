@@ -29,7 +29,10 @@ pub enum UniformType {
     Float2,
     Float3,
     Float4,
-    Int,
+    Int1,
+    Int2,
+    Int3,
+    Int4,
     Mat4,
 }
 
@@ -40,7 +43,10 @@ impl UniformType {
             UniformType::Float2 => 8 * count,
             UniformType::Float3 => 12 * count,
             UniformType::Float4 => 16 * count,
-            UniformType::Int => 4 * count,
+            UniformType::Int1 => 4 * count,
+            UniformType::Int2 => 8 * count,
+            UniformType::Int3 => 12 * count,
+            UniformType::Int4 => 16 * count,
             UniformType::Mat4 => 64 * count,
         }
     }
@@ -584,6 +590,7 @@ impl Context {
 
             unsafe {
                 let data = (uniforms as *const _ as *const f32).offset(offset as isize);
+                let data_int = (uniforms as *const _ as *const i32).offset(offset as isize);
 
                 match uniform.uniform_type {
                     Float1 => {
@@ -598,8 +605,17 @@ impl Context {
                     Float4 => {
                         glUniform4fv(uniform.gl_loc, 1, data);
                     }
-                    Int => {
-                        glUniform1iv(uniform.gl_loc, 1, data as *const GLint);
+                    Int1 => {
+                        glUniform1iv(uniform.gl_loc, 1, data_int);
+                    }
+                    Int2 => {
+                        glUniform2iv(uniform.gl_loc, 1, data_int);
+                    }
+                    Int3 => {
+                        glUniform3iv(uniform.gl_loc, 1, data_int);
+                    }
+                    Int4 => {
+                        glUniform4iv(uniform.gl_loc, 1, data_int);
                     }
                     Mat4 => {
                         glUniformMatrix4fv(uniform.gl_loc, 1, 0, data);
