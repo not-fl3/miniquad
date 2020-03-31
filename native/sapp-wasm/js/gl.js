@@ -372,6 +372,11 @@ into_sapp_keycode = function (key_code) {
         case "ArrowDown": return 264;
         case "ArrowUp": return 265;
         case "Space": return 32;
+        case "Home": return 268;
+        case "End": return 269;
+        case "Enter": return 257;
+        case "Delete": return 261;
+        case "Backspace": return 259;
     }
 }
 
@@ -797,6 +802,9 @@ var importObject = {
             canvas.onkeyup = function (event) {
                 var sapp_key_code = into_sapp_keycode(event.code);
                 wasm_exports.key_up(sapp_key_code);
+            };
+            canvas.onkeypress = function (event) {
+                wasm_exports.key_press(event.charCode);
             };
 
             canvas.addEventListener("touchstart", function (event) {

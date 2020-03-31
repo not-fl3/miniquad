@@ -415,6 +415,17 @@ pub extern "C" fn key_down(key: u32) {
 }
 
 #[no_mangle]
+pub extern "C" fn key_press(key: u32) {
+    let mut event: sapp_event = unsafe { std::mem::zeroed() };
+
+    event.type_ = sapp_event_type_SAPP_EVENTTYPE_CHAR;
+    event.char_code = key;
+    unsafe {
+        sapp_context().event(event);
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn key_up(key: u32) {
     let mut event: sapp_event = unsafe { std::mem::zeroed() };
 
