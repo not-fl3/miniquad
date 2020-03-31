@@ -932,6 +932,7 @@ pub enum BlendFactor {
     One,
     Value(BlendValue),
     OneMinusValue(BlendValue),
+    SourceAlphaSaturate,
 }
 
 impl From<Equation> for GLenum {
@@ -957,6 +958,7 @@ impl From<BlendFactor> for GLenum {
             BlendFactor::OneMinusValue(BlendValue::SourceAlpha) => GL_ONE_MINUS_SRC_ALPHA,
             BlendFactor::OneMinusValue(BlendValue::DestinationColor) => GL_ONE_MINUS_DST_COLOR,
             BlendFactor::OneMinusValue(BlendValue::DestinationAlpha) => GL_ONE_MINUS_DST_ALPHA,
+            BlendFactor::SourceAlphaSaturate => GL_SRC_ALPHA_SATURATE,
         }
     }
 }
