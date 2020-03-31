@@ -490,6 +490,30 @@ var importObject = {
             var view = getArray(value, Float32Array, 4);
             gl.uniform4fv(GL.uniforms[location], view);
         },
+        glUniform1iv: function (location, count, value) {
+            GL.validateGLObjectID(GL.uniforms, location, 'glUniform1fv', 'location');
+            assert((value & 3) == 0, 'Pointer to i32 data passed to glUniform1iv must be aligned to four bytes!');
+            var view = getArray(value, Int32Array, 1);
+            gl.uniform1iv(GL.uniforms[location], view);
+        },
+        glUniform2iv: function (location, count, value) {
+            GL.validateGLObjectID(GL.uniforms, location, 'glUniform2fv', 'location');
+            assert((value & 3) == 0, 'Pointer to i32 data passed to glUniform2iv must be aligned to four bytes!');
+            var view = getArray(value, Int32Array, 2);
+            gl.uniform2iv(GL.uniforms[location], view);
+        },
+        glUniform3iv: function (location, count, value) {
+            GL.validateGLObjectID(GL.uniforms, location, 'glUniform3fv', 'location');
+            assert((value & 3) == 0, 'Pointer to i32 data passed to glUniform3iv must be aligned to four bytes!');
+            var view = getArray(value, Int32Array, 3);
+            gl.uniform3iv(GL.uniforms[location], view);
+        },
+        glUniform4iv: function (location, count, value) {
+            GL.validateGLObjectID(GL.uniforms, location, 'glUniform4fv', 'location');
+            assert((value & 3) == 0, 'Pointer to i32 data passed to glUniform4iv must be aligned to four bytes!');
+            var view = getArray(value, Int32Array, 4);
+            gl.uniform4iv(GL.uniforms[location], view);
+        },
         glBlendFunc: function (sfactor, dfactor) {
             gl.blendFunc(sfactor, dfactor);
         },
