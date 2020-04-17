@@ -239,7 +239,7 @@ mod display_shader {
     pub const META: ShaderMeta = ShaderMeta {
         images: &["tex"],
         uniforms: UniformBlockLayout {
-            uniforms: &[("mvp", UniformType::Mat4)],
+            uniforms: &[UniformDesc::new("mvp", UniformType::Mat4)],
         },
     };
 
@@ -277,7 +277,7 @@ mod offscreen_shader {
     pub const META: ShaderMeta = ShaderMeta {
         images: &[],
         uniforms: UniformBlockLayout {
-            uniforms: &[("mvp", UniformType::Mat4)],
+            uniforms: &[UniformDesc::new("mvp", UniformType::Mat4)],
         },
     };
 }

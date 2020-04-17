@@ -12,11 +12,14 @@ impl EventHandlerFree for Stage {
 }
 
 fn main() {
-    miniquad::start(conf::Conf {
-        window_title: "Miniquad".to_string(),
-        window_width: 1024,
-        window_height: 768,
-        fullscreen: true,
-        ..Default::default()
-    }, |ctx| UserData::free(Stage { ctx }));
+    miniquad::start(
+        conf::Conf {
+            window_title: "Miniquad".to_string(),
+            window_width: 1024,
+            window_height: 768,
+            fullscreen: true,
+            ..Default::default()
+        },
+        |ctx| UserData::free(Stage { ctx }),
+    );
 }

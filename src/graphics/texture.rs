@@ -47,9 +47,7 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
         match format {
             TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
             TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
-            TextureFormat::Depth => {
-                (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT)
-            }
+            TextureFormat::Depth => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT),
         }
     }
 }
@@ -143,7 +141,7 @@ impl Texture {
             texture,
             width: params.width,
             height: params.height,
-            format: params.format
+            format: params.format,
         }
     }
 
@@ -185,7 +183,7 @@ impl Texture {
                 texture,
                 width: params.width as u32,
                 height: params.height as u32,
-                format: params.format
+                format: params.format,
             }
         }
     }

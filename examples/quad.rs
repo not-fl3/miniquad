@@ -119,7 +119,7 @@ mod shader {
     pub const META: ShaderMeta = ShaderMeta {
         images: &["tex"],
         uniforms: UniformBlockLayout {
-            uniforms: &[("offset", UniformType::Float2)],
+            uniforms: &[UniformDesc::new("offset", UniformType::Float2)],
         },
     };
 
