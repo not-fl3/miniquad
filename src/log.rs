@@ -222,7 +222,6 @@ pub fn __private_api_log_lit(
     unsafe { sapp_android::sapp_android_log(msg.as_ptr()) };
 }
 
-
 #[test]
 fn test_logs() {
     trace!("info");

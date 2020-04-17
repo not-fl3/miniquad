@@ -176,7 +176,7 @@ mod shader {
     pub const META: ShaderMeta = ShaderMeta {
         images: &[],
         uniforms: UniformBlockLayout {
-            uniforms: &[("mvp", UniformType::Mat4)],
+            uniforms: &[UniformDesc::new("mvp", UniformType::Mat4)],
         },
     };
 

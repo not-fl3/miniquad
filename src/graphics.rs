@@ -7,9 +7,7 @@ use crate::sapp::*;
 // workaround sapp::* also contains None on Android
 use std::option::Option::None;
 
-pub use texture::{
-    FilterMode, TextureParams, Texture, TextureFormat,
-};
+pub use texture::{FilterMode, Texture, TextureFormat, TextureParams};
 
 fn get_uniform_location(program: GLuint, name: &str) -> i32 {
     let cname = CString::new(name).unwrap_or_else(|e| panic!(e));
@@ -52,8 +50,35 @@ impl UniformType {
     }
 }
 
+pub struct UniformDesc {
+    name: &'static str,
+    uniform_type: UniformType,
+    array_count: usize,
+}
+
 pub struct UniformBlockLayout {
-    pub uniforms: &'static [(&'static str, UniformType)],
+    pub uniforms: &'static [UniformDesc],
+}
+
+impl UniformDesc {
+    pub const fn new(name: &'static str, uniform_type: UniformType) -> UniformDesc {
+        UniformDesc {
+            name,
+            uniform_type,
+            array_count: 1,
+        }
+    }
+    pub const fn with_array(
+        name: &'static str,
+        uniform_type: UniformType,
+        array_count: usize,
+    ) -> UniformDesc {
+        UniformDesc {
+            name,
+            uniform_type,
+            array_count,
+        }
+    }
 }
 
 pub struct ShaderMeta {
@@ -219,6 +244,7 @@ pub struct ShaderUniform {
     offset: usize,
     size: usize,
     uniform_type: UniformType,
+    array_count: i32,
 }
 
 struct ShaderInternal {
@@ -586,7 +612,10 @@ impl Context {
         for (_, uniform) in shader.uniforms.iter().enumerate() {
             use UniformType::*;
 
-            assert!(offset < std::mem::size_of::<U>() - 4);
+            assert!(
+                offset <= std::mem::size_of::<U>() - uniform.uniform_type.size(1) / 4,
+                "Uniforms struct does not match shader uniforms layout"
+            );
 
             unsafe {
                 let data = (uniforms as *const _ as *const f32).offset(offset as isize);
@@ -594,35 +623,35 @@ impl Context {
 
                 match uniform.uniform_type {
                     Float1 => {
-                        glUniform1fv(uniform.gl_loc, 1, data);
+                        glUniform1fv(uniform.gl_loc, uniform.array_count, data);
                     }
                     Float2 => {
-                        glUniform2fv(uniform.gl_loc, 1, data);
+                        glUniform2fv(uniform.gl_loc, uniform.array_count, data);
                     }
                     Float3 => {
-                        glUniform3fv(uniform.gl_loc, 1, data);
+                        glUniform3fv(uniform.gl_loc, uniform.array_count, data);
                     }
                     Float4 => {
-                        glUniform4fv(uniform.gl_loc, 1, data);
+                        glUniform4fv(uniform.gl_loc, uniform.array_count, data);
                     }
                     Int1 => {
-                        glUniform1iv(uniform.gl_loc, 1, data_int);
+                        glUniform1iv(uniform.gl_loc, uniform.array_count, data_int);
                     }
                     Int2 => {
-                        glUniform2iv(uniform.gl_loc, 1, data_int);
+                        glUniform2iv(uniform.gl_loc, uniform.array_count, data_int);
                     }
                     Int3 => {
-                        glUniform3iv(uniform.gl_loc, 1, data_int);
+                        glUniform3iv(uniform.gl_loc, uniform.array_count, data_int);
                     }
                     Int4 => {
-                        glUniform4iv(uniform.gl_loc, 1, data_int);
+                        glUniform4iv(uniform.gl_loc, uniform.array_count, data_int);
                     }
                     Mat4 => {
-                        glUniformMatrix4fv(uniform.gl_loc, 1, 0, data);
+                        glUniformMatrix4fv(uniform.gl_loc, uniform.array_count, 0, data);
                     }
                 }
             }
-            offset += uniform.uniform_type.size(1) / 4;
+            offset += uniform.uniform_type.size(1) / 4 * uniform.array_count as usize;
         }
     }
 
@@ -765,12 +794,13 @@ fn load_shader_internal(
         #[rustfmt::skip]
         let uniforms = meta.uniforms.uniforms.iter().scan(0, |offset, uniform| {
             let res = ShaderUniform {
-                gl_loc: get_uniform_location(program, uniform.0),
+                gl_loc: get_uniform_location(program, uniform.name),
                 offset: *offset,
-                size: uniform.1.size(1),
-                uniform_type: uniform.1
+                size: uniform.uniform_type.size(1),
+                uniform_type: uniform.uniform_type,
+                array_count: uniform.array_count as _,
             };
-            *offset += uniform.1.size(1);
+            *offset += uniform.uniform_type.size(1) * uniform.array_count;
             Some(res)
         }).collect();
         ShaderInternal {
