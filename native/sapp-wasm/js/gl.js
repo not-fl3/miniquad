@@ -405,6 +405,15 @@ texture_size = function (internalFormat, width, height) {
     }
 }
 
+mouse_relative_position = function (clientX, clientY) {
+    var targetRect = canvas.getBoundingClientRect();
+
+    var x = clientX - targetRect.left;
+    var y = clientY - targetRect.top;
+
+    return { x, y };
+}
+
 var emscripten_shaders_hack = false;
 
 var importObject = {
@@ -797,8 +806,9 @@ var importObject = {
         },
         init_opengl: function (ptr) {
             canvas.onmousemove = function (event) {
-                var x = event.clientX;
-                var y = event.clientY;
+                var relative_position = mouse_relative_position(event.clientX, event.clientY);
+                var x = relative_position.x;
+                var y = relative_position.y;
 
                 // TODO: do not send mouse_move when cursor is captured
                 wasm_exports.mouse_move(Math.floor(x), Math.floor(y));
@@ -809,8 +819,10 @@ var importObject = {
                 }
             };
             canvas.onmousedown = function (event) {
-                var x = event.clientX;
-                var y = event.clientY;
+                var relative_position = mouse_relative_position(event.clientX, event.clientY);
+                var x = relative_position.x;
+                var y = relative_position.y;
+
                 var btn = into_sapp_mousebutton(event.button);
                 wasm_exports.mouse_down(x, y, btn);
             };
@@ -820,8 +832,10 @@ var importObject = {
                     wasm_exports.mouse_wheel(-event.deltaX, -event.deltaY);
                 });
             canvas.onmouseup = function (event) {
-                var x = event.clientX;
-                var y = event.clientY;
+                var relative_position = mouse_relative_position(event.clientX, event.clientY);
+                var x = relative_position.x;
+                var y = relative_position.y;
+
                 var btn = into_sapp_mousebutton(event.button);
                 wasm_exports.mouse_up(x, y, btn);
             };
