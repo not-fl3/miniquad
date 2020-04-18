@@ -32,7 +32,18 @@ pub use graphics::*;
 
 use std::ffi::CString;
 
-pub use sapp::{rand, RAND_MAX};
+#[deprecated(
+    since = "0.3",
+    note = "libc rand is slow and incosistent across platforms. Please use quad-rnd crate instead."
+)]
+pub unsafe fn rand() -> i32 {
+    sapp::rand()
+}
+#[deprecated(
+    since = "0.3",
+    note = "libc rand is slow and incosistent across platforms. Please use quad-rnd crate instead."
+)]
+pub const RAND_MAX: u32 = sapp::RAND_MAX;
 
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
