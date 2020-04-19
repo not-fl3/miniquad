@@ -74,6 +74,8 @@ pub struct Conf {
     pub high_dpi: bool,
     /// whether the window should be created in fullscreen mode, ignored on wasm/android
     pub fullscreen: bool,
+    /// MSAA sample count
+    pub sample_count: i32,
 }
 
 impl Default for Conf {
@@ -86,6 +88,7 @@ impl Default for Conf {
             window_height: 600,
             high_dpi: false,
             fullscreen: false,
+            sample_count: 1,
         }
     }
 }
