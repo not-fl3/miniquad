@@ -40,6 +40,7 @@ pub enum TextureFormat {
     RGB8,
     RGBA8,
     Depth,
+    Alpha,
 }
 
 impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
@@ -48,6 +49,7 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
             TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
             TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
             TextureFormat::Depth => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT),
+            TextureFormat::Alpha => (GL_R8, GL_RED, GL_UNSIGNED_BYTE),
         }
     }
 }
@@ -61,6 +63,7 @@ impl TextureFormat {
             TextureFormat::RGB8 => 3 * square,
             TextureFormat::RGBA8 => 4 * square,
             TextureFormat::Depth => 2 * square,
+            TextureFormat::Alpha => 1 * square,
         }
     }
 }
