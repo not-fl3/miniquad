@@ -7,7 +7,7 @@ use crate::sapp::*;
 // workaround sapp::* also contains None on Android
 use std::option::Option::None;
 
-pub use texture::{FilterMode, Texture, TextureFormat, TextureParams};
+pub use texture::{FilterMode, Texture, TextureFormat, TextureParams, TextureWrap};
 
 fn get_uniform_location(program: GLuint, name: &str) -> i32 {
     let cname = CString::new(name).unwrap_or_else(|e| panic!(e));
