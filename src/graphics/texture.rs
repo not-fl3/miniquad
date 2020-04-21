@@ -121,7 +121,7 @@ impl Texture {
         Self::new(ctx, TextureAccess::RenderTarget, None, params)
     }
 
-    pub fn new(ctx: &mut Context, access: TextureAccess, bytes: Option<&[u8]>, params: TextureParams) -> Texture {
+    pub fn new(ctx: &mut Context, _access: TextureAccess, bytes: Option<&[u8]>, params: TextureParams) -> Texture {
         if let Some(bytes_data) = bytes {
             assert_eq!(
                 params.format.size(params.width, params.height),
@@ -137,9 +137,6 @@ impl Texture {
 
         unsafe {
             glGenTextures(1, &mut texture as *mut _);
-            if access == TextureAccess::RenderTarget {
-                glActiveTexture(GL_TEXTURE0);
-            }
             ctx.cache.bind_texture(0, texture);
             glTexImage2D(
                 GL_TEXTURE_2D,
