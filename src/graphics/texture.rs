@@ -5,7 +5,7 @@ pub struct Texture {
     pub(crate) texture: GLuint,
     pub width: u32,
     pub height: u32,
-    format: TextureFormat,
+    pub format: TextureFormat,
 }
 
 impl Texture {
