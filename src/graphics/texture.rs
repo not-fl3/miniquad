@@ -146,13 +146,11 @@ impl Texture {
     }
 
     /// Upload texture to GPU with given TextureParams
-    pub fn from_data_and_format(ctx: &mut Context, bytes: Option<&[u8]>, params: TextureParams) -> Texture {
-        if let Some(bytes_data) = bytes {
-            assert_eq!(
-                params.format.size(params.width, params.height),
-                bytes_data.len() as u32
-            );
-        }
+    pub fn from_data_and_format(ctx: &mut Context, bytes: &[u8], params: TextureParams) -> Texture {
+        assert_eq!(
+            params.format.size(params.width, params.height),
+            bytes.len() as u32
+        );
 
         let (internal_format, format, pixel_type) = params.format.into();
 
@@ -171,10 +169,7 @@ impl Texture {
                 0,
                 format,
                 pixel_type,
-                match bytes {
-                    Some(bytes) => bytes.as_ptr() as *const _,
-                    Option::None => std::ptr::null(),
-                },
+                bytes.as_ptr() as *const _,
             );
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE as i32);
@@ -194,10 +189,8 @@ impl Texture {
     }
 
     /// Upload RGBA8 texture to GPU
-    pub fn from_rgba8(ctx: &mut Context, width: u16, height: u16, bytes: Option<&[u8]>) -> Texture {
-        if let Some(bytes_data) = bytes {
-            assert_eq!(width as usize * height as usize * 4, bytes_data.len());
-        }
+    pub fn from_rgba8(ctx: &mut Context, width: u16, height: u16, bytes: &[u8]) -> Texture {
+        assert_eq!(width as usize * height as usize * 4, bytes.len());
 
         Self::from_data_and_format(
             ctx,
