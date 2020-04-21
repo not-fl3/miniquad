@@ -97,6 +97,15 @@ pub enum FilterMode {
     Nearest = GL_NEAREST as isize,
 }
 
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum TextureAccess {
+    /// Used as read-only from GPU
+    Static,
+    /// Can be written to from GPU
+    RenderTarget,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct TextureParams {
     pub format: TextureFormat,
@@ -107,7 +116,12 @@ pub struct TextureParams {
 }
 
 impl Texture {
+    /// Shorthand for `new(ctx, TextureAccess::RenderTarget, params)`
     pub fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
+        Texture::new(ctx, TextureAccess::RenderTarget, params)
+    }
+
+    pub fn new(ctx: &mut Context, access: TextureAccess, params: TextureParams) -> Texture {
         let (internal_format, format, pixel_type) = params.format.into();
 
         ctx.cache.store_texture_binding(0);
@@ -116,7 +130,9 @@ impl Texture {
 
         unsafe {
             glGenTextures(1, &mut texture as *mut _);
-            glActiveTexture(GL_TEXTURE0);
+            if access == TextureAccess::RenderTarget {
+                glActiveTexture(GL_TEXTURE0);
+            }
             ctx.cache.bind_texture(0, texture);
             glTexImage2D(
                 GL_TEXTURE_2D,
