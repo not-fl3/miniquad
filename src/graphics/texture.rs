@@ -118,10 +118,17 @@ pub struct TextureParams {
 impl Texture {
     /// Shorthand for `new(ctx, TextureAccess::RenderTarget, params)`
     pub fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
-        Texture::new(ctx, TextureAccess::RenderTarget, params)
+        Self::new(ctx, TextureAccess::RenderTarget, None, params)
     }
 
-    pub fn new(ctx: &mut Context, access: TextureAccess, params: TextureParams) -> Texture {
+    pub fn new(ctx: &mut Context, access: TextureAccess, bytes: Option<&[u8]>, params: TextureParams) -> Texture {
+        if let Some(bytes_data) = bytes {
+            assert_eq!(
+                params.format.size(params.width, params.height),
+                bytes_data.len() as u32
+            );
+        }
+
         let (internal_format, format, pixel_type) = params.format.into();
 
         ctx.cache.store_texture_binding(0);
@@ -143,7 +150,10 @@ impl Texture {
                 0,
                 format,
                 pixel_type,
-                std::ptr::null(),
+                match bytes {
+                    Some(bytes) => bytes.as_ptr() as *const _,
+                    Option::None => std::ptr::null(),
+                },
             );
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE as i32);
@@ -163,45 +173,7 @@ impl Texture {
 
     /// Upload texture to GPU with given TextureParams
     pub fn from_data_and_format(ctx: &mut Context, bytes: &[u8], params: TextureParams) -> Texture {
-        assert_eq!(
-            params.format.size(params.width, params.height),
-            bytes.len() as u32
-        );
-
-        let (internal_format, format, pixel_type) = params.format.into();
-
-        unsafe {
-            ctx.cache.store_texture_binding(0);
-
-            let mut texture: GLuint = 0;
-            glGenTextures(1, &mut texture as *mut _);
-            ctx.cache.bind_texture(0, texture);
-            glTexImage2D(
-                GL_TEXTURE_2D,
-                0,
-                internal_format as i32,
-                params.width as i32,
-                params.height as i32,
-                0,
-                format,
-                pixel_type,
-                bytes.as_ptr() as *const _,
-            );
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR as i32);
-
-            ctx.cache.restore_texture_binding(0);
-
-            Texture {
-                texture,
-                width: params.width as u32,
-                height: params.height as u32,
-                format: params.format,
-            }
-        }
+        Self::new(ctx, TextureAccess::Static, Some(bytes), params)
     }
 
     /// Upload RGBA8 texture to GPU
