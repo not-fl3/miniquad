@@ -935,6 +935,12 @@ pub enum BlendFactor {
     SourceAlphaSaturate,
 }
 
+impl Default for Equation {
+    fn default() -> Equation {
+        Equation::Add
+    }
+}
+
 impl From<Equation> for GLenum {
     fn from(eq: Equation) -> Self {
         match eq {
