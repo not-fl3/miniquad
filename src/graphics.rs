@@ -196,11 +196,11 @@ pub struct VertexAttribute {
 }
 
 impl VertexAttribute {
-    pub fn new(name: &'static str, format: VertexFormat) -> VertexAttribute {
+    pub const fn new(name: &'static str, format: VertexFormat) -> VertexAttribute {
         Self::with_buffer(name, format, 0)
     }
 
-    pub fn with_buffer(
+    pub const fn with_buffer(
         name: &'static str,
         format: VertexFormat,
         buffer_index: usize,
@@ -255,12 +255,12 @@ struct ShaderInternal {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct BlendState {
-    eq_rgb: Equation,
-    eq_alpha: Equation,
-    src_rgb: BlendFactor,
-    dst_rgb: BlendFactor,
-    src_alpha: BlendFactor,
-    dst_alpha: BlendFactor,
+    pub eq_rgb: Equation,
+    pub eq_alpha: Equation,
+    pub src_rgb: BlendFactor,
+    pub dst_rgb: BlendFactor,
+    pub src_alpha: BlendFactor,
+    pub dst_alpha: BlendFactor,
 }
 
 type ColorMask = (bool, bool, bool, bool);
