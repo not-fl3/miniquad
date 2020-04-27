@@ -498,49 +498,64 @@ impl Context {
     pub fn apply_pipeline(&mut self, pipeline: &Pipeline) {
         self.cache.cur_pipeline = Some(*pipeline);
 
-        let pipeline = &mut self.pipelines[pipeline.0];
-        let shader = &mut self.shaders[pipeline.shader.0];
-        unsafe {
-            glUseProgram(shader.program);
-        }
-
-        unsafe {
-            glEnable(GL_SCISSOR_TEST);
-        }
-
-        if pipeline.params.depth_write {
+        {
+            let pipeline = &self.pipelines[pipeline.0];
+            let shader = &mut self.shaders[pipeline.shader.0];
             unsafe {
-                glEnable(GL_DEPTH_TEST);
-                glDepthFunc(pipeline.params.depth_test.into())
+                glUseProgram(shader.program);
             }
-        } else {
+
             unsafe {
-                glDisable(GL_DEPTH_TEST);
+                glEnable(GL_SCISSOR_TEST);
             }
-        }
 
-        if self.cache.blend != pipeline.params.color_blend {
-            unsafe {
-                if let Some(blend) = pipeline.params.color_blend {
-                    if self.cache.blend.is_none() {
-                        glEnable(GL_BLEND);
-                    }
-
-                    glBlendFuncSeparate(blend.src_rgb.into(), blend.dst_rgb.into(), blend.src_alpha.into(), blend.dst_alpha.into());
-                    glBlendEquationSeparate(blend.eq_rgb.into(), blend.eq_alpha.into());
-                } else if self.cache.blend.is_some() {
-                    glDisable(GL_BLEND);
+            if pipeline.params.depth_write {
+                unsafe {
+                    glEnable(GL_DEPTH_TEST);
+                    glDepthFunc(pipeline.params.depth_test.into())
                 }
-
-                self.cache.blend = pipeline.params.color_blend;
+            } else {
+                unsafe {
+                    glDisable(GL_DEPTH_TEST);
+                }
             }
         }
 
+        if self.cache.blend != self.pipelines[pipeline.0].params.color_blend {
+            self.set_blend(self.pipelines[pipeline.0].params.color_blend);
+        }
+
+        let pipeline = &self.pipelines[pipeline.0];
         if self.cache.color_write != pipeline.params.color_write {
             let (r, g, b, a) = pipeline.params.color_write;
             unsafe { glColorMask(r as _, g as _, b as _, a as _) }
             self.cache.color_write = pipeline.params.color_write;
         }
+    }
+
+    pub fn set_blend(&mut self, color_blend: Option<BlendState>) {
+        if self.cache.blend == color_blend {
+            return;
+        }
+        unsafe {
+            if let Some(blend) = color_blend {
+                if self.cache.blend.is_none() {
+                    glEnable(GL_BLEND);
+                }
+
+                glBlendFuncSeparate(
+                    blend.src_rgb.into(),
+                    blend.dst_rgb.into(),
+                    blend.src_alpha.into(),
+                    blend.dst_alpha.into(),
+                );
+                glBlendEquationSeparate(blend.eq_rgb.into(), blend.eq_alpha.into());
+            } else if self.cache.blend.is_some() {
+                glDisable(GL_BLEND);
+            }
+        }
+
+        self.cache.blend = color_blend;
     }
 
     pub fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
