@@ -100,6 +100,10 @@ pub enum VertexFormat {
     Short2,
     Short3,
     Short4,
+    Int1,
+    Int2,
+    Int3,
+    Int4,
     Mat4,
 }
 
@@ -118,6 +122,10 @@ impl VertexFormat {
             VertexFormat::Short2 => 2,
             VertexFormat::Short3 => 3,
             VertexFormat::Short4 => 4,
+            VertexFormat::Int1 => 1,
+            VertexFormat::Int2 => 2,
+            VertexFormat::Int3 => 3,
+            VertexFormat::Int4 => 4,
             VertexFormat::Mat4 => 16,
         }
     }
@@ -136,6 +144,10 @@ impl VertexFormat {
             VertexFormat::Short2 => 2 * 2,
             VertexFormat::Short3 => 3 * 2,
             VertexFormat::Short4 => 4 * 2,
+            VertexFormat::Int1 => 1 * 4,
+            VertexFormat::Int2 => 2 * 4,
+            VertexFormat::Int3 => 3 * 4,
+            VertexFormat::Int4 => 4 * 4,
             VertexFormat::Mat4 => 16 * 4,
         }
     }
@@ -154,6 +166,10 @@ impl VertexFormat {
             VertexFormat::Short2 => GL_UNSIGNED_SHORT,
             VertexFormat::Short3 => GL_UNSIGNED_SHORT,
             VertexFormat::Short4 => GL_UNSIGNED_SHORT,
+            VertexFormat::Int1 => GL_UNSIGNED_INT,
+            VertexFormat::Int2 => GL_UNSIGNED_INT,
+            VertexFormat::Int3 => GL_UNSIGNED_INT,
+            VertexFormat::Int4 => GL_UNSIGNED_INT,
             VertexFormat::Mat4 => GL_FLOAT,
         }
     }
