@@ -8147,6 +8147,8 @@ pub const GL_ONE_MINUS_DST_ALPHA: u32 = 773;
 pub const GL_COLOR: u32 = 6144;
 pub const GL_TEXTURE_2D_ARRAY: u32 = 35866;
 pub const GL_TRIANGLES: u32 = 4;
+pub const GL_TRIANGLE_STRIP: u32 = 5;
+pub const GL_TRIANGLE_FAN: u32 = 6;
 pub const GL_UNSIGNED_BYTE: u32 = 5121;
 pub const GL_TEXTURE_MAG_FILTER: u32 = 10240;
 pub const GL_ONE_MINUS_CONSTANT_ALPHA: u32 = 32772;
@@ -41976,9 +41978,9 @@ pub type PFN_glStencilOpSeparate = ::std::option::Option<
 extern "C" {
     pub static mut _sapp_glStencilOpSeparate: PFN_glStencilOpSeparate;
 }
-// extern "C" { TODO: make this work by linking to library that supports it
-//     pub fn glStencilOpSeparate(face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum);
-// }
+extern "C" {
+    pub fn glStencilOpSeparate(face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum);
+}
 pub type PFN_glRenderbufferStorageMultisample = ::std::option::Option<
     unsafe extern "C" fn(
         target: GLenum,
