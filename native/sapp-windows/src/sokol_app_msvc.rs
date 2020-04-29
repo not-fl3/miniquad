@@ -42392,7 +42392,6 @@ extern "C" {
 extern "C" {
     pub fn glBindBuffer(target: GLenum, buffer: GLuint);
 }
-
 pub type PFN_glDeleteVertexArrays =
     ::std::option::Option<unsafe extern "C" fn(n: GLsizei, arrays: *const GLuint)>;
 extern "C" {
