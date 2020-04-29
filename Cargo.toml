@@ -40,3 +40,4 @@ sapp-dummy = { path ="./native/sapp-dummy", version = "=0.1.3" }
 
 [dev-dependencies]
 glam = {version = "0.8", features = ["scalar-math"] }
+quad-rand = "0.1"
