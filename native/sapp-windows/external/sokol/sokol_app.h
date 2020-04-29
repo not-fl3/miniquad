@@ -3223,6 +3223,9 @@ typedef void  (GL_APIENTRY *PFN_glStencilFuncSeparate)(GLenum face, GLenum func,
 static PFN_glStencilFuncSeparate _sapp_glStencilFuncSeparate;
 typedef void  (GL_APIENTRY *PFN_glStencilOpSeparate)(GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass);
 static PFN_glStencilOpSeparate _sapp_glStencilOpSeparate;
+void glStencilOpSeparate(GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass) {
+    _sapp_glStencilOpSeparate(face, sfail, dpfail, dppass);
+}
 typedef void  (GL_APIENTRY *PFN_glRenderbufferStorageMultisample)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
 static PFN_glRenderbufferStorageMultisample _sapp_glRenderbufferStorageMultisample;
 typedef void  (GL_APIENTRY *PFN_glDrawBuffers)(GLsizei n, const GLenum * bufs);
