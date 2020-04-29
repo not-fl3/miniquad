@@ -42382,9 +42382,6 @@ pub type PFN_glColorMask = ::std::option::Option<
     unsafe extern "C" fn(red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean),
 >;
 extern "C" {
-    pub fn glColorMask(red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean);
-}
-extern "C" {
     pub static mut _sapp_glColorMask: PFN_glColorMask;
 }
 extern "C" {
