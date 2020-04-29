@@ -8147,7 +8147,6 @@ pub const GL_ONE_MINUS_DST_ALPHA: u32 = 773;
 pub const GL_COLOR: u32 = 6144;
 pub const GL_TEXTURE_2D_ARRAY: u32 = 35866;
 pub const GL_TRIANGLES: u32 = 4;
-pub const GL_TRIANGLE_STRIP: u32 = 5;
 pub const GL_TRIANGLE_FAN: u32 = 6;
 pub const GL_UNSIGNED_BYTE: u32 = 5121;
 pub const GL_TEXTURE_MAG_FILTER: u32 = 10240;
