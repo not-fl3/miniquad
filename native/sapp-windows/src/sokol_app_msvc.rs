@@ -42530,9 +42530,6 @@ extern "C" {
 extern "C" {
     pub fn glAttachShader(program: GLuint, shader: GLuint);
 }
-extern "C" {
-    pub fn glBindAttribLocation(program: GLuint, index: GLuint, name: *const GLchar);
-}
 pub type PFN_glGetError = ::std::option::Option<unsafe extern "C" fn() -> GLenum>;
 extern "C" {
     pub static mut _sapp_glGetError: PFN_glGetError;
