@@ -1002,13 +1002,17 @@ impl From<BlendFactor> for GLenum {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct PipelineParams {
-    pub cull_face: CullFace,
-    pub front_face_order: FrontFaceOrder,
+    pub cull_face: CullFace, // TODO: UNUSED, should call glCullFace
+    pub front_face_order: FrontFaceOrder, // TODO: UNUSED, should call glFrontFace
     pub depth_test: Comparison,
     pub depth_write: bool,
     pub depth_write_offset: Option<(f32, f32)>,
     pub color_blend: Option<BlendState>,
     pub color_write: ColorMask,
+    // TODO: support:
+    // glStencilMaskSeparate(...);
+    // glStencilFuncSeparate(...);
+    // glStencilOpSeparate(...);
 }
 
 #[derive(Copy, Clone, Debug)]
