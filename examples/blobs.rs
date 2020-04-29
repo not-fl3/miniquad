@@ -103,12 +103,7 @@ impl EventHandler for Stage {
 
         let (w, h) = ctx.screen_size();
         let (x, y) = (x / w, 1. - y / h);
-        let (dx, dy) = unsafe {
-            (
-                miniquad::rand() as f32 / miniquad::RAND_MAX as f32 - 0.5,
-                miniquad::rand() as f32 / miniquad::RAND_MAX as f32 - 0.5,
-            )
-        };
+        let (dx, dy) = (quad_rand::gen_range(-1., 1.), quad_rand::gen_range(-1., 1.));
 
         self.uniforms.blobs_positions[self.uniforms.blobs_count as usize] = (x, y);
         self.blobs_velocities[self.uniforms.blobs_count as usize] = (dx, dy);
