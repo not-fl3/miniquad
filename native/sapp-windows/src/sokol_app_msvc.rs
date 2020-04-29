@@ -8147,7 +8147,6 @@ pub const GL_ONE_MINUS_DST_ALPHA: u32 = 773;
 pub const GL_COLOR: u32 = 6144;
 pub const GL_TEXTURE_2D_ARRAY: u32 = 35866;
 pub const GL_TRIANGLES: u32 = 4;
-pub const GL_TRIANGLE_FAN: u32 = 6;
 pub const GL_UNSIGNED_BYTE: u32 = 5121;
 pub const GL_TEXTURE_MAG_FILTER: u32 = 10240;
 pub const GL_ONE_MINUS_CONSTANT_ALPHA: u32 = 32772;
@@ -8220,7 +8219,6 @@ pub const GL_POINTS: u32 = 0;
 pub const GL_ONE_MINUS_SRC_COLOR: u32 = 769;
 pub const GL_MIRRORED_REPEAT: u32 = 33648;
 pub const GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS: u32 = 35661;
-pub const GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT: u32 = 35380;
 pub const GL_R11F_G11F_B10F: u32 = 35898;
 pub const GL_UNSIGNED_INT_10F_11F_11F_REV: u32 = 35899;
 pub const GL_RGBA32UI: u32 = 36208;
@@ -8272,7 +8270,6 @@ pub const GL_MAX_ARRAY_TEXTURE_LAYERS: u32 = 35071;
 pub const GL_MAX_VERTEX_ATTRIBS: u32 = 34921;
 pub const GL_CLAMP_TO_BORDER: u32 = 33069;
 pub const GL_TEXTURE_BORDER_COLOR: u32 = 4100;
-pub const GL_UNIFORM_BUFFER: u32 = 35345;
 pub type __gnuc_va_list = __builtin_va_list;
 pub type va_list = __gnuc_va_list;
 extern "C" {
@@ -42395,18 +42392,6 @@ extern "C" {
 extern "C" {
     pub fn glBindBuffer(target: GLenum, buffer: GLuint);
 }
-
-// TODO: make this work by linking to library that supports it
-// extern "C" {
-//     pub fn glBindBufferRange(
-//         target: GLenum,
-//         index: GLuint,
-//         buffer: GLuint,
-//         offset: GLintptr,
-//         size: GLsizeiptr,
-//     );
-// }
-
 
 pub type PFN_glDeleteVertexArrays =
     ::std::option::Option<unsafe extern "C" fn(n: GLsizei, arrays: *const GLuint)>;
