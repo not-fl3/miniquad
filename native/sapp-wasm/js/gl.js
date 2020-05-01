@@ -363,6 +363,16 @@ into_sapp_mousebutton = function (btn) {
 
 into_sapp_keycode = function (key_code) {
     switch (key_code) {
+        case "Digit0": return 48;
+        case "Digit1": return 49;
+        case "Digit2": return 50;
+        case "Digit3": return 51;
+        case "Digit4": return 52;
+        case "Digit5": return 53;
+        case "Digit6": return 54;
+        case "Digit7": return 55;
+        case "Digit8": return 56;
+        case "Digit9": return 57;
         case "KeyA": return 65;
         case "KeyS": return 83;
         case "KeyD": return 68;
@@ -378,6 +388,8 @@ into_sapp_keycode = function (key_code) {
         case "Delete": return 261;
         case "Backspace": return 259;
     }
+
+    console.log("Unsupported keyboard key")
 }
 
 texture_size = function (internalFormat, width, height) {
