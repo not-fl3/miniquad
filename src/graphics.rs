@@ -660,7 +660,7 @@ impl Context {
                 // glStencilFuncSeparate(GL_FRONT, front.test_func, front.test_ref, front.test_mask);
                 // glStencilMaskSeparate(GL_FRONT, front.write_mask);
 
-                // let back = &stencil.front;
+                // let back = &stencil.back;
                 // glStencilOpSeparate(GL_BACK, back.fail_op, back.depth_fail_op, back.pass_op);
                 // glStencilFuncSeparate(GL_BACK, back.test_func, back.test_ref, back.test_mask);
                 // glStencilMaskSeparate(GL_BACK, back.write_mask);
