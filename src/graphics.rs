@@ -598,6 +598,29 @@ impl Context {
                     glDisable(GL_DEPTH_TEST);
                 }
             }
+
+            match pipeline.params.front_face_order {
+                FrontFaceOrder::Clockwise => unsafe {
+                    glFrontFace(GL_CW);
+                },
+                FrontFaceOrder::CounterClockwise => unsafe {
+                    glFrontFace(GL_CCW);
+                },
+            }
+
+            match pipeline.params.cull_face {
+                CullFace::Nothing => unsafe {
+                    glDisable(GL_CULL_FACE);
+                },
+                CullFace::Front => unsafe {
+                    glEnable(GL_CULL_FACE);
+                    glCullFace(GL_FRONT);
+                },
+                CullFace::Back => unsafe {
+                    glEnable(GL_CULL_FACE);
+                    glCullFace(GL_BACK);
+                },
+            }
         }
 
         if self.cache.blend != self.pipelines[pipeline.0].params.color_blend {

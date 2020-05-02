@@ -42790,9 +42790,15 @@ pub type PFN_glFrontFace = ::std::option::Option<unsafe extern "C" fn(mode: GLen
 extern "C" {
     pub static mut _sapp_glFrontFace: PFN_glFrontFace;
 }
+extern "C" {
+    pub fn glFrontFace(mode: GLenum);
+}
 pub type PFN_glCullFace = ::std::option::Option<unsafe extern "C" fn(mode: GLenum)>;
 extern "C" {
     pub static mut _sapp_glCullFace: PFN_glCullFace;
+}
+extern "C" {
+    pub fn glCullFace(mode: GLenum);
 }
 pub type __builtin_va_list = *mut ::std::os::raw::c_char;
 #[repr(C)]

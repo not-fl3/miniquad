@@ -3533,8 +3533,14 @@ void glGenVertexArrays(GLsizei n, GLuint * arrays) {
 }
 typedef void  (GL_APIENTRY *PFN_glFrontFace)(GLenum mode);
 static PFN_glFrontFace _sapp_glFrontFace;
+void glFrontFace(GLenum mode) {
+    _sapp_glFrontFace(mode);
+}
 typedef void  (GL_APIENTRY *PFN_glCullFace)(GLenum mode);
 static PFN_glCullFace _sapp_glCullFace;
+void glCullFace(GLenum mode) {
+    _sapp_glCullFace(mode);
+}
 
 _SOKOL_PRIVATE void* _sapp_win32_glgetprocaddr(const char* name) {
     void* proc_addr = (void*) _sapp_wglGetProcAddress(name);
