@@ -599,15 +599,6 @@ impl Context {
                 }
             }
 
-            match pipeline.params.front_face_order {
-                FrontFaceOrder::Clockwise => unsafe {
-                    glFrontFace(GL_CW);
-                },
-                FrontFaceOrder::CounterClockwise => unsafe {
-                    glFrontFace(GL_CCW);
-                },
-            }
-
             match pipeline.params.cull_face {
                 CullFace::Nothing => unsafe {
                     glDisable(GL_CULL_FACE);
@@ -619,6 +610,15 @@ impl Context {
                 CullFace::Back => unsafe {
                     glEnable(GL_CULL_FACE);
                     glCullFace(GL_BACK);
+                },
+            }
+
+            match pipeline.params.front_face_order {
+                FrontFaceOrder::Clockwise => unsafe {
+                    glFrontFace(GL_CW);
+                },
+                FrontFaceOrder::CounterClockwise => unsafe {
+                    glFrontFace(GL_CCW);
                 },
             }
         }
