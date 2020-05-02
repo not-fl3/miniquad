@@ -279,6 +279,70 @@ pub struct BlendState {
     pub dst_alpha: BlendFactor,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct StencilState {
+    pub front: StencilFaceState,
+    pub back: StencilFaceState,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct StencilFaceState {
+    // gl.stencilOpSeparate(face, fail_op, depth_fail_op, pass_op)
+    /// Operation to use when stencil test fails
+    pub fail_op: StencilOp,
+    
+    /// Operation to use when stencil test passes, but depth test fails
+    pub depth_fail_op: StencilOp,
+    
+    /// Operation to use when both stencil and depth test pass, 
+    /// or when stencil pass and no depth or depth disabled
+    pub pass_op: StencilOp,
+    
+    // gl.stencilFuncSeparate(face, test_func, test_ref, test_mask);
+    /// Used for stencil testing with test_ref and test_mask: if (test_ref & test_mask) *test_func* (*stencil* && test_mask)
+    /// Default is Always, which means "always pass"
+    pub test_func: CompareFunc,
+    
+    /// Default value: 0
+    pub test_ref: i32,
+
+    /// Default value: all 1s
+    pub test_mask: u32,
+
+    // gl.stencilMaskSeparate(face, write_mask)
+    /// Specifies a bit mask to enable or disable writing of individual bits in the stencil planes
+    /// Default value: all 1s
+    pub write_mask: u32, 
+}
+
+/// Operations performed on current stencil value when comparison test passes or fails.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum StencilOp {
+    /// Default value
+    Keep,
+    Zero,
+    Replace,
+    IncrementClamp,
+    DecrementClamp,
+    Invert,
+    IncrementWrap,
+    DecrementWrap,
+}
+
+/// Depth and stencil compare function
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum CompareFunc {
+    /// Default value
+    Always,
+    Never,
+    Less,
+    Equal,
+    LessOrEqual,
+    Greater,
+    NotEqual,
+    GreaterOrEqual,
+}
+
 type ColorMask = (bool, bool, bool, bool);
 
 #[derive(Default, Copy, Clone)]
@@ -296,6 +360,7 @@ struct GlCache {
     textures: [GLuint; MAX_SHADERSTAGE_IMAGES],
     cur_pipeline: Option<Pipeline>,
     blend: Option<BlendState>,
+    stencil: Option<StencilState>,
     color_write: ColorMask,
     attributes: [Option<CachedAttribute>; MAX_VERTEX_ATTRIBUTES],
 }
@@ -483,6 +548,7 @@ impl Context {
                     vertex_buffer: 0,
                     cur_pipeline: None,
                     blend: None,
+                    stencil: None,
                     color_write: (true, true, true, true),
                     stored_texture: 0,
                     textures: [0; MAX_SHADERSTAGE_IMAGES],
@@ -541,6 +607,10 @@ impl Context {
             self.set_blend(self.pipelines[pipeline.0].params.color_blend);
         }
 
+        if self.cache.stencil != self.pipelines[pipeline.0].params.stencil_test {
+            self.set_stencil(self.pipelines[pipeline.0].params.stencil_test);
+        }
+
         let pipeline = &self.pipelines[pipeline.0];
         if self.cache.color_write != pipeline.params.color_write {
             let (r, g, b, a) = pipeline.params.color_write;
@@ -572,6 +642,34 @@ impl Context {
         }
 
         self.cache.blend = color_blend;
+    }
+
+    pub fn set_stencil(&mut self, stencil_test: Option<StencilState>) {
+        if self.cache.stencil == stencil_test {
+            return;
+        }
+        unsafe {
+            if let Some(stencil) = stencil_test {
+                if self.cache.stencil.is_none() {
+                    glEnable(GL_STENCIL_TEST);
+                }
+
+                // TODO: uncomment once functions implemented
+                // let front = &stencil.front;
+                // glStencilOpSeparate(GL_FRONT, front.fail_op, front.depth_fail_op, front.pass_op);
+                // glStencilFuncSeparate(GL_FRONT, front.test_func, front.test_ref, front.test_mask);
+                // glStencilMaskSeparate(GL_FRONT, front.write_mask);
+
+                // let back = &stencil.front;
+                // glStencilOpSeparate(GL_BACK, back.fail_op, back.depth_fail_op, back.pass_op);
+                // glStencilFuncSeparate(GL_BACK, back.test_func, back.test_ref, back.test_mask);
+                // glStencilMaskSeparate(GL_BACK, back.write_mask);
+            } else if self.cache.blend.is_some() {
+                glDisable(GL_STENCIL_TEST);
+            }
+        }
+
+        self.cache.stencil = stencil_test;
     }
 
     pub fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
@@ -1008,6 +1106,7 @@ pub struct PipelineParams {
     pub depth_write: bool,
     pub depth_write_offset: Option<(f32, f32)>,
     pub color_blend: Option<BlendState>,
+    pub stencil_test: Option<StencilState>,
     pub color_write: ColorMask,
     // TODO: support:
     // glStencilMaskSeparate(...);
@@ -1027,6 +1126,7 @@ impl Default for PipelineParams {
             depth_write: false,             // no depth write,
             depth_write_offset: None,
             color_blend: None,
+            stencil_test: None,
             color_write: (true, true, true, true),
         }
     }
