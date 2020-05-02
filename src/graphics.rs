@@ -7,7 +7,7 @@ use crate::sapp::*;
 // workaround sapp::* also contains None on Android
 use std::option::Option::None;
 
-pub use texture::{FilterMode, Texture, TextureFormat, TextureParams, TextureWrap, TextureAccess};
+pub use texture::{FilterMode, Texture, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 
 fn get_uniform_location(program: GLuint, name: &str) -> i32 {
     let cname = CString::new(name).unwrap_or_else(|e| panic!(e));
@@ -290,19 +290,19 @@ pub struct StencilFaceState {
     // gl.stencilOpSeparate(face, fail_op, depth_fail_op, pass_op)
     /// Operation to use when stencil test fails
     pub fail_op: StencilOp,
-    
+
     /// Operation to use when stencil test passes, but depth test fails
     pub depth_fail_op: StencilOp,
-    
-    /// Operation to use when both stencil and depth test pass, 
+
+    /// Operation to use when both stencil and depth test pass,
     /// or when stencil pass and no depth or depth disabled
     pub pass_op: StencilOp,
-    
+
     // gl.stencilFuncSeparate(face, test_func, test_ref, test_mask);
     /// Used for stencil testing with test_ref and test_mask: if (test_ref & test_mask) *test_func* (*stencil* && test_mask)
     /// Default is Always, which means "always pass"
     pub test_func: CompareFunc,
-    
+
     /// Default value: 0
     pub test_ref: i32,
 
@@ -312,7 +312,7 @@ pub struct StencilFaceState {
     // gl.stencilMaskSeparate(face, write_mask)
     /// Specifies a bit mask to enable or disable writing of individual bits in the stencil planes
     /// Default value: all 1s
-    pub write_mask: u32, 
+    pub write_mask: u32,
 }
 
 /// Operations performed on current stencil value when comparison test passes or fails.
@@ -654,16 +654,35 @@ impl Context {
                     glEnable(GL_STENCIL_TEST);
                 }
 
-                // TODO: uncomment once functions implemented
-                // let front = &stencil.front;
-                // glStencilOpSeparate(GL_FRONT, front.fail_op, front.depth_fail_op, front.pass_op);
-                // glStencilFuncSeparate(GL_FRONT, front.test_func, front.test_ref, front.test_mask);
-                // glStencilMaskSeparate(GL_FRONT, front.write_mask);
+                let front = &stencil.front;
+                glStencilOpSeparate(
+                    GL_FRONT,
+                    front.fail_op.into(),
+                    front.depth_fail_op.into(),
+                    front.pass_op.into(),
+                );
+                glStencilFuncSeparate(
+                    GL_FRONT,
+                    front.test_func.into(),
+                    front.test_ref,
+                    front.test_mask,
+                );
+                glStencilMaskSeparate(GL_FRONT, front.write_mask);
 
-                // let back = &stencil.back;
-                // glStencilOpSeparate(GL_BACK, back.fail_op, back.depth_fail_op, back.pass_op);
-                // glStencilFuncSeparate(GL_BACK, back.test_func, back.test_ref, back.test_mask);
-                // glStencilMaskSeparate(GL_BACK, back.write_mask);
+                let back = &stencil.back;
+                glStencilOpSeparate(
+                    GL_BACK,
+                    back.fail_op.into(),
+                    back.depth_fail_op.into(),
+                    back.pass_op.into(),
+                );
+                glStencilFuncSeparate(
+                    GL_BACK,
+                    back.test_func.into(),
+                    back.test_ref.into(),
+                    back.test_mask,
+                );
+                glStencilMaskSeparate(GL_BACK, back.write_mask);
             } else if self.cache.blend.is_some() {
                 glDisable(GL_STENCIL_TEST);
             }
@@ -1094,6 +1113,36 @@ impl From<BlendFactor> for GLenum {
             BlendFactor::OneMinusValue(BlendValue::DestinationColor) => GL_ONE_MINUS_DST_COLOR,
             BlendFactor::OneMinusValue(BlendValue::DestinationAlpha) => GL_ONE_MINUS_DST_ALPHA,
             BlendFactor::SourceAlphaSaturate => GL_SRC_ALPHA_SATURATE,
+        }
+    }
+}
+
+impl From<StencilOp> for GLenum {
+    fn from(op: StencilOp) -> Self {
+        match op {
+            StencilOp::Keep => GL_KEEP,
+            StencilOp::Zero => GL_ZERO,
+            StencilOp::Replace => GL_REPLACE,
+            StencilOp::IncrementClamp => GL_INCR,
+            StencilOp::DecrementClamp => GL_DECR,
+            StencilOp::Invert => GL_INVERT,
+            StencilOp::IncrementWrap => GL_INCR_WRAP,
+            StencilOp::DecrementWrap => GL_DECR_WRAP,
+        }
+    }
+}
+
+impl From<CompareFunc> for GLenum {
+    fn from(cf: CompareFunc) -> Self {
+        match cf {
+            CompareFunc::Always => GL_ALWAYS,
+            CompareFunc::Never => GL_NEVER,
+            CompareFunc::Less => GL_LESS,
+            CompareFunc::Equal => GL_EQUAL,
+            CompareFunc::LessOrEqual => GL_LEQUAL,
+            CompareFunc::Greater => GL_GREATER,
+            CompareFunc::NotEqual => GL_NOTEQUAL,
+            CompareFunc::GreaterOrEqual => GL_GEQUAL,
         }
     }
 }

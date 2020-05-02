@@ -41970,11 +41970,17 @@ pub type PFN_glStencilFuncSeparate = ::std::option::Option<
 extern "C" {
     pub static mut _sapp_glStencilFuncSeparate: PFN_glStencilFuncSeparate;
 }
+extern "C" {
+    pub fn glStencilFuncSeparate(face: GLenum, func: GLenum, ref_: GLint, mask: GLuint);
+}
 pub type PFN_glStencilOpSeparate = ::std::option::Option<
     unsafe extern "C" fn(face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum),
 >;
 extern "C" {
     pub static mut _sapp_glStencilOpSeparate: PFN_glStencilOpSeparate;
+}
+extern "C" {
+    pub fn glStencilOpSeparate(face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum);
 }
 pub type PFN_glRenderbufferStorageMultisample = ::std::option::Option<
     unsafe extern "C" fn(
@@ -42515,6 +42521,13 @@ extern "C" {
 pub type PFN_glStencilMask = ::std::option::Option<unsafe extern "C" fn(mask: GLuint)>;
 extern "C" {
     pub static mut _sapp_glStencilMask: PFN_glStencilMask;
+}
+pub type PFN_glStencilMaskSeparate = ::std::option::Option<unsafe extern "C" fn(face: GLenum, mask: GLuint)>;
+extern "C" {
+    pub static mut _sapp_glStencilMaskSeparate: PFN_glStencilMaskSeparate;
+}
+extern "C" {
+    pub fn glStencilMaskSeparate(face: GLenum, mask: GLuint);
 }
 pub type PFN_glAttachShader =
     ::std::option::Option<unsafe extern "C" fn(program: GLuint, shader: GLuint)>;

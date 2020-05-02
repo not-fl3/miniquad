@@ -695,6 +695,15 @@ var importObject = {
             GL.shaders[id] = gl.createShader(shaderType);
             return id;
         },
+        stencilFuncSeparate: function (face, func, ref_, mask) {
+            gl.glStencilFuncSeparate(face, func, ref_, mask);
+        },
+        stencilMaskSeparate: function (face, mask) {
+            gl.glStencilMaskSeparate(face, mask);
+        },
+        stencilOpSeparate: function (face, fail, zfail, zpass) {
+            gl.glStencilOpSeparate(face, fail, zfail, zpass);
+        },
         glShaderSource: function (shader, count, string, length) {
             GL.validateGLObjectID(GL.shaders, shader, 'glShaderSource', 'shader');
             var source = GL.getSource(shader, count, string, length);

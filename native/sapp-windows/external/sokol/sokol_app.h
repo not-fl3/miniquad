@@ -3220,8 +3220,14 @@ void glCompileShader(GLuint shader) {
 }
 typedef void  (GL_APIENTRY *PFN_glStencilFuncSeparate)(GLenum face, GLenum func, GLint ref, GLuint mask);
 static PFN_glStencilFuncSeparate _sapp_glStencilFuncSeparate;
+void glStencilFuncSeparate(GLenum face, GLenum func, GLint ref, GLuint mask) {
+    _sapp_glStencilFuncSeparate(face, func, ref, mask);
+}
 typedef void  (GL_APIENTRY *PFN_glStencilOpSeparate)(GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass);
 static PFN_glStencilOpSeparate _sapp_glStencilOpSeparate;
+void glStencilOpSeparate(GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass) {
+    _sapp_glStencilOpSeparate(face, sfail, dpfail, dppass);
+}
 typedef void  (GL_APIENTRY *PFN_glRenderbufferStorageMultisample)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
 static PFN_glRenderbufferStorageMultisample _sapp_glRenderbufferStorageMultisample;
 typedef void  (GL_APIENTRY *PFN_glDrawBuffers)(GLsizei n, const GLenum * bufs);
@@ -3451,6 +3457,11 @@ typedef void  (GL_APIENTRY *PFN_glBlitFramebuffer)(GLint srcX0, GLint srcY0, GLi
 static PFN_glBlitFramebuffer _sapp_glBlitFramebuffer;
 typedef void  (GL_APIENTRY *PFN_glStencilMask)(GLuint mask);
 static PFN_glStencilMask _sapp_glStencilMask;
+typedef void  (GL_APIENTRY *PFN_glStencilMaskSeparate)(GLenum face, GLuint mask);
+static PFN_glStencilMaskSeparate _sapp_glStencilMaskSeparate;
+void glStencilMaskSeparate(GLenum face, GLuint mask) {
+    _sapp_glStencilMaskSeparate(face, mask);
+}
 typedef void  (GL_APIENTRY *PFN_glAttachShader)(GLuint program, GLuint shader);
 static PFN_glAttachShader _sapp_glAttachShader;
 void glAttachShader(GLuint program, GLuint shader) {
@@ -3620,6 +3631,7 @@ _SOKOL_PRIVATE  void _sapp_win32_gl_loadfuncs(void) {
     _SAPP_GLPROC(glEnable);
     _SAPP_GLPROC(glBlitFramebuffer);
     _SAPP_GLPROC(glStencilMask);
+    _SAPP_GLPROC(glStencilMaskSeparate);
     _SAPP_GLPROC(glAttachShader);
     _SAPP_GLPROC(glGetError);
     _SAPP_GLPROC(glClearColor);
@@ -3716,6 +3728,7 @@ _SOKOL_PRIVATE  void _sapp_win32_gl_loadfuncs(void) {
 #define glEnable _sapp_glEnable
 #define glBlitFramebuffer _sapp_glBlitFramebuffer
 #define glStencilMask _sapp_glStencilMask
+#define glStencilMaskSeparate _sapp_glStencilMaskSeparate
 #define glAttachShader _sapp_glAttachShader
 #define glGetError _sapp_glGetError
 #define glClearColor _sapp_glClearColor
