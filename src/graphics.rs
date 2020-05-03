@@ -957,9 +957,14 @@ fn load_shader_internal(
                 &mut max_length as *mut _,
                 error_message.as_mut_ptr() as *mut _,
             );
+            // trim trailing zeros
+            while error_message.last().copied() == Some(0) {
+                error_message.pop();
+            }
 
             let error_message = std::string::String::from_utf8_lossy(&error_message);
-            panic!("{}", error_message);
+            eprintln!("Shader link error:\n{}", error_message);
+            panic!("can't link shader");
         }
 
         glUseProgram(program);
@@ -1012,6 +1017,10 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> GLuint {
                 &mut max_length as *mut _,
                 error_message.as_mut_ptr() as *mut _,
             );
+            // trim trailing zeros
+            while error_message.last().copied() == Some(0) {
+                error_message.pop();
+            }
 
             #[cfg(target_arch = "wasm32")]
             console_log(error_message.as_ptr() as *const _);
