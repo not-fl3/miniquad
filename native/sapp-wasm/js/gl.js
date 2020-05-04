@@ -675,8 +675,10 @@ var importObject = {
                 return;
             }
             if (pname == 0x8B84) { // GL_INFO_LOG_LENGTH
-                console.error("unsupported operation");
-                return;
+                var log = gl.getProgramInfoLog(GL.programs[program]);
+                assert(log !== null);
+
+                getArray(p, Int32Array, 1)[0] = log.length + 1;
             } else if (pname == 0x8B87 /* GL_ACTIVE_UNIFORM_MAX_LENGTH */) {
                 console.error("unsupported operation");
                 return;
