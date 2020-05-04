@@ -949,7 +949,9 @@ fn load_shader_internal(
         let mut link_status = 0;
         glGetProgramiv(program, GL_LINK_STATUS, &mut link_status as *mut _);
         if link_status == 0 {
-            let mut max_length = 100;
+            let mut max_length: i32 = 0;
+            glGetProgramiv(program, GL_INFO_LOG_LENGTH, &mut max_length as *mut _);
+
             let mut error_message = vec![0u8; max_length as usize + 1];
             glGetProgramInfoLog(
                 program,
@@ -957,14 +959,10 @@ fn load_shader_internal(
                 &mut max_length as *mut _,
                 error_message.as_mut_ptr() as *mut _,
             );
-            // trim trailing zeros
-            while error_message.last().copied() == Some(0) {
-                error_message.pop();
-            }
-
-            let error_message = std::string::String::from_utf8_lossy(&error_message);
-            eprintln!("Shader link error:\n{}", error_message);
-            panic!("can't link shader");
+            assert!(max_length >= 1);
+            let error_message =
+                std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1]);
+            panic!("can't link shader {}", error_message);
         }
 
         glUseProgram(program);
@@ -1017,18 +1015,11 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> GLuint {
                 &mut max_length as *mut _,
                 error_message.as_mut_ptr() as *mut _,
             );
-            // trim trailing zeros
-            while error_message.last().copied() == Some(0) {
-                error_message.pop();
-            }
 
-            #[cfg(target_arch = "wasm32")]
-            console_log(error_message.as_ptr() as *const _);
-
-            let error_message = std::string::String::from_utf8_lossy(&error_message);
-            eprintln!("Shader error:\n{}", error_message);
-            glDeleteShader(shader);
-            panic!("cant compile shader!");
+            assert!(max_length >= 1);
+            let error_message =
+                std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1]);
+            panic!("cant compile shader {}!", error_message);
         }
 
         shader
