@@ -16,7 +16,7 @@
 //! You can also get a DPI scaling factor with the function
 //! [`Context::dpi_scale`](../graphics/struct.Context.html#method.dpi_scale).
 //! Here's an example on a Mac with Retina display:
-//! ```
+//! ```ignore
 //! Conf {
 //!   width = 640,
 //!   height = 480,
