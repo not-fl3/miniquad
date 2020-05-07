@@ -1129,7 +1129,7 @@ pub unsafe extern "C" fn _sapp_fail(mut msg: *const libc::c_char) {
         } else {
             use std::ffi::CString;
 
-            let rust_msg = CString::from_raw(msg as *mut i8);
+            let rust_msg = CString::from_raw(msg as *mut _);
 
             println!("{}", rust_msg.to_str().unwrap());
         }
