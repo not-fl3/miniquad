@@ -14,26 +14,8 @@ struct Stage {
 
 impl Stage {
     pub fn new(ctx: &mut Context) -> Stage {
-        let color_img = Texture::new_render_texture(
-            ctx,
-            TextureParams {
-                width: 256,
-                height: 256,
-                format: TextureFormat::RGBA8,
-                ..Default::default()
-            },
-        );
-        let depth_img = Texture::new_render_texture(
-            ctx,
-            TextureParams {
-                width: 256,
-                height: 256,
-                format: TextureFormat::Depth,
-                ..Default::default()
-            },
-        );
-
-        let offscreen_pass = RenderPass::new(ctx, color_img, depth_img);
+        let (w, h) = ctx.screen_size();
+        let (color_img, offscreen_pass) = Self::create_offscreen_pass(ctx, w as _, h as _);
 
         #[rustfmt::skip]
         let vertices: &[f32] = &[
@@ -167,10 +149,44 @@ impl Stage {
             ry: 0.,
         }
     }
+
+    fn create_offscreen_pass(ctx: &mut Context, width: u32, height: u32) -> (Texture, RenderPass) {
+        let color_img = Texture::new_render_texture(
+            ctx,
+            TextureParams {
+                width,
+                height,
+                format: TextureFormat::RGBA8,
+                ..Default::default()
+            },
+        );
+        let depth_img = Texture::new_render_texture(
+            ctx,
+            TextureParams {
+                width,
+                height,
+                format: TextureFormat::Depth,
+                ..Default::default()
+            },
+        );
+
+        (color_img, RenderPass::new(ctx, color_img, depth_img))
+    }
+
 }
 
 impl EventHandler for Stage {
     fn update(&mut self, _ctx: &mut Context) {}
+
+    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
+        let (color_img, offscreen_pass) = Stage::create_offscreen_pass(ctx, width as _, height as _);
+
+        self.offscreen_pass.delete(ctx);
+        self.offscreen_pass = offscreen_pass;
+
+        self.post_processing_bind.images[0].delete();
+        self.post_processing_bind.images[0] = color_img;
+    }
 
     fn draw(&mut self, ctx: &mut Context) {
         let (width, height) = ctx.screen_size();
@@ -190,6 +206,8 @@ impl EventHandler for Stage {
             mvp: view_proj * model,
         };
 
+        let (w, h) = ctx.screen_size();
+        
         // the offscreen pass, rendering an rotating, untextured cube into a render target image
         ctx.begin_pass(
             self.offscreen_pass,

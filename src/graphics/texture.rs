@@ -200,6 +200,35 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
     }
 
+    pub fn resize(&mut self, ctx: &mut Context, width: u32, height: u32, bytes: Option<&[u8]>) {
+        ctx.cache.store_texture_binding(0);
+
+        let (internal_format, format, pixel_type) = self.format.into();
+
+        self.width = width;
+        self.height = height;
+
+        unsafe {
+            glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                internal_format as i32,
+                self.width as i32,
+                self.height as i32,
+                0,
+                format,
+                pixel_type,
+                match bytes {
+                    Some(bytes) => bytes.as_ptr() as *const _,
+                    Option::None => std::ptr::null(),
+                },
+            );
+        }
+
+        ctx.cache.restore_texture_binding(0);
+
+    }
+
     /// Update whole texture content
     /// bytes should be width * height * 4 size - non rgba8 textures are not supported yet anyway
     pub fn update(&self, ctx: &mut Context, bytes: &[u8]) {
