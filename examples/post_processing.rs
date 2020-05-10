@@ -183,8 +183,6 @@ impl EventHandler for Stage {
 
         self.offscreen_pass.delete(ctx);
         self.offscreen_pass = offscreen_pass;
-
-        self.post_processing_bind.images[0].delete();
         self.post_processing_bind.images[0] = color_img;
     }
 

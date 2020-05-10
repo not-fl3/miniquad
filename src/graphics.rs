@@ -494,6 +494,7 @@ pub struct RenderPass(usize);
 struct RenderPassInternal {
     gl_fb: GLuint,
     texture: Texture,
+    depth_texture: Option<Texture>,
 }
 
 impl RenderPass {
@@ -503,6 +504,8 @@ impl RenderPass {
         depth_img: impl Into<Option<Texture>>,
     ) -> RenderPass {
         let mut gl_fb = 0;
+
+        let depth_img = depth_img.into();
 
         unsafe {
             glGenFramebuffers(1, &mut gl_fb as *mut _);
@@ -514,7 +517,7 @@ impl RenderPass {
                 color_img.texture,
                 0,
             );
-            if let Some(depth_img) = depth_img.into() {
+            if let Some(depth_img) = depth_img {
                 glFramebufferTexture2D(
                     GL_FRAMEBUFFER,
                     GL_DEPTH_ATTACHMENT,
@@ -528,6 +531,7 @@ impl RenderPass {
         let pass = RenderPassInternal {
             gl_fb,
             texture: color_img,
+            depth_texture: depth_img
         };
 
         context.passes.push(pass);
@@ -540,6 +544,11 @@ impl RenderPass {
 
         unsafe {
             glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _)
+        }
+
+        render_pass.texture.delete();
+        if let Some(depth_texture) = render_pass.depth_texture {
+            depth_texture.delete();
         }
     }
 }
