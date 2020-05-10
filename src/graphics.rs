@@ -359,6 +359,7 @@ struct GlCache {
     blend: Option<BlendState>,
     stencil: Option<StencilState>,
     color_write: ColorMask,
+    cull_face: CullFace,
     attributes: [Option<CachedAttribute>; MAX_VERTEX_ATTRIBUTES],
 }
 
@@ -547,6 +548,7 @@ impl Context {
                     blend: None,
                     stencil: None,
                     color_write: (true, true, true, true),
+                    cull_face: CullFace::Nothing,
                     stored_texture: 0,
                     textures: [0; MAX_SHADERSTAGE_IMAGES],
                     attributes: [None; MAX_VERTEX_ATTRIBUTES],
@@ -599,20 +601,6 @@ impl Context {
                 }
             }
 
-            match pipeline.params.cull_face {
-                CullFace::Nothing => unsafe {
-                    glDisable(GL_CULL_FACE);
-                },
-                CullFace::Front => unsafe {
-                    glEnable(GL_CULL_FACE);
-                    glCullFace(GL_FRONT);
-                },
-                CullFace::Back => unsafe {
-                    glEnable(GL_CULL_FACE);
-                    glCullFace(GL_BACK);
-                },
-            }
-
             match pipeline.params.front_face_order {
                 FrontFaceOrder::Clockwise => unsafe {
                     glFrontFace(GL_CW);
@@ -623,20 +611,40 @@ impl Context {
             }
         }
 
-        if self.cache.blend != self.pipelines[pipeline.0].params.color_blend {
-            self.set_blend(self.pipelines[pipeline.0].params.color_blend);
+        self.set_cull_face(self.pipelines[pipeline.0].params.cull_face);
+        self.set_blend(self.pipelines[pipeline.0].params.color_blend);
+        self.set_stencil(self.pipelines[pipeline.0].params.stencil_test);
+        self.set_color_write(self.pipelines[pipeline.0].params.color_write);
+    }
+
+    pub fn set_cull_face(&mut self, cull_face: CullFace) {
+        if self.cache.cull_face == cull_face {
+            return;
         }
 
-        if self.cache.stencil != self.pipelines[pipeline.0].params.stencil_test {
-            self.set_stencil(self.pipelines[pipeline.0].params.stencil_test);
+        match cull_face {
+            CullFace::Nothing => unsafe {
+                glDisable(GL_CULL_FACE);
+            },
+            CullFace::Front => unsafe {
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_FRONT);
+            },
+            CullFace::Back => unsafe {
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+            },
         }
+        self.cache.cull_face = cull_face;
+    }
 
-        let pipeline = &self.pipelines[pipeline.0];
-        if self.cache.color_write != pipeline.params.color_write {
-            let (r, g, b, a) = pipeline.params.color_write;
-            unsafe { glColorMask(r as _, g as _, b as _, a as _) }
-            self.cache.color_write = pipeline.params.color_write;
+    pub fn set_color_write(&mut self, color_write: ColorMask) {
+        if self.cache.color_write == color_write {
+            return;
         }
+        let (r, g, b, a) = color_write;
+        unsafe { glColorMask(r as _, g as _, b as _, a as _) }
+        self.cache.color_write = color_write;
     }
 
     pub fn set_blend(&mut self, color_blend: Option<BlendState>) {
