@@ -32,7 +32,7 @@ impl Texture {
     }
 }
 
-/// List of all the possible formats of input data when uploading to texture.
+/// List of all the possible internal texture formats for storing texture array in GPU memory
 /// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -42,12 +42,23 @@ pub enum TextureFormat {
     Depth,
 }
 
-impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
+/// List of all the possible pixel formats of input data when uploading to texture.
+/// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
+#[repr(u8)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum PixelFormat {
+    RGB8,
+    RGBA8,
+    Depth,
+    Alpha,
+}
+
+impl From<TextureFormat> for GLenum {
     fn from(format: TextureFormat) -> Self {
         match format {
-            TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
-            TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
-            TextureFormat::Depth => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT),
+            TextureFormat::RGB8 => GL_RGB,
+            TextureFormat::RGBA8 => GL_RGBA,
+            TextureFormat::Depth => GL_DEPTH_COMPONENT,
         }
     }
 }
@@ -61,6 +72,42 @@ impl TextureFormat {
             TextureFormat::RGB8 => 3 * square,
             TextureFormat::RGBA8 => 4 * square,
             TextureFormat::Depth => 2 * square,
+        }
+    }
+}
+
+impl PixelFormat {
+    /// Returns the size in bytes of texture with `dimensions`.
+    pub fn size(self, width: u32, height: u32) -> u32 {
+        let square = width * height;
+
+        match self {
+            PixelFormat::RGB8 => 3 * square,
+            PixelFormat::RGBA8 => 4 * square,
+            PixelFormat::Depth => 2 * square,
+            PixelFormat::Alpha => 1 * square,
+        }
+    }
+}
+
+/// Convert from `PixelFormat` into (format, pixel_tyle, row_alignment)
+impl From<PixelFormat> for (GLenum, GLenum, GLenum) {
+    fn from(format: PixelFormat) -> Self {
+        match format {
+            PixelFormat::RGB8 => (GL_RGB, GL_UNSIGNED_BYTE, 4),
+            PixelFormat::RGBA8 => (GL_RGBA, GL_UNSIGNED_BYTE, 4),
+            PixelFormat::Depth => (GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, 4),
+            PixelFormat::Alpha => (GL_RED, GL_UNSIGNED_BYTE, 1),
+        }
+    }
+}
+
+impl From<TextureFormat> for PixelFormat {
+    fn from(format: TextureFormat) -> Self {
+        match format {
+            TextureFormat::RGB8 => PixelFormat::RGB8,
+            TextureFormat::RGBA8 => PixelFormat::RGBA8,
+            TextureFormat::Depth => PixelFormat::Depth,
         }
     }
 }
@@ -97,7 +144,6 @@ pub enum FilterMode {
     Nearest = GL_NEAREST as isize,
 }
 
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TextureAccess {
     /// Used as read-only from GPU
@@ -118,10 +164,22 @@ pub struct TextureParams {
 impl Texture {
     /// Shorthand for `new(ctx, TextureAccess::RenderTarget, params)`
     pub fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
-        Self::new(ctx, TextureAccess::RenderTarget, None, params)
+        Self::new(
+            ctx,
+            TextureAccess::RenderTarget,
+            None,
+            params.format.into(),
+            params,
+        )
     }
 
-    pub fn new(ctx: &mut Context, _access: TextureAccess, bytes: Option<&[u8]>, params: TextureParams) -> Texture {
+    pub fn new(
+        ctx: &mut Context,
+        _access: TextureAccess,
+        bytes: Option<&[u8]>,
+        pixel_format: PixelFormat,
+        params: TextureParams,
+    ) -> Texture {
         if let Some(bytes_data) = bytes {
             assert_eq!(
                 params.format.size(params.width, params.height),
@@ -129,7 +187,8 @@ impl Texture {
             );
         }
 
-        let (internal_format, format, pixel_type) = params.format.into();
+        let internal_format: GLuint = params.format.into();
+        let (format, pixel_type, row_alignment) = pixel_format.into();
 
         ctx.cache.store_texture_binding(0);
 
@@ -138,6 +197,9 @@ impl Texture {
         unsafe {
             glGenTextures(1, &mut texture as *mut _);
             ctx.cache.bind_texture(0, texture);
+            if row_alignment != 4 {
+                glPixelStorei(GL_UNPACK_ALIGNMENT, row_alignment as _);
+            }
             glTexImage2D(
                 GL_TEXTURE_2D,
                 0,
@@ -157,6 +219,9 @@ impl Texture {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR as i32);
+            if row_alignment != 4 {
+                glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+            }
         }
         ctx.cache.restore_texture_binding(0);
 
@@ -169,8 +234,19 @@ impl Texture {
     }
 
     /// Upload texture to GPU with given TextureParams
-    pub fn from_data_and_format(ctx: &mut Context, bytes: &[u8], params: TextureParams) -> Texture {
-        Self::new(ctx, TextureAccess::Static, Some(bytes), params)
+    pub fn from_data_and_format(
+        ctx: &mut Context,
+        bytes: &[u8],
+        pixel_format: PixelFormat,
+        params: TextureParams,
+    ) -> Texture {
+        Self::new(
+            ctx,
+            TextureAccess::Static,
+            Some(bytes),
+            pixel_format,
+            params,
+        )
     }
 
     /// Upload RGBA8 texture to GPU
@@ -180,6 +256,7 @@ impl Texture {
         Self::from_data_and_format(
             ctx,
             bytes,
+            PixelFormat::RGBA8,
             TextureParams {
                 width: width as _,
                 height: height as _,
@@ -201,9 +278,14 @@ impl Texture {
     }
 
     /// Update whole texture content
-    /// bytes should be width * height * 4 size - non rgba8 textures are not supported yet anyway
-    pub fn update(&self, ctx: &mut Context, bytes: &[u8]) {
-        assert_eq!(self.width as usize * self.height as usize * 4, bytes.len());
+    /// Note: non rgba8 textures on the GPU are not yet supported. However, you can upload alpha data to RGBA texture by setting
+    /// pixel_format to PixelFormat::Alpha
+    /// To upload alpha data to RGBA textures, use update_texture_part() instead
+    pub fn update(&self, ctx: &mut Context, pixels: &[u8], pixel_format: PixelFormat) {
+        assert_eq!(
+            pixel_format.size(self.width, self.height),
+            pixels.len() as u32
+        );
 
         self.update_texture_part(
             ctx,
@@ -211,7 +293,8 @@ impl Texture {
             0 as _,
             self.width as _,
             self.height as _,
-            bytes,
+            pixels,
+            pixel_format,
         )
     }
 
@@ -222,18 +305,26 @@ impl Texture {
         y_offset: i32,
         width: i32,
         height: i32,
-        bytes: &[u8],
+        pixels: &[u8],
+        pixel_format: PixelFormat,
     ) {
-        assert_eq!(width as usize * height as usize * 4, bytes.len());
+        assert_eq!(
+            pixel_format.size(width as _, height as _),
+            pixels.len() as u32
+        );
         assert!(x_offset + width <= self.width as _);
         assert!(y_offset + height <= self.height as _);
 
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
 
-        let (_, format, pixel_type) = self.format.into();
+        let (format, pixel_type, row_alignment) = pixel_format.into();
 
         unsafe {
+            if row_alignment != 4 {
+                glPixelStorei(GL_UNPACK_ALIGNMENT, row_alignment as _);
+            }
+
             glTexSubImage2D(
                 GL_TEXTURE_2D,
                 0,
@@ -243,8 +334,12 @@ impl Texture {
                 height as _,
                 format,
                 pixel_type,
-                bytes.as_ptr() as *const _,
+                pixels.as_ptr() as *const _,
             );
+
+            if row_alignment != 4 {
+                glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+            }
         }
 
         ctx.cache.restore_texture_binding(0);
