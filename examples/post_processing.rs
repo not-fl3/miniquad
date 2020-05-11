@@ -99,7 +99,7 @@ impl Stage {
             post_processing_shader::META,
         );
 
-        let post_processing_pipeline = Pipeline::with_params(
+        let post_processing_pipeline = Pipeline::new(
             ctx,
             &[BufferLayout::default()],
             &[
@@ -107,11 +107,6 @@ impl Stage {
                 VertexAttribute::new("uv", VertexFormat::Float2),
             ],
             default_shader,
-            PipelineParams {
-                depth_test: Comparison::LessOrEqual,
-                depth_write: true,
-                ..Default::default()
-            },
         );
 
         let offscreen_shader = Shader::new(
@@ -209,7 +204,7 @@ impl EventHandler for Stage {
         // the offscreen pass, rendering an rotating, untextured cube into a render target image
         ctx.begin_pass(
             self.offscreen_pass,
-            PassAction::clear_color(1.0, 1.0, 1.0, 1.),
+            PassAction::clear_color(1.0, 1.0, 1.0, 1.0),
         );
         ctx.apply_pipeline(&self.offscreen_pipeline);
         ctx.apply_bindings(&self.offscreen_bind);
@@ -219,10 +214,9 @@ impl EventHandler for Stage {
 
         // and the post-processing-pass, rendering a rotating, textured cube, using the
         // previously rendered offscreen render-target as texture
-        ctx.begin_default_pass(PassAction::clear_color(0.0, 0., 0.45, 1.));
+        ctx.begin_default_pass(PassAction::Nothing);
         ctx.apply_pipeline(&self.post_processing_pipeline);
         ctx.apply_bindings(&self.post_processing_bind);
-        ctx.apply_uniforms(&vs_params);
         ctx.draw(0, 36, 1);
         ctx.end_render_pass();
         ctx.commit_frame();
