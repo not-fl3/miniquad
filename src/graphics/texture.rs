@@ -32,7 +32,7 @@ impl Texture {
     }
 }
 
-/// List of all the possible internal texture formats for storing texture array in GPU memory
+/// List of all the possible texture formats for storing texture array in GPU memory or uploading data to GPU
 /// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -43,7 +43,6 @@ pub enum TextureFormat {
 
     /// Alpha textures on the GPU are not yet supported
     /// Alpha is supported only for uploading data
-    /// Will `panic!` if used to create alpha texture.
     Alpha,
 }
 
