@@ -40,25 +40,21 @@ pub enum TextureFormat {
     RGB8,
     RGBA8,
     Depth,
-}
 
-/// List of all the possible pixel formats of input data when uploading to texture.
-/// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
-#[repr(u8)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum PixelFormat {
-    RGB8,
-    RGBA8,
-    Depth,
+    /// Alpha textures on the GPU are not yet supported
+    /// Alpha is supported only for uploading data
+    /// Will `panic!` if used to create alpha texture.
     Alpha,
 }
 
-impl From<TextureFormat> for GLenum {
+/// Convert from `TextureFormat` into (format, pixel_type, row_alignment)
+impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
     fn from(format: TextureFormat) -> Self {
         match format {
-            TextureFormat::RGB8 => GL_RGB,
-            TextureFormat::RGBA8 => GL_RGBA,
-            TextureFormat::Depth => GL_DEPTH_COMPONENT,
+            TextureFormat::RGB8 => (GL_RGB, GL_UNSIGNED_BYTE, 4),
+            TextureFormat::RGBA8 => (GL_RGBA, GL_UNSIGNED_BYTE, 4),
+            TextureFormat::Depth => (GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, 4),
+            TextureFormat::Alpha => (GL_RED, GL_UNSIGNED_BYTE, 1),
         }
     }
 }
@@ -72,42 +68,7 @@ impl TextureFormat {
             TextureFormat::RGB8 => 3 * square,
             TextureFormat::RGBA8 => 4 * square,
             TextureFormat::Depth => 2 * square,
-        }
-    }
-}
-
-impl PixelFormat {
-    /// Returns the size in bytes of texture with `dimensions`.
-    pub fn size(self, width: u32, height: u32) -> u32 {
-        let square = width * height;
-
-        match self {
-            PixelFormat::RGB8 => 3 * square,
-            PixelFormat::RGBA8 => 4 * square,
-            PixelFormat::Depth => 2 * square,
-            PixelFormat::Alpha => 1 * square,
-        }
-    }
-}
-
-/// Convert from `PixelFormat` into (format, pixel_tyle, row_alignment)
-impl From<PixelFormat> for (GLenum, GLenum, GLenum) {
-    fn from(format: PixelFormat) -> Self {
-        match format {
-            PixelFormat::RGB8 => (GL_RGB, GL_UNSIGNED_BYTE, 4),
-            PixelFormat::RGBA8 => (GL_RGBA, GL_UNSIGNED_BYTE, 4),
-            PixelFormat::Depth => (GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, 4),
-            PixelFormat::Alpha => (GL_RED, GL_UNSIGNED_BYTE, 1),
-        }
-    }
-}
-
-impl From<TextureFormat> for PixelFormat {
-    fn from(format: TextureFormat) -> Self {
-        match format {
-            TextureFormat::RGB8 => PixelFormat::RGB8,
-            TextureFormat::RGBA8 => PixelFormat::RGBA8,
-            TextureFormat::Depth => PixelFormat::Depth,
+            TextureFormat::Alpha => 1 * square,
         }
     }
 }
@@ -177,9 +138,13 @@ impl Texture {
         ctx: &mut Context,
         _access: TextureAccess,
         bytes: Option<&[u8]>,
-        pixel_format: PixelFormat,
+        pixel_format: TextureFormat,
         params: TextureParams,
     ) -> Texture {
+        if params.format == TextureFormat::Alpha {
+            panic!("TextureFormat::Alpha textures are not supported yet. Use TextureFormat::RGBA textures instead and upload TextureFormat::Alpha data");
+        }
+
         if let Some(bytes_data) = bytes {
             assert_eq!(
                 params.format.size(params.width, params.height),
@@ -187,7 +152,7 @@ impl Texture {
             );
         }
 
-        let internal_format: GLuint = params.format.into();
+        let (internal_format, _, _) = params.format.into();
         let (format, pixel_type, row_alignment) = pixel_format.into();
 
         ctx.cache.store_texture_binding(0);
@@ -237,7 +202,7 @@ impl Texture {
     pub fn from_data_and_format(
         ctx: &mut Context,
         bytes: &[u8],
-        pixel_format: PixelFormat,
+        pixel_format: TextureFormat,
         params: TextureParams,
     ) -> Texture {
         Self::new(
@@ -256,7 +221,7 @@ impl Texture {
         Self::from_data_and_format(
             ctx,
             bytes,
-            PixelFormat::RGBA8,
+            TextureFormat::RGBA8,
             TextureParams {
                 width: width as _,
                 height: height as _,
@@ -279,9 +244,8 @@ impl Texture {
 
     /// Update whole texture content
     /// Note: non rgba8 textures on the GPU are not yet supported. However, you can upload alpha data to RGBA texture by setting
-    /// pixel_format to PixelFormat::Alpha
-    /// To upload alpha data to RGBA textures, use update_texture_part() instead
-    pub fn update(&self, ctx: &mut Context, pixels: &[u8], pixel_format: PixelFormat) {
+    /// pixel_format to TextureFormat::Alpha
+    pub fn update(&self, ctx: &mut Context, pixels: &[u8], pixel_format: TextureFormat) {
         assert_eq!(
             pixel_format.size(self.width, self.height),
             pixels.len() as u32
@@ -306,7 +270,7 @@ impl Texture {
         width: i32,
         height: i32,
         pixels: &[u8],
-        pixel_format: PixelFormat,
+        pixel_format: TextureFormat,
     ) {
         assert_eq!(
             pixel_format.size(width as _, height as _),
