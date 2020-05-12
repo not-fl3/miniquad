@@ -140,9 +140,8 @@ impl Texture {
         pixel_format: TextureFormat,
         params: TextureParams,
     ) -> Texture {
-        if params.format == TextureFormat::Alpha {
-            panic!("TextureFormat::Alpha textures are not supported yet. Use TextureFormat::RGBA textures instead and upload TextureFormat::Alpha data");
-        }
+        assert!(params.format != TextureFormat::Alpha, "TextureFormat::Alpha textures are not supported yet. Use TextureFormat::RGBA textures instead and upload TextureFormat::Alpha data");
+        assert!(params.format == pixel_format, "Different GPU and CPU pixel formats are not supported when creating texture (OK when updating texture data), because of limitations in WebGL1 and not yet implemented support.");
 
         if let Some(bytes_data) = bytes {
             assert_eq!(
