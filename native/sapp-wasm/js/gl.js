@@ -811,6 +811,20 @@ var importObject = {
                 GL.buffers[id] = null;
             }
         },
+        glDeleteFramebuffers: function (n, buffers) {
+            for (var i = 0; i < n; i++) {
+                var id = getArray(buffers + i * 4, Uint32Array, 1)[0];
+                var buffer = GL.framebuffers[id];
+
+                // From spec: "glDeleteFrameBuffers silently ignores 0's and names that do not
+                // correspond to existing buffer objects."
+                if (!buffer) continue;
+
+                gl.deleteFrameBuffer(buffer);
+                buffer.name = 0;
+                GL.framebuffers[id] = null;
+            }
+        },
         glDeleteTextures: function (n, textures) {
             for (var i = 0; i < n; i++) {
                 var id = getArray(textures + i * 4, Uint32Array, 1)[0];
