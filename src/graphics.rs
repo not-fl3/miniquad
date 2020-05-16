@@ -680,7 +680,7 @@ impl Context {
         if color_blend.is_none() && alpha_blend.is_some() {
             panic!("AlphaBlend without ColorBlend");
         }
-        if self.cache.color_blend == color_blend || self.cache.alpha_blend == alpha_blend {
+        if self.cache.color_blend == color_blend && self.cache.alpha_blend == alpha_blend {
             return;
         }
         unsafe {
