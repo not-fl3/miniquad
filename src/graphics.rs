@@ -235,6 +235,7 @@ pub struct PipelineLayout {
     pub attributes: &'static [VertexAttribute],
 }
 
+#[derive(Clone, Debug, Copy)]
 pub struct Shader(usize);
 
 impl Shader {
@@ -578,7 +579,6 @@ impl Context {
                     textures: [0; MAX_SHADERSTAGE_IMAGES],
                     attributes: [None; MAX_VERTEX_ATTRIBUTES],
                 },
-                //attributes: [None; 16],
             }
         }
     }
@@ -977,9 +977,17 @@ impl Context {
     }
 
     pub fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32) {
+        assert!(
+            self.cache.cur_pipeline.is_some(),
+            "Drawing without any binded pipeline"
+        );
+
+        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
+        let primitive_type = pip.params.primitive_type.into();
+
         unsafe {
             glDrawElementsInstanced(
-                GL_TRIANGLES,
+                primitive_type,
                 num_elements,
                 GL_UNSIGNED_SHORT,
                 (2 * base_element) as *mut _,
@@ -1225,6 +1233,21 @@ impl From<CompareFunc> for GLenum {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+pub enum PrimitiveType {
+    Triangles,
+    Lines,
+}
+
+impl From<PrimitiveType> for GLenum {
+    fn from(primitive_type: PrimitiveType) -> Self {
+        match primitive_type {
+            PrimitiveType::Triangles => GL_TRIANGLES,
+            PrimitiveType::Lines => GL_LINES,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct PipelineParams {
     pub cull_face: CullFace,
     pub front_face_order: FrontFaceOrder,
@@ -1269,6 +1292,7 @@ pub struct PipelineParams {
     pub alpha_blend: Option<BlendState>,
     pub stencil_test: Option<StencilState>,
     pub color_write: ColorMask,
+    pub primitive_type: PrimitiveType,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -1286,6 +1310,7 @@ impl Default for PipelineParams {
             alpha_blend: None,
             stencil_test: None,
             color_write: (true, true, true, true),
+            primitive_type: PrimitiveType::Triangles,
         }
     }
 }
