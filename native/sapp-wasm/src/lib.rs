@@ -321,6 +321,8 @@ extern "C" {
     /// Notice that this function will works only from "engaging" event callbacks - from
     /// "mouse_down"/"key_down" event handler functions.
     pub fn sapp_set_cursor_grab(grab: bool);
+
+    fn load_js(code: *const ::std::os::raw::c_char);
 }
 
 /// Do nothing on wasm - cursor will be hidden by "sapp_set_cursor_grab" anyway.
@@ -332,6 +334,12 @@ pub unsafe fn sapp_high_dpi() -> bool {
 
 pub unsafe fn sapp_dpi_scale() -> f32 {
     1.
+}
+
+#[no_mangle]
+pub extern "C" fn load_gl_js() {
+    let code = std::ffi::CString::new(include_str!("../js/gl.js")).unwrap();
+    unsafe { load_js(code.as_ptr()) };
 }
 
 #[no_mangle]
