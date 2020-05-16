@@ -58,7 +58,7 @@ pub mod date {
 
     #[cfg(target_arch = "wasm32")]
     pub fn now() -> f64 {
-        unsafe { sapp::time() }
+        unsafe { sapp::now() }
     }
 }
 
