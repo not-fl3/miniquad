@@ -6,6 +6,7 @@ pub struct Texture {
     pub width: u32,
     pub height: u32,
     pub format: TextureFormat,
+    pub row_alignment: RowAlignment,
 }
 
 impl Texture {
@@ -15,6 +16,7 @@ impl Texture {
             width: 0,
             height: 0,
             format: TextureFormat::RGBA8,
+            row_alignment: RowAlignment::Four,
         }
     }
 
@@ -30,6 +32,12 @@ impl Texture {
             glDeleteTextures(1, &self.texture as *const _);
         }
     }
+}
+
+//
+pub struct PixelStorageParams {
+    pack_alignment: u8,
+    unpack_alignment: u8,
 }
 
 /// List of all the possible formats of input data when uploading to texture.
@@ -97,7 +105,6 @@ pub enum FilterMode {
     Nearest = GL_NEAREST as isize,
 }
 
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TextureAccess {
     /// Used as read-only from GPU
@@ -115,13 +122,37 @@ pub struct TextureParams {
     pub height: u32,
 }
 
+/// Specifies row start alignment when:
+/// - uploading texture from CPU to GPU memory using the update*() functions
+/// - downloading texture from GPU memory
+/// Valid values: 1, 2, 4, 8
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum RowAlignment {
+    One = 1,
+    Two = 2,
+    Four = 4,
+    Eight = 8,
+}
+
 impl Texture {
     /// Shorthand for `new(ctx, TextureAccess::RenderTarget, params)`
     pub fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
-        Self::new(ctx, TextureAccess::RenderTarget, None, params)
+        Self::new(
+            ctx,
+            TextureAccess::RenderTarget,
+            None,
+            params,
+            RowAlignment::Four,
+        )
     }
 
-    pub fn new(ctx: &mut Context, _access: TextureAccess, bytes: Option<&[u8]>, params: TextureParams) -> Texture {
+    pub fn new(
+        ctx: &mut Context,
+        _access: TextureAccess,
+        bytes: Option<&[u8]>,
+        params: TextureParams,
+        row_alignment: RowAlignment,
+    ) -> Texture {
         if let Some(bytes_data) = bytes {
             assert_eq!(
                 params.format.size(params.width, params.height),
@@ -138,6 +169,7 @@ impl Texture {
         unsafe {
             glGenTextures(1, &mut texture as *mut _);
             ctx.cache.bind_texture(0, texture);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, row_alignment as _);
             glTexImage2D(
                 GL_TEXTURE_2D,
                 0,
@@ -165,12 +197,19 @@ impl Texture {
             width: params.width,
             height: params.height,
             format: params.format,
+            row_alignment,
         }
     }
 
     /// Upload texture to GPU with given TextureParams
     pub fn from_data_and_format(ctx: &mut Context, bytes: &[u8], params: TextureParams) -> Texture {
-        Self::new(ctx, TextureAccess::Static, Some(bytes), params)
+        Self::new(
+            ctx,
+            TextureAccess::Static,
+            Some(bytes),
+            params,
+            RowAlignment::Four,
+        )
     }
 
     /// Upload RGBA8 texture to GPU
@@ -234,6 +273,7 @@ impl Texture {
         let (_, format, pixel_type) = self.format.into();
 
         unsafe {
+            glPixelStorei(GL_UNPACK_ALIGNMENT, self.row_alignment as _);
             glTexSubImage2D(
                 GL_TEXTURE_2D,
                 0,
