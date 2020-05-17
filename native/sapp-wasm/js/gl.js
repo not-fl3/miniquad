@@ -748,6 +748,9 @@ var importObject = {
             gl.linkProgram(GL.programs[program]);
             GL.populateUniformTable(program);
         },
+        glPixelStorei: function (pname, param) {
+            gl.pixelStorei(pname, param);
+        },
         glFramebufferTexture2D: function (target, attachment, textarget, texture, level) {
             GL.validateGLObjectID(GL.textures, texture, 'glFramebufferTexture2D', 'texture');
             gl.framebufferTexture2D(target, attachment, textarget, GL.textures[texture], level);
