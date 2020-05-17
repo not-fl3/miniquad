@@ -56,14 +56,19 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
 
 impl TextureFormat {
     /// Returns the size in bytes of texture with `dimensions`.
-    pub fn size(self, width: u32, height: u32) -> u32 {
-        let square = width * height;
+    pub fn size(self, width: u32, height: u32, row_alignment: RowAlignment) -> u32 {
+        let pixel_size = match self {
+            TextureFormat::RGB8 => 3,
+            TextureFormat::RGBA8 => 4,
+            TextureFormat::Depth => 2,
+        };
 
-        match self {
-            TextureFormat::RGB8 => 3 * square,
-            TextureFormat::RGBA8 => 4 * square,
-            TextureFormat::Depth => 2 * square,
-        }
+        let row_alignment = row_alignment as u32;
+
+        let row_size_unaligned = width * pixel_size;
+        let row_size = (row_size_unaligned + row_alignment - 1) / row_alignment * row_alignment;
+
+        row_size * height
     }
 }
 
@@ -149,8 +154,10 @@ impl Texture {
     ) -> Texture {
         if let Some(bytes_data) = bytes {
             assert_eq!(
-                params.format.size(params.width, params.height),
-                bytes_data.len() as u32
+                params
+                    .format
+                    .size(params.width, params.height, row_alignment) as usize,
+                bytes_data.len()
             );
         }
 
@@ -236,7 +243,7 @@ impl Texture {
     /// Update whole texture content
     /// bytes should be width * height * 4 size - non rgba8 textures are not supported yet anyway
     pub fn update(&self, ctx: &mut Context, bytes: &[u8]) {
-        assert_eq!(self.width as usize * self.height as usize * 4, bytes.len());
+        assert_eq!(self.size(self.width, self.height), bytes.len());
 
         self.update_texture_part(
             ctx,
@@ -257,7 +264,7 @@ impl Texture {
         height: i32,
         bytes: &[u8],
     ) {
-        assert_eq!(width as usize * height as usize * 4, bytes.len());
+        assert_eq!(self.size(width as _, height as _), bytes.len());
         assert!(x_offset + width <= self.width as _);
         assert!(y_offset + height <= self.height as _);
 
@@ -282,5 +289,10 @@ impl Texture {
         }
 
         ctx.cache.restore_texture_binding(0);
+    }
+
+    #[inline]
+    fn size(&self, width: u32, height: u32) -> usize {
+        self.format.size(width, height, self.row_alignment) as usize
     }
 }
