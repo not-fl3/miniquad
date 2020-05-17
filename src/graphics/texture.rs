@@ -6,7 +6,6 @@ pub struct Texture {
     pub width: u32,
     pub height: u32,
     pub format: TextureFormat,
-    pub row_alignment: RowAlignment,
 }
 
 impl Texture {
@@ -16,7 +15,6 @@ impl Texture {
             width: 0,
             height: 0,
             format: TextureFormat::RGBA8,
-            row_alignment: RowAlignment::Four,
         }
     }
 
@@ -62,20 +60,14 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
 
 impl TextureFormat {
     /// Returns the size in bytes of texture with `dimensions`.
-    pub fn size(self, width: u32, height: u32, row_alignment: RowAlignment) -> u32 {
-        let pixel_size = match self {
-            TextureFormat::RGB8 => 3,
-            TextureFormat::RGBA8 => 4,
-            TextureFormat::Depth => 2,
-            TextureFormat::Alpha => 1,
-        };
-
-        let row_alignment = row_alignment as u32;
-
-        let row_size_unaligned = width * pixel_size;
-        let row_size = (row_size_unaligned + row_alignment - 1) / row_alignment * row_alignment;
-
-        row_size * height
+    pub fn size(self, width: u32, height: u32) -> u32 {
+        let square = width * height;
+        match self {
+            TextureFormat::RGB8 => 3 * square,
+            TextureFormat::RGBA8 => 4 * square,
+            TextureFormat::Depth => 2 * square,
+            TextureFormat::Alpha => 1 * square,
+        }
     }
 }
 
@@ -128,28 +120,10 @@ pub struct TextureParams {
     pub height: u32,
 }
 
-/// Specifies row start alignment when:
-/// - uploading texture from CPU to GPU memory using the update*() functions
-/// - downloading texture from GPU memory
-/// Valid values: 1, 2, 4, 8
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum RowAlignment {
-    One = 1,
-    Two = 2,
-    Four = 4,
-    Eight = 8,
-}
-
 impl Texture {
     /// Shorthand for `new(ctx, TextureAccess::RenderTarget, params)`
     pub fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
-        Self::new(
-            ctx,
-            TextureAccess::RenderTarget,
-            None,
-            params,
-            RowAlignment::Four,
-        )
+        Self::new(ctx, TextureAccess::RenderTarget, None, params)
     }
 
     pub fn new(
@@ -157,13 +131,10 @@ impl Texture {
         _access: TextureAccess,
         bytes: Option<&[u8]>,
         params: TextureParams,
-        row_alignment: RowAlignment,
     ) -> Texture {
         if let Some(bytes_data) = bytes {
             assert_eq!(
-                params
-                    .format
-                    .size(params.width, params.height, row_alignment) as usize,
+                params.format.size(params.width, params.height) as usize,
                 bytes_data.len()
             );
         }
@@ -177,14 +148,15 @@ impl Texture {
         unsafe {
             glGenTextures(1, &mut texture as *mut _);
             ctx.cache.bind_texture(0, texture);
-            glPixelStorei(GL_UNPACK_ALIGNMENT, row_alignment as _);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
 
-            if cfg!(not(target_arch = "wasm32")) { // if not WASM
-                if params.format == TextureFormat::Alpha { // if alpha miniquad texture, the value on non-WASM is stored in red channel
+            if cfg!(not(target_arch = "wasm32")) {
+                // if not WASM
+                if params.format == TextureFormat::Alpha {
+                    // if alpha miniquad texture, the value on non-WASM is stored in red channel
                     // swizzle red -> alpha
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
-                } 
-                else {
+                } else {
                     // keep alpha -> alpha
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
                 }
@@ -217,19 +189,12 @@ impl Texture {
             width: params.width,
             height: params.height,
             format: params.format,
-            row_alignment,
         }
     }
 
     /// Upload texture to GPU with given TextureParams
     pub fn from_data_and_format(ctx: &mut Context, bytes: &[u8], params: TextureParams) -> Texture {
-        Self::new(
-            ctx,
-            TextureAccess::Static,
-            Some(bytes),
-            params,
-            RowAlignment::Four,
-        )
+        Self::new(ctx, TextureAccess::Static, Some(bytes), params)
     }
 
     /// Upload RGBA8 texture to GPU
@@ -293,14 +258,15 @@ impl Texture {
         let (_, format, pixel_type) = self.format.into();
 
         unsafe {
-            glPixelStorei(GL_UNPACK_ALIGNMENT, self.row_alignment as _);
-            
-            if cfg!(not(target_arch = "wasm32")) { // if not WASM
-                if self.format == TextureFormat::Alpha { // if alpha miniquad texture, the value on non-WASM is stored in red channel
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
+
+            if cfg!(not(target_arch = "wasm32")) {
+                // if not WASM
+                if self.format == TextureFormat::Alpha {
+                    // if alpha miniquad texture, the value on non-WASM is stored in red channel
                     // swizzle red -> alpha
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
-                } 
-                else {
+                } else {
                     // keep alpha -> alpha
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
                 }
@@ -324,6 +290,6 @@ impl Texture {
 
     #[inline]
     fn size(&self, width: u32, height: u32) -> usize {
-        self.format.size(width, height, self.row_alignment) as usize
+        self.format.size(width, height) as usize
     }
 }
