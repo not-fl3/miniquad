@@ -8217,6 +8217,7 @@ pub const GL_TRUE: u32 = 1;
 pub const GL_NEVER: u32 = 512;
 pub const GL_POINTS: u32 = 0;
 pub const GL_ONE_MINUS_SRC_COLOR: u32 = 769;
+pub const GL_UNPACK_ALIGNMENT: u32 = 3317;
 pub const GL_MIRRORED_REPEAT: u32 = 33648;
 pub const GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS: u32 = 35661;
 pub const GL_R11F_G11F_B10F: u32 = 35898;
@@ -41894,6 +41895,13 @@ extern "C" {
 }
 extern "C" {
     pub fn glLinkProgram(program: GLuint);
+}
+pub type PFN_glPixelStorei = ::std::option::Option<unsafe extern "C" fn(pname: GLenum, param: GLint)>;
+extern "C" {
+    pub static mut _sapp_glPixelStorei: PFN_glPixelStorei;
+}
+extern "C" {
+    pub fn glPixelStorei(pname: GLenum, param: GLint);
 }
 pub type PFN_glGetUniformLocation =
     ::std::option::Option<unsafe extern "C" fn(program: GLuint, name: *const GLchar) -> GLint>;
