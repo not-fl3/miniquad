@@ -42,14 +42,20 @@ pub enum TextureFormat {
     RGB8,
     RGBA8,
     Depth,
+    Alpha,
 }
 
+/// Converts from TextureFormat to (internal_format, format, pixel_type)
 impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
     fn from(format: TextureFormat) -> Self {
         match format {
             TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
             TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
             TextureFormat::Depth => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT),
+            #[cfg(target_arch = "wasm32")]
+            TextureFormat::Alpha => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
+            #[cfg(not(target_arch = "wasm32"))]
+            TextureFormat::Alpha => (GL_R8, GL_RED, GL_UNSIGNED_BYTE), // texture updates will swizzle Red -> Alpha to match WASM
         }
     }
 }
@@ -61,6 +67,7 @@ impl TextureFormat {
             TextureFormat::RGB8 => 3,
             TextureFormat::RGBA8 => 4,
             TextureFormat::Depth => 2,
+            TextureFormat::Alpha => 1,
         };
 
         let row_alignment = row_alignment as u32;
@@ -171,6 +178,18 @@ impl Texture {
             glGenTextures(1, &mut texture as *mut _);
             ctx.cache.bind_texture(0, texture);
             glPixelStorei(GL_UNPACK_ALIGNMENT, row_alignment as _);
+
+            if cfg!(not(target_arch = "wasm32")) { // if not WASM
+                if params.format == TextureFormat::Alpha { // if alpha miniquad texture, the value on non-WASM is stored in red channel
+                    // swizzle red -> alpha
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
+                } 
+                else {
+                    // keep alpha -> alpha
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
+                }
+            }
+
             glTexImage2D(
                 GL_TEXTURE_2D,
                 0,
@@ -275,6 +294,18 @@ impl Texture {
 
         unsafe {
             glPixelStorei(GL_UNPACK_ALIGNMENT, self.row_alignment as _);
+            
+            if cfg!(not(target_arch = "wasm32")) { // if not WASM
+                if self.format == TextureFormat::Alpha { // if alpha miniquad texture, the value on non-WASM is stored in red channel
+                    // swizzle red -> alpha
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
+                } 
+                else {
+                    // keep alpha -> alpha
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
+                }
+            }
+
             glTexSubImage2D(
                 GL_TEXTURE_2D,
                 0,
