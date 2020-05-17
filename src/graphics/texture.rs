@@ -34,12 +34,6 @@ impl Texture {
     }
 }
 
-//
-pub struct PixelStorageParams {
-    pack_alignment: u8,
-    unpack_alignment: u8,
-}
-
 /// List of all the possible formats of input data when uploading to texture.
 /// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
 #[repr(u8)]
