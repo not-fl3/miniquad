@@ -42168,6 +42168,12 @@ pub type PFN_glDeleteFramebuffers =
 extern "C" {
     pub static mut _sapp_glDeleteFramebuffers: PFN_glDeleteFramebuffers;
 }
+extern "C" {
+    pub fn glDeleteFramebuffers(
+        n: GLsizei,
+        buffers: *const GLuint,
+    );
+}
 pub type PFN_glBlendEquationSeparate =
     ::std::option::Option<unsafe extern "C" fn(modeRGB: GLenum, modeAlpha: GLenum)>;
 extern "C" {
