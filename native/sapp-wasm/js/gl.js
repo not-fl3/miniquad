@@ -913,7 +913,7 @@ var importObject = {
                 // correspond to existing buffer objects."
                 if (!buffer) continue;
 
-                gl.deleteFrameBuffer(buffer);
+                gl.deleteFramebuffer(buffer);
                 buffer.name = 0;
                 GL.framebuffers[id] = null;
             }
