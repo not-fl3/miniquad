@@ -3288,6 +3288,10 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void * indice
 }
 typedef void  (GL_APIENTRY *PFN_glDeleteFramebuffers)(GLsizei n, const GLuint * framebuffers);
 static PFN_glDeleteFramebuffers _sapp_glDeleteFramebuffers;
+void glDeleteFramebuffers(GLsizei n, const GLuint * buffers) {
+    _sapp_glDeleteFramebuffers(n, buffers);
+}
+static PFN_glDeleteFramebuffers _sapp_glDeleteFramebuffers;
 typedef void  (GL_APIENTRY *PFN_glBlendEquationSeparate)(GLenum modeRGB, GLenum modeAlpha);
 static PFN_glBlendEquationSeparate _sapp_glBlendEquationSeparate;
 typedef void  (GL_APIENTRY *PFN_glBlendEquationSeparate)(GLenum modeRGB, GLenum modeAlpha);
