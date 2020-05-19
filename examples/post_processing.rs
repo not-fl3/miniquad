@@ -15,7 +15,26 @@ struct Stage {
 impl Stage {
     pub fn new(ctx: &mut Context) -> Stage {
         let (w, h) = ctx.screen_size();
-        let (color_img, offscreen_pass) = Self::create_offscreen_pass(ctx, w as _, h as _);
+        let color_img = Texture::new_render_texture(
+            ctx,
+            TextureParams {
+                width: w as _,
+                height: h as _,
+                format: TextureFormat::RGBA8,
+                ..Default::default()
+            },
+        );
+        let depth_img = Texture::new_render_texture(
+            ctx,
+            TextureParams {
+                width: w as _,
+                height: h as _,
+                format: TextureFormat::Depth,
+                ..Default::default()
+            },
+        );
+
+        let offscreen_pass = RenderPass::new(ctx, color_img, depth_img);
 
         #[rustfmt::skip]
         let vertices: &[f32] = &[
@@ -82,7 +101,7 @@ impl Stage {
 
         let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
 
-        let indices: &[u16] = &[0, 1, 2,  0, 2, 3];
+        let indices: &[u16] = &[0, 1, 2, 0, 2, 3];
 
         let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
 
@@ -144,13 +163,17 @@ impl Stage {
             ry: 0.,
         }
     }
+}
 
-    fn create_offscreen_pass(ctx: &mut Context, width: u32, height: u32) -> (Texture, RenderPass) {
+impl EventHandler for Stage {
+    fn update(&mut self, _ctx: &mut Context) {}
+
+    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
         let color_img = Texture::new_render_texture(
             ctx,
             TextureParams {
-                width,
-                height,
+                width: width as _,
+                height: height as _,
                 format: TextureFormat::RGBA8,
                 ..Default::default()
             },
@@ -158,23 +181,14 @@ impl Stage {
         let depth_img = Texture::new_render_texture(
             ctx,
             TextureParams {
-                width,
-                height,
+                width: width as _,
+                height: height as _,
                 format: TextureFormat::Depth,
                 ..Default::default()
             },
         );
 
-        (color_img, RenderPass::new(ctx, color_img, depth_img))
-    }
-
-}
-
-impl EventHandler for Stage {
-    fn update(&mut self, _ctx: &mut Context) {}
-
-    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-        let (color_img, offscreen_pass) = Stage::create_offscreen_pass(ctx, width as _, height as _);
+        let offscreen_pass = RenderPass::new(ctx, color_img, depth_img);
 
         self.offscreen_pass.delete(ctx);
         self.offscreen_pass = offscreen_pass;
@@ -195,20 +209,18 @@ impl EventHandler for Stage {
         self.ry += 0.03;
         let model = Mat4::from_rotation_ypr(self.rx, self.ry, 0.);
 
-        let vs_params = post_processing_shader::Uniforms {
-            mvp: view_proj * model,
-        };
-
         let (w, h) = ctx.screen_size();
-        
         // the offscreen pass, rendering an rotating, untextured cube into a render target image
         ctx.begin_pass(
             self.offscreen_pass,
             PassAction::clear_color(1.0, 1.0, 1.0, 1.0),
         );
         ctx.apply_pipeline(&self.offscreen_pipeline);
+        ctx.apply_uniforms(&self.offscreen_bind);
         ctx.apply_bindings(&self.offscreen_bind);
-        ctx.apply_uniforms(&vs_params);
+        ctx.apply_uniforms(&offscreen_shader::Uniforms {
+            mvp: view_proj * model,
+        });
         ctx.draw(0, 36, 1);
         ctx.end_render_pass();
 
@@ -217,6 +229,9 @@ impl EventHandler for Stage {
         ctx.begin_default_pass(PassAction::Nothing);
         ctx.apply_pipeline(&self.post_processing_pipeline);
         ctx.apply_bindings(&self.post_processing_bind);
+        ctx.apply_uniforms(&post_processing_shader::Uniforms {
+            resolution: glam::vec2(w, h),
+        });
         ctx.draw(0, 6, 1);
         ctx.end_render_pass();
         ctx.commit_frame();
@@ -245,11 +260,14 @@ mod post_processing_shader {
     "#;
 
     pub const FRAGMENT: &str = r#"#version 100
-    varying lowp vec2 texcoord;
+    precision lowp float;
+
+    varying vec2 texcoord;
 
     uniform sampler2D tex;
+    uniform vec2 resolution;
 
-    precision lowp float;
+
 
     // Source: https://github.com/Jam3/glsl-fast-gaussian-blur/blob/master/5.glsl
     vec4 blur5(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
@@ -262,20 +280,20 @@ mod post_processing_shader {
     }
 
     void main() {
-        gl_FragColor = blur5(tex, texcoord, vec2(256.0), vec2(3.0));
+        gl_FragColor = blur5(tex, texcoord, resolution, vec2(3.0));
     }
     "#;
 
     pub const META: ShaderMeta = ShaderMeta {
         images: &["tex"],
         uniforms: UniformBlockLayout {
-            uniforms: &[],
+            uniforms: &[UniformDesc::new("resolution", UniformType::Float2)],
         },
     };
 
     #[repr(C)]
     pub struct Uniforms {
-        pub mvp: glam::Mat4,
+        pub resolution: glam::Vec2,
     }
 }
 
@@ -311,4 +329,9 @@ mod offscreen_shader {
             uniforms: &[UniformDesc::new("mvp", UniformType::Mat4)],
         },
     };
+
+    #[repr(C)]
+    pub struct Uniforms {
+        pub mvp: glam::Mat4,
+    }
 }
