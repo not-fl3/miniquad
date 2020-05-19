@@ -217,7 +217,7 @@ impl EventHandler for Stage {
         ctx.begin_default_pass(PassAction::Nothing);
         ctx.apply_pipeline(&self.post_processing_pipeline);
         ctx.apply_bindings(&self.post_processing_bind);
-        ctx.draw(0, 36, 1);
+        ctx.draw(0, 6, 1);
         ctx.end_render_pass();
         ctx.commit_frame();
     }
