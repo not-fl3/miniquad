@@ -529,7 +529,7 @@ var importObject = {
         rand: function () {
             return Math.floor(Math.random() * 2147483647);
         },
-        time: function () {
+        now: function () {
             return Date.now() / 1000.0;
         },
         canvas_width: function () {
