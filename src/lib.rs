@@ -169,7 +169,7 @@ extern "C" fn init(user_data: *mut ::std::os::raw::c_void) {
     let context = graphics::Context::new();
 
     let user_data = f(context);
-    std::mem::replace(data, UserDataState::Intialized(user_data));
+    *data = UserDataState::Intialized(user_data);
 }
 
 extern "C" fn frame(user_data: *mut ::std::os::raw::c_void) {
