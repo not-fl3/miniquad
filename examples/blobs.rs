@@ -40,7 +40,7 @@ impl Stage {
             images: vec![],
         };
 
-        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::META);
+        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::META).unwrap();
 
         let pipeline = Pipeline::new(
             ctx,

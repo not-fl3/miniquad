@@ -116,7 +116,7 @@ impl Stage {
             post_processing_shader::VERTEX,
             post_processing_shader::FRAGMENT,
             post_processing_shader::META,
-        );
+        ).unwrap();
 
         let post_processing_pipeline = Pipeline::new(
             ctx,
@@ -133,7 +133,7 @@ impl Stage {
             offscreen_shader::VERTEX,
             offscreen_shader::FRAGMENT,
             offscreen_shader::META,
-        );
+        ).unwrap();
 
         let offscreen_pipeline = Pipeline::with_params(
             ctx,

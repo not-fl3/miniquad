@@ -236,6 +236,29 @@ pub struct PipelineLayout {
 }
 
 #[derive(Clone, Debug, Copy)]
+pub enum ShaderType {
+    Vertex,
+    Fragment
+}
+
+#[derive(Clone, Debug)]
+pub enum ShaderError {
+    CompilationError {
+	shader_type: ShaderType,
+        error_message: String,
+    },
+    LinkError(String),
+    /// Shader strings should never contains \00 in the middle
+    FFINulError(std::ffi::NulError),
+}
+
+impl From<std::ffi::NulError> for ShaderError {
+    fn from(e: std::ffi::NulError) -> ShaderError {
+        ShaderError::FFINulError(e)
+    }
+}
+
+#[derive(Clone, Debug, Copy)]
 pub struct Shader(usize);
 
 impl Shader {
@@ -244,10 +267,10 @@ impl Shader {
         vertex_shader: &str,
         fragment_shader: &str,
         meta: ShaderMeta,
-    ) -> Shader {
-        let shader = load_shader_internal(vertex_shader, fragment_shader, meta);
+    ) -> Result<Shader, ShaderError> {
+        let shader = load_shader_internal(vertex_shader, fragment_shader, meta)?;
         ctx.shaders.push(shader);
-        Shader(ctx.shaders.len() - 1)
+        Ok(Shader(ctx.shaders.len() - 1))
     }
 }
 
@@ -531,7 +554,7 @@ impl RenderPass {
         let pass = RenderPassInternal {
             gl_fb,
             texture: color_img,
-            depth_texture: depth_img
+            depth_texture: depth_img,
         };
 
         context.passes.push(pass);
@@ -542,9 +565,7 @@ impl RenderPass {
     pub fn delete(&self, ctx: &mut Context) {
         let render_pass = &mut ctx.passes[self.0];
 
-        unsafe {
-            glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _)
-        }
+        unsafe { glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _) }
 
         render_pass.texture.delete();
         if let Some(depth_texture) = render_pass.depth_texture {
@@ -1018,10 +1039,10 @@ fn load_shader_internal(
     vertex_shader: &str,
     fragment_shader: &str,
     meta: ShaderMeta,
-) -> ShaderInternal {
+) -> Result<ShaderInternal, ShaderError> {
     unsafe {
-        let vertex_shader = load_shader(GL_VERTEX_SHADER, vertex_shader);
-        let fragment_shader = load_shader(GL_FRAGMENT_SHADER, fragment_shader);
+        let vertex_shader = load_shader(GL_VERTEX_SHADER, vertex_shader)?;
+        let fragment_shader = load_shader(GL_FRAGMENT_SHADER, fragment_shader)?;
 
         let program = glCreateProgram();
         glAttachShader(program, vertex_shader);
@@ -1044,15 +1065,16 @@ fn load_shader_internal(
             assert!(max_length >= 1);
             let error_message =
                 std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1]);
-            panic!("can't link shader {}", error_message);
+            return Err(ShaderError::LinkError(error_message.to_string()));
         }
 
         glUseProgram(program);
 
         #[rustfmt::skip]
         let images = meta.images.iter().map(|name| ShaderImage {
-                gl_loc: get_uniform_location(program, name),
-            }).collect();
+            gl_loc: get_uniform_location(program, name),
+        }).collect();
+
         #[rustfmt::skip]
         let uniforms = meta.uniforms.uniforms.iter().scan(0, |offset, uniform| {
             let res = ShaderUniform {
@@ -1065,21 +1087,21 @@ fn load_shader_internal(
             *offset += uniform.uniform_type.size(1) * uniform.array_count;
             Some(res)
         }).collect();
-        ShaderInternal {
+
+        Ok(ShaderInternal {
             program,
             images,
             uniforms,
-        }
+        })
     }
 }
 
-pub fn load_shader(shader_type: GLenum, source: &str) -> GLuint {
+pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderError> {
     unsafe {
         let shader = glCreateShader(shader_type);
-
         assert!(shader != 0);
 
-        let cstring = CString::new(source).unwrap_or_else(|e| panic!(e));
+        let cstring = CString::new(source)?;
         let csource = [cstring];
         glShaderSource(shader, 1, csource.as_ptr() as *const _, std::ptr::null());
         glCompileShader(shader);
@@ -1100,11 +1122,20 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> GLuint {
 
             assert!(max_length >= 1);
             let error_message =
-                std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1]);
-            panic!("cant compile shader {}!", error_message);
+                std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1])
+                .to_string();
+
+            return Err(ShaderError::CompilationError {
+		shader_type: match shader_type {
+		    GL_VERTEX_SHADER => ShaderType::Vertex,
+		    GL_FRAGMENT_SHADER => ShaderType::Fragment,
+		    _ => unreachable!()
+		},
+                error_message,
+            });
         }
 
-        shader
+        Ok(shader)
     }
 }
 
