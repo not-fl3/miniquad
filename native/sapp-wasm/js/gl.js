@@ -352,6 +352,11 @@ const SAPP_EVENTTYPE_TOUCHES_MOVED = 11;
 const SAPP_EVENTTYPE_TOUCHES_ENDED = 12;
 const SAPP_EVENTTYPE_TOUCHES_CANCELLED = 13;
 
+const SAPP_MODIFIER_SHIFT = 1;
+const SAPP_MODIFIER_CTRL = 2;
+const SAPP_MODIFIER_ALT = 4;
+const SAPP_MODIFIER_SUPER = 8;
+
 into_sapp_mousebutton = function (btn) {
     switch (btn) {
         case 0: return 0;
@@ -975,7 +980,23 @@ var importObject = {
                         event.preventDefault();
                         break;
                 }
-                wasm_exports.key_down(sapp_key_code);
+                var modifiers = 0;
+                if (event.ctrlKey) {
+                    modifiers |= SAPP_MODIFIER_CTRL;
+                }
+                if (event.shiftKey) {
+                    modifiers |= SAPP_MODIFIER_SHIFT;
+                }
+                if (event.altKey) {
+                    modifiers |= SAPP_MODIFIER_ALT;
+                }
+                wasm_exports.key_down(sapp_key_code, modifiers);
+                // for "space" preventDefault will prevent
+                // key_press event, so send it here instead
+                if (sapp_key_code == 32) {
+                    wasm_exports.key_press(sapp_key_code);
+                }
+
             };
             canvas.onkeyup = function (event) {
                 var sapp_key_code = into_sapp_keycode(event.code);
