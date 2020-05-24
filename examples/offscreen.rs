@@ -100,7 +100,7 @@ impl Stage {
             display_shader::VERTEX,
             display_shader::FRAGMENT,
             display_shader::META,
-        );
+        ).unwrap();
 
         let display_pipeline = Pipeline::with_params(
             ctx,
@@ -123,7 +123,7 @@ impl Stage {
             offscreen_shader::VERTEX,
             offscreen_shader::FRAGMENT,
             offscreen_shader::META,
-        );
+        ).unwrap();
 
         let offscreen_pipeline = Pipeline::with_params(
             ctx,
