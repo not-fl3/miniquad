@@ -191,9 +191,8 @@ pub fn __private_api_log_lit(
 pub fn __private_api_log_lit(
     message: &str,
     level: Level,
-    &(target, module_path, file, line): &(&str, &'static str, &'static str, u32),
+    &(_target, _module_path, _file, _line): &(&str, &'static str, &'static str, u32),
 ) {
-    use sapp_wasm;
     use std::ffi::CString;
 
     let log_fn = match level {

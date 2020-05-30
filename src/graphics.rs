@@ -238,13 +238,13 @@ pub struct PipelineLayout {
 #[derive(Clone, Debug, Copy)]
 pub enum ShaderType {
     Vertex,
-    Fragment
+    Fragment,
 }
 
 #[derive(Clone, Debug)]
 pub enum ShaderError {
     CompilationError {
-	shader_type: ShaderType,
+        shader_type: ShaderType,
         error_message: String,
     },
     LinkError(String),
@@ -1123,14 +1123,14 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderEr
             assert!(max_length >= 1);
             let error_message =
                 std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1])
-                .to_string();
+                    .to_string();
 
             return Err(ShaderError::CompilationError {
-		shader_type: match shader_type {
-		    GL_VERTEX_SHADER => ShaderType::Vertex,
-		    GL_FRAGMENT_SHADER => ShaderType::Fragment,
-		    _ => unreachable!()
-		},
+                shader_type: match shader_type {
+                    GL_VERTEX_SHADER => ShaderType::Vertex,
+                    GL_FRAGMENT_SHADER => ShaderType::Fragment,
+                    _ => unreachable!(),
+                },
                 error_message,
             });
         }
