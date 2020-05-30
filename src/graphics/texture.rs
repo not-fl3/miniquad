@@ -250,7 +250,6 @@ impl Texture {
         }
 
         ctx.cache.restore_texture_binding(0);
-
     }
 
     /// Update whole texture content
