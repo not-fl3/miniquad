@@ -9,12 +9,16 @@ pub use rand::*;
 
 struct SappContext {
     desc: sapp_desc,
+    clipboard: Option<String>,
 }
 
 impl SappContext {
     unsafe fn init(desc: sapp_desc) {
         let user_data = desc.user_data;
-        SAPP_CONTEXT = Some(SappContext { desc });
+        SAPP_CONTEXT = Some(SappContext {
+            desc,
+            clipboard: None,
+        });
         SAPP_CONTEXT
             .as_mut()
             .unwrap()
@@ -315,6 +319,8 @@ extern "C" {
     pub fn console_warn(msg: *const ::std::os::raw::c_char);
     pub fn console_error(msg: *const ::std::os::raw::c_char);
 
+    pub fn sapp_set_clipboard(clipboard: *const i8, len: usize);
+
     /// call "requestPointerLock" and "exitPointerLock" internally.
     /// Will hide cursor and will disable mouse_move events, but instead will
     /// will make inifinite mouse field for raw_device_input event.
@@ -332,6 +338,31 @@ pub unsafe fn sapp_high_dpi() -> bool {
 
 pub unsafe fn sapp_dpi_scale() -> f32 {
     1.
+}
+
+#[no_mangle]
+pub extern "C" fn allocate_vec_u8(len: usize) -> *mut u8 {
+    let mut string = vec![0u8; len];
+    let ptr = string.as_mut_ptr();
+    std::mem::forget(string);
+    ptr
+}
+
+#[no_mangle]
+pub extern "C" fn on_clipboard_paste(msg: *mut u8, len: usize) {
+    let msg = unsafe { String::from_raw_parts(msg, len, len) };
+
+    unsafe { sapp_context().clipboard = Some(msg) };
+}
+
+pub fn clipboard_get() -> Option<String> {
+    unsafe { sapp_context().clipboard.clone() }
+}
+
+pub fn clipboard_set(data: &str) {
+    let len = data.len();
+    let data = std::ffi::CString::new(data).unwrap();
+    unsafe { sapp_set_clipboard(data.as_ptr(), len) };
 }
 
 #[no_mangle]

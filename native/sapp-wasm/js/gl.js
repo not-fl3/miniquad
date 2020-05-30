@@ -1,16 +1,18 @@
 // load wasm module and link with gl functions
-// 
-// this file was made by tons of hacks from emscripten's parseTools and library_webgl 
+//
+// this file was made by tons of hacks from emscripten's parseTools and library_webgl
 // https://github.com/emscripten-core/emscripten/blob/master/src/parseTools.js
 // https://github.com/emscripten-core/emscripten/blob/master/src/library_webgl.js
-// 
-// TODO: split to gl.js and loader.js 
+//
+// TODO: split to gl.js and loader.js
 
 const canvas = document.querySelector("#glcanvas");
 const gl = canvas.getContext("webgl");
 if (gl === null) {
     alert("Unable to initialize WebGL. Your browser or machine may not support it.");
 }
+
+var clipboard = null;
 
 var plugins = [];
 
@@ -106,6 +108,43 @@ function UTF8ToString(ptr, maxBytesToRead) {
     return str;
 }
 
+function stringToUTF8(str, heap, outIdx, maxBytesToWrite) {
+    var startIdx = outIdx;
+    var endIdx = outIdx + maxBytesToWrite;
+    for (var i = 0; i < str.length; ++i) {
+        // Gotcha: charCodeAt returns a 16-bit word that is a UTF-16 encoded code unit, not a Unicode code point of the character! So decode UTF16->UTF32->UTF8.
+        // See http://unicode.org/faq/utf_bom.html#utf16-3
+        // For UTF8 byte structure, see http://en.wikipedia.org/wiki/UTF-8#Description and https://www.ietf.org/rfc/rfc2279.txt and https://tools.ietf.org/html/rfc3629
+        var u = str.charCodeAt(i); // possibly a lead surrogate
+        if (u >= 0xD800 && u <= 0xDFFF) {
+            var u1 = str.charCodeAt(++i);
+            u = 0x10000 + ((u & 0x3FF) << 10) | (u1 & 0x3FF);
+        }
+        if (u <= 0x7F) {
+            if (outIdx >= endIdx) break;
+            heap[outIdx++] = u;
+        } else if (u <= 0x7FF) {
+            if (outIdx + 1 >= endIdx) break;
+            heap[outIdx++] = 0xC0 | (u >> 6);
+            heap[outIdx++] = 0x80 | (u & 63);
+        } else if (u <= 0xFFFF) {
+            if (outIdx + 2 >= endIdx) break;
+            heap[outIdx++] = 0xE0 | (u >> 12);
+            heap[outIdx++] = 0x80 | ((u >> 6) & 63);
+            heap[outIdx++] = 0x80 | (u & 63);
+        } else {
+            if (outIdx + 3 >= endIdx) break;
+
+            if (u >= 0x200000) console.warn('Invalid Unicode code point 0x' + u.toString(16) + ' encountered when serializing a JS string to an UTF-8 string on the asm.js/wasm heap! (Valid unicode code points should be in range 0-0x1FFFFF).');
+
+            heap[outIdx++] = 0xF0 | (u >> 18);
+            heap[outIdx++] = 0x80 | ((u >> 12) & 63);
+            heap[outIdx++] = 0x80 | ((u >> 6) & 63);
+            heap[outIdx++] = 0x80 | (u & 63);
+        }
+    }
+    return outIdx - startIdx;
+}
 var FS = {
     loaded_files: [],
     unique_id: 0
@@ -229,7 +268,7 @@ _webglGet = function (name_, p, type) {
         case 0x8DFA: // GL_SHADER_COMPILER
             ret = 1;
             break;
-        case 0x8DF8: // GL_SHADER_BINARY_FORMATS    
+        case 0x8DF8: // GL_SHADER_BINARY_FORMATS
             if (type != 'EM_FUNC_SIG_PARAM_I' && type != 'EM_FUNC_SIG_PARAM_I64') {
                 GL.recordError(0x500); // GL_INVALID_ENUM
 
@@ -530,6 +569,9 @@ var importObject = {
         },
         set_emscripten_shader_hack: function (flag) {
             emscripten_shaders_hack = flag;
+        },
+        sapp_set_clipboard: function(ptr, len) {
+            clipboard = UTF8ToString(ptr, len);
         },
         rand: function () {
             return Math.floor(Math.random() * 2147483647);
@@ -972,7 +1014,7 @@ var importObject = {
                 var sapp_key_code = into_sapp_keycode(event.code);
                 switch (sapp_key_code) {
                     //  space, arrows - prevent scrolling of the page
-                    case 32: case 262: case 263: case 264: case 265: 
+                    case 32: case 262: case 263: case 264: case 265:
                     // F1-F10
                     case 290: case 291: case 292: case 293: case 294: case 295: case 296: case 297: case 298: case 299:
                     // backspace is Back on Firefox/Windows
@@ -980,6 +1022,7 @@ var importObject = {
                         event.preventDefault();
                         break;
                 }
+
                 var modifiers = 0;
                 if (event.ctrlKey) {
                     modifiers |= SAPP_MODIFIER_CTRL;
@@ -996,14 +1039,20 @@ var importObject = {
                 if (sapp_key_code == 32) {
                     wasm_exports.key_press(sapp_key_code);
                 }
-
             };
             canvas.onkeyup = function (event) {
                 var sapp_key_code = into_sapp_keycode(event.code);
                 wasm_exports.key_up(sapp_key_code);
             };
             canvas.onkeypress = function (event) {
-                wasm_exports.key_press(event.charCode);
+                var sapp_key_code = into_sapp_keycode(event.code);
+
+                // firefox do not send onkeypress events for ctrl+keys and delete key while chrome do
+                // workaround to make this behavior consistent
+                let chrome_only = sapp_key_code == 261 || event.ctrlKey;
+                if (chrome_only == false) {
+                    wasm_exports.key_press(event.charCode);
+                }
             };
 
             canvas.addEventListener("touchstart", function (event) {
@@ -1038,6 +1087,34 @@ var importObject = {
             window.onresize = function () {
                 resize(canvas, wasm_exports.resize);
             };
+            window.addEventListener("copy", function(e) {
+                if (clipboard != null) {
+                    event.clipboardData.setData('text/plain', clipboard);
+                    event.preventDefault();
+                }
+            });
+            window.addEventListener("cut", function(e) {
+                if (clipboard != null) {
+                    event.clipboardData.setData('text/plain', clipboard);
+                    event.preventDefault();
+                }
+            });
+
+            window.addEventListener("paste", function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                clipboardData = e.clipboardData || window.clipboardData;
+                pastedData = clipboardData.getData('Text');
+
+                if (pastedData != undefined && pastedData != null && pastedData.length != 0) {
+                    var len = pastedData.length;
+                    var msg = wasm_exports.allocate_vec_u8(len);
+                    var heap = new Uint8Array(wasm_memory.buffer, msg, len);
+                    stringToUTF8(pastedData, heap, 0, len);
+                    wasm_exports.on_clipboard_paste(msg, len);
+                }
+            });
+
             window.requestAnimationFrame(animation);
         },
 
