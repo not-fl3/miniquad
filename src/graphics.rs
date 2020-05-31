@@ -5,7 +5,7 @@ mod texture;
 use crate::sapp::*;
 
 // workaround sapp::* also contains None on Android
-use std::option::Option::None;
+use std::{error::Error, fmt::Display, option::Option::None};
 
 pub use texture::{FilterMode, Texture, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 
@@ -255,6 +255,18 @@ pub enum ShaderError {
 impl From<std::ffi::NulError> for ShaderError {
     fn from(e: std::ffi::NulError) -> ShaderError {
         ShaderError::FFINulError(e)
+    }
+}
+
+impl Display for ShaderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self) // Display the same way as Debug
+    }
+}
+
+impl Error for ShaderError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
     }
 }
 
