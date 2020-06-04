@@ -54,7 +54,7 @@ fn main() {
     let target = env::var("TARGET").unwrap_or_else(|e| panic!(e));
 
     if target.contains("windows") == false{
-        panic!("Trying to build sapp_linux not for linux!");
+        panic!("Trying to build sapp_windows not for windows!");
         }
 
     build_windows(&target);
