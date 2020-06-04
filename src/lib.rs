@@ -231,7 +231,7 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
             let keycode = KeyCode::from(event.key_code);
             let key_mods = KeyMods::from(event.modifiers);
 
-            event_call!(data, key_down_event, keycode, key_mods, false)
+            event_call!(data, key_down_event, keycode, key_mods, event.key_repeat)
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_KEY_UP => {
             let keycode = KeyCode::from(event.key_code);
