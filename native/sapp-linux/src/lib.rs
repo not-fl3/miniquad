@@ -2351,12 +2351,6 @@ pub unsafe extern "C" fn _sapp_x11_get_window_property(
     return itemCount;
 }
 pub static mut _sapp_x11_WM_STATE: Atom = 0;
-#[no_mangle]
-pub unsafe extern "C" fn sapp_run(mut desc: *const sapp_desc) -> libc::c_int {
-    assert!(!desc.is_null());
-    _sapp_run(desc);
-    return 0 as libc::c_int;
-}
 pub unsafe extern "C" fn _sapp_x11_get_window_state() -> libc::c_int {
     let mut result = WithdrawnState;
     let mut state: *mut C2RustUnnamed_1 = std::ptr::null_mut();
@@ -2642,7 +2636,9 @@ pub unsafe extern "C" fn _sapp_x11_destroy_window() {
     XFlush(_sapp_x11_display);
 }
 pub static mut _sapp_x11_display: *mut Display = 0 as *const Display as *mut Display;
-pub unsafe extern "C" fn _sapp_run(mut desc: *const sapp_desc) {
+
+#[no_mangle]
+pub unsafe extern "C" fn sapp_run(mut desc: *const sapp_desc) {
     _sapp_init_state(desc);
     _sapp_x11_window_state = NormalState;
     XInitThreads();
