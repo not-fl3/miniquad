@@ -1220,6 +1220,72 @@ pub unsafe extern "C" fn _sapp_x11_show_window() {
         XFlush(_sapp_x11_display);
     };
 }
+
+unsafe fn _sapp_x11_set_fullscreen() {
+    let mut wm_state = XInternAtom(
+        _sapp_x11_display,
+        b"_NET_WM_STATE\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    let wm_fullscreen = XInternAtom(
+        _sapp_x11_display,
+        b"_NET_WM_STATE_FULLSCREEN\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+
+    // this is the first method to make window fullscreen
+    // hide it, change _NET_WM_STATE_FULLSCREEN property and than show it back
+    // someone on stackoverflow mentioned that this is not working on ubuntu/unity though
+    {
+        XLowerWindow(_sapp_x11_display, _sapp_x11_window);
+        XUnmapWindow(_sapp_x11_display, _sapp_x11_window);
+        XSync(_sapp_x11_display, false as _);
+
+        let mut atoms: [Atom; 2] = [wm_fullscreen, 0 as _];
+        XChangeProperty(
+            _sapp_x11_display,
+            _sapp_x11_window,
+            wm_state,
+            4 as _,
+            32,
+            PropModeReplace,
+            atoms.as_mut_ptr() as *mut _ as *mut _,
+            1,
+        );
+        XMapWindow(_sapp_x11_display, _sapp_x11_window);
+        XRaiseWindow(_sapp_x11_display, _sapp_x11_window);
+        XFlush(_sapp_x11_display);
+    }
+
+    // however, this is X, so just in case - the second method
+    // send ClientMessage to the window with request to change property to fullscreen
+    {
+        let mut data = [0i64; 5];
+
+        data[0] = 1;
+        data[1] = wm_fullscreen as i64;
+        data[2] = 0;
+
+        let mut ev = XClientMessageEvent {
+            type_0: 33,
+            serial: 0,
+            send_event: true as _,
+            message_type: wm_state,
+            window: _sapp_x11_window,
+            display: _sapp_x11_display,
+            format: 32,
+            data: ClientMessageData { l: data },
+        };
+        XSendEvent(
+            _sapp_x11_display,
+            _sapp_x11_root,
+            false as _,
+            (1048576 | 131072) as _,
+            &mut ev as *mut XClientMessageEvent as *mut XEvent,
+        );
+    }
+}
+
 pub static mut _sapp_glx_EXT_swap_control: bool = false;
 pub static mut _sapp_glx_SwapIntervalEXT: PFNGLXSWAPINTERVALEXTPROC = None;
 pub static mut _sapp_glx_MESA_swap_control: bool = false;
@@ -2670,8 +2736,12 @@ pub unsafe extern "C" fn sapp_run(mut desc: *const sapp_desc) {
     _sapp_glx_create_context();
     _sapp.valid = true;
     _sapp_x11_show_window();
+    if (*desc).fullscreen {
+        _sapp_x11_set_fullscreen();
+    }
     _sapp_glx_swapinterval(_sapp.swap_interval);
     XFlush(_sapp_x11_display);
+
     while !_sapp.quit_ordered {
         _sapp_glx_make_current();
         let mut count = XPending(_sapp_x11_display);
