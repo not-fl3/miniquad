@@ -26,16 +26,6 @@ extern "C" {
 
     #[no_mangle]
     pub fn XSetSelectionOwner(_: *mut Display, _: Atom, _: Window, _: Time) -> libc::c_int;
-
-    #[no_mangle]
-    pub fn XSendEvent(
-        _: *mut Display,
-        _: Window,
-        _: libc::c_int,
-        _: libc::c_long,
-        _: *mut XEvent,
-    ) -> libc::c_int;
-
 }
 
 pub unsafe fn get_clipboard(

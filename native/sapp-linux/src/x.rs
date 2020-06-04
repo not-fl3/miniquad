@@ -13,13 +13,14 @@ pub use X_h::{
     StaticGravity, StructureNotifyMask, Success, VisibilityChangeMask, Window, XID,
 };
 pub use Xlib_h::{
-    Display, Screen, Visual, XChangeProperty, XCloseDisplay, XCreateColormap, XCreateWindow,
-    XDestroyWindow, XErrorEvent, XErrorHandler, XEvent, XFlush, XFree, XFreeColormap,
-    XGetKeyboardMapping, XGetWindowAttributes, XGetWindowProperty, XGrabPointer, XInitThreads,
-    XInternAtom, XKeyEvent, XMapWindow, XNextEvent, XOpenDisplay, XPending, XPointer, XRaiseWindow,
-    XResourceManagerString, XSelectionEvent, XSelectionRequestEvent, XSetErrorHandler,
-    XSetWMProtocols, XSetWindowAttributes, XSync, XUngrabPointer, XUnmapWindow, XWindowAttributes,
-    XrmInitialize, _XEvent, _XPrivDisplay, _XrmHashBucketRec,
+    ClientMessageData, Display, Screen, Visual, XChangeProperty, XClientMessageEvent,
+    XCloseDisplay, XCreateColormap, XCreateWindow, XDestroyWindow, XErrorEvent, XErrorHandler,
+    XEvent, XFlush, XFree, XFreeColormap, XGetKeyboardMapping, XGetWindowAttributes,
+    XGetWindowProperty, XGrabPointer, XInitThreads, XInternAtom, XKeyEvent, XLowerWindow,
+    XMapWindow, XNextEvent, XOpenDisplay, XPending, XPointer, XRaiseWindow, XResourceManagerString,
+    XSelectionEvent, XSelectionRequestEvent, XSetErrorHandler, XSetWMProtocols,
+    XSetWindowAttributes, XSync, XUngrabPointer, XUnmapWindow, XWindowAttributes, XrmInitialize,
+    _XEvent, _XPrivDisplay, _XrmHashBucketRec,
 };
 pub use Xmd_h::CARD32;
 pub use Xresource_h::{
@@ -140,11 +141,11 @@ pub mod Xlib_h {
         pub window: Window,
         pub message_type: Atom,
         pub format: libc::c_int,
-        pub data: C2RustUnnamed_0,
+        pub data: ClientMessageData,
     }
     #[derive(Copy, Clone)]
     #[repr(C)]
-    pub union C2RustUnnamed_0 {
+    pub union ClientMessageData {
         pub b: [libc::c_char; 20],
         pub s: [libc::c_short; 10],
         pub l: [libc::c_long; 5],
@@ -744,6 +745,8 @@ pub mod Xlib_h {
         #[no_mangle]
         pub fn XMapWindow(_: *mut Display, _: Window) -> libc::c_int;
         #[no_mangle]
+        pub fn XLowerWindow(_: *mut Display, _: Window) -> libc::c_int;
+        #[no_mangle]
         pub fn XRaiseWindow(_: *mut Display, _: Window) -> libc::c_int;
         #[no_mangle]
         pub fn XPending(_: *mut Display) -> libc::c_int;
@@ -1019,4 +1022,15 @@ pub mod string_h {
         #[no_mangle]
         pub fn memset(_: *mut libc::c_void, _: libc::c_int, _: libc::c_ulong) -> *mut libc::c_void;
     }
+}
+
+extern "C" {
+    #[no_mangle]
+    pub fn XSendEvent(
+        _: *mut Display,
+        _: Window,
+        _: libc::c_int,
+        _: libc::c_long,
+        _: *mut XEvent,
+    ) -> libc::c_int;
 }
