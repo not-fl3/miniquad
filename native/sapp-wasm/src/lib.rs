@@ -435,12 +435,13 @@ pub extern "C" fn mouse_wheel(delta_x: i32, delta_y: i32) {
 }
 
 #[no_mangle]
-pub extern "C" fn key_down(key: u32, modifiers: u32) {
+pub extern "C" fn key_down(key: u32, modifiers: u32, repeat: bool) {
     let mut event: sapp_event = unsafe { std::mem::zeroed() };
 
     event.type_ = sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN;
     event.key_code = key;
     event.modifiers = modifiers;
+    event.key_repeat = repeat;
     unsafe {
         sapp_context().event(event);
     }

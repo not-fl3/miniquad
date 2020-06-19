@@ -1034,7 +1034,7 @@ var importObject = {
                 if (event.altKey) {
                     modifiers |= SAPP_MODIFIER_ALT;
                 }
-                wasm_exports.key_down(sapp_key_code, modifiers);
+                wasm_exports.key_down(sapp_key_code, modifiers, event.repeat);
                 // for "space" preventDefault will prevent
                 // key_press event, so send it here instead
                 if (sapp_key_code == 32) {
