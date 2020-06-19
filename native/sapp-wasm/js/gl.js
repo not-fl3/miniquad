@@ -1000,6 +1000,7 @@ var importObject = {
             // SO WEB SO CONSISTENT
             canvas.addEventListener('wheel',
                 function (event) {
+                    event.preventDefault();
                     wasm_exports.mouse_wheel(-event.deltaX, -event.deltaY);
                 });
             canvas.onmouseup = function (event) {
