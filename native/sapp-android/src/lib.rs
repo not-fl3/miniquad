@@ -10,6 +10,9 @@ pub use rand::*;
 pub use egl::*;
 pub use gl3::*;
 
+// workaround for egl::* also contains None on Android
+pub use std::option::Option::None;
+
 // bindgen --no-layout-tests external/sokol/sokol_app.h --opaque-type IMAGE_TLS_DIRECTORY64 -- -D DSOKOL_GLES3 -target arm-linux-androideabi > src/sokol_app_android.rs
 pub use sokol_app_android::*;
 
