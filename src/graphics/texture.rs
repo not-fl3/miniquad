@@ -123,7 +123,7 @@ pub struct TextureParams {
 impl Texture {
     /// Shorthand for `new(ctx, TextureAccess::RenderTarget, params)`
     pub fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
-        Self::new(ctx, TextureAccess::RenderTarget, None, params)
+        Self::new(ctx, TextureAccess::RenderTarget, Option::None, params)
     }
 
     pub fn new(
