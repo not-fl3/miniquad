@@ -67,3 +67,4 @@ class Wasm {
 }
 
 window.wasm = new Wasm();
+window.load = wasm.load;
