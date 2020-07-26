@@ -2,9 +2,12 @@
 extern crate sapp_android as sapp;
 #[cfg(target_os = "macos")]
 extern crate sapp_darwin as sapp;
+#[cfg(target_os = "ios")]
+extern crate sapp_ios as sapp;
 #[cfg(not(any(
     target_os = "linux",
     target_os = "macos",
+    target_os = "ios",
     target_os = "android",
     target_arch = "wasm32",
     windows
@@ -108,6 +111,7 @@ impl Context {
     ///         so set_cursor_grab(false) on window's focus lost is recommended.
     /// TODO: implement window focus events
     pub fn set_cursor_grab(&self, grab: bool) {
+        #[cfg(not(target_os = "ios"))]
         unsafe {
             sapp::sapp_set_cursor_grab(grab);
         }
@@ -267,6 +271,7 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
         sapp::sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED => {
             event_call!(data, quit_requested_event);
         }
+        #[cfg(not(target_os = "ios"))]
         sapp::sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE => {
             event_call!(data, raw_mouse_motion, event.mouse_dx, event.mouse_dy);
         }
