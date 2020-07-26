@@ -14,6 +14,8 @@ jobs:
           - { os: ubuntu-latest, target: 'x86_64-pc-windows-gnu' }
           - { os: ubuntu-latest, target: 'wasm32-unknown-unknown' }
           - { os: macos-latest, target: 'x86_64-apple-darwin' }
+          - { os: macos-latest, target: 'aarch64-apple-ios' }
+          - { os: macos-latest, target: 'x86_64-apple-ios' }
           - { os: windows-latest, target: 'x86_64-pc-windows-msvc' }
         include:
           - os: ubuntu-latest

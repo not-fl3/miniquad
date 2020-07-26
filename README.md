@@ -22,6 +22,7 @@ For higher level API take a look on:
 * Windows, OpenGl 3
 * Linux, OpenGl 3
 * macOS, OpenGL 3
+* iOS, GLES 3
 * WASM, WebGl1 - tested on ios safari, ff, chrome
 * Android, GLES3
 
@@ -34,8 +35,8 @@ For higher level API take a look on:
 
 ![Imgur](https://i.imgur.com/TRI50rk.gif)
 
-[examples/quad.rs](https://github.com/not-fl3/miniquad/blob/master/examples/quad.rs): [web demo](https://not-fl3.github.io/miniquad-samples/quad.html)   
-[examples/offscreen.rs](https://github.com/not-fl3/miniquad/blob/master/examples/offscreen.rs): [web demo](https://not-fl3.github.io/miniquad-samples/offscreen.html)   
+[examples/quad.rs](https://github.com/not-fl3/miniquad/blob/master/examples/quad.rs): [web demo](https://not-fl3.github.io/miniquad-samples/quad.html)<br/>
+[examples/offscreen.rs](https://github.com/not-fl3/miniquad/blob/master/examples/offscreen.rs): [web demo](https://not-fl3.github.io/miniquad-samples/offscreen.html)<br/>
 
 [PonasKovas/miniquad-mandelbrot](https://github.com/PonasKovas/miniquad-mandelbrot): [web demo](https://ponaskovas.github.io/miniquad-mandelbrot-wasm-demo/)
 
@@ -52,13 +53,13 @@ apt install libx11-dev libxi-dev libgl1-mesa-dev
 cargo run --example quad
 ```
 
-## windows 
+## windows
 
 ```bash
 # both MSVC and GNU target is supported:
 rustup target add x86_64-pc-windows-msvc
 # or
-rustup target add x86_64-pc-windows-gnu 
+rustup target add x86_64-pc-windows-gnu
 
 cargo run --example quad
 ```
@@ -114,7 +115,7 @@ basic-http-server .
 
 ## android
 
-Recommended way to build for android is using Docker.   
+Recommended way to build for android is using Docker.<br/>
 miniquad use slightly modifed version of `cargo-apk`
 
 ```
@@ -126,13 +127,17 @@ APK file will be in `target/android-artifacts/(debug|release)/apk`
 With "log-impl" enabled all log calls will be forwarded to adb console.
 No code modifications for Android required, everything should just works.
 
+## iOS
+
+See miniquad iOS [sample project](https://github.com/Gordon-F/miniquad_ios_example).
+
 ## cross compilation
 
 ```bash
 
 # windows target from linux host:
 # this is how windows builds are tested from linux machine:
-rustup target add x86_64-pc-windows-gnu 
+rustup target add x86_64-pc-windows-gnu
 cargo run --example quad --target x86_64-pc-windows-gnu
 ```
 
@@ -153,4 +158,3 @@ cargo run --example quad --target x86_64-pc-windows-gnu
 * High end API, like Vulkan/DirectX 12. Take a look on [gfx-rs](https://github.com/gfx-rs/gfx) or [vulkano](https://github.com/vulkano-rs/vulkano) instead!
 
 * sokol-gfx api compatibility. While sokol is absolutely great as an API design foundation, just reimplementing sokol in rust is not a goal. The idea is to learn from sokol, but make a library in a rust way when it is possible.
-
