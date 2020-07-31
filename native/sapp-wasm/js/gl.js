@@ -639,7 +639,7 @@ var importObject = {
         glUniform3fv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform3fv', 'location');
             assert((value & 3) == 0, 'Pointer to float data passed to glUniform3fv must be aligned to four bytes!');
-            var view = getArray(value, Float32Array, 4 * count);
+            var view = getArray(value, Float32Array, 3 * count);
             gl.uniform3fv(GL.uniforms[location], view);
         },
         glUniform4fv: function (location, count, value) {
