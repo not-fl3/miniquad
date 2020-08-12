@@ -24,7 +24,7 @@ pub use rand::*;
 
 use crate::x::*;
 
-pub type sapp_event_type = libc::c_uint;
+pub type sapp_event_type = cty::c_uint;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
 pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 22;
 pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
@@ -50,7 +50,7 @@ pub const sapp_event_type_SAPP_EVENTTYPE_KEY_UP: sapp_event_type = 2;
 pub const sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN: sapp_event_type = 1;
 pub const sapp_event_type_SAPP_EVENTTYPE_INVALID: sapp_event_type = 0;
 
-pub type sapp_keycode = libc::c_uint;
+pub type sapp_keycode = cty::c_uint;
 pub const sapp_keycode_SAPP_KEYCODE_MENU: sapp_keycode = 348;
 pub const sapp_keycode_SAPP_KEYCODE_RIGHT_SUPER: sapp_keycode = 347;
 pub const sapp_keycode_SAPP_KEYCODE_RIGHT_ALT: sapp_keycode = 346;
@@ -176,22 +176,22 @@ pub const sapp_keycode_SAPP_KEYCODE_INVALID: sapp_keycode = 0;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct sapp_touchpoint {
-    pub identifier: libc::c_ulong,
-    pub pos_x: libc::c_float,
-    pub pos_y: libc::c_float,
+    pub identifier: cty::c_ulong,
+    pub pos_x: cty::c_float,
+    pub pos_y: cty::c_float,
     pub changed: bool,
 }
 
-pub type sapp_mousebutton = libc::c_int;
+pub type sapp_mousebutton = cty::c_int;
 pub const sapp_mousebutton_SAPP_MOUSEBUTTON_MIDDLE: sapp_mousebutton = 2;
 pub const sapp_mousebutton_SAPP_MOUSEBUTTON_RIGHT: sapp_mousebutton = 1;
 pub const sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT: sapp_mousebutton = 0;
 pub const sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID: sapp_mousebutton = -1;
 
-pub const SAPP_MODIFIER_SHIFT: libc::c_uint = 1 << 0;
-pub const SAPP_MODIFIER_CTRL: libc::c_uint = 1 << 1;
-pub const SAPP_MODIFIER_ALT: libc::c_uint = 1 << 2;
-pub const SAPP_MODIFIER_SUPER: libc::c_uint = 1 << 3;
+pub const SAPP_MODIFIER_SHIFT: cty::c_uint = 1 << 0;
+pub const SAPP_MODIFIER_CTRL: cty::c_uint = 1 << 1;
+pub const SAPP_MODIFIER_ALT: cty::c_uint = 1 << 2;
+pub const SAPP_MODIFIER_SUPER: cty::c_uint = 1 << 3;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -203,18 +203,18 @@ pub struct sapp_event {
     pub key_repeat: bool,
     pub modifiers: u32,
     pub mouse_button: sapp_mousebutton,
-    pub mouse_x: libc::c_float,
-    pub mouse_y: libc::c_float,
-    pub mouse_dx: libc::c_float,
-    pub mouse_dy: libc::c_float,
-    pub scroll_x: libc::c_float,
-    pub scroll_y: libc::c_float,
-    pub num_touches: libc::c_int,
+    pub mouse_x: cty::c_float,
+    pub mouse_y: cty::c_float,
+    pub mouse_dx: cty::c_float,
+    pub mouse_dy: cty::c_float,
+    pub scroll_x: cty::c_float,
+    pub scroll_y: cty::c_float,
+    pub num_touches: cty::c_int,
     pub touches: [sapp_touchpoint; 8],
-    pub window_width: libc::c_int,
-    pub window_height: libc::c_int,
-    pub framebuffer_width: libc::c_int,
-    pub framebuffer_height: libc::c_int,
+    pub window_width: cty::c_int,
+    pub window_height: cty::c_int,
+    pub framebuffer_width: cty::c_int,
+    pub framebuffer_height: cty::c_int,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -223,25 +223,25 @@ pub struct sapp_desc {
     pub frame_cb: Option<unsafe extern "C" fn() -> ()>,
     pub cleanup_cb: Option<unsafe extern "C" fn() -> ()>,
     pub event_cb: Option<unsafe extern "C" fn(_: *const sapp_event) -> ()>,
-    pub fail_cb: Option<unsafe extern "C" fn(_: *const libc::c_char) -> ()>,
-    pub user_data: *mut libc::c_void,
-    pub init_userdata_cb: Option<unsafe extern "C" fn(_: *mut libc::c_void) -> ()>,
-    pub frame_userdata_cb: Option<unsafe extern "C" fn(_: *mut libc::c_void) -> ()>,
-    pub cleanup_userdata_cb: Option<unsafe extern "C" fn(_: *mut libc::c_void) -> ()>,
+    pub fail_cb: Option<unsafe extern "C" fn(_: *const cty::c_char) -> ()>,
+    pub user_data: *mut cty::c_void,
+    pub init_userdata_cb: Option<unsafe extern "C" fn(_: *mut cty::c_void) -> ()>,
+    pub frame_userdata_cb: Option<unsafe extern "C" fn(_: *mut cty::c_void) -> ()>,
+    pub cleanup_userdata_cb: Option<unsafe extern "C" fn(_: *mut cty::c_void) -> ()>,
     pub event_userdata_cb:
-        Option<unsafe extern "C" fn(_: *const sapp_event, _: *mut libc::c_void) -> ()>,
+        Option<unsafe extern "C" fn(_: *const sapp_event, _: *mut cty::c_void) -> ()>,
     pub fail_userdata_cb:
-        Option<unsafe extern "C" fn(_: *const libc::c_char, _: *mut libc::c_void) -> ()>,
-    pub width: libc::c_int,
-    pub height: libc::c_int,
-    pub sample_count: libc::c_int,
-    pub swap_interval: libc::c_int,
+        Option<unsafe extern "C" fn(_: *const cty::c_char, _: *mut cty::c_void) -> ()>,
+    pub width: cty::c_int,
+    pub height: cty::c_int,
+    pub sample_count: cty::c_int,
+    pub swap_interval: cty::c_int,
     pub high_dpi: bool,
     pub fullscreen: bool,
     pub alpha: bool,
-    pub window_title: *const libc::c_char,
+    pub window_title: *const cty::c_char,
     pub user_cursor: bool,
-    pub html5_canvas_name: *const libc::c_char,
+    pub html5_canvas_name: *const cty::c_char,
     pub html5_canvas_resize: bool,
     pub html5_preserve_drawing_buffer: bool,
     pub html5_premultiplied_alpha: bool,
@@ -253,26 +253,26 @@ pub struct sapp_desc {
 #[repr(C)]
 pub struct _sapp_state {
     pub valid: bool,
-    pub window_width: libc::c_int,
-    pub window_height: libc::c_int,
-    pub framebuffer_width: libc::c_int,
-    pub framebuffer_height: libc::c_int,
-    pub sample_count: libc::c_int,
-    pub swap_interval: libc::c_int,
-    pub dpi_scale: libc::c_float,
+    pub window_width: cty::c_int,
+    pub window_height: cty::c_int,
+    pub framebuffer_width: cty::c_int,
+    pub framebuffer_height: cty::c_int,
+    pub sample_count: cty::c_int,
+    pub swap_interval: cty::c_int,
+    pub dpi_scale: cty::c_float,
     pub gles2_fallback: bool,
     pub first_frame: bool,
     pub init_called: bool,
     pub cleanup_called: bool,
     pub quit_requested: bool,
     pub quit_ordered: bool,
-    pub html5_canvas_name: *const libc::c_char,
+    pub html5_canvas_name: *const cty::c_char,
     pub html5_ask_leave_site: bool,
-    pub window_title: [libc::c_char; 128],
+    pub window_title: [cty::c_char; 128],
     pub window_title_wide: [i32; 128],
     pub frame_count: u64,
-    pub mouse_x: libc::c_float,
-    pub mouse_y: libc::c_float,
+    pub mouse_x: cty::c_float,
+    pub mouse_y: cty::c_float,
     pub win32_mouse_tracked: bool,
     pub onscreen_keyboard_shown: bool,
     pub event: sapp_event,
@@ -312,43 +312,43 @@ impl _sapp_x11_codepair {
     }
 }
 pub type PFNGLXMAKECURRENTPROC =
-    Option<unsafe extern "C" fn(_: *mut Display, _: GLXDrawable, _: GLXContext) -> libc::c_int>;
-pub type PFNGLXSWAPINTERVALMESAPROC = Option<unsafe extern "C" fn(_: libc::c_int) -> libc::c_int>;
+    Option<unsafe extern "C" fn(_: *mut Display, _: GLXDrawable, _: GLXContext) -> cty::c_int>;
+pub type PFNGLXSWAPINTERVALMESAPROC = Option<unsafe extern "C" fn(_: cty::c_int) -> cty::c_int>;
 pub type PFNGLXSWAPINTERVALEXTPROC =
-    Option<unsafe extern "C" fn(_: *mut Display, _: GLXDrawable, _: libc::c_int) -> ()>;
+    Option<unsafe extern "C" fn(_: *mut Display, _: GLXDrawable, _: cty::c_int) -> ()>;
 pub type GLXFBConfig = *mut __GLXFBConfig;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct _sapp_gl_fbconfig {
-    pub red_bits: libc::c_int,
-    pub green_bits: libc::c_int,
-    pub blue_bits: libc::c_int,
-    pub alpha_bits: libc::c_int,
-    pub depth_bits: libc::c_int,
-    pub stencil_bits: libc::c_int,
-    pub samples: libc::c_int,
+    pub red_bits: cty::c_int,
+    pub green_bits: cty::c_int,
+    pub blue_bits: cty::c_int,
+    pub alpha_bits: cty::c_int,
+    pub depth_bits: cty::c_int,
+    pub stencil_bits: cty::c_int,
+    pub samples: cty::c_int,
     pub doublebuffer: bool,
-    pub handle: libc::c_ulong,
+    pub handle: cty::c_ulong,
 }
 pub type PFNGLXGETFBCONFIGATTRIBPROC = Option<
     unsafe extern "C" fn(
         _: *mut Display,
         _: GLXFBConfig,
-        _: libc::c_int,
-        _: *mut libc::c_int,
-    ) -> libc::c_int,
+        _: cty::c_int,
+        _: *mut cty::c_int,
+    ) -> cty::c_int,
 >;
 pub type PFNGLXGETFBCONFIGSPROC = Option<
-    unsafe extern "C" fn(_: *mut Display, _: libc::c_int, _: *mut libc::c_int) -> *mut GLXFBConfig,
+    unsafe extern "C" fn(_: *mut Display, _: cty::c_int, _: *mut cty::c_int) -> *mut GLXFBConfig,
 >;
 pub type PFNGLXGETCLIENTSTRINGPROC =
-    Option<unsafe extern "C" fn(_: *mut Display, _: libc::c_int) -> *const libc::c_char>;
+    Option<unsafe extern "C" fn(_: *mut Display, _: cty::c_int) -> *const cty::c_char>;
 pub type PFNGLXCREATEWINDOWPROC = Option<
     unsafe extern "C" fn(
         _: *mut Display,
         _: GLXFBConfig,
         _: Window,
-        _: *const libc::c_int,
+        _: *const cty::c_int,
     ) -> GLXWindow,
 >;
 pub type PFNGLXCREATECONTEXTATTRIBSARBPROC = Option<
@@ -356,33 +356,33 @@ pub type PFNGLXCREATECONTEXTATTRIBSARBPROC = Option<
         _: *mut Display,
         _: GLXFBConfig,
         _: GLXContext,
-        _: libc::c_int,
-        _: *const libc::c_int,
+        _: cty::c_int,
+        _: *const cty::c_int,
     ) -> GLXContext,
 >;
 pub type PFNGLXGETVISUALFROMFBCONFIGPROC =
     Option<unsafe extern "C" fn(_: *mut Display, _: GLXFBConfig) -> *mut XVisualInfo>;
 pub type PFNGLXQUERYEXTENSIONSSTRINGPROC =
-    Option<unsafe extern "C" fn(_: *mut Display, _: libc::c_int) -> *const libc::c_char>;
+    Option<unsafe extern "C" fn(_: *mut Display, _: cty::c_int) -> *const cty::c_char>;
 pub type __GLXextproc = Option<unsafe extern "C" fn() -> ()>;
 pub type PFNGLXGETPROCADDRESSPROC = Option<unsafe extern "C" fn(_: *const GLubyte) -> __GLXextproc>;
 pub type PFNGLXQUERYVERSIONPROC = Option<
-    unsafe extern "C" fn(_: *mut Display, _: *mut libc::c_int, _: *mut libc::c_int) -> libc::c_int,
+    unsafe extern "C" fn(_: *mut Display, _: *mut cty::c_int, _: *mut cty::c_int) -> cty::c_int,
 >;
 pub type PFNGLXQUERYEXTENSIONPROC = Option<
-    unsafe extern "C" fn(_: *mut Display, _: *mut libc::c_int, _: *mut libc::c_int) -> libc::c_int,
+    unsafe extern "C" fn(_: *mut Display, _: *mut cty::c_int, _: *mut cty::c_int) -> cty::c_int,
 >;
 pub type PFNGLXCREATENEWCONTEXTPROC = Option<
     unsafe extern "C" fn(
         _: *mut Display,
         _: GLXFBConfig,
-        _: libc::c_int,
+        _: cty::c_int,
         _: GLXContext,
-        _: libc::c_int,
+        _: cty::c_int,
     ) -> GLXContext,
 >;
 
-pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut depth: libc::c_int) {
+pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut depth: cty::c_int) {
     _sapp_x11_colormap = XCreateColormap(_sapp_x11_display, _sapp_x11_root, visual, AllocNone);
     let mut wa = XSetWindowAttributes {
         background_pixmap: 0,
@@ -402,13 +402,13 @@ pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut de
         cursor: 0,
     };
     memset(
-        &mut wa as *mut XSetWindowAttributes as *mut libc::c_void,
-        0 as libc::c_int,
-        ::std::mem::size_of::<XSetWindowAttributes>() as libc::c_ulong,
+        &mut wa as *mut XSetWindowAttributes as *mut cty::c_void,
+        0 as cty::c_int,
+        ::std::mem::size_of::<XSetWindowAttributes>() as cty::c_ulong,
     );
     let wamask = (CWBorderPixel | CWColormap | CWEventMask) as u32;
     wa.colormap = _sapp_x11_colormap;
-    wa.border_pixel = 0 as libc::c_int as libc::c_ulong;
+    wa.border_pixel = 0 as cty::c_int as cty::c_ulong;
     wa.event_mask = StructureNotifyMask
         | KeyPressMask
         | KeyReleaseMask
@@ -426,20 +426,20 @@ pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut de
     _sapp_x11_window = XCreateWindow(
         _sapp_x11_display,
         _sapp_x11_root,
-        0 as libc::c_int,
-        0 as libc::c_int,
-        _sapp.window_width as libc::c_uint,
-        _sapp.window_height as libc::c_uint,
-        0 as libc::c_int as libc::c_uint,
+        0 as cty::c_int,
+        0 as cty::c_int,
+        _sapp.window_width as cty::c_uint,
+        _sapp.window_height as cty::c_uint,
+        0 as cty::c_int as cty::c_uint,
         depth,
-        InputOutput as libc::c_uint,
+        InputOutput as cty::c_uint,
         visual,
-        wamask as libc::c_ulong,
+        wamask as cty::c_ulong,
         &mut wa,
     );
     _sapp_x11_release_error_handler();
     if _sapp_x11_window == 0 {
-        _sapp_fail(b"X11: Failed to create window\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail(b"X11: Failed to create window\x00" as *const u8 as *const cty::c_char);
     }
 
     _sapp_xi_extension_opcode = xi_input::query_xi_extension()
@@ -452,33 +452,33 @@ pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut de
         _sapp_x11_display,
         _sapp_x11_window,
         protocols.as_mut_ptr(),
-        1 as libc::c_int,
+        1 as cty::c_int,
     );
     let mut hints = XAllocSizeHints();
     (*hints).flags |= PWinGravity;
     (*hints).win_gravity = StaticGravity;
     XSetWMNormalHints(_sapp_x11_display, _sapp_x11_window, hints);
-    XFree(hints as *mut libc::c_void);
+    XFree(hints as *mut cty::c_void);
     _sapp_x11_update_window_title();
     _sapp_x11_query_window_size();
 }
 
 pub unsafe extern "C" fn _sapp_strcpy(
-    mut src: *const libc::c_char,
-    mut dst: *mut libc::c_char,
-    mut max_len: libc::c_int,
+    mut src: *const cty::c_char,
+    mut dst: *mut cty::c_char,
+    mut max_len: cty::c_int,
 ) {
     assert!(
-        !src.is_null() && !dst.is_null() && max_len > 0 as libc::c_int,
+        !src.is_null() && !dst.is_null() && max_len > 0 as cty::c_int,
         "src && dst && (max_len > 0)"
     );
-    let end: *mut libc::c_char =
-        &mut *dst.offset((max_len - 1 as libc::c_int) as isize) as *mut libc::c_char;
-    let mut c = 0 as libc::c_int as libc::c_char;
-    let mut i = 0 as libc::c_int;
+    let end: *mut cty::c_char =
+        &mut *dst.offset((max_len - 1 as cty::c_int) as isize) as *mut cty::c_char;
+    let mut c = 0 as cty::c_int as cty::c_char;
+    let mut i = 0 as cty::c_int;
     while i < max_len {
         c = *src;
-        if c as libc::c_int != 0 as libc::c_int {
+        if c as cty::c_int != 0 as cty::c_int {
             src = src.offset(1)
         }
         let fresh0 = dst;
@@ -486,42 +486,42 @@ pub unsafe extern "C" fn _sapp_strcpy(
         *fresh0 = c;
         i += 1
     }
-    if c as libc::c_int != 0 as libc::c_int {
-        *end = 0 as libc::c_int as libc::c_char
+    if c as cty::c_int != 0 as cty::c_int {
+        *end = 0 as cty::c_int as cty::c_char
     };
 }
 pub unsafe extern "C" fn _sapp_init_state(mut desc: *const sapp_desc) {
     memset(
-        &mut _sapp as *mut _sapp_state as *mut libc::c_void,
-        0 as libc::c_int,
-        ::std::mem::size_of::<_sapp_state>() as libc::c_ulong,
+        &mut _sapp as *mut _sapp_state as *mut cty::c_void,
+        0 as cty::c_int,
+        ::std::mem::size_of::<_sapp_state>() as cty::c_ulong,
     );
     _sapp.desc = *desc;
     _sapp.first_frame = true;
-    _sapp.window_width = if _sapp.desc.width == 0 as libc::c_int {
-        640 as libc::c_int
+    _sapp.window_width = if _sapp.desc.width == 0 as cty::c_int {
+        640 as cty::c_int
     } else {
         _sapp.desc.width
     };
-    _sapp.window_height = if _sapp.desc.height == 0 as libc::c_int {
-        480 as libc::c_int
+    _sapp.window_height = if _sapp.desc.height == 0 as cty::c_int {
+        480 as cty::c_int
     } else {
         _sapp.desc.height
     };
     _sapp.framebuffer_width = _sapp.window_width;
     _sapp.framebuffer_height = _sapp.window_height;
-    _sapp.sample_count = if _sapp.desc.sample_count == 0 as libc::c_int {
-        1 as libc::c_int
+    _sapp.sample_count = if _sapp.desc.sample_count == 0 as cty::c_int {
+        1 as cty::c_int
     } else {
         _sapp.desc.sample_count
     };
-    _sapp.swap_interval = if _sapp.desc.swap_interval == 0 as libc::c_int {
-        1 as libc::c_int
+    _sapp.swap_interval = if _sapp.desc.swap_interval == 0 as cty::c_int {
+        1 as cty::c_int
     } else {
         _sapp.desc.swap_interval
     };
     _sapp.html5_canvas_name = if _sapp.desc.html5_canvas_name.is_null() {
-        b"canvas\x00" as *const u8 as *const libc::c_char
+        b"canvas\x00" as *const u8 as *const cty::c_char
     } else {
         _sapp.desc.html5_canvas_name
     };
@@ -530,13 +530,13 @@ pub unsafe extern "C" fn _sapp_init_state(mut desc: *const sapp_desc) {
         _sapp_strcpy(
             _sapp.desc.window_title,
             _sapp.window_title.as_mut_ptr(),
-            ::std::mem::size_of::<[libc::c_char; 128]>() as libc::c_ulong as libc::c_int,
+            ::std::mem::size_of::<[cty::c_char; 128]>() as cty::c_ulong as cty::c_int,
         );
     } else {
         _sapp_strcpy(
-            b"sokol_app\x00" as *const u8 as *const libc::c_char,
+            b"sokol_app\x00" as *const u8 as *const cty::c_char,
             _sapp.window_title.as_mut_ptr(),
-            ::std::mem::size_of::<[libc::c_char; 128]>() as libc::c_ulong as libc::c_int,
+            ::std::mem::size_of::<[cty::c_char; 128]>() as cty::c_ulong as cty::c_int,
         );
     }
     _sapp.dpi_scale = 1.0f32;
@@ -548,73 +548,73 @@ pub unsafe extern "C" fn _sapp_x11_query_system_dpi() {
         if !db.is_null() {
             let mut value = XrmValue {
                 size: 0,
-                addr: 0 as *mut libc::c_char,
+                addr: 0 as *mut cty::c_char,
             };
             let mut type_ = std::ptr::null_mut();
             if XrmGetResource(
                 db,
-                b"Xft.dpi\x00" as *const u8 as *const libc::c_char,
-                b"Xft.Dpi\x00" as *const u8 as *const libc::c_char,
+                b"Xft.dpi\x00" as *const u8 as *const cty::c_char,
+                b"Xft.Dpi\x00" as *const u8 as *const cty::c_char,
                 &mut type_,
                 &mut value,
             ) != 0
             {
                 if !type_.is_null()
-                    && strcmp(type_, b"String\x00" as *const u8 as *const libc::c_char)
-                        == 0 as libc::c_int
+                    && strcmp(type_, b"String\x00" as *const u8 as *const cty::c_char)
+                        == 0 as cty::c_int
                 {
-                    _sapp_x11_dpi = atof(value.addr as *const libc::c_char) as libc::c_float
+                    _sapp_x11_dpi = atof(value.addr as *const cty::c_char) as cty::c_float
                 }
             }
             XrmDestroyDatabase(db);
         }
     };
 }
-pub static mut _sapp_x11_dpi: libc::c_float = 0.;
+pub static mut _sapp_x11_dpi: cty::c_float = 0.;
 pub unsafe extern "C" fn _sapp_x11_init_extensions() {
     _sapp_x11_UTF8_STRING = XInternAtom(
         _sapp_x11_display,
-        b"UTF8_STRING\x00" as *const u8 as *const libc::c_char,
+        b"UTF8_STRING\x00" as *const u8 as *const cty::c_char,
         false as _,
     );
     _sapp_x11_WM_PROTOCOLS = XInternAtom(
         _sapp_x11_display,
-        b"WM_PROTOCOLS\x00" as *const u8 as *const libc::c_char,
+        b"WM_PROTOCOLS\x00" as *const u8 as *const cty::c_char,
         false as _,
     );
     _sapp_x11_WM_DELETE_WINDOW = XInternAtom(
         _sapp_x11_display,
-        b"WM_DELETE_WINDOW\x00" as *const u8 as *const libc::c_char,
+        b"WM_DELETE_WINDOW\x00" as *const u8 as *const cty::c_char,
         false as _,
     );
     _sapp_x11_WM_STATE = XInternAtom(
         _sapp_x11_display,
-        b"WM_STATE\x00" as *const u8 as *const libc::c_char,
+        b"WM_STATE\x00" as *const u8 as *const cty::c_char,
         false as _,
     );
     _sapp_x11_NET_WM_NAME = XInternAtom(
         _sapp_x11_display,
-        b"_NET_WM_NAME\x00" as *const u8 as *const libc::c_char,
+        b"_NET_WM_NAME\x00" as *const u8 as *const cty::c_char,
         false as _,
     );
     _sapp_x11_NET_WM_ICON_NAME = XInternAtom(
         _sapp_x11_display,
-        b"_NET_WM_ICON_NAME\x00" as *const u8 as *const libc::c_char,
+        b"_NET_WM_ICON_NAME\x00" as *const u8 as *const cty::c_char,
         false as _,
     );
 }
 pub static mut _sapp_glx_CreateNewContext: PFNGLXCREATENEWCONTEXTPROC = None;
 pub static mut _sapp_glx_QueryExtension: PFNGLXQUERYEXTENSIONPROC = None;
-pub static mut _sapp_glx_errorbase: libc::c_int = 0;
-pub static mut _sapp_glx_eventbase: libc::c_int = 0;
+pub static mut _sapp_glx_errorbase: cty::c_int = 0;
+pub static mut _sapp_glx_eventbase: cty::c_int = 0;
 pub static mut _sapp_glx_QueryVersion: PFNGLXQUERYVERSIONPROC = None;
-pub static mut _sapp_glx_major: libc::c_int = 0;
-pub static mut _sapp_glx_minor: libc::c_int = 0;
+pub static mut _sapp_glx_major: cty::c_int = 0;
+pub static mut _sapp_glx_minor: cty::c_int = 0;
 pub static mut _sapp_glx_ARB_framebuffer_sRGB: bool = false;
 pub static mut _sapp_glx_EXT_framebuffer_sRGB: bool = false;
 pub static mut _sapp_glx_GetProcAddress: PFNGLXGETPROCADDRESSPROC = None;
 pub static mut _sapp_glx_GetProcAddressARB: PFNGLXGETPROCADDRESSPROC = None;
-pub static mut _sapp_glx_libgl: *mut libc::c_void = 0 as *const libc::c_void as *mut libc::c_void;
+pub static mut _sapp_glx_libgl: *mut cty::c_void = 0 as *const cty::c_void as *mut cty::c_void;
 
 unsafe fn _sapp_glx_getprocaddr<T: Sized>(procname: &[u8]) -> T {
     let procname = procname.as_ptr() as _;
@@ -634,23 +634,23 @@ unsafe fn _sapp_glx_getprocaddr<T: Sized>(procname: &[u8]) -> T {
     };
 }
 pub unsafe extern "C" fn _sapp_glx_has_ext(
-    mut ext: *const libc::c_char,
-    mut extensions: *const libc::c_char,
+    mut ext: *const cty::c_char,
+    mut extensions: *const cty::c_char,
 ) -> bool {
     assert!(!ext.is_null());
 
     let mut start = extensions;
     loop {
-        let mut where_0: *const libc::c_char = strstr(start, ext);
+        let mut where_0: *const cty::c_char = strstr(start, ext);
         if where_0.is_null() {
             return false;
         }
         let mut terminator = where_0.offset(strlen(ext) as isize);
         if where_0 == start
-            || *where_0.offset(-(1 as libc::c_int as isize)) as libc::c_int == ' ' as i32
+            || *where_0.offset(-(1 as cty::c_int as isize)) as cty::c_int == ' ' as i32
         {
-            if *terminator as libc::c_int == ' ' as i32
-                || *terminator as libc::c_int == '\u{0}' as i32
+            if *terminator as cty::c_int == ' ' as i32
+                || *terminator as cty::c_int == '\u{0}' as i32
             {
                 break;
             }
@@ -661,7 +661,7 @@ pub unsafe extern "C" fn _sapp_glx_has_ext(
 }
 pub unsafe extern "C" fn _sapp_glx_extsupported(
     mut ext: &[u8],
-    mut extensions: *const libc::c_char,
+    mut extensions: *const cty::c_char,
 ) -> bool {
     if !extensions.is_null() {
         return _sapp_glx_has_ext(ext.as_ptr() as _, extensions);
@@ -671,12 +671,12 @@ pub unsafe extern "C" fn _sapp_glx_extsupported(
 }
 pub static mut _sapp_glx_QueryExtensionsString: PFNGLXQUERYEXTENSIONSSTRINGPROC = None;
 pub unsafe extern "C" fn _sapp_glx_init() {
-    let mut sonames: [*const libc::c_char; 3] = [
-        b"libGL.so.1\x00" as *const u8 as *const libc::c_char,
-        b"libGL.so\x00" as *const u8 as *const libc::c_char,
-        0 as *const libc::c_char,
+    let mut sonames: [*const cty::c_char; 3] = [
+        b"libGL.so.1\x00" as *const u8 as *const cty::c_char,
+        b"libGL.so\x00" as *const u8 as *const cty::c_char,
+        0 as *const cty::c_char,
     ];
-    let mut i = 0 as libc::c_int;
+    let mut i = 0 as cty::c_int;
     while !sonames[i as usize].is_null() {
         _sapp_glx_libgl = dlopen(sonames[i as usize], RTLD_LAZY | RTLD_GLOBAL);
         if !_sapp_glx_libgl.is_null() {
@@ -685,11 +685,11 @@ pub unsafe extern "C" fn _sapp_glx_init() {
         i += 1
     }
     if _sapp_glx_libgl.is_null() {
-        _sapp_fail(b"GLX: failed to load libGL\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail(b"GLX: failed to load libGL\x00" as *const u8 as *const cty::c_char);
     }
 
-    unsafe fn load<T: Sized>(lib: *mut libc::c_void, symbol: &[u8]) -> T {
-        ::std::mem::transmute_copy::<*mut libc::c_void, T>(&dlsym(lib, symbol.as_ptr() as _))
+    unsafe fn load<T: Sized>(lib: *mut cty::c_void, symbol: &[u8]) -> T {
+        ::std::mem::transmute_copy::<*mut cty::c_void, T>(&dlsym(lib, symbol.as_ptr() as _))
     }
     _sapp_glx_GetFBConfigs = load(_sapp_glx_libgl, b"glXGetFBConfigs\x00");
     _sapp_glx_GetFBConfigAttrib = load(_sapp_glx_libgl, b"glXGetFBConfigAttrib\x00");
@@ -723,7 +723,7 @@ pub unsafe extern "C" fn _sapp_glx_init() {
         || _sapp_glx_GetVisualFromFBConfig.is_none()
     {
         _sapp_fail(
-            b"GLX: failed to load required entry points\x00" as *const u8 as *const libc::c_char,
+            b"GLX: failed to load required entry points\x00" as *const u8 as *const cty::c_char,
         );
     }
     if _sapp_glx_QueryExtension.expect("non-null function pointer")(
@@ -732,7 +732,7 @@ pub unsafe extern "C" fn _sapp_glx_init() {
         &mut _sapp_glx_eventbase,
     ) == 0
     {
-        _sapp_fail(b"GLX: GLX extension not found\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail(b"GLX: GLX extension not found\x00" as *const u8 as *const cty::c_char);
     }
     if _sapp_glx_QueryVersion.expect("non-null function pointer")(
         _sapp_x11_display,
@@ -740,10 +740,10 @@ pub unsafe extern "C" fn _sapp_glx_init() {
         &mut _sapp_glx_minor,
     ) == 0
     {
-        _sapp_fail(b"GLX: Failed to query GLX version\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail(b"GLX: Failed to query GLX version\x00" as *const u8 as *const cty::c_char);
     }
-    if _sapp_glx_major == 1 as libc::c_int && _sapp_glx_minor < 3 as libc::c_int {
-        _sapp_fail(b"GLX: GLX version 1.3 is required\x00" as *const u8 as *const libc::c_char);
+    if _sapp_glx_major == 1 as cty::c_int && _sapp_glx_minor < 3 as cty::c_int {
+        _sapp_fail(b"GLX: GLX version 1.3 is required\x00" as *const u8 as *const cty::c_char);
     }
     let mut exts = _sapp_glx_QueryExtensionsString.expect("non-null function pointer")(
         _sapp_x11_display,
@@ -772,12 +772,12 @@ pub unsafe extern "C" fn _sapp_glx_init() {
 pub static mut _sapp_glx_GetVisualFromFBConfig: PFNGLXGETVISUALFROMFBCONFIGPROC = None;
 pub unsafe extern "C" fn _sapp_glx_choose_visual(
     mut visual: *mut *mut Visual,
-    mut depth: *mut libc::c_int,
+    mut depth: *mut cty::c_int,
 ) {
     let mut native = _sapp_glx_choosefbconfig();
     if native.is_null() {
         _sapp_fail(
-            b"GLX: Failed to find a suitable GLXFBConfig\x00" as *const u8 as *const libc::c_char,
+            b"GLX: Failed to find a suitable GLXFBConfig\x00" as *const u8 as *const cty::c_char,
         );
     }
     let mut result = _sapp_glx_GetVisualFromFBConfig.expect("non-null function pointer")(
@@ -787,12 +787,12 @@ pub unsafe extern "C" fn _sapp_glx_choose_visual(
     if result.is_null() {
         _sapp_fail(
             b"GLX: Failed to retrieve Visual for GLXFBConfig\x00" as *const u8
-                as *const libc::c_char,
+                as *const cty::c_char,
         );
     }
     *visual = (*result).visual;
     *depth = (*result).depth;
-    XFree(result as *mut libc::c_void);
+    XFree(result as *mut cty::c_void);
 }
 pub static mut _sapp_x11_root: Window = 0;
 pub static mut _sapp_x11_NET_WM_NAME: Atom = 0;
@@ -805,7 +805,7 @@ pub unsafe extern "C" fn _sapp_x11_update_window_title() {
         _sapp.window_title.as_mut_ptr(),
         _sapp.window_title.as_mut_ptr(),
         std::ptr::null_mut(),
-        0 as libc::c_int,
+        0 as cty::c_int,
         std::ptr::null_mut(),
         std::ptr::null_mut(),
         std::ptr::null_mut(),
@@ -815,20 +815,20 @@ pub unsafe extern "C" fn _sapp_x11_update_window_title() {
         _sapp_x11_window,
         _sapp_x11_NET_WM_NAME,
         _sapp_x11_UTF8_STRING,
-        8 as libc::c_int,
+        8 as cty::c_int,
         PropModeReplace,
-        _sapp.window_title.as_mut_ptr() as *mut libc::c_uchar,
-        strlen(_sapp.window_title.as_mut_ptr()) as libc::c_int,
+        _sapp.window_title.as_mut_ptr() as *mut cty::c_uchar,
+        strlen(_sapp.window_title.as_mut_ptr()) as cty::c_int,
     );
     XChangeProperty(
         _sapp_x11_display,
         _sapp_x11_window,
         _sapp_x11_NET_WM_ICON_NAME,
         _sapp_x11_UTF8_STRING,
-        8 as libc::c_int,
+        8 as cty::c_int,
         PropModeReplace,
-        _sapp.window_title.as_mut_ptr() as *mut libc::c_uchar,
-        strlen(_sapp.window_title.as_mut_ptr()) as libc::c_int,
+        _sapp.window_title.as_mut_ptr() as *mut cty::c_uchar,
+        strlen(_sapp.window_title.as_mut_ptr()) as cty::c_int,
     );
     XFlush(_sapp_x11_display);
 }
@@ -866,55 +866,55 @@ pub unsafe extern "C" fn _sapp_x11_query_window_size() {
 }
 pub static mut _sapp_glx_ARB_create_context: bool = false;
 pub static mut _sapp_glx_ARB_create_context_profile: bool = false;
-pub static mut _sapp_x11_error_code: libc::c_uchar = 0;
+pub static mut _sapp_x11_error_code: cty::c_uchar = 0;
 pub unsafe extern "C" fn _sapp_x11_error_handler(
     mut display: *mut Display,
     mut event: *mut XErrorEvent,
-) -> libc::c_int {
+) -> cty::c_int {
     _sapp_x11_error_code = (*event).error_code;
-    return 0 as libc::c_int;
+    return 0 as cty::c_int;
 }
 pub unsafe extern "C" fn _sapp_x11_grab_error_handler() {
-    _sapp_x11_error_code = Success as libc::c_uchar;
+    _sapp_x11_error_code = Success as cty::c_uchar;
     XSetErrorHandler(Some(
         _sapp_x11_error_handler
-            as unsafe extern "C" fn(_: *mut Display, _: *mut XErrorEvent) -> libc::c_int,
+            as unsafe extern "C" fn(_: *mut Display, _: *mut XErrorEvent) -> cty::c_int,
     ));
 }
 pub static mut _sapp_glx_CreateContextAttribsARB: PFNGLXCREATECONTEXTATTRIBSARBPROC = None;
-pub const GLX_CONTEXT_MAJOR_VERSION_ARB: libc::c_int = 0x2091 as libc::c_int;
-pub const GLX_CONTEXT_MINOR_VERSION_ARB: libc::c_int = 0x2092 as libc::c_int;
-pub const GLX_CONTEXT_PROFILE_MASK_ARB: libc::c_int = 0x9126 as libc::c_int;
-pub const GLX_CONTEXT_CORE_PROFILE_BIT_ARB: libc::c_int = 0x1 as libc::c_int;
-pub const GLX_CONTEXT_FLAGS_ARB: libc::c_int = 0x2094 as libc::c_int;
-pub const GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB: libc::c_int = 0x2 as libc::c_int;
+pub const GLX_CONTEXT_MAJOR_VERSION_ARB: cty::c_int = 0x2091 as cty::c_int;
+pub const GLX_CONTEXT_MINOR_VERSION_ARB: cty::c_int = 0x2092 as cty::c_int;
+pub const GLX_CONTEXT_PROFILE_MASK_ARB: cty::c_int = 0x9126 as cty::c_int;
+pub const GLX_CONTEXT_CORE_PROFILE_BIT_ARB: cty::c_int = 0x1 as cty::c_int;
+pub const GLX_CONTEXT_FLAGS_ARB: cty::c_int = 0x2094 as cty::c_int;
+pub const GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB: cty::c_int = 0x2 as cty::c_int;
 pub unsafe extern "C" fn _sapp_x11_release_error_handler() {
     XSync(_sapp_x11_display, false as _);
     XSetErrorHandler(None);
 }
 pub static mut _sapp_glx_CreateWindow: PFNGLXCREATEWINDOWPROC = None;
 pub static mut _sapp_glx_GetClientString: PFNGLXGETCLIENTSTRINGPROC = None;
-pub const GLX_VENDOR: libc::c_int = 1 as libc::c_int;
+pub const GLX_VENDOR: cty::c_int = 1 as cty::c_int;
 pub static mut _sapp_glx_GetFBConfigs: PFNGLXGETFBCONFIGSPROC = None;
-pub static mut _sapp_x11_screen: libc::c_int = 0;
-pub const GLX_RENDER_TYPE: libc::c_int = 0x8011 as libc::c_int;
-pub const GLX_RGBA_BIT: libc::c_int = 0x1 as libc::c_int;
-pub const GLX_DRAWABLE_TYPE: libc::c_int = 0x8010 as libc::c_int;
-pub const GLX_WINDOW_BIT: libc::c_int = 0x1 as libc::c_int;
-pub const GLX_RED_SIZE: libc::c_int = 8 as libc::c_int;
-pub const GLX_GREEN_SIZE: libc::c_int = 9 as libc::c_int;
-pub const GLX_BLUE_SIZE: libc::c_int = 10 as libc::c_int;
-pub const GLX_ALPHA_SIZE: libc::c_int = 11 as libc::c_int;
-pub const GLX_DEPTH_SIZE: libc::c_int = 12 as libc::c_int;
-pub const GLX_STENCIL_SIZE: libc::c_int = 13 as libc::c_int;
-pub const GLX_DOUBLEBUFFER: libc::c_int = 5 as libc::c_int;
+pub static mut _sapp_x11_screen: cty::c_int = 0;
+pub const GLX_RENDER_TYPE: cty::c_int = 0x8011 as cty::c_int;
+pub const GLX_RGBA_BIT: cty::c_int = 0x1 as cty::c_int;
+pub const GLX_DRAWABLE_TYPE: cty::c_int = 0x8010 as cty::c_int;
+pub const GLX_WINDOW_BIT: cty::c_int = 0x1 as cty::c_int;
+pub const GLX_RED_SIZE: cty::c_int = 8 as cty::c_int;
+pub const GLX_GREEN_SIZE: cty::c_int = 9 as cty::c_int;
+pub const GLX_BLUE_SIZE: cty::c_int = 10 as cty::c_int;
+pub const GLX_ALPHA_SIZE: cty::c_int = 11 as cty::c_int;
+pub const GLX_DEPTH_SIZE: cty::c_int = 12 as cty::c_int;
+pub const GLX_STENCIL_SIZE: cty::c_int = 13 as cty::c_int;
+pub const GLX_DOUBLEBUFFER: cty::c_int = 5 as cty::c_int;
 pub static mut _sapp_glx_ARB_multisample: bool = false;
 pub static mut _sapp_glx_GetFBConfigAttrib: PFNGLXGETFBCONFIGATTRIBPROC = None;
 pub unsafe extern "C" fn _sapp_glx_attrib(
     mut fbconfig: GLXFBConfig,
-    mut attrib: libc::c_int,
-) -> libc::c_int {
-    let mut value: libc::c_int = 0;
+    mut attrib: cty::c_int,
+) -> cty::c_int {
+    let mut value: cty::c_int = 0;
     _sapp_glx_GetFBConfigAttrib.expect("non-null function pointer")(
         _sapp_x11_display,
         fbconfig,
@@ -923,16 +923,16 @@ pub unsafe extern "C" fn _sapp_glx_attrib(
     );
     return value;
 }
-pub const GLX_SAMPLES: libc::c_int = 0x186a1 as libc::c_int;
+pub const GLX_SAMPLES: cty::c_int = 0x186a1 as cty::c_int;
 pub fn _sapp_gl_init_fbconfig() -> _sapp_gl_fbconfig {
     _sapp_gl_fbconfig {
-        red_bits: -(1 as libc::c_int),
-        green_bits: -(1 as libc::c_int),
-        blue_bits: -(1 as libc::c_int),
-        alpha_bits: -(1 as libc::c_int),
-        depth_bits: -(1 as libc::c_int),
-        stencil_bits: -(1 as libc::c_int),
-        samples: -(1 as libc::c_int),
+        red_bits: -(1 as cty::c_int),
+        green_bits: -(1 as cty::c_int),
+        blue_bits: -(1 as cty::c_int),
+        alpha_bits: -(1 as cty::c_int),
+        depth_bits: -(1 as cty::c_int),
+        stencil_bits: -(1 as cty::c_int),
+        samples: -(1 as cty::c_int),
         doublebuffer: false,
         handle: 0,
     }
@@ -940,7 +940,7 @@ pub fn _sapp_gl_init_fbconfig() -> _sapp_gl_fbconfig {
 pub unsafe extern "C" fn _sapp_gl_choose_fbconfig(
     mut desired: *const _sapp_gl_fbconfig,
     mut alternatives: *const _sapp_gl_fbconfig,
-    mut count: libc::c_uint,
+    mut count: cty::c_uint,
 ) -> *const _sapp_gl_fbconfig {
     let mut i: i32 = 0;
     let mut missing: i32 = 0;
@@ -1036,17 +1036,17 @@ pub unsafe extern "C" fn _sapp_gl_choose_fbconfig(
 pub unsafe extern "C" fn _sapp_glx_choosefbconfig() -> GLXFBConfig {
     let mut native_configs = 0 as *mut GLXFBConfig;
     let mut closest = 0 as *const _sapp_gl_fbconfig;
-    let mut i: libc::c_int = 0;
-    let mut native_count: libc::c_int = 0;
-    let mut usable_count: libc::c_int = 0;
-    let mut vendor = 0 as *const libc::c_char;
+    let mut i: cty::c_int = 0;
+    let mut native_count: cty::c_int = 0;
+    let mut usable_count: cty::c_int = 0;
+    let mut vendor = 0 as *const cty::c_char;
     let mut trust_window_bit = true;
     vendor = _sapp_glx_GetClientString.expect("non-null function pointer")(
         _sapp_x11_display,
         GLX_VENDOR,
     );
     if !vendor.is_null()
-        && strcmp(vendor, b"Chromium\x00" as *const u8 as *const libc::c_char) == 0 as libc::c_int
+        && strcmp(vendor, b"Chromium\x00" as *const u8 as *const cty::c_char) == 0 as cty::c_int
     {
         trust_window_bit = false
     }
@@ -1056,10 +1056,10 @@ pub unsafe extern "C" fn _sapp_glx_choosefbconfig() -> GLXFBConfig {
         &mut native_count,
     );
     if native_configs.is_null() || native_count == 0 {
-        _sapp_fail(b"GLX: No GLXFBConfigs returned\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail(b"GLX: No GLXFBConfigs returned\x00" as *const u8 as *const cty::c_char);
     }
     let mut usable_configs: Vec<_sapp_gl_fbconfig> = Vec::new();
-    usable_count = 0 as libc::c_int;
+    usable_count = 0 as cty::c_int;
     let mut current_block_25: u64;
     for i in 0..native_count {
         let n = *native_configs.offset(i as isize);
@@ -1085,7 +1085,7 @@ pub unsafe extern "C" fn _sapp_glx_choosefbconfig() -> GLXFBConfig {
         if _sapp_glx_ARB_multisample {
             u.samples = _sapp_glx_attrib(n, GLX_SAMPLES)
         }
-        u.handle = n as libc::c_ulong;
+        u.handle = n as cty::c_ulong;
         usable_configs.push(u);
         usable_count += 1
     }
@@ -1106,16 +1106,16 @@ pub unsafe extern "C" fn _sapp_glx_choosefbconfig() -> GLXFBConfig {
     closest = _sapp_gl_choose_fbconfig(
         &mut desired,
         usable_configs.as_mut_ptr(),
-        usable_count as libc::c_uint,
+        usable_count as cty::c_uint,
     );
     let mut result = 0 as GLXFBConfig;
     if !closest.is_null() {
         result = (*closest).handle as GLXFBConfig
     }
-    XFree(native_configs as *mut libc::c_void);
+    XFree(native_configs as *mut cty::c_void);
     return result;
 }
-pub unsafe extern "C" fn _sapp_fail(mut msg: *const libc::c_char) {
+pub unsafe extern "C" fn _sapp_fail(mut msg: *const cty::c_char) {
     if _sapp.desc.fail_cb.is_some() {
         _sapp.desc.fail_cb.expect("non-null function pointer")(msg);
     } else if _sapp.desc.fail_userdata_cb.is_some() {
@@ -1141,17 +1141,17 @@ pub unsafe extern "C" fn _sapp_glx_create_context() {
     if native.is_null() {
         _sapp_fail(
             b"GLX: Failed to find a suitable GLXFBConfig (2)\x00" as *const u8
-                as *const libc::c_char,
+                as *const cty::c_char,
         );
     }
     if !(_sapp_glx_ARB_create_context && _sapp_glx_ARB_create_context_profile) {
         _sapp_fail(
             b"GLX: ARB_create_context and ARB_create_context_profile required\x00" as *const u8
-                as *const libc::c_char,
+                as *const cty::c_char,
         );
     }
     _sapp_x11_grab_error_handler();
-    let attribs: [libc::c_int; 10] = [
+    let attribs: [cty::c_int; 10] = [
         GLX_CONTEXT_MAJOR_VERSION_ARB,
         3,
         GLX_CONTEXT_MINOR_VERSION_ARB,
@@ -1171,7 +1171,7 @@ pub unsafe extern "C" fn _sapp_glx_create_context() {
         attribs.as_ptr(),
     );
     if _sapp_glx_ctx.is_null() {
-        _sapp_fail(b"GLX: failed to create GL context\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail(b"GLX: failed to create GL context\x00" as *const u8 as *const cty::c_char);
     }
     _sapp_x11_release_error_handler();
     _sapp_glx_window = _sapp_glx_CreateWindow.expect("non-null function pointer")(
@@ -1181,7 +1181,7 @@ pub unsafe extern "C" fn _sapp_glx_create_context() {
         std::ptr::null(),
     );
     if _sapp_glx_window == 0 {
-        _sapp_fail(b"GLX: failed to create window\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail(b"GLX: failed to create window\x00" as *const u8 as *const cty::c_char);
     };
 }
 pub unsafe extern "C" fn _sapp_x11_window_visible() -> bool {
@@ -1224,12 +1224,12 @@ pub unsafe extern "C" fn _sapp_x11_show_window() {
 unsafe fn _sapp_x11_set_fullscreen() {
     let mut wm_state = XInternAtom(
         _sapp_x11_display,
-        b"_NET_WM_STATE\x00" as *const u8 as *const libc::c_char,
+        b"_NET_WM_STATE\x00" as *const u8 as *const cty::c_char,
         false as _,
     );
     let wm_fullscreen = XInternAtom(
         _sapp_x11_display,
-        b"_NET_WM_STATE_FULLSCREEN\x00" as *const u8 as *const libc::c_char,
+        b"_NET_WM_STATE_FULLSCREEN\x00" as *const u8 as *const cty::c_char,
         false as _,
     );
 
@@ -1290,7 +1290,7 @@ pub static mut _sapp_glx_EXT_swap_control: bool = false;
 pub static mut _sapp_glx_SwapIntervalEXT: PFNGLXSWAPINTERVALEXTPROC = None;
 pub static mut _sapp_glx_MESA_swap_control: bool = false;
 pub static mut _sapp_glx_SwapIntervalMESA: PFNGLXSWAPINTERVALMESAPROC = None;
-pub unsafe extern "C" fn _sapp_glx_swapinterval(mut interval: libc::c_int) {
+pub unsafe extern "C" fn _sapp_glx_swapinterval(mut interval: cty::c_int) {
     _sapp_glx_make_current();
     if _sapp_glx_EXT_swap_control {
         _sapp_glx_SwapIntervalEXT.expect("non-null function pointer")(
@@ -2160,34 +2160,34 @@ pub static mut _sapp_x11_keysymtab: [_sapp_x11_codepair; 828] = [
     _sapp_x11_codepair::new(0xffbd /*XKB_KEY_KP_Equal*/, '=' as u16),
 ];
 pub unsafe extern "C" fn _sapp_x11_keysym_to_unicode(mut keysym: KeySym) -> i32 {
-    let mut min = 0 as libc::c_int;
-    let mut max = (::std::mem::size_of::<[_sapp_x11_codepair; 828]>() as libc::c_ulong)
-        .wrapping_div(::std::mem::size_of::<_sapp_x11_codepair>() as libc::c_ulong)
-        .wrapping_sub(1 as libc::c_int as libc::c_ulong) as libc::c_int;
-    let mut mid: libc::c_int = 0;
-    if keysym >= 0x20 as libc::c_int as libc::c_ulong
-        && keysym <= 0x7e as libc::c_int as libc::c_ulong
-        || keysym >= 0xa0 as libc::c_int as libc::c_ulong
-            && keysym <= 0xff as libc::c_int as libc::c_ulong
+    let mut min = 0 as cty::c_int;
+    let mut max = (::std::mem::size_of::<[_sapp_x11_codepair; 828]>() as cty::c_ulong)
+        .wrapping_div(::std::mem::size_of::<_sapp_x11_codepair>() as cty::c_ulong)
+        .wrapping_sub(1 as cty::c_int as cty::c_ulong) as cty::c_int;
+    let mut mid: cty::c_int = 0;
+    if keysym >= 0x20 as cty::c_int as cty::c_ulong
+        && keysym <= 0x7e as cty::c_int as cty::c_ulong
+        || keysym >= 0xa0 as cty::c_int as cty::c_ulong
+            && keysym <= 0xff as cty::c_int as cty::c_ulong
     {
         return keysym as i32;
     }
-    if keysym & 0xff000000 as libc::c_uint as libc::c_ulong
-        == 0x1000000 as libc::c_int as libc::c_ulong
+    if keysym & 0xff000000 as cty::c_uint as cty::c_ulong
+        == 0x1000000 as cty::c_int as cty::c_ulong
     {
-        return (keysym & 0xffffff as libc::c_int as libc::c_ulong) as i32;
+        return (keysym & 0xffffff as cty::c_int as cty::c_ulong) as i32;
     }
     while max >= min {
-        mid = (min + max) / 2 as libc::c_int;
-        if (_sapp_x11_keysymtab[mid as usize].keysym as libc::c_ulong) < keysym {
-            min = mid + 1 as libc::c_int
-        } else if _sapp_x11_keysymtab[mid as usize].keysym as libc::c_ulong > keysym {
-            max = mid - 1 as libc::c_int
+        mid = (min + max) / 2 as cty::c_int;
+        if (_sapp_x11_keysymtab[mid as usize].keysym as cty::c_ulong) < keysym {
+            min = mid + 1 as cty::c_int
+        } else if _sapp_x11_keysymtab[mid as usize].keysym as cty::c_ulong > keysym {
+            max = mid - 1 as cty::c_int
         } else {
             return _sapp_x11_keysymtab[mid as usize].ucs as i32;
         }
     }
-    return -(1 as libc::c_int);
+    return -(1 as cty::c_int);
 }
 pub static mut _sapp_x11_keycodes: [bool; 256] = [false; 256];
 pub unsafe extern "C" fn _sapp_x11_key_event(
@@ -2204,18 +2204,18 @@ pub unsafe extern "C" fn _sapp_x11_key_event(
         _sapp_call_event(&mut _sapp.event);
     };
 }
-pub unsafe extern "C" fn _sapp_x11_translate_key(mut scancode: libc::c_int) -> sapp_keycode {
-    let mut dummy: libc::c_int = 0;
+pub unsafe extern "C" fn _sapp_x11_translate_key(mut scancode: cty::c_int) -> sapp_keycode {
+    let mut dummy: cty::c_int = 0;
     let mut keysyms = XGetKeyboardMapping(
         _sapp_x11_display,
         scancode as KeyCode,
-        1 as libc::c_int,
+        1 as cty::c_int,
         &mut dummy,
     );
     assert!(!keysyms.is_null());
 
-    let mut keysym = *keysyms.offset(0 as libc::c_int as isize);
-    XFree(keysyms as *mut libc::c_void);
+    let mut keysym = *keysyms.offset(0 as cty::c_int as isize);
+    XFree(keysyms as *mut cty::c_void);
     match keysym {
         65307 => return sapp_keycode_SAPP_KEYCODE_ESCAPE,
         65289 => return sapp_keycode_SAPP_KEYCODE_TAB,
@@ -2340,8 +2340,8 @@ pub unsafe extern "C" fn _sapp_x11_translate_key(mut scancode: libc::c_int) -> s
     };
 }
 pub unsafe extern "C" fn _sapp_x11_scroll_event(
-    mut x: libc::c_float,
-    mut y: libc::c_float,
+    mut x: cty::c_float,
+    mut y: cty::c_float,
     mut mods: u32,
 ) {
     if _sapp_events_enabled() {
@@ -2374,38 +2374,38 @@ pub unsafe extern "C" fn _sapp_x11_mouse_event(
         _sapp_call_event(&mut _sapp.event);
     };
 }
-pub unsafe extern "C" fn _sapp_x11_mod(mut x11_mods: libc::c_int) -> u32 {
-    let mut mods = 0 as libc::c_int as u32;
+pub unsafe extern "C" fn _sapp_x11_mod(mut x11_mods: cty::c_int) -> u32 {
+    let mut mods = 0 as cty::c_int as u32;
     if x11_mods & ShiftMask != 0 {
-        mods |= SAPP_MODIFIER_SHIFT as libc::c_int as libc::c_uint
+        mods |= SAPP_MODIFIER_SHIFT as cty::c_int as cty::c_uint
     }
     if x11_mods & ControlMask != 0 {
-        mods |= SAPP_MODIFIER_CTRL as libc::c_int as libc::c_uint
+        mods |= SAPP_MODIFIER_CTRL as cty::c_int as cty::c_uint
     }
     if x11_mods & Mod1Mask != 0 {
-        mods |= SAPP_MODIFIER_ALT as libc::c_int as libc::c_uint
+        mods |= SAPP_MODIFIER_ALT as cty::c_int as cty::c_uint
     }
     if x11_mods & Mod4Mask != 0 {
-        mods |= SAPP_MODIFIER_SUPER as libc::c_int as libc::c_uint
+        mods |= SAPP_MODIFIER_SUPER as cty::c_int as cty::c_uint
     }
     return mods;
 }
-pub static mut _sapp_x11_window_state: libc::c_int = 0;
+pub static mut _sapp_x11_window_state: cty::c_int = 0;
 pub unsafe extern "C" fn _sapp_x11_get_window_property(
     mut property: Atom,
     mut type_: Atom,
-    mut value: *mut *mut libc::c_uchar,
-) -> libc::c_ulong {
+    mut value: *mut *mut cty::c_uchar,
+) -> cty::c_ulong {
     let mut actualType: Atom = 0;
-    let mut actualFormat: libc::c_int = 0;
-    let mut itemCount: libc::c_ulong = 0;
-    let mut bytesAfter: libc::c_ulong = 0;
+    let mut actualFormat: cty::c_int = 0;
+    let mut itemCount: cty::c_ulong = 0;
+    let mut bytesAfter: cty::c_ulong = 0;
     XGetWindowProperty(
         _sapp_x11_display,
         _sapp_x11_window,
         property,
         0,
-        libc::c_long::max_value(),
+        cty::c_long::max_value(),
         false as _,
         type_,
         &mut actualType,
@@ -2417,19 +2417,19 @@ pub unsafe extern "C" fn _sapp_x11_get_window_property(
     return itemCount;
 }
 pub static mut _sapp_x11_WM_STATE: Atom = 0;
-pub unsafe extern "C" fn _sapp_x11_get_window_state() -> libc::c_int {
+pub unsafe extern "C" fn _sapp_x11_get_window_state() -> cty::c_int {
     let mut result = WithdrawnState;
     let mut state: *mut C2RustUnnamed_1 = std::ptr::null_mut();
     if _sapp_x11_get_window_property(
         _sapp_x11_WM_STATE,
         _sapp_x11_WM_STATE,
-        &mut state as *mut *mut C2RustUnnamed_1 as *mut *mut libc::c_uchar,
+        &mut state as *mut *mut C2RustUnnamed_1 as *mut *mut cty::c_uchar,
     ) >= 2
     {
-        result = (*state).state as libc::c_int
+        result = (*state).state as cty::c_int
     }
     if !state.is_null() {
-        XFree(state as *mut libc::c_void);
+        XFree(state as *mut cty::c_void);
     }
     return result;
 }
@@ -2438,13 +2438,13 @@ pub static mut _sapp_x11_WM_DELETE_WINDOW: Atom = 0;
 pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
     match (*event).type_0 {
         2 => {
-            let mut keycode = (*event).xkey.keycode as libc::c_int;
+            let mut keycode = (*event).xkey.keycode as cty::c_int;
             let key = _sapp_x11_translate_key(keycode);
-            let mut repeat = _sapp_x11_keycodes[(keycode & 0xff as libc::c_int) as usize];
-            _sapp_x11_keycodes[(keycode & 0xff as libc::c_int) as usize] = true;
-            let mods = _sapp_x11_mod((*event).xkey.state as libc::c_int);
-            if key as libc::c_uint
-                != sapp_keycode_SAPP_KEYCODE_INVALID as libc::c_int as libc::c_uint
+            let mut repeat = _sapp_x11_keycodes[(keycode & 0xff as cty::c_int) as usize];
+            _sapp_x11_keycodes[(keycode & 0xff as cty::c_int) as usize] = true;
+            let mods = _sapp_x11_mod((*event).xkey.state as cty::c_int);
+            if key as cty::c_uint
+                != sapp_keycode_SAPP_KEYCODE_INVALID as cty::c_int as cty::c_uint
             {
                 _sapp_x11_key_event(sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN, key, repeat, mods);
             }
@@ -2452,30 +2452,30 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
             XLookupString(
                 &mut (*event).xkey,
                 std::ptr::null_mut(),
-                0 as libc::c_int,
+                0 as cty::c_int,
                 &mut keysym,
                 std::ptr::null_mut(),
             );
             let mut chr = _sapp_x11_keysym_to_unicode(keysym);
-            if chr > 0 as libc::c_int {
+            if chr > 0 as cty::c_int {
                 _sapp_x11_char_event(chr as u32, repeat, mods);
             }
         }
         3 => {
-            let mut keycode_0 = (*event).xkey.keycode as libc::c_int;
+            let mut keycode_0 = (*event).xkey.keycode as cty::c_int;
             let key_0 = _sapp_x11_translate_key(keycode_0);
-            _sapp_x11_keycodes[(keycode_0 & 0xff as libc::c_int) as usize] = false;
-            if key_0 as libc::c_uint
-                != sapp_keycode_SAPP_KEYCODE_INVALID as libc::c_int as libc::c_uint
+            _sapp_x11_keycodes[(keycode_0 & 0xff as cty::c_int) as usize] = false;
+            if key_0 as cty::c_uint
+                != sapp_keycode_SAPP_KEYCODE_INVALID as cty::c_int as cty::c_uint
             {
-                let mods_0 = _sapp_x11_mod((*event).xkey.state as libc::c_int);
+                let mods_0 = _sapp_x11_mod((*event).xkey.state as cty::c_int);
                 _sapp_x11_key_event(sapp_event_type_SAPP_EVENTTYPE_KEY_UP, key_0, false, mods_0);
             }
         }
         4 => {
             let btn = _sapp_x11_translate_button(event);
-            let mods_1 = _sapp_x11_mod((*event).xbutton.state as libc::c_int);
-            if btn as libc::c_int != sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID as libc::c_int {
+            let mods_1 = _sapp_x11_mod((*event).xbutton.state as cty::c_int);
+            if btn as cty::c_int != sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID as cty::c_int {
                 _sapp_x11_mouse_event(sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN, btn, mods_1);
             } else {
                 match (*event).xbutton.button {
@@ -2497,11 +2497,11 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
         }
         5 => {
             let btn_0 = _sapp_x11_translate_button(event);
-            if btn_0 as libc::c_int != sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID as libc::c_int {
+            if btn_0 as cty::c_int != sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID as cty::c_int {
                 _sapp_x11_mouse_event(
                     sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP,
                     btn_0,
-                    _sapp_x11_mod((*event).xbutton.state as libc::c_int),
+                    _sapp_x11_mod((*event).xbutton.state as cty::c_int),
                 );
             }
         }
@@ -2509,23 +2509,23 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
             _sapp_x11_mouse_event(
                 sapp_event_type_SAPP_EVENTTYPE_MOUSE_ENTER,
                 sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
-                _sapp_x11_mod((*event).xcrossing.state as libc::c_int),
+                _sapp_x11_mod((*event).xcrossing.state as cty::c_int),
             );
         }
         8 => {
             _sapp_x11_mouse_event(
                 sapp_event_type_SAPP_EVENTTYPE_MOUSE_LEAVE,
                 sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
-                _sapp_x11_mod((*event).xcrossing.state as libc::c_int),
+                _sapp_x11_mod((*event).xcrossing.state as cty::c_int),
             );
         }
         6 => {
-            _sapp.mouse_x = (*event).xmotion.x as libc::c_float;
-            _sapp.mouse_y = (*event).xmotion.y as libc::c_float;
+            _sapp.mouse_x = (*event).xmotion.x as cty::c_float;
+            _sapp.mouse_y = (*event).xmotion.y as cty::c_float;
             _sapp_x11_mouse_event(
                 sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE,
                 sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
-                _sapp_x11_mod((*event).xmotion.state as libc::c_int),
+                _sapp_x11_mod((*event).xmotion.state as cty::c_int),
             );
         }
         22 => {
@@ -2556,7 +2556,7 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
         }
         33 => {
             if (*event).xclient.message_type == _sapp_x11_WM_PROTOCOLS {
-                let protocol = (*event).xclient.data.l[0 as libc::c_int as usize] as Atom;
+                let protocol = (*event).xclient.data.l[0 as cty::c_int as usize] as Atom;
                 if protocol == _sapp_x11_WM_DELETE_WINDOW {
                     _sapp.quit_requested = true
                 }
@@ -2595,7 +2595,7 @@ pub unsafe extern "C" fn _sapp_call_init() {
     _sapp.init_called = true;
 }
 pub unsafe extern "C" fn _sapp_call_frame() {
-    if _sapp.init_called as libc::c_int != 0 && !_sapp.cleanup_called {
+    if _sapp.init_called as cty::c_int != 0 && !_sapp.cleanup_called {
         if _sapp.desc.frame_cb.is_some() {
             _sapp.desc.frame_cb.expect("non-null function pointer")();
         } else if _sapp.desc.frame_userdata_cb.is_some() {
@@ -2620,13 +2620,13 @@ pub unsafe extern "C" fn _sapp_glx_swap_buffers() {
 }
 pub unsafe extern "C" fn _sapp_events_enabled() -> bool {
     return (_sapp.desc.event_cb.is_some() || _sapp.desc.event_userdata_cb.is_some())
-        && _sapp.init_called as libc::c_int != 0;
+        && _sapp.init_called as cty::c_int != 0;
 }
 pub unsafe extern "C" fn _sapp_init_event(mut type_: sapp_event_type) {
     memset(
-        &mut _sapp.event as *mut sapp_event as *mut libc::c_void,
+        &mut _sapp.event as *mut sapp_event as *mut cty::c_void,
         0,
-        ::std::mem::size_of::<sapp_event>() as libc::c_ulong,
+        ::std::mem::size_of::<sapp_event>() as cty::c_ulong,
     );
     _sapp.event.type_ = type_;
     _sapp.event.frame_count = _sapp.frame_count;
@@ -2677,7 +2677,7 @@ pub unsafe extern "C" fn _sapp_glx_destroy_context() {
             _sapp_x11_display,
             _sapp_glx_window,
         );
-        _sapp_glx_window = 0 as libc::c_int as GLXWindow
+        _sapp_glx_window = 0 as cty::c_int as GLXWindow
     }
     if !_sapp_glx_ctx.is_null() {
         _sapp_glx_DestroyContext.expect("non-null function pointer")(
@@ -2693,11 +2693,11 @@ pub unsafe extern "C" fn _sapp_x11_destroy_window() {
     if _sapp_x11_window != 0 {
         XUnmapWindow(_sapp_x11_display, _sapp_x11_window);
         XDestroyWindow(_sapp_x11_display, _sapp_x11_window);
-        _sapp_x11_window = 0 as libc::c_int as Window
+        _sapp_x11_window = 0 as cty::c_int as Window
     }
     if _sapp_x11_colormap != 0 {
         XFreeColormap(_sapp_x11_display, _sapp_x11_colormap);
-        _sapp_x11_colormap = 0 as libc::c_int as Colormap
+        _sapp_x11_colormap = 0 as cty::c_int as Colormap
     }
     XFlush(_sapp_x11_display);
 }
@@ -2711,7 +2711,7 @@ pub unsafe extern "C" fn sapp_run(mut desc: *const sapp_desc) {
     XrmInitialize();
     _sapp_x11_display = XOpenDisplay(std::ptr::null());
     if _sapp_x11_display.is_null() {
-        _sapp_fail(b"XOpenDisplay() failed!\n\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail(b"XOpenDisplay() failed!\n\x00" as *const u8 as *const cty::c_char);
     }
     _sapp_x11_screen = (*(_sapp_x11_display as _XPrivDisplay)).default_screen;
     _sapp_x11_root = (*(*(_sapp_x11_display as _XPrivDisplay))
@@ -2730,7 +2730,7 @@ pub unsafe extern "C" fn sapp_run(mut desc: *const sapp_desc) {
     _sapp_x11_init_extensions();
     _sapp_glx_init();
     let mut visual = 0 as *mut Visual;
-    let mut depth = 0 as libc::c_int;
+    let mut depth = 0 as cty::c_int;
     _sapp_glx_choose_visual(&mut visual, &mut depth);
     _sapp_x11_create_window(visual, depth);
     _sapp_glx_create_context();
@@ -2758,7 +2758,7 @@ pub unsafe extern "C" fn sapp_run(mut desc: *const sapp_desc) {
         _sapp_frame();
         _sapp_glx_swap_buffers();
         XFlush(_sapp_x11_display);
-        if _sapp.quit_requested as libc::c_int != 0 && !_sapp.quit_ordered {
+        if _sapp.quit_requested as cty::c_int != 0 && !_sapp.quit_ordered {
             _sapp_x11_app_event(sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED);
             if _sapp.quit_requested {
                 _sapp.quit_ordered = true
@@ -2791,7 +2791,7 @@ pub unsafe extern "C" fn sapp_query_desc() -> sapp_desc {
     return _sapp.desc;
 }
 #[no_mangle]
-pub unsafe extern "C" fn sapp_userdata() -> *mut libc::c_void {
+pub unsafe extern "C" fn sapp_userdata() -> *mut cty::c_void {
     return _sapp.desc.user_data;
 }
 #[no_mangle]
@@ -2819,7 +2819,7 @@ pub unsafe extern "C" fn sapp_set_cursor_grab(mut grab: bool) {
                 | Button4MotionMask
                 | Button5MotionMask
                 | ButtonMotionMask
-                | KeymapStateMask) as libc::c_uint,
+                | KeymapStateMask) as cty::c_uint,
             GrabModeAsync,
             GrabModeAsync,
             _sapp_x11_window,
@@ -2846,7 +2846,7 @@ pub unsafe extern "C" fn sapp_keyboard_shown() -> bool {
 #[no_mangle]
 pub unsafe extern "C" fn sapp_show_keyboard(mut shown: bool) {}
 #[no_mangle]
-pub unsafe extern "C" fn sapp_dpi_scale() -> libc::c_float {
+pub unsafe extern "C" fn sapp_dpi_scale() -> cty::c_float {
     return _sapp.dpi_scale;
 }
 #[no_mangle]
@@ -2854,7 +2854,7 @@ pub unsafe extern "C" fn sapp_high_dpi() -> bool {
     return _sapp.desc.high_dpi && _sapp.dpi_scale > 1.5f32;
 }
 #[no_mangle]
-pub unsafe extern "C" fn sapp_height() -> libc::c_int {
+pub unsafe extern "C" fn sapp_height() -> cty::c_int {
     return if _sapp.framebuffer_height > 0 {
         _sapp.framebuffer_height
     } else {
@@ -2862,7 +2862,7 @@ pub unsafe extern "C" fn sapp_height() -> libc::c_int {
     };
 }
 #[no_mangle]
-pub unsafe extern "C" fn sapp_width() -> libc::c_int {
+pub unsafe extern "C" fn sapp_width() -> cty::c_int {
     return if _sapp.framebuffer_width > 0 {
         _sapp.framebuffer_width
     } else {
@@ -2884,7 +2884,7 @@ pub static mut _sapp: _sapp_state = _sapp_state {
     cleanup_called: false,
     quit_requested: false,
     quit_ordered: false,
-    html5_canvas_name: 0 as *const libc::c_char,
+    html5_canvas_name: 0 as *const cty::c_char,
     html5_ask_leave_site: false,
     window_title: [0; 128],
     window_title_wide: [0; 128],
@@ -2925,7 +2925,7 @@ pub static mut _sapp: _sapp_state = _sapp_state {
         cleanup_cb: None,
         event_cb: None,
         fail_cb: None,
-        user_data: 0 as *const libc::c_void as *mut libc::c_void,
+        user_data: 0 as *const cty::c_void as *mut cty::c_void,
         init_userdata_cb: None,
         frame_userdata_cb: None,
         cleanup_userdata_cb: None,
@@ -2938,9 +2938,9 @@ pub static mut _sapp: _sapp_state = _sapp_state {
         high_dpi: false,
         fullscreen: false,
         alpha: false,
-        window_title: 0 as *const libc::c_char,
+        window_title: 0 as *const cty::c_char,
         user_cursor: false,
-        html5_canvas_name: 0 as *const libc::c_char,
+        html5_canvas_name: 0 as *const cty::c_char,
         html5_canvas_resize: false,
         html5_preserve_drawing_buffer: false,
         html5_premultiplied_alpha: false,

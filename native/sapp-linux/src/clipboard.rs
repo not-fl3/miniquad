@@ -6,12 +6,12 @@ use crate::x::*;
 
 use crate::{_sapp_x11_display, _sapp_x11_window};
 
-const CurrentTime: libc::c_long = 0 as libc::c_long;
-pub(crate) const SelectionRequest: libc::c_int = 30 as libc::c_int;
-pub(crate) const SelectionNotify: libc::c_int = 31 as libc::c_int;
-const AnyPropertyType: libc::c_long = 0 as libc::c_long;
+const CurrentTime: cty::c_long = 0 as cty::c_long;
+pub(crate) const SelectionRequest: cty::c_int = 30 as cty::c_int;
+pub(crate) const SelectionNotify: cty::c_int = 31 as cty::c_int;
+const AnyPropertyType: cty::c_long = 0 as cty::c_long;
 
-type Time = libc::c_ulong;
+type Time = cty::c_ulong;
 
 extern "C" {
     #[no_mangle]
@@ -22,32 +22,32 @@ extern "C" {
         _: Atom,
         _: Window,
         _: Time,
-    ) -> libc::c_int;
+    ) -> cty::c_int;
 
     #[no_mangle]
-    pub fn XSetSelectionOwner(_: *mut Display, _: Atom, _: Window, _: Time) -> libc::c_int;
+    pub fn XSetSelectionOwner(_: *mut Display, _: Atom, _: Window, _: Time) -> cty::c_int;
 }
 
 pub unsafe fn get_clipboard(
-    mut bufname: *const libc::c_char,
-    mut fmtname: *const libc::c_char,
+    mut bufname: *const cty::c_char,
+    mut fmtname: *const cty::c_char,
 ) -> Option<String> {
     assert!(_sapp_x11_display as usize != 0 && _sapp_x11_window != 0);
 
-    let mut result = 0 as *mut libc::c_char;
-    let mut ressize: libc::c_ulong = 0;
-    let mut restail: libc::c_ulong = 0;
-    let mut resbits: libc::c_int = 0;
+    let mut result = 0 as *mut cty::c_char;
+    let mut ressize: cty::c_ulong = 0;
+    let mut restail: cty::c_ulong = 0;
+    let mut resbits: cty::c_int = 0;
     let mut bufid = XInternAtom(_sapp_x11_display, bufname, false as _);
     let mut fmtid = XInternAtom(_sapp_x11_display, fmtname, false as _);
     let mut propid = XInternAtom(
         _sapp_x11_display,
-        b"XSEL_DATA\x00" as *const u8 as *const libc::c_char,
+        b"XSEL_DATA\x00" as *const u8 as *const cty::c_char,
         false as _,
     );
     let mut incrid = XInternAtom(
         _sapp_x11_display,
-        b"INCR\x00" as *const u8 as *const libc::c_char,
+        b"INCR\x00" as *const u8 as *const cty::c_char,
         false as _,
     );
     let mut event = _XEvent { type_0: 0 };
@@ -84,7 +84,7 @@ pub unsafe fn get_clipboard(
             _sapp_x11_display,
             _sapp_x11_window,
             propid,
-            0 as libc::c_int as libc::c_long,
+            0 as cty::c_int as cty::c_long,
             (1024 as u32 * std::mem::size_of::<Atom>() as u32) as _,
             false as _,
             AnyPropertyType as Atom,
@@ -92,16 +92,16 @@ pub unsafe fn get_clipboard(
             &mut resbits,
             &mut ressize,
             &mut restail,
-            &mut result as *mut *mut libc::c_char as *mut *mut libc::c_uchar,
+            &mut result as *mut *mut cty::c_char as *mut *mut cty::c_uchar,
         );
         if fmtid == incrid {
-            XFree(result as *mut libc::c_void);
+            XFree(result as *mut cty::c_void);
             panic!("Buffer is too large and INCR reading is not implemented yet.");
         } else {
             let slice = std::slice::from_raw_parts(result as *const _, ressize as _);
             let str_result = std::str::from_utf8(slice).map(|s| s.to_owned()).ok();
 
-            XFree(result as *mut libc::c_void);
+            XFree(result as *mut cty::c_void);
 
             return str_result;
         }
@@ -115,20 +115,20 @@ static mut MESSAGE: Option<String> = None;
 
 /// Claim that our app is X11 clipboard owner
 /// Now when some other linux app will ask X11 for clipboard content - it will be redirected to our app
-pub unsafe fn claim_clipboard_ownership(mut bufname: *const libc::c_char, message: String) {
+pub unsafe fn claim_clipboard_ownership(mut bufname: *const cty::c_char, message: String) {
     assert!(_sapp_x11_display as usize != 0 && _sapp_x11_window != 0);
 
     let mut selection = XInternAtom(
         _sapp_x11_display,
-        bufname as *const u8 as *const libc::c_char,
-        0 as libc::c_int,
+        bufname as *const u8 as *const cty::c_char,
+        0 as cty::c_int,
     );
 
     XSetSelectionOwner(
         _sapp_x11_display,
         selection,
         _sapp_x11_window,
-        0 as libc::c_int as Time,
+        0 as cty::c_int as Time,
     );
 
     MESSAGE = Some(message);
@@ -145,8 +145,8 @@ pub(crate) unsafe fn respond_to_clipboard_request(event: *const XEvent) {
 
     let UTF8 = XInternAtom(
         _sapp_x11_display,
-        b"UTF8_STRING\x00" as *const u8 as *const libc::c_char,
-        1 as libc::c_int,
+        b"UTF8_STRING\x00" as *const u8 as *const cty::c_char,
+        1 as cty::c_int,
     );
     let xselectionrequest = (*event).xselectionrequest;
     let mut ev = XSelectionEvent {
@@ -168,7 +168,7 @@ pub(crate) unsafe fn respond_to_clipboard_request(event: *const XEvent) {
             xselectionrequest.requestor,
             xselectionrequest.property,
             UTF8,
-            8 as libc::c_int,
+            8 as cty::c_int,
             PropModeReplace,
             message.as_bytes().as_ptr() as *const u8 as *const _,
             message.as_bytes().len() as _,
@@ -177,8 +177,8 @@ pub(crate) unsafe fn respond_to_clipboard_request(event: *const XEvent) {
         XSendEvent(
             _sapp_x11_display,
             ev.requestor,
-            0 as libc::c_int,
-            0 as libc::c_int as libc::c_long,
+            0 as cty::c_int,
+            0 as cty::c_int as cty::c_long,
             &mut ev as *mut XSelectionEvent as *mut XEvent,
         );
     } else {
@@ -188,8 +188,8 @@ pub(crate) unsafe fn respond_to_clipboard_request(event: *const XEvent) {
         XSendEvent(
             _sapp_x11_display,
             ev.requestor,
-            0 as libc::c_int,
-            0 as libc::c_int as libc::c_long,
+            0 as cty::c_int,
+            0 as cty::c_int as cty::c_long,
             &mut ev as *mut XSelectionEvent as *mut XEvent,
         );
     }
