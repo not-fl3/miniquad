@@ -27,8 +27,14 @@ impl Stage {
         ];
         let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
 
+        #[cfg(all(target_os = "macos", feature = "metal"))]
+        vertex_buffer.with_label("QuadVertexBuffer");
+
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
         let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
+
+        #[cfg(all(target_os = "macos", feature = "metal"))]
+        index_buffer.with_label("QuadIntexBuffer");
 
         let pixels: [u8; 4 * 4 * 4] = [
             0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00,
@@ -45,11 +51,23 @@ impl Stage {
             images: vec![texture],
         };
 
+        #[cfg(not(feature = "metal"))]
         let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::META).unwrap();
+
+        #[cfg(all(target_os = "macos", feature = "metal"))]
+        let shader = Shader::new(
+            ctx,
+            &include_bytes!("shaders/quad/quad.metallib")[..],
+            shader::META,
+        )
+        .unwrap();
 
         let pipeline = Pipeline::new(
             ctx,
-            &[BufferLayout::default()],
+            &[BufferLayout {
+                stride: std::mem::size_of::<Vertex>() as i32,
+                ..Default::default()
+            }],
             &[
                 VertexAttribute::new("pos", VertexFormat::Float2),
                 VertexAttribute::new("uv", VertexFormat::Float2),
@@ -94,32 +112,16 @@ fn main() {
 mod shader {
     use miniquad::*;
 
-    pub const VERTEX: &str = r#"#version 100
-    attribute vec2 pos;
-    attribute vec2 uv;
-
-    uniform vec2 offset;
-
-    varying lowp vec2 texcoord;
-
-    void main() {
-        gl_Position = vec4(pos + offset, 0, 1);
-        texcoord = uv;
-    }"#;
-
-    pub const FRAGMENT: &str = r#"#version 100
-    varying lowp vec2 texcoord;
-
-    uniform sampler2D tex;
-
-    void main() {
-        gl_FragColor = texture2D(tex, texcoord);
-    }"#;
+    #[cfg(not(feature = "metal"))]
+    pub const VERTEX: &str = include_str!("shaders/quad/quad_100.vert");
+    #[cfg(not(feature = "metal"))]
+    pub const FRAGMENT: &str = include_str!("shaders/quad/quad_100.frag");
 
     pub const META: ShaderMeta = ShaderMeta {
         images: &["tex"],
         uniforms: UniformBlockLayout {
-            uniforms: &[UniformDesc::new("offset", UniformType::Float2)],
+            // TODO: "offset". How we can set uniform name with spirv-cross ?
+            uniforms: &[UniformDesc::new("_22.offset", UniformType::Float2)],
         },
     };
 

@@ -1,9 +1,9 @@
 #[cfg(target_os = "android")]
 extern crate sapp_android as sapp;
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(feature = "metal")))]
 extern crate sapp_darwin as sapp;
-#[cfg(target_os = "ios")]
-extern crate sapp_ios as sapp;
+#[cfg(all(any(target_os = "macos", target_os = "ios"), feature = "metal"))]
+extern crate sapp_metal as sapp;
 #[cfg(not(any(
     target_os = "linux",
     target_os = "macos",
@@ -13,6 +13,8 @@ extern crate sapp_ios as sapp;
     windows
 )))]
 extern crate sapp_dummy as sapp;
+#[cfg(all(target_os = "ios", not(feature = "metal")))]
+extern crate sapp_ios as sapp;
 #[cfg(target_os = "linux")]
 extern crate sapp_linux as sapp;
 #[cfg(target_arch = "wasm32")]
@@ -20,12 +22,16 @@ extern crate sapp_wasm as sapp;
 #[cfg(windows)]
 extern crate sapp_windows as sapp;
 
+#[cfg(feature = "metal")]
+#[macro_use]
+extern crate objc;
+
 pub mod clipboard;
 pub mod conf;
 mod event;
 pub mod fs;
-pub mod graphics;
 
+pub mod graphics;
 #[cfg(feature = "log-impl")]
 pub mod log;
 
@@ -65,12 +71,12 @@ pub mod date {
     }
 }
 
-impl Context {
+pub trait NativeContext {
     /// This function simply quits the application without
     /// giving the user a chance to intervene. Usually this might
     /// be called when the user clicks the 'Ok' button in a 'Really Quit?'
     /// dialog box
-    pub fn quit(&self) {
+    fn quit(&self) {
         // its not possible to quit wasm anyway
         #[cfg(not(target_arch = "wasm32"))]
         unsafe {
@@ -83,7 +89,7 @@ impl Context {
     /// (for instance to show a 'Really Quit?' dialog box).
     /// If the event handler callback does nothing, the application will be quit as usual.
     /// To prevent this, call the function "cancel_quit()"" from inside the event handler.
-    pub fn request_quit(&self) {
+    fn request_quit(&self) {
         // its not possible to quit wasm anyway
         #[cfg(not(target_arch = "wasm32"))]
         unsafe {
@@ -96,7 +102,7 @@ impl Context {
     /// by calling "request_quit()". The only place where calling this
     /// function makes sense is from inside the event handler callback when
     /// the "quit_requested_event" event has been received
-    pub fn cancel_quit(&self) {
+    fn cancel_quit(&self) {
         // its not possible to quit wasm anyway
         #[cfg(not(target_arch = "wasm32"))]
         unsafe {
@@ -110,7 +116,7 @@ impl Context {
     /// NOTICE: on desktop cursor will not be automatically released after window lost focus
     ///         so set_cursor_grab(false) on window's focus lost is recommended.
     /// TODO: implement window focus events
-    pub fn set_cursor_grab(&self, grab: bool) {
+    fn set_cursor_grab(&self, grab: bool) {
         #[cfg(not(target_os = "ios"))]
         unsafe {
             sapp::sapp_set_cursor_grab(grab);
@@ -118,12 +124,14 @@ impl Context {
     }
 
     /// Show or hide the mouse cursor
-    pub fn show_mouse(&self, shown: bool) {
+    fn show_mouse(&self, shown: bool) {
         unsafe {
             sapp::sapp_show_mouse(shown);
         }
     }
 }
+
+impl NativeContext for Context {}
 
 pub enum UserData {
     Owning((Box<dyn EventHandler>, Context)),

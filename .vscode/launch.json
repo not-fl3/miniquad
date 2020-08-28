@@ -1,0 +1,288 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'miniquad'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "miniquad",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'instancing'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=instancing",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "instancing",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'instancing'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=instancing",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "instancing",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'window_free'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=window_free",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "window_free",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'window_free'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=window_free",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "window_free",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'quad'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=quad",
+                    "--package=miniquad",
+                    "--no-default-features",
+                    "--features=metal"
+                ],
+                "filter": {
+                    "name": "quad",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'quad'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=quad",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "quad",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'window_owned'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=window_owned",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "window_owned",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'window_owned'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=window_owned",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "window_owned",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'offscreen'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=offscreen",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "offscreen",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'offscreen'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=offscreen",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "offscreen",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'blobs'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=blobs",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "blobs",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'blobs'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=blobs",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "blobs",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'post_processing'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=post_processing",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "post_processing",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'post_processing'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=post_processing",
+                    "--package=miniquad"
+                ],
+                "filter": {
+                    "name": "post_processing",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

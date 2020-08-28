@@ -10,12 +10,13 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-latest, target: 'x86_64-unknown-linux-gnu' }
-          - { os: ubuntu-latest, target: 'x86_64-pc-windows-gnu' }
-          - { os: ubuntu-latest, target: 'wasm32-unknown-unknown' }
-          - { os: macos-latest, target: 'x86_64-apple-darwin' }
-          - { os: macos-latest, target: 'aarch64-apple-ios' }
-          - { os: macos-latest, target: 'x86_64-apple-ios' }
+          - { os: ubuntu-latest, target: 'x86_64-unknown-linux-gnu', build_args: '--all-targets' }
+          - { os: ubuntu-latest, target: 'x86_64-pc-windows-gnu', build_args: '--all-targets' }
+          - { os: ubuntu-latest, target: 'wasm32-unknown-unknown', build_args: '--all-targets' }
+          - { os: macos-latest, target: 'x86_64-apple-darwin', build_args: '--all-targets' }
+          - { os: macos-latest, target: 'x86_64-apple-darwin', build_args: '--example quad --no-default-features --features metal' }
+          - { os: macos-latest, target: 'aarch64-apple-ios', build_args: '--all-targets' }
+          - { os: macos-latest, target: 'x86_64-apple-ios', build_args: '--all-targets' }
           - { os: windows-latest, target: 'x86_64-pc-windows-msvc' }
         include:
           - os: ubuntu-latest
@@ -28,11 +29,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get -yq --no-install-suggests --no-install-recommends install ${{ matrix.packages }}
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: ${{ matrix.config.target }}
-          override: true
       - name: Workaround MinGW issue # https://github.com/rust-lang/rust/issues/47048
         if: runner.os == 'Linux' && matrix.config.target == 'x86_64-pc-windows-gnu'
         run: |
@@ -40,7 +36,9 @@ jobs:
           sudo cp /usr/x86_64-w64-mingw32/lib/crt2.o  ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-pc-windows-gnu/lib/crt2.o
           echo "[target.x86_64-pc-windows-gnu]" >> ~/.cargo/config
           echo "linker = \"/usr/bin/x86_64-w64-mingw32-gcc\"" >> ~/.cargo/config
-      - uses: actions-rs/cargo@v1
+      - uses: actions-rs/toolchain@v1
         with:
-          command: build
-          args: --all-targets --target=${{ matrix.config.target }}
+          toolchain: stable
+          target: ${{ matrix.config.target }}
+          override: true
+      - run: cargo build ${{ matrix.config.build_args }}

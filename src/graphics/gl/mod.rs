@@ -1,12 +1,11 @@
-use std::{ffi::CString, mem};
-
 mod texture;
 
+pub use texture::*;
+
+use std::{ffi::CString, mem};
+
+use crate::graphics::*;
 use crate::sapp::*;
-
-use std::{error::Error, fmt::Display};
-
-pub use texture::{FilterMode, Texture, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 
 fn get_uniform_location(program: GLuint, name: &str) -> i32 {
     let cname = CString::new(name).unwrap_or_else(|e| panic!(e));
@@ -20,137 +19,7 @@ fn get_uniform_location(program: GLuint, name: &str) -> i32 {
     location
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum UniformType {
-    Float1,
-    Float2,
-    Float3,
-    Float4,
-    Int1,
-    Int2,
-    Int3,
-    Int4,
-    Mat4,
-}
-
-impl UniformType {
-    fn size(&self, count: usize) -> usize {
-        match self {
-            UniformType::Float1 => 4 * count,
-            UniformType::Float2 => 8 * count,
-            UniformType::Float3 => 12 * count,
-            UniformType::Float4 => 16 * count,
-            UniformType::Int1 => 4 * count,
-            UniformType::Int2 => 8 * count,
-            UniformType::Int3 => 12 * count,
-            UniformType::Int4 => 16 * count,
-            UniformType::Mat4 => 64 * count,
-        }
-    }
-}
-
-pub struct UniformDesc {
-    name: &'static str,
-    uniform_type: UniformType,
-    array_count: usize,
-}
-
-pub struct UniformBlockLayout {
-    pub uniforms: &'static [UniformDesc],
-}
-
-impl UniformDesc {
-    pub const fn new(name: &'static str, uniform_type: UniformType) -> UniformDesc {
-        UniformDesc {
-            name,
-            uniform_type,
-            array_count: 1,
-        }
-    }
-    pub const fn with_array(
-        name: &'static str,
-        uniform_type: UniformType,
-        array_count: usize,
-    ) -> UniformDesc {
-        UniformDesc {
-            name,
-            uniform_type,
-            array_count,
-        }
-    }
-}
-
-pub struct ShaderMeta {
-    pub uniforms: UniformBlockLayout,
-    pub images: &'static [&'static str],
-}
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum VertexFormat {
-    Float1,
-    Float2,
-    Float3,
-    Float4,
-    Byte1,
-    Byte2,
-    Byte3,
-    Byte4,
-    Short1,
-    Short2,
-    Short3,
-    Short4,
-    Int1,
-    Int2,
-    Int3,
-    Int4,
-    Mat4,
-}
-
 impl VertexFormat {
-    pub fn size(&self) -> i32 {
-        match self {
-            VertexFormat::Float1 => 1,
-            VertexFormat::Float2 => 2,
-            VertexFormat::Float3 => 3,
-            VertexFormat::Float4 => 4,
-            VertexFormat::Byte1 => 1,
-            VertexFormat::Byte2 => 2,
-            VertexFormat::Byte3 => 3,
-            VertexFormat::Byte4 => 4,
-            VertexFormat::Short1 => 1,
-            VertexFormat::Short2 => 2,
-            VertexFormat::Short3 => 3,
-            VertexFormat::Short4 => 4,
-            VertexFormat::Int1 => 1,
-            VertexFormat::Int2 => 2,
-            VertexFormat::Int3 => 3,
-            VertexFormat::Int4 => 4,
-            VertexFormat::Mat4 => 16,
-        }
-    }
-
-    pub fn byte_len(&self) -> i32 {
-        match self {
-            VertexFormat::Float1 => 1 * 4,
-            VertexFormat::Float2 => 2 * 4,
-            VertexFormat::Float3 => 3 * 4,
-            VertexFormat::Float4 => 4 * 4,
-            VertexFormat::Byte1 => 1,
-            VertexFormat::Byte2 => 2,
-            VertexFormat::Byte3 => 3,
-            VertexFormat::Byte4 => 4,
-            VertexFormat::Short1 => 1 * 2,
-            VertexFormat::Short2 => 2 * 2,
-            VertexFormat::Short3 => 3 * 2,
-            VertexFormat::Short4 => 4 * 2,
-            VertexFormat::Int1 => 1 * 4,
-            VertexFormat::Int2 => 2 * 4,
-            VertexFormat::Int3 => 3 * 4,
-            VertexFormat::Int4 => 4 * 4,
-            VertexFormat::Mat4 => 16 * 4,
-        }
-    }
-
     fn type_(&self) -> GLuint {
         match self {
             VertexFormat::Float1 => GL_FLOAT,
@@ -173,104 +42,6 @@ impl VertexFormat {
         }
     }
 }
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum VertexStep {
-    PerVertex,
-    PerInstance,
-}
-
-impl Default for VertexStep {
-    fn default() -> VertexStep {
-        VertexStep::PerVertex
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct BufferLayout {
-    pub stride: i32,
-    pub step_func: VertexStep,
-    pub step_rate: i32,
-}
-
-impl Default for BufferLayout {
-    fn default() -> BufferLayout {
-        BufferLayout {
-            stride: 0,
-            step_func: VertexStep::PerVertex,
-            step_rate: 1,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct VertexAttribute {
-    pub name: &'static str,
-    pub format: VertexFormat,
-    pub buffer_index: usize,
-}
-
-impl VertexAttribute {
-    pub const fn new(name: &'static str, format: VertexFormat) -> VertexAttribute {
-        Self::with_buffer(name, format, 0)
-    }
-
-    pub const fn with_buffer(
-        name: &'static str,
-        format: VertexFormat,
-        buffer_index: usize,
-    ) -> VertexAttribute {
-        VertexAttribute {
-            name,
-            format,
-            buffer_index,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct PipelineLayout {
-    pub buffers: &'static [BufferLayout],
-    pub attributes: &'static [VertexAttribute],
-}
-
-#[derive(Clone, Debug, Copy)]
-pub enum ShaderType {
-    Vertex,
-    Fragment,
-}
-
-#[derive(Clone, Debug)]
-pub enum ShaderError {
-    CompilationError {
-        shader_type: ShaderType,
-        error_message: String,
-    },
-    LinkError(String),
-    /// Shader strings should never contains \00 in the middle
-    FFINulError(std::ffi::NulError),
-}
-
-impl From<std::ffi::NulError> for ShaderError {
-    fn from(e: std::ffi::NulError) -> ShaderError {
-        ShaderError::FFINulError(e)
-    }
-}
-
-impl Display for ShaderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self) // Display the same way as Debug
-    }
-}
-
-impl Error for ShaderError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
-}
-
-#[derive(Clone, Debug, Copy)]
-pub struct Shader(usize);
 
 impl Shader {
     pub fn new(
@@ -303,102 +74,6 @@ struct ShaderInternal {
     images: Vec<ShaderImage>,
     uniforms: Vec<ShaderUniform>,
 }
-
-/// Pixel arithmetic description for blending operations.
-/// Will be used in an equation:
-/// `equation(sfactor * source_color, dfactor * destination_color)`
-/// Where source_color is the new pixel color and destination color is color from the destination buffer.
-///
-/// Example:
-///```
-///# use miniquad::{BlendState, BlendFactor, BlendValue, Equation};
-///BlendState::new(
-///    Equation::Add,
-///    BlendFactor::Value(BlendValue::SourceAlpha),
-///    BlendFactor::OneMinusValue(BlendValue::SourceAlpha)
-///);
-///```
-/// This will be `source_color * source_color.a + destination_color * (1 - source_color.a)`
-/// Wich is quite common set up for alpha blending.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct BlendState {
-    equation: Equation,
-    sfactor: BlendFactor,
-    dfactor: BlendFactor,
-}
-
-impl BlendState {
-    pub fn new(equation: Equation, sfactor: BlendFactor, dfactor: BlendFactor) -> BlendState {
-        BlendState {
-            equation,
-            sfactor,
-            dfactor,
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct StencilState {
-    pub front: StencilFaceState,
-    pub back: StencilFaceState,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct StencilFaceState {
-    /// Operation to use when stencil test fails
-    pub fail_op: StencilOp,
-
-    /// Operation to use when stencil test passes, but depth test fails
-    pub depth_fail_op: StencilOp,
-
-    /// Operation to use when both stencil and depth test pass,
-    /// or when stencil pass and no depth or depth disabled
-    pub pass_op: StencilOp,
-
-    /// Used for stencil testing with test_ref and test_mask: if (test_ref & test_mask) *test_func* (*stencil* && test_mask)
-    /// Default is Always, which means "always pass"
-    pub test_func: CompareFunc,
-
-    /// Default value: 0
-    pub test_ref: i32,
-
-    /// Default value: all 1s
-    pub test_mask: u32,
-
-    /// Specifies a bit mask to enable or disable writing of individual bits in the stencil planes
-    /// Default value: all 1s
-    pub write_mask: u32,
-}
-
-/// Operations performed on current stencil value when comparison test passes or fails.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum StencilOp {
-    /// Default value
-    Keep,
-    Zero,
-    Replace,
-    IncrementClamp,
-    DecrementClamp,
-    Invert,
-    IncrementWrap,
-    DecrementWrap,
-}
-
-/// Depth and stencil compare function
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum CompareFunc {
-    /// Default value
-    Always,
-    Never,
-    Less,
-    Equal,
-    LessOrEqual,
-    Greater,
-    NotEqual,
-    GreaterOrEqual,
-}
-
-type ColorMask = (bool, bool, bool, bool);
 
 #[derive(Default, Copy, Clone)]
 struct CachedAttribute {
@@ -493,38 +168,6 @@ impl GlCache {
     }
 }
 
-pub enum PassAction {
-    Nothing,
-    Clear {
-        color: Option<(f32, f32, f32, f32)>,
-        depth: Option<f32>,
-        stencil: Option<i32>,
-    },
-}
-
-impl PassAction {
-    pub fn clear_color(r: f32, g: f32, b: f32, a: f32) -> PassAction {
-        PassAction::Clear {
-            color: Some((r, g, b, a)),
-            depth: Some(1.),
-            stencil: None,
-        }
-    }
-}
-
-impl Default for PassAction {
-    fn default() -> PassAction {
-        PassAction::Clear {
-            color: Some((0.0, 0.0, 0.0, 0.0)),
-            depth: Some(1.),
-            stencil: None,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct RenderPass(usize);
-
 struct RenderPassInternal {
     gl_fb: GLuint,
     texture: Texture,
@@ -585,9 +228,6 @@ impl RenderPass {
     }
 }
 
-pub const MAX_VERTEX_ATTRIBUTES: usize = 16;
-pub const MAX_SHADERSTAGE_IMAGES: usize = 12;
-
 pub struct Context {
     shaders: Vec<ShaderInternal>,
     pipelines: Vec<PipelineInternal>,
@@ -631,26 +271,10 @@ impl Context {
             }
         }
     }
+}
 
-    /// The current framebuffer size in pixels
-    /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
-    pub fn screen_size(&self) -> (f32, f32) {
-        unsafe { (sapp_width() as f32, sapp_height() as f32) }
-    }
-
-    /// The dpi scaling factor (window pixels to framebuffer pixels)
-    /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
-    pub fn dpi_scale(&self) -> f32 {
-        unsafe { sapp_dpi_scale() }
-    }
-
-    /// True when high_dpi was requested and actually running in a high-dpi scenario
-    /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
-    pub fn high_dpi(&self) -> bool {
-        unsafe { sapp_high_dpi() }
-    }
-
-    pub fn apply_pipeline(&mut self, pipeline: &Pipeline) {
+impl GraphicContext for Context {
+    fn apply_pipeline(&mut self, pipeline: &Pipeline) {
         self.cache.cur_pipeline = Some(*pipeline);
 
         {
@@ -695,7 +319,7 @@ impl Context {
         self.set_color_write(self.pipelines[pipeline.0].params.color_write);
     }
 
-    pub fn set_cull_face(&mut self, cull_face: CullFace) {
+    fn set_cull_face(&mut self, cull_face: CullFace) {
         if self.cache.cull_face == cull_face {
             return;
         }
@@ -716,7 +340,7 @@ impl Context {
         self.cache.cull_face = cull_face;
     }
 
-    pub fn set_color_write(&mut self, color_write: ColorMask) {
+    fn set_color_write(&mut self, color_write: ColorMask) {
         if self.cache.color_write == color_write {
             return;
         }
@@ -725,7 +349,7 @@ impl Context {
         self.cache.color_write = color_write;
     }
 
-    pub fn set_blend(&mut self, color_blend: Option<BlendState>, alpha_blend: Option<BlendState>) {
+    fn set_blend(&mut self, color_blend: Option<BlendState>, alpha_blend: Option<BlendState>) {
         if color_blend.is_none() && alpha_blend.is_some() {
             panic!("AlphaBlend without ColorBlend");
         }
@@ -770,7 +394,7 @@ impl Context {
         self.cache.alpha_blend = alpha_blend;
     }
 
-    pub fn set_stencil(&mut self, stencil_test: Option<StencilState>) {
+    fn set_stencil(&mut self, stencil_test: Option<StencilState>) {
         if self.cache.stencil == stencil_test {
             return;
         }
@@ -817,13 +441,13 @@ impl Context {
         self.cache.stencil = stencil_test;
     }
 
-    pub fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
+    fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
         unsafe {
             glScissor(x, y, w, h);
         }
     }
 
-    pub fn apply_bindings(&mut self, bindings: &Bindings) {
+    fn apply_bindings(&mut self, bindings: &Bindings) {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let shader = &self.shaders[pip.shader.0];
 
@@ -886,7 +510,7 @@ impl Context {
         }
     }
 
-    pub fn apply_uniforms<U>(&mut self, uniforms: &U) {
+    fn apply_uniforms<U>(&mut self, uniforms: &U) {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let shader = &self.shaders[pip.shader.0];
 
@@ -938,12 +562,7 @@ impl Context {
         }
     }
 
-    pub fn clear(
-        &self,
-        color: Option<(f32, f32, f32, f32)>,
-        depth: Option<f32>,
-        stencil: Option<i32>,
-    ) {
+    fn clear(&self, color: Option<(f32, f32, f32, f32)>, depth: Option<f32>, stencil: Option<i32>) {
         let mut bits = 0;
         if let Some((r, g, b, a)) = color {
             bits |= GL_COLOR_BUFFER_BIT;
@@ -974,12 +593,12 @@ impl Context {
     }
 
     /// start rendering to the default frame buffer
-    pub fn begin_default_pass(&mut self, action: PassAction) {
+    fn begin_default_pass(&mut self, action: PassAction) {
         self.begin_pass(None, action);
     }
 
     /// start rendering to an offscreen framebuffer
-    pub fn begin_pass(&mut self, pass: impl Into<Option<RenderPass>>, action: PassAction) {
+    fn begin_pass(&mut self, pass: impl Into<Option<RenderPass>>, action: PassAction) {
         let (framebuffer, w, h) = match pass.into() {
             None => (
                 self.default_framebuffer,
@@ -1012,7 +631,7 @@ impl Context {
         }
     }
 
-    pub fn end_render_pass(&mut self) {
+    fn end_render_pass(&mut self) {
         unsafe {
             glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
             self.cache.bind_buffer(GL_ARRAY_BUFFER, 0);
@@ -1020,12 +639,12 @@ impl Context {
         }
     }
 
-    pub fn commit_frame(&mut self) {
+    fn commit_frame(&mut self) {
         self.cache.clear_buffer_bindings();
         self.cache.clear_texture_bindings();
     }
 
-    pub fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32) {
+    fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32) {
         assert!(
             self.cache.cur_pipeline.is_some(),
             "Drawing without any binded pipeline"
@@ -1150,34 +769,6 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderEr
     }
 }
 
-/// Specify whether front- or back-facing polygons can be culled.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum CullFace {
-    Nothing,
-    Front,
-    Back,
-}
-
-/// Define front- and back-facing polygons.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum FrontFaceOrder {
-    Clockwise,
-    CounterClockwise,
-}
-
-/// A pixel-wise comparison function.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Comparison {
-    Never,
-    Less,
-    LessOrEqual,
-    Greater,
-    GreaterOrEqual,
-    Equal,
-    NotEqual,
-    Always,
-}
-
 impl From<Comparison> for GLenum {
     fn from(cmp: Comparison) -> Self {
         match cmp {
@@ -1190,46 +781,6 @@ impl From<Comparison> for GLenum {
             Comparison::NotEqual => GL_NOTEQUAL,
             Comparison::Always => GL_ALWAYS,
         }
-    }
-}
-
-/// Specifies how incoming RGBA values (source) and the RGBA in framebuffer (destination)
-/// are combined.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Equation {
-    /// Adds source and destination. Source and destination are multiplied
-    /// by blending parameters before addition.
-    Add,
-    /// Subtracts destination from source. Source and destination are
-    /// multiplied by blending parameters before subtraction.
-    Subtract,
-    /// Subtracts source from destination. Source and destination are
-    /// multiplied by blending parameters before subtraction.
-    ReverseSubtract,
-}
-
-/// Blend values.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum BlendValue {
-    SourceColor,
-    SourceAlpha,
-    DestinationColor,
-    DestinationAlpha,
-}
-
-/// Blend factors.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum BlendFactor {
-    Zero,
-    One,
-    Value(BlendValue),
-    OneMinusValue(BlendValue),
-    SourceAlphaSaturate,
-}
-
-impl Default for Equation {
-    fn default() -> Equation {
-        Equation::Add
     }
 }
 
@@ -1291,12 +842,6 @@ impl From<CompareFunc> for GLenum {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum PrimitiveType {
-    Triangles,
-    Lines,
-}
-
 impl From<PrimitiveType> for GLenum {
     fn from(primitive_type: PrimitiveType) -> Self {
         match primitive_type {
@@ -1306,70 +851,48 @@ impl From<PrimitiveType> for GLenum {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct PipelineParams {
-    pub cull_face: CullFace,
-    pub front_face_order: FrontFaceOrder,
-    pub depth_test: Comparison,
-    pub depth_write: bool,
-    pub depth_write_offset: Option<(f32, f32)>,
-    /// Color (RGB) blend function. If None - blending will be disabled for this pipeline.
-    /// Usual use case to get alpha-blending:
-    ///```
-    ///# use miniquad::{PipelineParams, BlendState, BlendValue, BlendFactor, Equation};
-    ///PipelineParams {
-    ///    color_blend: Some(BlendState::new(
-    ///        Equation::Add,
-    ///        BlendFactor::Value(BlendValue::SourceAlpha),
-    ///        BlendFactor::OneMinusValue(BlendValue::SourceAlpha))
-    ///    ),
-    ///    ..Default::default()
-    ///};
-    ///```
-    pub color_blend: Option<BlendState>,
-    /// Alpha blend function. If None - alpha will be blended with same equation than RGB colors.
-    /// One of possible separate alpha channel blend settings is to avoid blending with WebGl background.
-    /// On webgl canvas's resulting alpha channel will be used to blend the whole canvas background.
-    /// To avoid modifying only alpha channel, but keep usual transparency:
-    ///```
-    ///# use miniquad::{PipelineParams, BlendState, BlendValue, BlendFactor, Equation};
-    ///PipelineParams {
-    ///    color_blend: Some(BlendState::new(
-    ///        Equation::Add,
-    ///        BlendFactor::Value(BlendValue::SourceAlpha),
-    ///        BlendFactor::OneMinusValue(BlendValue::SourceAlpha))
-    ///    ),
-    ///    alpha_blend: Some(BlendState::new(
-    ///        Equation::Add,
-    ///        BlendFactor::Zero,
-    ///        BlendFactor::One)
-    ///    ),
-    ///    ..Default::default()
-    ///};
-    ///```
-    /// The same results may be achieved with ColorMask(true, true, true, false)
-    pub alpha_blend: Option<BlendState>,
-    pub stencil_test: Option<StencilState>,
-    pub color_write: ColorMask,
-    pub primitive_type: PrimitiveType,
-}
+impl VertexFormat {
+    pub fn size(&self) -> i32 {
+        match self {
+            VertexFormat::Float1 => 1,
+            VertexFormat::Float2 => 2,
+            VertexFormat::Float3 => 3,
+            VertexFormat::Float4 => 4,
+            VertexFormat::Byte1 => 1,
+            VertexFormat::Byte2 => 2,
+            VertexFormat::Byte3 => 3,
+            VertexFormat::Byte4 => 4,
+            VertexFormat::Short1 => 1,
+            VertexFormat::Short2 => 2,
+            VertexFormat::Short3 => 3,
+            VertexFormat::Short4 => 4,
+            VertexFormat::Int1 => 1,
+            VertexFormat::Int2 => 2,
+            VertexFormat::Int3 => 3,
+            VertexFormat::Int4 => 4,
+            VertexFormat::Mat4 => 16,
+        }
+    }
 
-#[derive(Copy, Clone, Debug)]
-pub struct Pipeline(usize);
-
-impl Default for PipelineParams {
-    fn default() -> PipelineParams {
-        PipelineParams {
-            cull_face: CullFace::Nothing,
-            front_face_order: FrontFaceOrder::CounterClockwise,
-            depth_test: Comparison::Always, // no depth test,
-            depth_write: false,             // no depth write,
-            depth_write_offset: None,
-            color_blend: None,
-            alpha_blend: None,
-            stencil_test: None,
-            color_write: (true, true, true, true),
-            primitive_type: PrimitiveType::Triangles,
+    pub fn byte_len(&self) -> i32 {
+        match self {
+            VertexFormat::Float1 => 1 * 4,
+            VertexFormat::Float2 => 2 * 4,
+            VertexFormat::Float3 => 3 * 4,
+            VertexFormat::Float4 => 4 * 4,
+            VertexFormat::Byte1 => 1,
+            VertexFormat::Byte2 => 2,
+            VertexFormat::Byte3 => 3,
+            VertexFormat::Byte4 => 4,
+            VertexFormat::Short1 => 1 * 2,
+            VertexFormat::Short2 => 2 * 2,
+            VertexFormat::Short3 => 3 * 2,
+            VertexFormat::Short4 => 4 * 2,
+            VertexFormat::Int1 => 1 * 4,
+            VertexFormat::Int2 => 2 * 4,
+            VertexFormat::Int3 => 3 * 4,
+            VertexFormat::Int4 => 4 * 4,
+            VertexFormat::Mat4 => 16 * 4,
         }
     }
 }
@@ -1522,26 +1045,6 @@ struct PipelineInternal {
     params: PipelineParams,
 }
 
-#[derive(Clone, Debug)]
-pub struct Bindings {
-    pub vertex_buffers: Vec<Buffer>,
-    pub index_buffer: Buffer,
-    pub images: Vec<Texture>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum BufferType {
-    VertexBuffer,
-    IndexBuffer,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Usage {
-    Immutable,
-    Dynamic,
-    Stream,
-}
-
 fn gl_buffer_target(buffer_type: &BufferType) -> GLenum {
     match buffer_type {
         BufferType::VertexBuffer => GL_ARRAY_BUFFER,
@@ -1658,5 +1161,14 @@ impl Buffer {
     /// this function is not marked as unsafe
     pub fn delete(&self) {
         unsafe { glDeleteBuffers(1, &self.gl_buf as *const _) }
+    }
+}
+
+impl FilterMode {
+    pub fn type_(self) -> GLuint {
+        match self {
+            FilterMode::Linear => GL_LINEAR,
+            FilterMode::Nearest => GL_NEAREST,
+        }
     }
 }

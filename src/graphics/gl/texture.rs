@@ -1,4 +1,7 @@
-use crate::{sapp::*, Context};
+use crate::{
+    sapp::*, Context, FilterMode, GraphicTexture, TextureAccess, TextureFormat, TextureParams,
+    TextureWrap,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Texture {
@@ -32,17 +35,6 @@ impl Texture {
     }
 }
 
-/// List of all the possible formats of input data when uploading to texture.
-/// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
-#[repr(u8)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum TextureFormat {
-    RGB8,
-    RGBA8,
-    Depth,
-    Alpha,
-}
-
 /// Converts from TextureFormat to (internal_format, format, pixel_type)
 impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
     fn from(format: TextureFormat) -> Self {
@@ -54,19 +46,6 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
             TextureFormat::Alpha => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
             #[cfg(not(target_arch = "wasm32"))]
             TextureFormat::Alpha => (GL_R8, GL_RED, GL_UNSIGNED_BYTE), // texture updates will swizzle Red -> Alpha to match WASM
-        }
-    }
-}
-
-impl TextureFormat {
-    /// Returns the size in bytes of texture with `dimensions`.
-    pub fn size(self, width: u32, height: u32) -> u32 {
-        let square = width * height;
-        match self {
-            TextureFormat::RGB8 => 3 * square,
-            TextureFormat::RGBA8 => 4 * square,
-            TextureFormat::Depth => 2 * square,
-            TextureFormat::Alpha => 1 * square,
         }
     }
 }
@@ -83,50 +62,12 @@ impl Default for TextureParams {
     }
 }
 
-/// Sets the wrap parameter for texture.
-#[repr(u8)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum TextureWrap {
-    /// Samples at coord x + 1 map to coord x.
-    Repeat,
-    /// Samples at coord x + 1 map to coord 1 - x.
-    Mirror,
-    /// Samples at coord x + 1 map to coord 1.
-    Clamp,
-    /// Same as Mirror, but only for one repetition.
-    MirrorClamp,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum FilterMode {
-    Linear = GL_LINEAR as isize,
-    Nearest = GL_NEAREST as isize,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum TextureAccess {
-    /// Used as read-only from GPU
-    Static,
-    /// Can be written to from GPU
-    RenderTarget,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct TextureParams {
-    pub format: TextureFormat,
-    pub wrap: TextureWrap,
-    pub filter: FilterMode,
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Texture {
-    /// Shorthand for `new(ctx, TextureAccess::RenderTarget, params)`
-    pub fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
+impl GraphicTexture for Texture {
+    fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
         Self::new(ctx, TextureAccess::RenderTarget, None, params)
     }
 
-    pub fn new(
+    fn new(
         ctx: &mut Context,
         _access: TextureAccess,
         bytes: Option<&[u8]>,
@@ -179,8 +120,16 @@ impl Texture {
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, params.filter as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, params.filter as i32);
+            glTexParameteri(
+                GL_TEXTURE_2D,
+                GL_TEXTURE_MIN_FILTER,
+                params.filter.type_() as i32,
+            );
+            glTexParameteri(
+                GL_TEXTURE_2D,
+                GL_TEXTURE_MAG_FILTER,
+                params.filter.type_() as i32,
+            );
         }
         ctx.cache.restore_texture_binding(0);
 
@@ -192,13 +141,11 @@ impl Texture {
         }
     }
 
-    /// Upload texture to GPU with given TextureParams
-    pub fn from_data_and_format(ctx: &mut Context, bytes: &[u8], params: TextureParams) -> Texture {
+    fn from_data_and_format(ctx: &mut Context, bytes: &[u8], params: TextureParams) -> Texture {
         Self::new(ctx, TextureAccess::Static, Some(bytes), params)
     }
 
-    /// Upload RGBA8 texture to GPU
-    pub fn from_rgba8(ctx: &mut Context, width: u16, height: u16, bytes: &[u8]) -> Texture {
+    fn from_rgba8(ctx: &mut Context, width: u16, height: u16, bytes: &[u8]) -> Texture {
         assert_eq!(width as usize * height as usize * 4, bytes.len());
 
         Self::from_data_and_format(
@@ -214,7 +161,7 @@ impl Texture {
         )
     }
 
-    pub fn set_filter(&self, ctx: &mut Context, filter: FilterMode) {
+    fn set_filter(&self, ctx: &mut Context, filter: FilterMode) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
         unsafe {
@@ -224,7 +171,7 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
     }
 
-    pub fn resize(&mut self, ctx: &mut Context, width: u32, height: u32, bytes: Option<&[u8]>) {
+    fn resize(&mut self, ctx: &mut Context, width: u32, height: u32, bytes: Option<&[u8]>) {
         ctx.cache.store_texture_binding(0);
 
         let (internal_format, format, pixel_type) = self.format.into();
@@ -252,9 +199,7 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
     }
 
-    /// Update whole texture content
-    /// bytes should be width * height * 4 size - non rgba8 textures are not supported yet anyway
-    pub fn update(&self, ctx: &mut Context, bytes: &[u8]) {
+    fn update(&self, ctx: &mut Context, bytes: &[u8]) {
         assert_eq!(self.size(self.width, self.height), bytes.len());
 
         self.update_texture_part(
@@ -267,7 +212,7 @@ impl Texture {
         )
     }
 
-    pub fn update_texture_part(
+    fn update_texture_part(
         &self,
         ctx: &mut Context,
         x_offset: i32,
