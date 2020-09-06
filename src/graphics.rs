@@ -573,6 +573,12 @@ impl RenderPass {
         RenderPass(context.passes.len() - 1)
     }
 
+    pub fn texture(&self, ctx: &mut Context) -> Texture {
+        let render_pass = &mut ctx.passes[self.0];
+
+        render_pass.texture
+    }
+
     pub fn delete(&self, ctx: &mut Context) {
         let render_pass = &mut ctx.passes[self.0];
 
