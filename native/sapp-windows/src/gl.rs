@@ -1,3 +1,5 @@
+use super::{_sapp_wglGetProcAddress, GetProcAddress, _sapp_opengl32};
+
 pub type GLenum = ::std::os::raw::c_uint;
 pub type GLboolean = ::std::os::raw::c_uchar;
 pub type GLbitfield = ::std::os::raw::c_uint;
@@ -238,6 +240,54 @@ pub const GL_TEXTURE_SWIZZLE_B: u32 = 36420;
 pub const GL_TEXTURE_SWIZZLE_A: u32 = 36421;
 pub const GL_TEXTURE_SWIZZLE_RGBA: u32 = 36422;
 
+pub const WGL_NUMBER_PIXEL_FORMATS_ARB: u32 = 0x2000;
+pub const WGL_SUPPORT_OPENGL_ARB: u32 = 0x2010;
+pub const WGL_DRAW_TO_WINDOW_ARB: u32 = 0x2001;
+pub const WGL_PIXEL_TYPE_ARB: u32 = 0x2013;
+pub const WGL_TYPE_RGBA_ARB: u32 = 0x202b;
+pub const WGL_ACCELERATION_ARB: u32 = 0x2003;
+pub const WGL_NO_ACCELERATION_ARB: u32 = 0x2025;
+pub const WGL_RED_BITS_ARB: u32 = 0x2015;
+pub const WGL_RED_SHIFT_ARB: u32 = 0x2016;
+pub const WGL_GREEN_BITS_ARB: u32 = 0x2017;
+pub const WGL_GREEN_SHIFT_ARB: u32 = 0x2018;
+pub const WGL_BLUE_BITS_ARB: u32 = 0x2019;
+pub const WGL_BLUE_SHIFT_ARB: u32 = 0x201a;
+pub const WGL_ALPHA_BITS_ARB: u32 = 0x201b;
+pub const WGL_ALPHA_SHIFT_ARB: u32 = 0x201c;
+pub const WGL_ACCUM_BITS_ARB: u32 = 0x201d;
+pub const WGL_ACCUM_RED_BITS_ARB: u32 = 0x201e;
+pub const WGL_ACCUM_GREEN_BITS_ARB: u32 = 0x201f;
+pub const WGL_ACCUM_BLUE_BITS_ARB: u32 = 0x2020;
+pub const WGL_ACCUM_ALPHA_BITS_ARB: u32 = 0x2021;
+pub const WGL_DEPTH_BITS_ARB: u32 = 0x2022;
+pub const WGL_STENCIL_BITS_ARB: u32 = 0x2023;
+pub const WGL_AUX_BUFFERS_ARB: u32 = 0x2024;
+pub const WGL_STEREO_ARB: u32 = 0x2012;
+pub const WGL_DOUBLE_BUFFER_ARB: u32 = 0x2011;
+pub const WGL_SAMPLES_ARB: u32 = 0x2042;
+pub const WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB: u32 = 0x20a9;
+pub const WGL_CONTEXT_DEBUG_BIT_ARB: u32 = 0x00000001;
+pub const WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB: u32 = 0x00000002;
+pub const WGL_CONTEXT_PROFILE_MASK_ARB: u32 = 0x9126;
+pub const WGL_CONTEXT_CORE_PROFILE_BIT_ARB: u32 = 0x00000001;
+pub const WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB: u32 = 0x00000002;
+pub const WGL_CONTEXT_MAJOR_VERSION_ARB: u32 = 0x2091;
+pub const WGL_CONTEXT_MINOR_VERSION_ARB: u32 = 0x2092;
+pub const WGL_CONTEXT_FLAGS_ARB: u32 = 0x2094;
+pub const WGL_CONTEXT_ROBUST_ACCESS_BIT_ARB: u32 = 0x00000004;
+pub const WGL_LOSE_CONTEXT_ON_RESET_ARB: u32 = 0x8252;
+pub const WGL_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB: u32 = 0x8256;
+pub const WGL_NO_RESET_NOTIFICATION_ARB: u32 = 0x8261;
+pub const WGL_CONTEXT_RELEASE_BEHAVIOR_ARB: u32 = 0x2097;
+pub const WGL_CONTEXT_RELEASE_BEHAVIOR_NONE_ARB: u32 = 0;
+pub const WGL_CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB: u32 = 0x2098;
+pub const WGL_COLORSPACE_EXT: u32 = 0x309d;
+pub const WGL_COLORSPACE_SRGB_EXT: u32 = 0x3089;
+pub const ERROR_INVALID_VERSION_ARB: u32 = 0x2095;
+pub const ERROR_INVALID_PROFILE_ARB: u32 = 0x2096;
+pub const ERROR_INCOMPATIBLE_DEVICE_CONTEXTS_ARB: u32 = 0x2054;
+
 macro_rules! gl_loader {
     (
         $(
@@ -253,17 +303,20 @@ macro_rules! gl_loader {
         }
 
         $(
-            pub fn $fn($($arg: $t),*) -> $res {
-                unsafe { (__pfns::$fn.unwrap())( $($arg),* ) }
+            pub unsafe fn $fn($($arg: $t),*) -> $res {
+                __pfns::$fn.unwrap()( $($arg),* )
             }
         )*
 
         pub fn load_gl_funcs() {
             $(
                 unsafe {
-                    let fn_name = concat!(stringify!($fnp), 0).as_ptr() as *const std::os::raw::c_char;
-                    let proc_ptr = winapi::um::wingdi::wglGetProcAddress(fn_name);
-                    assert!(proc_ptr.is_null() == false);
+                    let fn_name = concat!(stringify!($fn), '\0').as_ptr() as *const std::os::raw::c_char;
+                    let mut proc_ptr = _sapp_wglGetProcAddress.unwrap()(fn_name);
+                    if proc_ptr.is_null() {
+                        proc_ptr = GetProcAddress(_sapp_opengl32, fn_name);
+                    }
+                    assert!(proc_ptr.is_null() == false, "Load GL func {:?} failed.", stringify!($fn));
                     __pfns::$fn = Some(std::mem::transmute(proc_ptr));
                 }
             )*
@@ -273,7 +326,6 @@ macro_rules! gl_loader {
 
 gl_loader!(
     fn glGetStringi(name: GLenum, index: GLuint) -> *const GLubyte,
-    fn glBindVertexArrayAPPLE(array: GLuint) -> (),
     fn glFramebufferTextureLayer(
         target: GLenum,
         attachment: GLenum,
