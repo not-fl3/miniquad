@@ -44,7 +44,7 @@ use winapi::{
     },
 };
 
-pub type sapp_event_type = libc::c_uint;
+pub type sapp_event_type = u32;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
 pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 22;
 pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
@@ -70,7 +70,7 @@ pub const sapp_event_type_SAPP_EVENTTYPE_KEY_UP: sapp_event_type = 2;
 pub const sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN: sapp_event_type = 1;
 pub const sapp_event_type_SAPP_EVENTTYPE_INVALID: sapp_event_type = 0;
 
-pub type sapp_keycode = libc::c_uint;
+pub type sapp_keycode = u32;
 pub const sapp_keycode_SAPP_KEYCODE_MENU: sapp_keycode = 348;
 pub const sapp_keycode_SAPP_KEYCODE_RIGHT_SUPER: sapp_keycode = 347;
 pub const sapp_keycode_SAPP_KEYCODE_RIGHT_ALT: sapp_keycode = 346;
@@ -195,22 +195,22 @@ pub const sapp_keycode_SAPP_KEYCODE_INVALID: sapp_keycode = 0;
 
 #[derive(Copy, Clone, Default)]
 pub struct sapp_touchpoint {
-    pub identifier: libc::c_ulong,
-    pub pos_x: libc::c_float,
-    pub pos_y: libc::c_float,
+    pub identifier: u64,
+    pub pos_x: f32,
+    pub pos_y: f32,
     pub changed: bool,
 }
 
-pub type sapp_mousebutton = libc::c_int;
+pub type sapp_mousebutton = i32;
 pub const sapp_mousebutton_SAPP_MOUSEBUTTON_MIDDLE: sapp_mousebutton = 2;
 pub const sapp_mousebutton_SAPP_MOUSEBUTTON_RIGHT: sapp_mousebutton = 1;
 pub const sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT: sapp_mousebutton = 0;
 pub const sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID: sapp_mousebutton = -1;
 
-pub const SAPP_MODIFIER_SHIFT: libc::c_uint = 1 << 0;
-pub const SAPP_MODIFIER_CTRL: libc::c_uint = 1 << 1;
-pub const SAPP_MODIFIER_ALT: libc::c_uint = 1 << 2;
-pub const SAPP_MODIFIER_SUPER: libc::c_uint = 1 << 3;
+pub const SAPP_MODIFIER_SHIFT: u32 = 1 << 0;
+pub const SAPP_MODIFIER_CTRL: u32 = 1 << 1;
+pub const SAPP_MODIFIER_ALT: u32 = 1 << 2;
+pub const SAPP_MODIFIER_SUPER: u32 = 1 << 3;
 
 #[derive(Copy, Clone, Default)]
 pub struct sapp_event {
@@ -221,18 +221,18 @@ pub struct sapp_event {
     pub key_repeat: bool,
     pub modifiers: u32,
     pub mouse_button: sapp_mousebutton,
-    pub mouse_x: libc::c_float,
-    pub mouse_y: libc::c_float,
-    pub mouse_dx: libc::c_float,
-    pub mouse_dy: libc::c_float,
-    pub scroll_x: libc::c_float,
-    pub scroll_y: libc::c_float,
-    pub num_touches: libc::c_int,
+    pub mouse_x: f32,
+    pub mouse_y: f32,
+    pub mouse_dx: f32,
+    pub mouse_dy: f32,
+    pub scroll_x: f32,
+    pub scroll_y: f32,
+    pub num_touches: i32,
     pub touches: [sapp_touchpoint; 8],
-    pub window_width: libc::c_int,
-    pub window_height: libc::c_int,
-    pub framebuffer_width: libc::c_int,
-    pub framebuffer_height: libc::c_int,
+    pub window_width: i32,
+    pub window_height: i32,
+    pub framebuffer_width: i32,
+    pub framebuffer_height: i32,
 }
 #[derive(Copy, Clone)]
 pub struct sapp_desc {
@@ -240,25 +240,25 @@ pub struct sapp_desc {
     pub frame_cb: Option<unsafe extern "C" fn() -> ()>,
     pub cleanup_cb: Option<unsafe extern "C" fn() -> ()>,
     pub event_cb: Option<unsafe extern "C" fn(_: *const sapp_event) -> ()>,
-    pub fail_cb: Option<unsafe extern "C" fn(_: *const libc::c_char) -> ()>,
-    pub user_data: *mut libc::c_void,
-    pub init_userdata_cb: Option<unsafe extern "C" fn(_: *mut libc::c_void) -> ()>,
-    pub frame_userdata_cb: Option<unsafe extern "C" fn(_: *mut libc::c_void) -> ()>,
-    pub cleanup_userdata_cb: Option<unsafe extern "C" fn(_: *mut libc::c_void) -> ()>,
+    pub fail_cb: Option<unsafe extern "C" fn(_: *const i8) -> ()>,
+    pub user_data: *mut std::ffi::c_void,
+    pub init_userdata_cb: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void) -> ()>,
+    pub frame_userdata_cb: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void) -> ()>,
+    pub cleanup_userdata_cb: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void) -> ()>,
     pub event_userdata_cb:
-        Option<unsafe extern "C" fn(_: *const sapp_event, _: *mut libc::c_void) -> ()>,
+        Option<unsafe extern "C" fn(_: *const sapp_event, _: *mut std::ffi::c_void) -> ()>,
     pub fail_userdata_cb:
-        Option<unsafe extern "C" fn(_: *const libc::c_char, _: *mut libc::c_void) -> ()>,
-    pub width: libc::c_int,
-    pub height: libc::c_int,
-    pub sample_count: libc::c_int,
-    pub swap_interval: libc::c_int,
+        Option<unsafe extern "C" fn(_: *const i8, _: *mut std::ffi::c_void) -> ()>,
+    pub width: i32,
+    pub height: i32,
+    pub sample_count: i32,
+    pub swap_interval: i32,
     pub high_dpi: bool,
     pub fullscreen: bool,
     pub alpha: bool,
-    pub window_title: *const libc::c_char,
+    pub window_title: *const i8,
     pub user_cursor: bool,
-    pub html5_canvas_name: *const libc::c_char,
+    pub html5_canvas_name: *const i8,
     pub html5_canvas_resize: bool,
     pub html5_preserve_drawing_buffer: bool,
     pub html5_premultiplied_alpha: bool,
@@ -270,13 +270,13 @@ pub struct sapp_desc {
 #[derive(Clone)]
 pub struct _sapp_state {
     pub valid: bool,
-    pub window_width: libc::c_int,
-    pub window_height: libc::c_int,
-    pub framebuffer_width: libc::c_int,
-    pub framebuffer_height: libc::c_int,
-    pub sample_count: libc::c_int,
-    pub swap_interval: libc::c_int,
-    pub dpi_scale: libc::c_float,
+    pub window_width: i32,
+    pub window_height: i32,
+    pub framebuffer_width: i32,
+    pub framebuffer_height: i32,
+    pub sample_count: i32,
+    pub swap_interval: i32,
+    pub dpi_scale: f32,
     pub gles2_fallback: bool,
     pub first_frame: bool,
     pub init_called: bool,
@@ -285,8 +285,8 @@ pub struct _sapp_state {
     pub quit_ordered: bool,
     pub window_title: String,
     pub frame_count: u64,
-    pub mouse_x: libc::c_float,
-    pub mouse_y: libc::c_float,
+    pub mouse_x: f32,
+    pub mouse_y: f32,
     pub win32_mouse_tracked: bool,
     pub onscreen_keyboard_shown: bool,
     pub event: sapp_event,
@@ -388,7 +388,7 @@ static mut _sapp: _sapp_state = _sapp_state {
         cleanup_cb: None,
         event_cb: None,
         fail_cb: None,
-        user_data: 0 as *const libc::c_void as *mut libc::c_void,
+        user_data: 0 as *const std::ffi::c_void as *mut std::ffi::c_void,
         init_userdata_cb: None,
         frame_userdata_cb: None,
         cleanup_userdata_cb: None,
@@ -401,9 +401,9 @@ static mut _sapp: _sapp_state = _sapp_state {
         high_dpi: false,
         fullscreen: false,
         alpha: false,
-        window_title: 0 as *const libc::c_char,
+        window_title: 0 as *const i8,
         user_cursor: false,
-        html5_canvas_name: 0 as *const libc::c_char,
+        html5_canvas_name: 0 as *const i8,
         html5_canvas_resize: false,
         html5_preserve_drawing_buffer: false,
         html5_premultiplied_alpha: false,
@@ -415,7 +415,7 @@ static mut _sapp: _sapp_state = _sapp_state {
 };
 
 #[no_mangle]
-pub unsafe extern "C" fn sapp_dpi_scale() -> libc::c_float {
+pub unsafe extern "C" fn sapp_dpi_scale() -> f32 {
     _sapp.dpi_scale
 }
 #[no_mangle]
@@ -423,7 +423,7 @@ pub unsafe extern "C" fn sapp_high_dpi() -> bool {
     _sapp.desc.high_dpi && (_sapp.dpi_scale > 1.5)
 }
 #[no_mangle]
-pub unsafe extern "C" fn sapp_height() -> libc::c_int {
+pub unsafe extern "C" fn sapp_height() -> i32 {
     if _sapp.framebuffer_height > 0 {
         _sapp.framebuffer_height
     } else {
@@ -432,7 +432,7 @@ pub unsafe extern "C" fn sapp_height() -> libc::c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sapp_width() -> libc::c_int {
+pub unsafe extern "C" fn sapp_width() -> i32 {
     if _sapp.framebuffer_width > 0 {
         _sapp.framebuffer_width
     } else {
@@ -747,7 +747,7 @@ unsafe fn _sapp_call_init() {
 }
 
 unsafe fn _sapp_call_frame() {
-    if _sapp.init_called as libc::c_int != 0 && !_sapp.cleanup_called {
+    if _sapp.init_called as i32 != 0 && !_sapp.cleanup_called {
         if _sapp.desc.frame_cb.is_some() {
             _sapp.desc.frame_cb.expect("non-null function pointer")();
         } else if _sapp.desc.frame_userdata_cb.is_some() {
@@ -1491,7 +1491,7 @@ unsafe fn wgl_destroy_context() {
     _sapp_gl_ctx = std::ptr::null_mut();
 }
 
-pub unsafe fn sapp_run(desc: *const sapp_desc) -> libc::c_int {
+pub unsafe fn sapp_run(desc: *const sapp_desc) -> i32 {
     init_state(desc);
     init_keytable();
     init_dpi();
@@ -1533,5 +1533,5 @@ pub unsafe fn sapp_run(desc: *const sapp_desc) -> libc::c_int {
     wgl_shutdown();
     destroy_window();
 
-    return 0 as libc::c_int;
+    return 0 as i32;
 }
