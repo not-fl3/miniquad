@@ -1444,8 +1444,8 @@ unsafe fn wgl_init() {
     _sapp_wglMakeCurrent = get_proc_address(_sapp_opengl32, b"wglMakeCurrent\0");
     assert!(_sapp_wglMakeCurrent.is_some());
 
-    let class_name = "MINIQUADAPP".encode_utf16().collect::<Vec<u16>>();
-    let window_name = "miniquad message window"
+    let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
+    let window_name = "miniquad message window\0"
         .encode_utf16()
         .collect::<Vec<u16>>();
     _sapp_win32_msg_hwnd = CreateWindowExW(
