@@ -1010,7 +1010,7 @@ unsafe fn create_window() {
     wndclassw.hInstance = GetModuleHandleW(NULL as _);
     wndclassw.hCursor = LoadCursorW(NULL as _, IDC_ARROW);
     wndclassw.hIcon = LoadIconW(NULL as _, IDI_WINLOGO);
-    let class_name = "MINIQUADAPP".encode_utf16().collect::<Vec<u16>>();
+    let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
     wndclassw.lpszClassName = class_name.as_ptr() as _;
     RegisterClassW(&wndclassw);
 
@@ -1041,8 +1041,9 @@ unsafe fn create_window() {
     let win_width = rect.right - rect.left;
     let win_height = rect.bottom - rect.top;
     _sapp_win32_in_create_window = true;
-    let class_name = "MINIQUADAPP".encode_utf16().collect::<Vec<u16>>();
-    let window_name = _sapp.window_title.encode_utf16().collect::<Vec<u16>>();
+    let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
+    let mut window_name = _sapp.window_title.encode_utf16().collect::<Vec<u16>>();
+    window_name.push(0);
     _sapp_win32_hwnd = CreateWindowExW(
         win_ex_style,                // dwExStyle
         class_name.as_ptr(),         // lpClassName
@@ -1070,7 +1071,7 @@ unsafe fn destroy_window() {
     DestroyWindow(_sapp_win32_hwnd);
     _sapp_win32_hwnd = std::ptr::null_mut();
 
-    let mut class_name = "MINIQUADAPP".encode_utf16().collect::<Vec<u16>>();
+    let mut class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
 
     UnregisterClassW(class_name.as_mut_ptr() as _, GetModuleHandleW(NULL as _));
 }
