@@ -8,16 +8,15 @@ use std::{error::Error, fmt::Display};
 
 pub use texture::{FilterMode, Texture, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 
-fn get_uniform_location(program: GLuint, name: &str) -> i32 {
+fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
     let cname = CString::new(name).unwrap_or_else(|e| panic!(e));
     let location = unsafe { glGetUniformLocation(program, cname.as_ptr()) };
 
-    assert!(
-        location != -1,
-        format!("Cant get \"{}\" uniform location", name)
-    );
+    if location == -1 {
+        return None;
+    }
 
-    location
+    Some(location)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -285,13 +284,15 @@ impl Shader {
     }
 }
 
+type UniformLocation = Option<GLint>;
+
 pub struct ShaderImage {
-    gl_loc: GLint,
+    gl_loc: UniformLocation,
 }
 
 #[derive(Debug)]
 pub struct ShaderUniform {
-    gl_loc: GLint,
+    gl_loc: UniformLocation,
     offset: usize,
     size: usize,
     uniform_type: UniformType,
@@ -838,9 +839,11 @@ impl Context {
                 .images
                 .get(n)
                 .unwrap_or_else(|| panic!("Image count in bindings and shader did not match!"));
-            unsafe {
-                self.cache.bind_texture(n, bindings_image.texture);
-                glUniform1i(shader_image.gl_loc, n as i32);
+            if let Some(gl_loc) = shader_image.gl_loc {
+                unsafe {
+                    self.cache.bind_texture(n, bindings_image.texture);
+                    glUniform1i(gl_loc, n as i32);
+                }
             }
         }
 
@@ -854,7 +857,7 @@ impl Context {
 
             let pip_attribute = pip.layout.get(attr_index).copied();
 
-            if let Some(attribute) = pip_attribute {
+            if let Some(Some(attribute)) = pip_attribute {
                 let vb = bindings.vertex_buffers[attribute.buffer_index];
 
                 if cached_attr.map_or(true, |cached_attr| {
@@ -910,33 +913,35 @@ impl Context {
                 let data = (uniforms as *const _ as *const f32).offset(offset as isize);
                 let data_int = (uniforms as *const _ as *const i32).offset(offset as isize);
 
-                match uniform.uniform_type {
-                    Float1 => {
-                        glUniform1fv(uniform.gl_loc, uniform.array_count, data);
-                    }
-                    Float2 => {
-                        glUniform2fv(uniform.gl_loc, uniform.array_count, data);
-                    }
-                    Float3 => {
-                        glUniform3fv(uniform.gl_loc, uniform.array_count, data);
-                    }
-                    Float4 => {
-                        glUniform4fv(uniform.gl_loc, uniform.array_count, data);
-                    }
-                    Int1 => {
-                        glUniform1iv(uniform.gl_loc, uniform.array_count, data_int);
-                    }
-                    Int2 => {
-                        glUniform2iv(uniform.gl_loc, uniform.array_count, data_int);
-                    }
-                    Int3 => {
-                        glUniform3iv(uniform.gl_loc, uniform.array_count, data_int);
-                    }
-                    Int4 => {
-                        glUniform4iv(uniform.gl_loc, uniform.array_count, data_int);
-                    }
-                    Mat4 => {
-                        glUniformMatrix4fv(uniform.gl_loc, uniform.array_count, 0, data);
+                if let Some(gl_loc) = uniform.gl_loc {
+                    match uniform.uniform_type {
+                        Float1 => {
+                            glUniform1fv(gl_loc, uniform.array_count, data);
+                        }
+                        Float2 => {
+                            glUniform2fv(gl_loc, uniform.array_count, data);
+                        }
+                        Float3 => {
+                            glUniform3fv(gl_loc, uniform.array_count, data);
+                        }
+                        Float4 => {
+                            glUniform4fv(gl_loc, uniform.array_count, data);
+                        }
+                        Int1 => {
+                            glUniform1iv(gl_loc, uniform.array_count, data_int);
+                        }
+                        Int2 => {
+                            glUniform2iv(gl_loc, uniform.array_count, data_int);
+                        }
+                        Int3 => {
+                            glUniform3iv(gl_loc, uniform.array_count, data_int);
+                        }
+                        Int4 => {
+                            glUniform4iv(gl_loc, uniform.array_count, data_int);
+                        }
+                        Mat4 => {
+                            glUniformMatrix4fv(gl_loc, uniform.array_count, 0, data);
+                        }
                     }
                 }
             }
@@ -1436,8 +1441,7 @@ impl Pipeline {
             })
             .sum();
 
-        let mut vertex_layout: Vec<VertexAttributeInternal> =
-            vec![VertexAttributeInternal::default(); attributes_len];
+        let mut vertex_layout: Vec<Option<VertexAttributeInternal>> = vec![None; attributes_len];
 
         for VertexAttribute {
             name,
@@ -1452,9 +1456,7 @@ impl Pipeline {
 
             let cname = CString::new(*name).unwrap_or_else(|e| panic!(e));
             let attr_loc = unsafe { glGetAttribLocation(program, cname.as_ptr() as *const _) };
-            if attr_loc == -1 {
-                panic!("failed to obtain location of attribute {}", name);
-            }
+            let attr_loc = if attr_loc == -1 { None } else { Some(attr_loc) };
             let divisor = if layout.step_func == VertexStep::PerVertex {
                 0
             } else {
@@ -1469,36 +1471,33 @@ impl Pipeline {
                 attributes_count = 4;
             }
             for i in 0..attributes_count {
-                let attr_loc = attr_loc as GLuint + i as GLuint;
+                if let Some(attr_loc) = attr_loc {
+                    let attr_loc = attr_loc as GLuint + i as GLuint;
 
-                let attr = VertexAttributeInternal {
-                    attr_loc,
-                    size: format.size(),
-                    type_: format.type_(),
-                    offset: buffer_data.offset,
-                    stride: buffer_data.stride,
-                    buffer_index: *buffer_index,
-                    divisor,
-                };
-                //println!("{}: {:?}", name, attr);
+                    let attr = VertexAttributeInternal {
+                        attr_loc,
+                        size: format.size(),
+                        type_: format.type_(),
+                        offset: buffer_data.offset,
+                        stride: buffer_data.stride,
+                        buffer_index: *buffer_index,
+                        divisor,
+                    };
+                    //println!("{}: {:?}", name, attr);
 
-                assert!(
-                    attr_loc < vertex_layout.len() as u32,
-                    format!(
-                        "attribute: {} outside of allocated attributes array len: {}",
-                        name,
-                        vertex_layout.len()
-                    )
-                );
-                vertex_layout[attr_loc as usize] = attr;
-
+                    assert!(
+                        attr_loc < vertex_layout.len() as u32,
+                        format!(
+                            "attribute: {} outside of allocated attributes array len: {}",
+                            name,
+                            vertex_layout.len()
+                        )
+                    );
+                    vertex_layout[attr_loc as usize] = Some(attr);
+                }
                 buffer_data.offset += format.byte_len() as i64
             }
         }
-
-        // TODO: it should be possible to express a "holes" in the attribute layout in the api
-        // so empty attributes will be fine. But right now empty attribute is always a bug
-        assert!(vertex_layout.iter().any(|attr| attr.size == 0) == false);
 
         let pipeline = PipelineInternal {
             layout: vertex_layout,
@@ -1523,7 +1522,7 @@ struct VertexAttributeInternal {
 }
 
 struct PipelineInternal {
-    layout: Vec<VertexAttributeInternal>,
+    layout: Vec<Option<VertexAttributeInternal>>,
     shader: Shader,
     params: PipelineParams,
 }
