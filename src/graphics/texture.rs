@@ -18,6 +18,10 @@ impl Texture {
         }
     }
 
+    pub fn gl_internal_id(&self) -> GLuint {
+        self.texture
+    }
+
     /// Delete GPU texture, leaving handle unmodified.
     ///
     /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some

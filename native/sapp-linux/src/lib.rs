@@ -11,7 +11,7 @@
     unused_mut
 )]
 
-mod gl;
+pub mod gl;
 mod rand;
 mod x;
 mod x_cursor;
