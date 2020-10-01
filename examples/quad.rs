@@ -45,7 +45,7 @@ impl Stage {
             images: vec![texture],
         };
 
-        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::META).unwrap();
+        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::meta()).unwrap();
 
         let pipeline = Pipeline::new(
             ctx,
@@ -116,12 +116,14 @@ mod shader {
         gl_FragColor = texture2D(tex, texcoord);
     }"#;
 
-    pub const META: ShaderMeta = ShaderMeta {
-        images: &["tex"],
-        uniforms: UniformBlockLayout {
-            uniforms: &[UniformDesc::new("offset", UniformType::Float2)],
-        },
-    };
+    pub fn meta() -> ShaderMeta {
+        ShaderMeta {
+            images: vec!["tex".to_string()],
+            uniforms: UniformBlockLayout {
+                uniforms: vec![UniformDesc::new("offset", UniformType::Float2)],
+            },
+        }
+    }
 
     #[repr(C)]
     pub struct Uniforms {
