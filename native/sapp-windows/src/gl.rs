@@ -493,6 +493,16 @@ gl_loader!(
         type_: GLenum,
         pixels: *const GLvoid
     ) -> (),
+    fn glCopyTexImage2D(
+        target: GLenum,
+        level: GLint,
+        internalformat: GLenum,
+        x: GLint,
+        y: GLint,
+        width: GLsizei,
+        height: GLsizei,
+        border: GLint
+    ) -> (),
     fn glClearDepthf(d: GLfloat) -> (),
     fn glClearDepth(depth: GLclampd) -> (),
     fn glFramebufferTexture2D(

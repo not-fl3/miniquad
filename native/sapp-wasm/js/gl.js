@@ -852,6 +852,10 @@ var importObject = {
         glCullFace: function (mode) {
             gl.cullFace(mode);
         },
+        glCopyTexImage2D: function (target, level, internalformat, x, y, width, height, border) {
+            gl.copyTexImage2D(target, level, internalformat, x, y, width, height, border);
+        },
+
         glShaderSource: function (shader, count, string, length) {
             GL.validateGLObjectID(GL.shaders, shader, 'glShaderSource', 'shader');
             var source = GL.getSource(shader, count, string, length);
