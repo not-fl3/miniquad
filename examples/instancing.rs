@@ -50,7 +50,7 @@ impl Stage {
             images: vec![],
         };
 
-        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::META).unwrap();
+        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::meta()).unwrap();
 
         let pipeline = Pipeline::new(
             ctx,
@@ -173,12 +173,14 @@ mod shader {
     }
     "#;
 
-    pub const META: ShaderMeta = ShaderMeta {
-        images: &[],
-        uniforms: UniformBlockLayout {
-            uniforms: &[UniformDesc::new("mvp", UniformType::Mat4)],
-        },
-    };
+    pub fn meta() -> ShaderMeta {
+        ShaderMeta {
+            images: vec![],
+            uniforms: UniformBlockLayout {
+                uniforms: vec![UniformDesc::new("mvp", UniformType::Mat4)],
+            },
+        }
+    }
 
     #[repr(C)]
     pub struct Uniforms {

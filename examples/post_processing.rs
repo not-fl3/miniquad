@@ -115,8 +115,9 @@ impl Stage {
             ctx,
             post_processing_shader::VERTEX,
             post_processing_shader::FRAGMENT,
-            post_processing_shader::META,
-        ).unwrap();
+            post_processing_shader::meta(),
+        )
+        .unwrap();
 
         let post_processing_pipeline = Pipeline::new(
             ctx,
@@ -132,8 +133,9 @@ impl Stage {
             ctx,
             offscreen_shader::VERTEX,
             offscreen_shader::FRAGMENT,
-            offscreen_shader::META,
-        ).unwrap();
+            offscreen_shader::meta(),
+        )
+        .unwrap();
 
         let offscreen_pipeline = Pipeline::with_params(
             ctx,
@@ -284,12 +286,14 @@ mod post_processing_shader {
     }
     "#;
 
-    pub const META: ShaderMeta = ShaderMeta {
-        images: &["tex"],
-        uniforms: UniformBlockLayout {
-            uniforms: &[UniformDesc::new("resolution", UniformType::Float2)],
-        },
-    };
+    pub fn meta() -> ShaderMeta {
+        ShaderMeta {
+            images: vec!["tex".to_string()],
+            uniforms: UniformBlockLayout {
+                uniforms: vec![UniformDesc::new("resolution", UniformType::Float2)],
+            },
+        }
+    }
 
     #[repr(C)]
     pub struct Uniforms {
@@ -323,12 +327,14 @@ mod offscreen_shader {
     }
     "#;
 
-    pub const META: ShaderMeta = ShaderMeta {
-        images: &[],
-        uniforms: UniformBlockLayout {
-            uniforms: &[UniformDesc::new("mvp", UniformType::Mat4)],
-        },
-    };
+    pub fn meta() -> ShaderMeta {
+        ShaderMeta {
+            images: vec![],
+            uniforms: UniformBlockLayout {
+                uniforms: vec![UniformDesc::new("mvp", UniformType::Mat4)],
+            },
+        }
+    }
 
     #[repr(C)]
     pub struct Uniforms {

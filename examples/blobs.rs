@@ -40,7 +40,7 @@ impl Stage {
             images: vec![],
         };
 
-        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::META).unwrap();
+        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::meta()).unwrap();
 
         let pipeline = Pipeline::new(
             ctx,
@@ -208,16 +208,18 @@ mod shader {
         gl_FragColor = vec4( gradient(shade), 1.0 );
     }"#;
 
-    pub const META: ShaderMeta = ShaderMeta {
-        images: &[],
-        uniforms: UniformBlockLayout {
-            uniforms: &[
-                UniformDesc::new("time", UniformType::Float1),
-                UniformDesc::new("blobs_count", UniformType::Int1),
-                UniformDesc::with_array("blobs_positions", UniformType::Float2, 32),
-            ],
-        },
-    };
+    pub fn meta() -> ShaderMeta {
+        ShaderMeta {
+            images: vec![],
+            uniforms: UniformBlockLayout {
+                uniforms: vec![
+                    UniformDesc::new("time", UniformType::Float1),
+                    UniformDesc::new("blobs_count", UniformType::Int1),
+                    UniformDesc::new("blobs_positions", UniformType::Float2).array(32),
+                ],
+            },
+        }
+    }
 
     #[repr(C)]
     pub struct Uniforms {

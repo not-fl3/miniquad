@@ -50,39 +50,35 @@ impl UniformType {
 }
 
 pub struct UniformDesc {
-    name: &'static str,
+    name: String,
     uniform_type: UniformType,
     array_count: usize,
 }
 
 pub struct UniformBlockLayout {
-    pub uniforms: &'static [UniformDesc],
+    pub uniforms: Vec<UniformDesc>,
 }
 
 impl UniformDesc {
-    pub const fn new(name: &'static str, uniform_type: UniformType) -> UniformDesc {
+    pub fn new(name: &str, uniform_type: UniformType) -> UniformDesc {
         UniformDesc {
-            name,
+            name: name.to_string(),
             uniform_type,
             array_count: 1,
         }
     }
-    pub const fn with_array(
-        name: &'static str,
-        uniform_type: UniformType,
-        array_count: usize,
-    ) -> UniformDesc {
+
+    pub fn array(self, array_count: usize) -> UniformDesc {
         UniformDesc {
-            name,
-            uniform_type,
             array_count,
+            ..self
         }
     }
 }
 
 pub struct ShaderMeta {
     pub uniforms: UniformBlockLayout,
-    pub images: &'static [&'static str],
+    pub images: Vec<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -1095,7 +1091,7 @@ fn load_shader_internal(
         #[rustfmt::skip]
         let uniforms = meta.uniforms.uniforms.iter().scan(0, |offset, uniform| {
             let res = ShaderUniform {
-                gl_loc: get_uniform_location(program, uniform.name),
+                gl_loc: get_uniform_location(program, &uniform.name),
                 offset: *offset,
                 size: uniform.uniform_type.size(1),
                 uniform_type: uniform.uniform_type,
