@@ -34,17 +34,18 @@ pub enum UniformType {
 }
 
 impl UniformType {
-    fn size(&self, count: usize) -> usize {
+    /// Byte size for a given UniformType
+    pub fn size(&self) -> usize {
         match self {
-            UniformType::Float1 => 4 * count,
-            UniformType::Float2 => 8 * count,
-            UniformType::Float3 => 12 * count,
-            UniformType::Float4 => 16 * count,
-            UniformType::Int1 => 4 * count,
-            UniformType::Int2 => 8 * count,
-            UniformType::Int3 => 12 * count,
-            UniformType::Int4 => 16 * count,
-            UniformType::Mat4 => 64 * count,
+            UniformType::Float1 => 4,
+            UniformType::Float2 => 8,
+            UniformType::Float3 => 12,
+            UniformType::Float4 => 16,
+            UniformType::Int1 => 4,
+            UniformType::Int2 => 8,
+            UniformType::Int3 => 12,
+            UniformType::Int4 => 16,
+            UniformType::Mat4 => 64,
         }
     }
 }
@@ -902,7 +903,7 @@ impl Context {
             use UniformType::*;
 
             assert!(
-                offset <= std::mem::size_of::<U>() - uniform.uniform_type.size(1) / 4,
+                offset <= std::mem::size_of::<U>() - uniform.uniform_type.size() / 4,
                 "Uniforms struct does not match shader uniforms layout"
             );
 
@@ -940,7 +941,7 @@ impl Context {
                     }
                 }
             }
-            offset += uniform.uniform_type.size(1) / 4 * uniform.array_count as usize;
+            offset += uniform.uniform_type.size() / 4 * uniform.array_count as usize;
         }
     }
 
@@ -1097,11 +1098,11 @@ fn load_shader_internal(
             let res = ShaderUniform {
                 gl_loc: get_uniform_location(program, uniform.name),
                 offset: *offset,
-                size: uniform.uniform_type.size(1),
+                size: uniform.uniform_type.size(),
                 uniform_type: uniform.uniform_type,
                 array_count: uniform.array_count as _,
             };
-            *offset += uniform.uniform_type.size(1) * uniform.array_count;
+            *offset += uniform.uniform_type.size() * uniform.array_count;
             Some(res)
         }).collect();
 
