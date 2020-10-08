@@ -736,8 +736,9 @@ impl Context {
         if self.cache.color_blend == color_blend && self.cache.alpha_blend == alpha_blend {
             return;
         }
+
         unsafe {
-            if let Some(blend) = color_blend {
+            if let Some(color_blend) = color_blend {
                 if self.cache.color_blend.is_none() {
                     glEnable(GL_BLEND);
                 }
@@ -746,7 +747,7 @@ impl Context {
                     equation: eq_rgb,
                     sfactor: src_rgb,
                     dfactor: dst_rgb,
-                } = blend;
+                } = color_blend;
 
                 if let Some(BlendState {
                     equation: eq_alpha,
@@ -765,7 +766,7 @@ impl Context {
                     glBlendFunc(src_rgb.into(), dst_rgb.into());
                     glBlendEquationSeparate(eq_rgb.into(), eq_rgb.into());
                 }
-            } else if self.cache.alpha_blend.is_some() {
+            } else if self.cache.color_blend.is_some() {
                 glDisable(GL_BLEND);
             }
         }
