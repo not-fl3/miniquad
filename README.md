@@ -158,3 +158,13 @@ cargo run --example quad --target x86_64-pc-windows-gnu
 * High end API, like Vulkan/DirectX 12. Take a look on [gfx-rs](https://github.com/gfx-rs/gfx) or [vulkano](https://github.com/vulkano-rs/vulkano) instead!
 
 * sokol-gfx api compatibility. While sokol is absolutely great as an API design foundation, just reimplementing sokol in rust is not a goal. The idea is to learn from sokol, but make a library in a rust way when it is possible.
+
+# Platinum sponsors
+
+Miniquad is supported by:
+
+<p>
+  <a href="http://embark-studios.com">
+    <img src="https://cdn.discordapp.com/attachments/497710174543544330/543104348423454730/unknown.png" width="201px">
+  </a>
+</p>
