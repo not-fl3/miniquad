@@ -2,13 +2,15 @@
 #![allow(improper_ctypes)] // u128 types are not actually used anywhere, so the functions with u128 in signatures will be stripped anyway (I believe)
 
 mod egl;
-mod gl3;
+pub mod gl3;
 mod rand;
 mod sokol_app_android;
 
 pub use rand::*;
 pub use egl::*;
 pub use gl3::*;
+
+pub use gl3 as gl;
 
 // workaround for egl::* also contains None on Android
 pub use std::option::Option::None;
