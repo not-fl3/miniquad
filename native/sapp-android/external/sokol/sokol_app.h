@@ -807,6 +807,13 @@ SOKOL_API_DECL void sapp_ANativeActivity_onCreate(void* activity, void* saved_st
 
 SOKOL_API_DECL void sapp_android_log(const char *message);
 
+typedef struct {
+    char * content;
+    int content_length;
+} android_asset;
+
+SOKOL_API_DECL void sapp_load_asset(const char *filepath, android_asset *asset);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
@@ -1828,10 +1835,7 @@ sapp_desc _sapp_desc;
 JNIEXPORT
 void sapp_ANativeActivity_onCreate(void* activity0, void* saved_state, int saved_state_size) {
     ANativeActivity* activity = activity0;
-    {
-         #include <android/log.h>
-        __android_log_write(ANDROID_LOG_INFO, "SOKOL_APP", "AAAAAAAAAAAAAAAAAAAAAAAAa");
-    }
+
     SOKOL_LOG("NativeActivity onCreate()");
 
     sokol_main(0, NULL);
@@ -2106,6 +2110,27 @@ SOKOL_API_IMPL void sapp_android_log(const char *message) {
     __android_log_write(ANDROID_LOG_INFO, "SOKOL_APP", message);
 }
 
+SOKOL_API_IMPL void sapp_load_asset(const char* filepath, android_asset *out) {
+    #include <android/asset_manager.h>
+    #include <android/asset_manager_jni.h>
+
+    AAssetManager * mgr = _sapp_android_state.activity->assetManager;
+
+    AAsset *asset = AAssetManager_open(mgr, filepath, AASSET_MODE_BUFFER);
+
+    if (asset == NULL) {
+        return;
+    }
+
+    off64_t length = AAsset_getLength64(asset);
+    char *buffer = malloc(length);
+    if (AAsset_read(asset, buffer, length) > 0) {
+         AAsset_close(asset);
+
+         out->content_length = length;
+         out->content = buffer;
+    }
+}
 #undef _sapp_def
 
 #ifdef _MSC_VER
