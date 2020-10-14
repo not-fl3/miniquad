@@ -44,3 +44,17 @@ jobs:
         with:
           command: build
           args: --all-targets --target=${{ matrix.config.target }}
+
+
+
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    container: notfl3/cargo-apk
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: cargo apk
+        run: |
+          cargo apk build 
