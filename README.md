@@ -164,7 +164,7 @@ cargo run --example quad --target x86_64-pc-windows-gnu
 Miniquad is supported by:
 
 <p>
-  <a href="http://embark-studios.com">
-    <img src="https://cdn.discordapp.com/attachments/497710174543544330/543104348423454730/unknown.png" width="201px">
+  <a href="https://embark-studios.com">
+    <img src="https://www.embark.dev/img/logo_black.png" width="201px">
   </a>
 </p>
