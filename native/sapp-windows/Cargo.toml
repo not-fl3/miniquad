@@ -11,4 +11,4 @@ Native bindings to slightly modified sokol-app.
 homepage = "https://github.com/not-fl3/miniquad"
 
 [dependencies]
-winapi = { version = "0.3", features = ["wingdi", "winuser", "libloaderapi", "windef", "shellscalingapi", "errhandlingapi", "windowsx"] }
+winapi = { version = "0.3", features = ["wingdi", "winuser", "libloaderapi", "windef", "shellscalingapi", "errhandlingapi", "windowsx", "winbase"] }
