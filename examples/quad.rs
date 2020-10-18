@@ -58,7 +58,7 @@ impl Stage {
         let shader = Shader::new(
             ctx,
             &include_bytes!("shaders/quad/quad.metallib")[..],
-            shader::META,
+            shader::meta(),
         )
         .unwrap();
 

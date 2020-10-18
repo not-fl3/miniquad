@@ -791,10 +791,10 @@ impl Shader {
             .uniforms
             .iter()
             .scan(0, |offset, uniform| {
-                let size = uniform.uniform_type.size(1) as u64;
+                let size = uniform.uniform_type.size() as u64;
                 stride += size;
                 let shader_uniform = ShaderUniform {
-                    size: uniform.uniform_type.size(1) as u64,
+                    size: uniform.uniform_type.size() as u64,
                     offset: *offset,
                     format: uniform.uniform_type.into(),
                 };

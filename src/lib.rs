@@ -39,6 +39,7 @@ pub use event::*;
 
 pub use graphics::*;
 
+#[cfg(not(feature = "metal"))]
 pub use sapp::gl;
 
 use std::ffi::CString;

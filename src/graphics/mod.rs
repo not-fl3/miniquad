@@ -83,55 +83,52 @@ pub enum UniformType {
 }
 
 impl UniformType {
-    fn size(&self, count: usize) -> usize {
+    /// Byte size for a given UniformType
+    pub fn size(&self) -> usize {
         match self {
-            UniformType::Float1 => 4 * count,
-            UniformType::Float2 => 8 * count,
-            UniformType::Float3 => 12 * count,
-            UniformType::Float4 => 16 * count,
-            UniformType::Int1 => 4 * count,
-            UniformType::Int2 => 8 * count,
-            UniformType::Int3 => 12 * count,
-            UniformType::Int4 => 16 * count,
-            UniformType::Mat4 => 64 * count,
+            UniformType::Float1 => 4,
+            UniformType::Float2 => 8,
+            UniformType::Float3 => 12,
+            UniformType::Float4 => 16,
+            UniformType::Int1 => 4,
+            UniformType::Int2 => 8,
+            UniformType::Int3 => 12,
+            UniformType::Int4 => 16,
+            UniformType::Mat4 => 64,
         }
     }
 }
 
 pub struct UniformDesc {
-    name: &'static str,
+    name: String,
     uniform_type: UniformType,
     array_count: usize,
 }
 
 pub struct UniformBlockLayout {
-    pub uniforms: &'static [UniformDesc],
+    pub uniforms: Vec<UniformDesc>,
 }
 
 impl UniformDesc {
-    pub const fn new(name: &'static str, uniform_type: UniformType) -> UniformDesc {
+    pub fn new(name: &str, uniform_type: UniformType) -> UniformDesc {
         UniformDesc {
-            name,
+            name: name.to_string(),
             uniform_type,
             array_count: 1,
         }
     }
-    pub const fn with_array(
-        name: &'static str,
-        uniform_type: UniformType,
-        array_count: usize,
-    ) -> UniformDesc {
+
+    pub fn array(self, array_count: usize) -> UniformDesc {
         UniformDesc {
-            name,
-            uniform_type,
             array_count,
+            ..self
         }
     }
 }
 
 pub struct ShaderMeta {
     pub uniforms: UniformBlockLayout,
-    pub images: &'static [&'static str],
+    pub images: Vec<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
