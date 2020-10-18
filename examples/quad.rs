@@ -52,7 +52,7 @@ impl Stage {
         };
 
         #[cfg(not(feature = "metal"))]
-        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::META).unwrap();
+        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::meta()).unwrap();
 
         #[cfg(all(target_os = "macos", feature = "metal"))]
         let shader = Shader::new(
@@ -117,13 +117,15 @@ mod shader {
     #[cfg(not(feature = "metal"))]
     pub const FRAGMENT: &str = include_str!("shaders/quad/quad_100.frag");
 
-    pub const META: ShaderMeta = ShaderMeta {
-        images: &["tex"],
-        uniforms: UniformBlockLayout {
-            // TODO: "offset". How we can set uniform name with spirv-cross ?
-            uniforms: &[UniformDesc::new("_22.offset", UniformType::Float2)],
-        },
-    };
+    pub fn meta() -> ShaderMeta {
+        ShaderMeta {
+            images: vec!["tex".to_string()],
+            uniforms: UniformBlockLayout {
+                // TODO: "offset". How we can set uniform name with spirv-cross ?
+                uniforms: vec![UniformDesc::new("_22.offset", UniformType::Float2)],
+            },
+        }
+    }
 
     #[repr(C)]
     pub struct Uniforms {

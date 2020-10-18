@@ -39,6 +39,8 @@ pub use event::*;
 
 pub use graphics::*;
 
+pub use sapp::gl;
+
 use std::ffi::CString;
 
 #[deprecated(

@@ -2,6 +2,7 @@
 pub enum Error {
     IOError(std::io::Error),
     DownloadFailed,
+    AndroidAssetLoadingError
 }
 
 impl std::fmt::Display for Error {
@@ -25,8 +26,35 @@ pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
     #[cfg(target_arch = "wasm32")]
     wasm::load_file(path, on_loaded);
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(target_os = "android")]
+    load_file_android(path, on_loaded);
+
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     load_file_desktop(path, on_loaded);
+}
+
+#[cfg(target_os = "android")]
+fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
+    fn load_file_sync(path: &str) -> Response {
+        let filename = std::ffi::CString::new(path).unwrap();
+
+        let mut data: sapp_android::android_asset = unsafe { std::mem::zeroed() };
+
+        unsafe { sapp_android::sapp_load_asset(filename.as_ptr(), &mut data as _) };
+
+        if data.content.is_null() == false {
+            let slice =
+                unsafe { std::slice::from_raw_parts(data.content, data.content_length as _) };
+            let response = slice.iter().map(|c| *c as _).collect::<Vec<_>>();
+            Ok(response)
+        } else {
+            Err(Error::AndroidAssetLoadingError)
+        }
+    }
+
+    let response = load_file_sync(path);
+
+    on_loaded(response);
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -76,7 +104,7 @@ mod wasm {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn load_file_desktop<F: Fn(Response)>(path: &str, on_loaded: F) {
     fn load_file_sync(path: &str) -> Response {
         use std::fs::File;

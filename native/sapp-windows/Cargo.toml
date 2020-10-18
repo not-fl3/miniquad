@@ -1,15 +1,14 @@
 [package]
 name = "sapp-windows"
-version = "0.2.9"
+version = "0.2.11"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
-build = "build.rs"
 description = """
 Part of miniquad rendering library.
 Native bindings to slightly modified sokol-app.
 """
 homepage = "https://github.com/not-fl3/miniquad"
 
-[build-dependencies]
-cc = "1.0"
+[dependencies]
+winapi = { version = "0.3", features = ["wingdi", "winuser", "libloaderapi", "windef", "shellscalingapi", "errhandlingapi", "windowsx", "winbase"] }

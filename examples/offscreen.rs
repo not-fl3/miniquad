@@ -42,27 +42,27 @@ impl Stage {
              1.0, -1.0, -1.0,    1.0, 0.5, 0.5, 1.0,     1.0, 0.0,
              1.0,  1.0, -1.0,    1.0, 0.5, 0.5, 1.0,     1.0, 1.0,
             -1.0,  1.0, -1.0,    1.0, 0.5, 0.5, 1.0,     0.0, 1.0,
-    
-            -1.0, -1.0,  1.0,    0.5, 1.0, 0.5, 1.0,     0.0, 0.0, 
+
+            -1.0, -1.0,  1.0,    0.5, 1.0, 0.5, 1.0,     0.0, 0.0,
              1.0, -1.0,  1.0,    0.5, 1.0, 0.5, 1.0,     1.0, 0.0,
              1.0,  1.0,  1.0,    0.5, 1.0, 0.5, 1.0,     1.0, 1.0,
             -1.0,  1.0,  1.0,    0.5, 1.0, 0.5, 1.0,     0.0, 1.0,
-    
+
             -1.0, -1.0, -1.0,    0.5, 0.5, 1.0, 1.0,     0.0, 0.0,
             -1.0,  1.0, -1.0,    0.5, 0.5, 1.0, 1.0,     1.0, 0.0,
             -1.0,  1.0,  1.0,    0.5, 0.5, 1.0, 1.0,     1.0, 1.0,
             -1.0, -1.0,  1.0,    0.5, 0.5, 1.0, 1.0,     0.0, 1.0,
-    
+
              1.0, -1.0, -1.0,    1.0, 0.5, 0.0, 1.0,     0.0, 0.0,
              1.0,  1.0, -1.0,    1.0, 0.5, 0.0, 1.0,     1.0, 0.0,
              1.0,  1.0,  1.0,    1.0, 0.5, 0.0, 1.0,     1.0, 1.0,
              1.0, -1.0,  1.0,    1.0, 0.5, 0.0, 1.0,     0.0, 1.0,
-    
+
             -1.0, -1.0, -1.0,    0.0, 0.5, 1.0, 1.0,     0.0, 0.0,
             -1.0, -1.0,  1.0,    0.0, 0.5, 1.0, 1.0,     1.0, 0.0,
              1.0, -1.0,  1.0,    0.0, 0.5, 1.0, 1.0,     1.0, 1.0,
              1.0, -1.0, -1.0,    0.0, 0.5, 1.0, 1.0,     0.0, 1.0,
-    
+
             -1.0,  1.0, -1.0,    1.0, 0.0, 0.5, 1.0,     0.0, 0.0,
             -1.0,  1.0,  1.0,    1.0, 0.0, 0.5, 1.0,     1.0, 0.0,
              1.0,  1.0,  1.0,    1.0, 0.0, 0.5, 1.0,     1.0, 1.0,
@@ -99,7 +99,7 @@ impl Stage {
             ctx,
             display_shader::VERTEX,
             display_shader::FRAGMENT,
-            display_shader::META,
+            display_shader::meta(),
         )
         .unwrap();
 
@@ -123,7 +123,7 @@ impl Stage {
             ctx,
             offscreen_shader::VERTEX,
             offscreen_shader::FRAGMENT,
-            offscreen_shader::META,
+            offscreen_shader::meta(),
         )
         .unwrap();
 
@@ -238,12 +238,14 @@ mod display_shader {
     }
     "#;
 
-    pub const META: ShaderMeta = ShaderMeta {
-        images: &["tex"],
-        uniforms: UniformBlockLayout {
-            uniforms: &[UniformDesc::new("mvp", UniformType::Mat4)],
-        },
-    };
+    pub fn meta() -> ShaderMeta {
+        ShaderMeta {
+            images: vec!["tex".to_string()],
+            uniforms: UniformBlockLayout {
+                uniforms: vec![UniformDesc::new("mvp", UniformType::Mat4)],
+            },
+        }
+    }
 
     #[repr(C)]
     pub struct Uniforms {
@@ -276,10 +278,12 @@ mod offscreen_shader {
     }
     "#;
 
-    pub const META: ShaderMeta = ShaderMeta {
-        images: &[],
-        uniforms: UniformBlockLayout {
-            uniforms: &[UniformDesc::new("mvp", UniformType::Mat4)],
-        },
-    };
+    pub fn meta() -> ShaderMeta {
+        ShaderMeta {
+            images: vec![],
+            uniforms: UniformBlockLayout {
+                uniforms: vec![UniformDesc::new("mvp", UniformType::Mat4)],
+            },
+        }
+    }
 }
