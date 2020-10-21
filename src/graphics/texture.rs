@@ -320,6 +320,39 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
     }
 
+    /// Read texture data into CPU memory
+    pub fn read_pixels(&self, bytes: &mut [u8]) {
+        let (_, format, pixel_type) = self.format.into();
+
+        let mut fbo = 0;
+        unsafe {
+            let mut binded_fbo: i32 = 0;
+            glGetIntegerv(gl::GL_DRAW_FRAMEBUFFER_BINDING, &mut binded_fbo);
+            glGenFramebuffers(1, &mut fbo);
+            glBindFramebuffer(gl::GL_FRAMEBUFFER, fbo);
+            glFramebufferTexture2D(
+                gl::GL_FRAMEBUFFER,
+                gl::GL_COLOR_ATTACHMENT0,
+                gl::GL_TEXTURE_2D,
+                self.texture,
+                0,
+            );
+
+            glReadPixels(
+                0,
+                0,
+                self.width as _,
+                self.height as _,
+                format,
+                pixel_type,
+                bytes.as_mut_ptr() as _,
+            );
+
+            glBindFramebuffer(gl::GL_FRAMEBUFFER, binded_fbo as _);
+            glDeleteFramebuffers(1, &fbo);
+        }
+    }
+
     #[inline]
     fn size(&self, width: u32, height: u32) -> usize {
         self.format.size(width, height) as usize
