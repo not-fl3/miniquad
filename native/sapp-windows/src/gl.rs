@@ -239,6 +239,7 @@ pub const GL_TEXTURE_SWIZZLE_G: u32 = 36419;
 pub const GL_TEXTURE_SWIZZLE_B: u32 = 36420;
 pub const GL_TEXTURE_SWIZZLE_A: u32 = 36421;
 pub const GL_TEXTURE_SWIZZLE_RGBA: u32 = 36422;
+pub const GL_DRAW_FRAMEBUFFER_BINDING: u32 = 36006;
 
 pub const WGL_NUMBER_PIXEL_FORMATS_ARB: u32 = 0x2000;
 pub const WGL_SUPPORT_OPENGL_ARB: u32 = 0x2010;
@@ -608,5 +609,14 @@ gl_loader!(
     fn glGenVertexArrays(n: GLsizei, arrays: *mut GLuint) -> (),
     fn glFrontFace(mode: GLenum) -> (),
     fn glCullFace(mode: GLenum) -> (),
-    fn glGenTextures(n: GLsizei, textures: *mut GLuint) -> ()
+    fn glGenTextures(n: GLsizei, textures: *mut GLuint) -> (),
+    fn glReadPixels(
+        x: GLint,
+        y: GLint,
+        width: GLsizei,
+        height: GLsizei,
+        format: GLenum,
+        type_: GLenum,
+        pixels: *mut GLvoid
+    ) -> ()
 );
