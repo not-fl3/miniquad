@@ -659,7 +659,7 @@ pub unsafe extern "C" fn _sapp_glx_has_ext(
     }
     return true;
 }
-pub unsafe extern "C" fn _sapp_glx_extsupported(
+pub unsafe fn _sapp_glx_extsupported(
     mut ext: &[u8],
     mut extensions: *const libc::c_char,
 ) -> bool {
