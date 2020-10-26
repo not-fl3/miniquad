@@ -2,9 +2,18 @@ mod egl;
 pub mod gl;
 mod wayland_client;
 mod wayland_egl;
-mod xdg_shell_protocol;
 
-use xdg_shell_protocol::{xdg_surface, xdg_toplevel, xdg_wm_base};
+#[macro_use]
+mod extensions;
+
+use extensions::{
+    xdg_decoration::{
+        zxdg_decoration_manager_v1, zxdg_decoration_manager_v1_interface,
+        zxdg_toplevel_decoration_v1, zxdg_toplevel_decoration_v1_interface,
+        ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE,
+    },
+    xdg_shell::{self, xdg_surface, xdg_toplevel, xdg_wm_base},
+};
 
 use crate::wayland::wayland_client::*;
 
@@ -13,7 +22,7 @@ use egl::{eglGetDisplay, eglInitialize};
 static mut COMPOSITOR: *mut wl_compositor = std::ptr::null_mut();
 static mut XDG_WM_BASE: *mut xdg_wm_base = std::ptr::null_mut();
 static mut SURFACE: *mut wl_surface = std::ptr::null_mut();
-
+static mut ZXDG_DECORATION_MANAGER: *mut zxdg_decoration_manager_v1 = std::ptr::null_mut();
 static mut CLOSED: bool = false;
 
 unsafe extern "C" fn registry_add_object(
@@ -23,15 +32,21 @@ unsafe extern "C" fn registry_add_object(
     interface: *const i8,
     version: u32,
 ) {
+    // println!(
+    //     "{:?}",
+    //     std::ffi::CStr::from_ptr(interface).to_str().unwrap()
+    // );
     if strcmp(interface, b"wl_compositor\x00" as *const u8 as *const _) == 0 {
         COMPOSITOR = wl_registry_bind(registry, name, &wl_compositor_interface, 1) as _;
     } else if strcmp(interface, b"xdg_wm_base\x00" as *const u8 as *const _) == 0 {
-        XDG_WM_BASE = wl_registry_bind(
-            registry,
-            name,
-            &xdg_shell_protocol::xdg_wm_base_interface,
-            1,
-        ) as _;
+        XDG_WM_BASE = wl_registry_bind(registry, name, &xdg_shell::xdg_wm_base_interface, 1) as _;
+    } else if strcmp(
+        interface,
+        b"zxdg_decoration_manager_v1\00" as *const u8 as *const _,
+    ) == 0
+    {
+        ZXDG_DECORATION_MANAGER =
+            wl_registry_bind(registry, name, &zxdg_decoration_manager_v1_interface, 1) as _;
     }
 }
 
@@ -131,7 +146,7 @@ unsafe fn xdg_wm_base_get_xdg_surface(
     id = wl_proxy_marshal_constructor(
         xdg_wm_base as _,
         xdg_wm_base::get_xdg_surface,
-        &xdg_shell_protocol::xdg_surface_interface as _,
+        &xdg_shell::xdg_surface_interface as _,
         std::ptr::null_mut::<std::ffi::c_void>(),
         surface,
     );
@@ -145,7 +160,7 @@ unsafe fn xdg_surface_get_toplevel(xdg_surface: *mut xdg_surface) -> *mut xdg_to
     id = wl_proxy_marshal_constructor(
         xdg_surface as _,
         xdg_surface::get_toplevel,
-        &xdg_shell_protocol::xdg_toplevel_interface as _,
+        &xdg_shell::xdg_toplevel_interface as _,
         std::ptr::null_mut::<std::ffi::c_void>(),
     );
 
@@ -156,6 +171,33 @@ unsafe fn xdg_surface_ack_configure(xdg_surface: *mut xdg_surface, serial: u32) 
     wl_proxy_marshal(xdg_surface as _, xdg_surface::ack_configure, serial);
 }
 
+unsafe fn zxdg_decoration_manager_v1_get_toplevel_decoration(
+    zxdg_decoration_manager_v1: *mut zxdg_decoration_manager_v1,
+    xdg_toplevel: *mut xdg_toplevel,
+) -> *mut zxdg_toplevel_decoration_v1 {
+    let id;
+
+    id = wl_proxy_marshal_constructor(
+        zxdg_decoration_manager_v1 as _,
+        zxdg_decoration_manager_v1::get_toplevel_decoration,
+        &zxdg_toplevel_decoration_v1_interface as _,
+        std::ptr::null_mut::<std::ffi::c_void>(),
+        xdg_toplevel,
+    );
+
+    id as *mut _
+}
+
+unsafe fn zxdg_toplevel_decoration_v1_set_mode(
+    zxdg_toplevel_decoration_v1: *mut zxdg_toplevel_decoration_v1,
+    mode: u32,
+) {
+    wl_proxy_marshal(
+        zxdg_toplevel_decoration_v1 as _,
+        zxdg_toplevel_decoration_v1::set_mode,
+        mode,
+    );
+}
 
 pub fn init_window() {
     unsafe {
@@ -177,6 +219,9 @@ pub fn init_window() {
         }
         if XDG_WM_BASE.is_null() {
             panic!("No xdg_wm_base");
+        }
+        if ZXDG_DECORATION_MANAGER.is_null() {
+            println!("Decoration manager not found, window decarations disabled");
         }
 
         let egl_display = eglGetDisplay(display as _);
@@ -216,7 +261,7 @@ pub fn init_window() {
         let xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
         assert!(xdg_toplevel.is_null() == false);
 
-        let mut xdg_surface_listener = xdg_shell_protocol::xdg_surface_listener {
+        let mut xdg_surface_listener = xdg_shell::xdg_surface_listener {
             configure: Some(xdg_surface_handle_configure),
         };
 
@@ -235,7 +280,7 @@ pub fn init_window() {
         ) -> () {
         }
 
-        let mut xdg_toplevel_listener = xdg_shell_protocol::xdg_toplevel_listener {
+        let mut xdg_toplevel_listener = xdg_shell::xdg_toplevel_listener {
             configure: Some(noop),
             close: Some(xdg_toplevel_handle_close),
         };
@@ -254,6 +299,18 @@ pub fn init_window() {
             egl::eglCreateWindowSurface(egl_display, config, egl_window as _, std::ptr::null_mut());
         egl::eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context);
 
+        if ZXDG_DECORATION_MANAGER.is_null() == false {
+            let server_decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(
+                ZXDG_DECORATION_MANAGER,
+                xdg_toplevel,
+            );
+            assert!(server_decoration.is_null() == false);
+
+            zxdg_toplevel_decoration_v1_set_mode(
+                server_decoration,
+                ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE,
+            );
+        }
         while CLOSED == false {
             wl_display_dispatch_pending(display);
 
