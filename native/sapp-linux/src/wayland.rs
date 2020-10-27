@@ -24,13 +24,135 @@ use egl::{eglGetDisplay, eglInitialize};
 
 static mut COMPOSITOR: *mut wl_compositor = std::ptr::null_mut();
 static mut SUBCOMPOSITOR: *mut wl_subcompositor = std::ptr::null_mut();
+static mut XDG_TOPLEVEL: *mut xdg_toplevel = std::ptr::null_mut();
 static mut XDG_WM_BASE: *mut xdg_wm_base = std::ptr::null_mut();
 static mut SURFACE: *mut wl_surface = std::ptr::null_mut();
 static mut ZXDG_DECORATION_MANAGER: *mut zxdg_decoration_manager_v1 = std::ptr::null_mut();
 static mut VIEWPORTER: *mut wp_viewporter = std::ptr::null_mut();
 static mut SHM: *mut wl_shm = std::ptr::null_mut();
+static mut SEAT: *mut wl_seat = std::ptr::null_mut();
+
+static mut POINTER: *mut wl_pointer = std::ptr::null_mut();
+static mut FOCUSED_WINDOW: *mut wl_surface = std::ptr::null_mut();
+
+static mut TOP_DECORATION: *mut wl_surface = std::ptr::null_mut();
 
 static mut CLOSED: bool = false;
+
+unsafe extern "C" fn pointer_handle_enter(
+    data: *mut ::std::os::raw::c_void,
+    wl_pointer: *mut wl_pointer,
+    serial: u32,
+    surface: *mut wl_surface,
+    surface_x: wl_fixed_t,
+    surface_y: wl_fixed_t,
+) {
+    FOCUSED_WINDOW = surface;
+}
+
+unsafe extern "C" fn pointer_handle_leave(
+    data: *mut ::std::os::raw::c_void,
+    wl_pointer: *mut wl_pointer,
+    serial: u32,
+    surface: *mut wl_surface,
+) {
+}
+
+unsafe extern "C" fn pointer_handle_motion(
+    data: *mut ::std::os::raw::c_void,
+    wl_pointer: *mut wl_pointer,
+    time: u32,
+    surface_x: wl_fixed_t,
+    surface_y: wl_fixed_t,
+) {
+}
+
+unsafe extern "C" fn pointer_handle_button(
+    data: *mut ::std::os::raw::c_void,
+    wl_pointer: *mut wl_pointer,
+    serial: u32,
+    time: u32,
+    button: u32,
+    state: u32,
+) {
+    if FOCUSED_WINDOW.is_null() {
+        return;
+    }
+
+    // for whatever reason actual constant is in linux/input-event-codes, not wayland headers
+    if button == 0x110 {
+        if FOCUSED_WINDOW == TOP_DECORATION {
+            xdg_toplevel_move(XDG_TOPLEVEL, SEAT, serial);
+        }
+    }
+}
+
+unsafe extern "C" fn pointer_handle_axis(
+    data: *mut ::std::os::raw::c_void,
+    wl_pointer: *mut wl_pointer,
+    time: u32,
+    axis: u32,
+    value: wl_fixed_t,
+) {
+}
+
+unsafe extern "C" fn pointer_handle_frame(
+    data: *mut ::std::os::raw::c_void,
+    wl_pointer: *mut wl_pointer,
+) {
+}
+
+unsafe extern "C" fn pointer_handle_axis_source(
+    data: *mut ::std::os::raw::c_void,
+    wl_pointer: *mut wl_pointer,
+    axis_source: u32,
+) {
+}
+unsafe extern "C" fn pointer_handle_axis_stop(
+    data: *mut ::std::os::raw::c_void,
+    wl_pointer: *mut wl_pointer,
+    time: u32,
+    axis: u32,
+) {
+}
+
+unsafe extern "C" fn pointer_handle_axis_discrete(
+    data: *mut ::std::os::raw::c_void,
+    wl_pointer: *mut wl_pointer,
+    axis: u32,
+    discrete: i32,
+) {
+}
+
+static mut pointer_listener: wl_pointer_listener = wl_pointer_listener {
+    enter: Some(pointer_handle_enter),
+    leave: Some(pointer_handle_leave),
+    motion: Some(pointer_handle_motion),
+    button: Some(pointer_handle_button),
+    axis: Some(pointer_handle_axis),
+    frame: Some(pointer_handle_frame),
+    axis_source: Some(pointer_handle_axis_source),
+    axis_stop: Some(pointer_handle_axis_stop),
+    axis_discrete: Some(pointer_handle_axis_discrete),
+};
+
+unsafe extern "C" fn seat_handle_capabilities(
+    data: *mut std::ffi::c_void,
+    seat: *mut wl_seat,
+    caps: wl_seat_capability,
+) {
+    if (caps & wl_seat_capability_WL_SEAT_CAPABILITY_POINTER) != 0 && POINTER.is_null() {
+        POINTER = wl_seat_get_pointer(seat);
+        wl_pointer_add_listener(POINTER, &pointer_listener, std::ptr::null_mut());
+    }
+}
+
+extern "C" fn seat_handle_name(data: *mut std::ffi::c_void, seat: *mut wl_seat, name: *const i8) {}
+
+static mut seat_listener: wl_seat_listener = wl_seat_listener {
+    capabilities: Some(seat_handle_capabilities),
+    name: Some(seat_handle_name),
+};
 
 unsafe extern "C" fn registry_add_object(
     data: *mut std::ffi::c_void,
@@ -39,16 +161,17 @@ unsafe extern "C" fn registry_add_object(
     interface: *const i8,
     version: u32,
 ) {
-    println!(
-        "{:?}",
-        std::ffi::CStr::from_ptr(interface).to_str().unwrap()
-    );
+    // println!(
+    //     "{:?}",
+    //     std::ffi::CStr::from_ptr(interface).to_str().unwrap()
+    // );
     if strcmp(interface, b"wl_compositor\x00" as *const u8 as *const _) == 0 {
         COMPOSITOR = wl_registry_bind(registry, name, &wl_compositor_interface, 1) as _;
     } else if strcmp(interface, b"wl_subcompositor\x00" as *const u8 as *const _) == 0 {
         SUBCOMPOSITOR = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1) as _;
     } else if strcmp(interface, b"xdg_wm_base\x00" as *const u8 as *const _) == 0 {
         XDG_WM_BASE = wl_registry_bind(registry, name, &xdg_shell::xdg_wm_base_interface, 1) as _;
+        xdg_wm_base_add_listener(XDG_WM_BASE, &xdg_wm_base_listener, std::ptr::null_mut());
     } else if strcmp(
         interface,
         b"zxdg_decoration_manager_v1\00" as *const u8 as *const _,
@@ -60,6 +183,11 @@ unsafe extern "C" fn registry_add_object(
         VIEWPORTER = wl_registry_bind(registry, name, &wp_viewporter_interface, 1) as _;
     } else if strcmp(interface, b"wl_shm\x00" as *const u8 as *const _) == 0 {
         SHM = wl_registry_bind(registry, name, &wl_shm_interface, 1) as _;
+    } else if strcmp(interface, b"wl_seat\x00" as *const u8 as *const _) == 0 {
+        let seat_version = 4.min(version);
+        SEAT = wl_registry_bind(registry, name, &wl_seat_interface, seat_version) as _;
+
+        wl_seat_add_listener(SEAT, &seat_listener, std::ptr::null_mut());
     }
 }
 
@@ -141,6 +269,43 @@ unsafe fn wl_registry_add_listener(
     wl_proxy_add_listener(wl_registry as _, listener as _, data as _)
 }
 
+unsafe fn wl_pointer_add_listener(
+    wl_pointer: *const wl_pointer,
+    listener: *const wl_pointer_listener,
+    data: *mut std::ffi::c_void,
+) -> i32 {
+    wl_proxy_add_listener(wl_pointer as _, listener as _, data as _)
+}
+
+unsafe fn wl_seat_add_listener(
+    wl_seat: *const wl_seat,
+    listener: *const wl_seat_listener,
+    data: *mut std::ffi::c_void,
+) -> i32 {
+    wl_proxy_add_listener(wl_seat as _, listener as _, data as _)
+}
+
+unsafe fn xdg_wm_base_add_listener(
+    xdg_wm_base: *const xdg_wm_base,
+    listener: *const xdg_shell::xdg_wm_base_listener,
+    data: *mut std::ffi::c_void,
+) -> i32 {
+    wl_proxy_add_listener(xdg_wm_base as _, listener as _, data as _)
+}
+
+unsafe fn wl_seat_get_pointer(wl_seat: *const wl_seat) -> *mut wl_pointer {
+    let id: *mut wl_proxy;
+
+    id = wl_proxy_marshal_constructor(
+        wl_seat as _,
+        WL_SEAT_GET_POINTER,
+        &wl_pointer_interface as _,
+        std::ptr::null_mut::<std::ffi::c_void>(),
+    );
+
+    id as *mut _
+}
+
 unsafe fn wl_compositor_create_surface(wl_compositor: *mut wl_compositor) -> *mut wl_surface {
     let id: *mut wl_proxy;
 
@@ -211,6 +376,10 @@ unsafe fn xdg_surface_ack_configure(xdg_surface: *mut xdg_surface, serial: u32) 
     wl_proxy_marshal(xdg_surface as _, xdg_surface::ack_configure, serial);
 }
 
+unsafe fn xdg_toplevel_move(xdg_toplevel: *mut xdg_toplevel, seat: *mut wl_seat, serial: u32) {
+    wl_proxy_marshal(xdg_toplevel as _, xdg_toplevel::r#move as _, seat, serial);
+}
+
 unsafe fn zxdg_decoration_manager_v1_get_toplevel_decoration(
     zxdg_decoration_manager_v1: *mut zxdg_decoration_manager_v1,
     xdg_toplevel: *mut xdg_toplevel,
@@ -222,7 +391,7 @@ unsafe fn zxdg_decoration_manager_v1_get_toplevel_decoration(
         zxdg_decoration_manager_v1::get_toplevel_decoration,
         &zxdg_toplevel_decoration_v1_interface as _,
         std::ptr::null_mut::<std::ffi::c_void>(),
-        xdg_toplevel,
+        XDG_TOPLEVEL,
     );
 
     id as *mut _
@@ -272,7 +441,7 @@ unsafe fn create_decoration(
     y: i32,
     w: i32,
     h: i32,
-) {
+) -> *mut wl_surface {
     let surface = wl_compositor_create_surface(COMPOSITOR);
     let subsurface = wl_subcompositor_get_subsurface(SUBCOMPOSITOR, surface, parent);
     wl_subsurface_set_position(subsurface, x, y);
@@ -280,7 +449,21 @@ unsafe fn create_decoration(
     wp_viewport_set_destination(viewport, w, h);
     wl_surface_attach(surface, buffer, 0, 0);
     wl_surface_commit(surface);
+
+    surface
 }
+
+unsafe extern "C" fn handle_wm_base_ping(
+    _: *mut std::ffi::c_void,
+    xdg_wm_base: *mut xdg_wm_base,
+    serial: u32,
+) {
+    wl_proxy_marshal(xdg_wm_base as _, xdg_wm_base::pong, serial);
+}
+
+static mut xdg_wm_base_listener: xdg_shell::xdg_wm_base_listener = xdg_shell::xdg_wm_base_listener {
+    ping: Some(handle_wm_base_ping),
+};
 
 pub fn init_window() {
     unsafe {
@@ -305,6 +488,9 @@ pub fn init_window() {
         }
         if SUBCOMPOSITOR.is_null() {
             panic!("No subcompositor!");
+        }
+        if SEAT.is_null() {
+            panic!("No seat!");
         }
 
         if ZXDG_DECORATION_MANAGER.is_null() {
@@ -345,8 +531,8 @@ pub fn init_window() {
         assert!(SURFACE.is_null() == false);
         let xdg_surface = xdg_wm_base_get_xdg_surface(XDG_WM_BASE, SURFACE);
         assert!(xdg_surface.is_null() == false);
-        let xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
-        assert!(xdg_toplevel.is_null() == false);
+        XDG_TOPLEVEL = xdg_surface_get_toplevel(xdg_surface);
+        assert!(XDG_TOPLEVEL.is_null() == false);
 
         let mut xdg_surface_listener = xdg_shell::xdg_surface_listener {
             configure: Some(xdg_surface_handle_configure),
@@ -373,7 +559,7 @@ pub fn init_window() {
         };
 
         wl_proxy_add_listener(
-            xdg_toplevel as _,
+            XDG_TOPLEVEL as _,
             std::mem::transmute(&mut xdg_toplevel_listener),
             std::ptr::null_mut(),
         );
@@ -389,7 +575,7 @@ pub fn init_window() {
         if ZXDG_DECORATION_MANAGER.is_null() == false {
             let server_decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(
                 ZXDG_DECORATION_MANAGER,
-                xdg_toplevel,
+                XDG_TOPLEVEL,
             );
             assert!(server_decoration.is_null() == false);
 
@@ -403,7 +589,7 @@ pub fn init_window() {
             // idk doest it takes ownership or not yet
             std::mem::forget(buffer);
 
-            create_decoration(SURFACE, buffer, -2, -15, 512 + 4, 15);
+            TOP_DECORATION = create_decoration(SURFACE, buffer, -2, -15, 512 + 4, 15);
             create_decoration(SURFACE, buffer, -2, -2, 2, 512 + 2);
             create_decoration(SURFACE, buffer, 512, -2, 2, 512 + 2);
             create_decoration(SURFACE, buffer, -2, 512, 512 + 4, 2);
