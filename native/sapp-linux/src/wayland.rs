@@ -6,7 +6,10 @@ mod wayland_egl;
 #[macro_use]
 mod extensions;
 
+mod shm;
+
 use extensions::{
+    viewporter::{wp_viewport, wp_viewport_interface, wp_viewporter, wp_viewporter_interface},
     xdg_decoration::{
         zxdg_decoration_manager_v1, zxdg_decoration_manager_v1_interface,
         zxdg_toplevel_decoration_v1, zxdg_toplevel_decoration_v1_interface,
@@ -20,9 +23,13 @@ use crate::wayland::wayland_client::*;
 use egl::{eglGetDisplay, eglInitialize};
 
 static mut COMPOSITOR: *mut wl_compositor = std::ptr::null_mut();
+static mut SUBCOMPOSITOR: *mut wl_subcompositor = std::ptr::null_mut();
 static mut XDG_WM_BASE: *mut xdg_wm_base = std::ptr::null_mut();
 static mut SURFACE: *mut wl_surface = std::ptr::null_mut();
 static mut ZXDG_DECORATION_MANAGER: *mut zxdg_decoration_manager_v1 = std::ptr::null_mut();
+static mut VIEWPORTER: *mut wp_viewporter = std::ptr::null_mut();
+static mut SHM: *mut wl_shm = std::ptr::null_mut();
+
 static mut CLOSED: bool = false;
 
 unsafe extern "C" fn registry_add_object(
@@ -32,12 +39,14 @@ unsafe extern "C" fn registry_add_object(
     interface: *const i8,
     version: u32,
 ) {
-    // println!(
-    //     "{:?}",
-    //     std::ffi::CStr::from_ptr(interface).to_str().unwrap()
-    // );
+    println!(
+        "{:?}",
+        std::ffi::CStr::from_ptr(interface).to_str().unwrap()
+    );
     if strcmp(interface, b"wl_compositor\x00" as *const u8 as *const _) == 0 {
         COMPOSITOR = wl_registry_bind(registry, name, &wl_compositor_interface, 1) as _;
+    } else if strcmp(interface, b"wl_subcompositor\x00" as *const u8 as *const _) == 0 {
+        SUBCOMPOSITOR = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1) as _;
     } else if strcmp(interface, b"xdg_wm_base\x00" as *const u8 as *const _) == 0 {
         XDG_WM_BASE = wl_registry_bind(registry, name, &xdg_shell::xdg_wm_base_interface, 1) as _;
     } else if strcmp(
@@ -47,6 +56,10 @@ unsafe extern "C" fn registry_add_object(
     {
         ZXDG_DECORATION_MANAGER =
             wl_registry_bind(registry, name, &zxdg_decoration_manager_v1_interface, 1) as _;
+    } else if strcmp(interface, b"wp_viewporter\x00" as *const u8 as *const _) == 0 {
+        VIEWPORTER = wl_registry_bind(registry, name, &wp_viewporter_interface, 1) as _;
+    } else if strcmp(interface, b"wl_shm\x00" as *const u8 as *const _) == 0 {
+        SHM = wl_registry_bind(registry, name, &wl_shm_interface, 1) as _;
     }
 }
 
@@ -112,6 +125,10 @@ unsafe fn wl_registry_bind(
     id as *mut _
 }
 
+unsafe fn wl_surface_attach(wl_surface: *mut wl_surface, buffer: *mut wl_buffer, x: i32, y: i32) {
+    wl_proxy_marshal(wl_surface as _, WL_SURFACE_ATTACH, buffer, x, y);
+}
+
 unsafe fn wl_surface_commit(wl_surface: *const wl_surface) {
     wl_proxy_marshal(wl_surface as _, WL_SURFACE_COMMIT)
 }
@@ -135,6 +152,29 @@ unsafe fn wl_compositor_create_surface(wl_compositor: *mut wl_compositor) -> *mu
     );
 
     id as *mut _
+}
+
+unsafe fn wl_subcompositor_get_subsurface(
+    wl_subcompositor: *mut wl_subcompositor,
+    surface: *mut wl_surface,
+    parent: *mut wl_surface,
+) -> *mut wl_subsurface {
+    let id: *mut wl_proxy;
+
+    id = wl_proxy_marshal_constructor(
+        wl_subcompositor as _,
+        WL_SUBCOMPOSITOR_GET_SUBSURFACE,
+        &wl_subsurface_interface as _,
+        std::ptr::null_mut::<std::ffi::c_void>(),
+        surface,
+        parent,
+    );
+
+    id as *mut _
+}
+
+unsafe fn wl_subsurface_set_position(wl_subsurface: *mut wl_subsurface, x: i32, y: i32) {
+    wl_proxy_marshal(wl_subsurface as _, WL_SUBSURFACE_SET_POSITION, x, y);
 }
 
 unsafe fn xdg_wm_base_get_xdg_surface(
@@ -199,6 +239,49 @@ unsafe fn zxdg_toplevel_decoration_v1_set_mode(
     );
 }
 
+unsafe fn wp_viewporter_get_viewport(
+    wp_viewporter: *mut wp_viewporter,
+    surface: *mut wl_surface,
+) -> *mut wp_viewport {
+    let id;
+
+    id = wl_proxy_marshal_constructor(
+        wp_viewporter as _,
+        wp_viewporter::get_viewport,
+        &wp_viewport_interface as _,
+        std::ptr::null_mut::<std::ffi::c_void>(),
+        surface,
+    );
+
+    id as _
+}
+
+unsafe fn wp_viewport_set_destination(wp_viewport: *mut wp_viewport, width: i32, height: i32) {
+    wl_proxy_marshal(
+        wp_viewport as _,
+        wp_viewport::set_destination,
+        width,
+        height,
+    );
+}
+
+unsafe fn create_decoration(
+    parent: *mut wl_surface,
+    buffer: *mut wl_buffer,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+) {
+    let surface = wl_compositor_create_surface(COMPOSITOR);
+    let subsurface = wl_subcompositor_get_subsurface(SUBCOMPOSITOR, surface, parent);
+    wl_subsurface_set_position(subsurface, x, y);
+    let viewport = wp_viewporter_get_viewport(VIEWPORTER, surface);
+    wp_viewport_set_destination(viewport, w, h);
+    wl_surface_attach(surface, buffer, 0, 0);
+    wl_surface_commit(surface);
+}
+
 pub fn init_window() {
     unsafe {
         let display = wl_display_connect(std::ptr::null_mut());
@@ -218,8 +301,12 @@ pub fn init_window() {
             panic!("No compositor!");
         }
         if XDG_WM_BASE.is_null() {
-            panic!("No xdg_wm_base");
+            panic!("No xdg_wm_base!");
         }
+        if SUBCOMPOSITOR.is_null() {
+            panic!("No subcompositor!");
+        }
+
         if ZXDG_DECORATION_MANAGER.is_null() {
             println!("Decoration manager not found, window decarations disabled");
         }
@@ -310,7 +397,18 @@ pub fn init_window() {
                 server_decoration,
                 ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE,
             );
+        } else {
+            let buffer = shm::create_shm_buffer(1, 1, &[200, 200, 200, 255]);
+
+            // idk doest it takes ownership or not yet
+            std::mem::forget(buffer);
+
+            create_decoration(SURFACE, buffer, -2, -15, 512 + 4, 15);
+            create_decoration(SURFACE, buffer, -2, -2, 2, 512 + 2);
+            create_decoration(SURFACE, buffer, 512, -2, 2, 512 + 2);
+            create_decoration(SURFACE, buffer, -2, 512, 512 + 4, 2);
         }
+
         while CLOSED == false {
             wl_display_dispatch_pending(display);
 
