@@ -403,6 +403,30 @@ unsafe fn _sapp_call_init() {
     _sapp.init_called = true;
 }
 
+unsafe fn _sapp_init_event(type_: sapp_event_type) {
+    _sapp.event = std::mem::zeroed();
+    _sapp.event.type_ = type_;
+    _sapp.event.frame_count = _sapp.frame_count;
+    //_sapp.event.mouse_button = crate::sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID;
+    _sapp.event.window_width = _sapp.window_width;
+    _sapp.event.window_height = _sapp.window_height;
+    _sapp.event.framebuffer_width = _sapp.framebuffer_width;
+    _sapp.event.framebuffer_height = _sapp.framebuffer_height;
+}
+
+unsafe fn _sapp_call_event(e: *const sapp_event) {
+    if !_sapp.cleanup_called {
+        if _sapp.desc.event_cb.is_some() {
+            _sapp.desc.event_cb.expect("non-null function pointer")(e);
+        } else if _sapp.desc.event_userdata_cb.is_some() {
+            _sapp
+                .desc
+                .event_userdata_cb
+                .expect("non-null function pointer")(e, _sapp.desc.user_data);
+        }
+    };
+}
+
 unsafe fn _sapp_call_frame() {
     if _sapp.init_called as i32 != 0 && !_sapp.cleanup_called {
         if _sapp.desc.frame_cb.is_some() {
@@ -476,11 +500,11 @@ pub unsafe extern "C" fn sapp_high_dpi() -> bool {
 }
 #[no_mangle]
 pub unsafe extern "C" fn sapp_height() -> libc::c_int {
-    512
+    _sapp.window_height
 }
 #[no_mangle]
 pub unsafe extern "C" fn sapp_width() -> libc::c_int {
-    512
+    _sapp.window_width
 }
 #[no_mangle]
 pub unsafe extern "C" fn sapp_isvalid() -> bool {

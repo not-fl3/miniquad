@@ -6,10 +6,12 @@ mod wayland_egl;
 #[macro_use]
 mod extensions;
 
+mod decorations;
 mod shm;
 
+use decorations::Decorations;
 use extensions::{
-    viewporter::{wp_viewport, wp_viewport_interface, wp_viewporter, wp_viewporter_interface},
+    viewporter::{wp_viewporter, wp_viewporter_interface},
     xdg_decoration::{
         zxdg_decoration_manager_v1, zxdg_decoration_manager_v1_interface,
         zxdg_toplevel_decoration_v1, zxdg_toplevel_decoration_v1_interface,
@@ -22,18 +24,6 @@ use crate::wayland::wayland_client::*;
 
 use egl::{eglGetDisplay, eglInitialize};
 
-struct Decoration {
-    surface: *mut wl_surface,
-}
-
-struct Decorations {
-    buffer: *mut wl_buffer,
-    top_decoration: Decoration,
-    bottom_decoration: Decoration,
-    left_decoration: Decoration,
-    right_decoration: Decoration,
-}
-
 struct GlobalState {
     compositor: *mut wl_compositor,
     subcompositor: *mut wl_subcompositor,
@@ -45,10 +35,11 @@ struct GlobalState {
     shm: *mut wl_shm,
     seat: *mut wl_seat,
 
+    egl_window: *mut wayland_egl::wl_egl_window,
     pointer: *mut wl_pointer,
     focused_window: *mut wl_surface,
 
-    decorations: Option<Decorations>,
+    decorations: Option<decorations::Decorations>,
 
     closed: bool,
 }
@@ -64,6 +55,7 @@ static mut GLOBALS: GlobalState = GlobalState {
     shm: std::ptr::null_mut(),
     seat: std::ptr::null_mut(),
 
+    egl_window: std::ptr::null_mut(),
     pointer: std::ptr::null_mut(),
     focused_window: std::ptr::null_mut(),
 
@@ -243,10 +235,10 @@ unsafe extern "C" fn registry_add_object(
     interface: *const i8,
     version: u32,
 ) {
-    println!(
-        "{:?}",
-        std::ffi::CStr::from_ptr(interface).to_str().unwrap()
-    );
+    // println!(
+    //     "{:?}",
+    //     std::ffi::CStr::from_ptr(interface).to_str().unwrap()
+    // );
     if strcmp(interface, b"wl_compositor\x00" as *const u8 as *const _) == 0 {
         GLOBALS.compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 1) as _;
     } else if strcmp(interface, b"wl_subcompositor\x00" as *const u8 as *const _) == 0 {
@@ -302,6 +294,41 @@ unsafe extern "C" fn xdg_toplevel_handle_close(
     GLOBALS.closed = true;
 }
 
+unsafe extern "C" fn xdg_toplevel_handle_configure(
+    data: *mut std::ffi::c_void,
+    toplevel: *mut crate::wayland::xdg_toplevel,
+    width: i32,
+    height: i32,
+    states: *mut crate::wayland::wl_array,
+) -> () {
+    if width != 0 && height != 0 {
+        let (egl_w, egl_h) = if GLOBALS.decorations.is_some() {
+            // Otherwise window will resize iteself on sway
+            // I have no idea why
+            (
+                width - Decorations::WIDTH * 2,
+                height - Decorations::BAR_HEIGHT - Decorations::WIDTH,
+            )
+        } else {
+            (width, height)
+        };
+        wayland_egl::wl_egl_window_resize(GLOBALS.egl_window, egl_w, egl_h, 0, 0);
+
+        crate::_sapp.window_width = width;
+        crate::_sapp.window_height = height;
+
+        crate::_sapp.framebuffer_width = width;
+        crate::_sapp.framebuffer_height = height;
+
+        crate::_sapp_init_event(crate::sapp_event_type_SAPP_EVENTTYPE_RESIZED);
+        crate::_sapp_call_event(&crate::_sapp.event);
+
+        if let Some(ref decorations) = GLOBALS.decorations {
+            decorations.resize(width, height);
+        }
+    }
+}
+
 #[no_mangle]
 extern "C" {
     pub fn strcmp(_: *const i8, _: *const i8) -> i32;
@@ -327,44 +354,6 @@ unsafe fn wl_registry_bind(
     );
 
     id as *mut _
-}
-
-unsafe fn create_decoration(
-    parent: *mut wl_surface,
-    buffer: *mut wl_buffer,
-    x: i32,
-    y: i32,
-    w: i32,
-    h: i32,
-) -> Decoration {
-    let surface = wl_request_constructor!(
-        GLOBALS.compositor,
-        WL_COMPOSITOR_CREATE_SURFACE,
-        &wl_surface_interface,
-    );
-
-    let subsurface = wl_request_constructor!(
-        GLOBALS.subcompositor,
-        WL_SUBCOMPOSITOR_GET_SUBSURFACE,
-        &wl_subsurface_interface,
-        surface,
-        parent
-    );
-
-    wl_request!(subsurface, WL_SUBSURFACE_SET_POSITION, x, y);
-
-    let viewport = wl_request_constructor!(
-        GLOBALS.viewporter,
-        wp_viewporter::get_viewport,
-        &wp_viewport_interface,
-        surface
-    );
-
-    wl_request!(viewport, wp_viewport::set_destination, w, h);
-    wl_request!(surface, WL_SURFACE_ATTACH, buffer, 0, 0);
-    wl_request!(surface, WL_SURFACE_COMMIT);
-
-    Decoration { surface }
 }
 
 unsafe extern "C" fn handle_wm_base_ping(
@@ -396,18 +385,10 @@ pub fn init_window() {
         wl_add_listener(registry, &registry_listener, std::ptr::null_mut());
         wl_display_roundtrip(display);
 
-        if GLOBALS.compositor.is_null() {
-            panic!("No compositor!");
-        }
-        if GLOBALS.xdg_wm_base.is_null() {
-            panic!("No xdg_wm_base!");
-        }
-        if GLOBALS.subcompositor.is_null() {
-            panic!("No subcompositor!");
-        }
-        if GLOBALS.seat.is_null() {
-            panic!("No seat!");
-        }
+        assert!(GLOBALS.compositor.is_null() == false);
+        assert!(GLOBALS.xdg_wm_base.is_null() == false);
+        assert!(GLOBALS.subcompositor.is_null() == false);
+        assert!(GLOBALS.seat.is_null() == false);
 
         if GLOBALS.decoration_manager.is_null() {
             println!("Decoration manager not found, window decarations disabled");
@@ -460,13 +441,6 @@ pub fn init_window() {
         );
         assert!(xdg_surface.is_null() == false);
 
-        GLOBALS.xdg_toplevel = wl_request_constructor!(
-            xdg_surface,
-            xdg_surface::get_toplevel,
-            &xdg_shell::xdg_toplevel_interface
-        );
-        assert!(GLOBALS.xdg_toplevel.is_null() == false);
-
         let mut xdg_surface_listener = xdg_shell::xdg_surface_listener {
             configure: Some(xdg_surface_handle_configure),
         };
@@ -477,17 +451,15 @@ pub fn init_window() {
             std::ptr::null_mut(),
         );
 
-        extern "C" fn noop(
-            _: *mut std::ffi::c_void,
-            _: *mut crate::wayland::xdg_toplevel,
-            _: i32,
-            _: i32,
-            _: *mut crate::wayland::wl_array,
-        ) -> () {
-        }
+        GLOBALS.xdg_toplevel = wl_request_constructor!(
+            xdg_surface,
+            xdg_surface::get_toplevel,
+            &xdg_shell::xdg_toplevel_interface
+        );
+        assert!(GLOBALS.xdg_toplevel.is_null() == false);
 
         let mut xdg_toplevel_listener = xdg_shell::xdg_toplevel_listener {
-            configure: Some(noop),
+            configure: Some(xdg_toplevel_handle_configure),
             close: Some(xdg_toplevel_handle_close),
         };
 
@@ -500,9 +472,19 @@ pub fn init_window() {
         wl_request!(GLOBALS.surface, WL_SURFACE_COMMIT);
         wl_display_roundtrip(display);
 
-        let egl_window = wayland_egl::wl_egl_window_create(GLOBALS.surface as _, 512, 512);
-        let egl_surface =
-            egl::eglCreateWindowSurface(egl_display, config, egl_window as _, std::ptr::null_mut());
+        GLOBALS.egl_window = wayland_egl::wl_egl_window_create(GLOBALS.surface as _, 512, 512);
+
+        crate::_sapp.window_width = 512;
+        crate::_sapp.window_height = 512;
+        crate::_sapp.framebuffer_width = 512;
+        crate::_sapp.framebuffer_height = 512;
+
+        let egl_surface = egl::eglCreateWindowSurface(
+            egl_display,
+            config,
+            GLOBALS.egl_window as _,
+            std::ptr::null_mut(),
+        );
         egl::eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context);
 
         if GLOBALS.decoration_manager.is_null() == false {
@@ -520,17 +502,14 @@ pub fn init_window() {
                 ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
             );
         } else {
-            let buffer = shm::create_shm_buffer(GLOBALS.shm, 1, 1, &[200, 200, 200, 255]);
-
-            let decorations = Decorations {
-                buffer,
-                top_decoration: create_decoration(GLOBALS.surface, buffer, -2, -15, 512 + 4, 15),
-                left_decoration: create_decoration(GLOBALS.surface, buffer, -2, -2, 2, 512 + 2),
-                bottom_decoration: create_decoration(GLOBALS.surface, buffer, 512, -2, 2, 512 + 2),
-                right_decoration: create_decoration(GLOBALS.surface, buffer, -2, 512, 512 + 4, 2),
-            };
-
-            GLOBALS.decorations = Some(decorations);
+            GLOBALS.decorations = Some(decorations::Decorations::new(
+                GLOBALS.compositor,
+                GLOBALS.subcompositor,
+                GLOBALS.shm,
+                GLOBALS.surface,
+                512,
+                512
+            ));
         }
 
         while GLOBALS.closed == false {
