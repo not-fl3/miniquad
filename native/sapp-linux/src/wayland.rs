@@ -8,6 +8,7 @@ mod extensions;
 
 mod decorations;
 mod shm;
+mod xkb;
 
 use decorations::Decorations;
 use extensions::{
@@ -37,7 +38,9 @@ struct GlobalState {
 
     egl_window: *mut wayland_egl::wl_egl_window,
     pointer: *mut wl_pointer,
+    keyboard: *mut wl_keyboard,
     focused_window: *mut wl_surface,
+    xkb_state: xkb::XkbState,
 
     decorations: Option<decorations::Decorations>,
 
@@ -57,7 +60,9 @@ static mut GLOBALS: GlobalState = GlobalState {
 
     egl_window: std::ptr::null_mut(),
     pointer: std::ptr::null_mut(),
+    keyboard: std::ptr::null_mut(),
     focused_window: std::ptr::null_mut(),
+    xkb_state: xkb::XkbState::new(),
 
     decorations: None,
 
@@ -127,6 +132,14 @@ unsafe extern "C" fn pointer_handle_leave(
 ) {
 }
 
+// TODO: move to wayland-util
+fn wl_fixed_to_double(f: wl_fixed_t) -> f64 {
+    let i: i64 = ((1023 + 44) << 52) + (1 << 51) + f as i64;
+    let d = unsafe { std::mem::transmute::<_, f64>(i) };
+
+    return d - (3i64 << 43) as f64;
+}
+
 unsafe extern "C" fn pointer_handle_motion(
     data: *mut ::std::os::raw::c_void,
     wl_pointer: *mut wl_pointer,
@@ -134,6 +147,10 @@ unsafe extern "C" fn pointer_handle_motion(
     surface_x: wl_fixed_t,
     surface_y: wl_fixed_t,
 ) {
+    crate::_sapp.mouse_x = wl_fixed_to_double(surface_x) as _;
+    crate::_sapp.mouse_y = wl_fixed_to_double(surface_y) as _;
+
+    crate::_sapp_mouse_event(crate::sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE, -1);
 }
 
 unsafe extern "C" fn pointer_handle_button(
@@ -158,6 +175,19 @@ unsafe extern "C" fn pointer_handle_button(
             }
         }
     }
+
+    let button = match button {
+        0x110 => crate::sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT,
+        0x111 => crate::sapp_mousebutton_SAPP_MOUSEBUTTON_RIGHT,
+        0x112 => crate::sapp_mousebutton_SAPP_MOUSEBUTTON_MIDDLE,
+        _ => -1,
+    };
+
+    let state = if state == wl_pointer_button_state_WL_POINTER_BUTTON_STATE_PRESSED {
+        crate::_sapp_mouse_event(crate::sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN, button);
+    } else {
+        crate::_sapp_mouse_event(crate::sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP, button);
+    };
 }
 
 unsafe extern "C" fn pointer_handle_axis(
@@ -210,6 +240,84 @@ static mut pointer_listener: wl_pointer_listener = wl_pointer_listener {
     axis_discrete: Some(pointer_handle_axis_discrete),
 };
 
+pub extern "C" fn keyboard_handle_keymap(
+    data: *mut ::std::os::raw::c_void,
+    wl_keyboard: *mut wl_keyboard,
+    format: u32,
+    fd: i32,
+    size: u32,
+) {
+}
+
+pub extern "C" fn keyboard_handle_enter(
+    data: *mut ::std::os::raw::c_void,
+    wl_keyboard: *mut wl_keyboard,
+    serial: u32,
+    surface: *mut wl_surface,
+    keys: *mut wl_array,
+) {
+}
+
+pub extern "C" fn keyboard_handle_leave(
+    data: *mut ::std::os::raw::c_void,
+    wl_keyboard: *mut wl_keyboard,
+    serial: u32,
+    surface: *mut wl_surface,
+) {
+}
+
+pub unsafe extern "C" fn keyboard_handle_key(
+    data: *mut ::std::os::raw::c_void,
+    wl_keyboard: *mut wl_keyboard,
+    serial: u32,
+    time: u32,
+    key: u32,
+    state: u32,
+) {
+    let event = if state == wl_keyboard_key_state_WL_KEYBOARD_KEY_STATE_PRESSED {
+        crate::sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN
+    } else {
+        crate::sapp_event_type_SAPP_EVENTTYPE_KEY_UP
+    };
+
+    crate::_sapp_key_event(event, key, false);
+
+    if event == crate::sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN {
+        if let Some(character) = GLOBALS.xkb_state.keycode_to_character(key) {
+            crate::_sapp_char_event(character as u32, false);
+        }
+    }
+}
+
+pub unsafe extern "C" fn keyboard_handle_modifiers(
+    data: *mut ::std::os::raw::c_void,
+    wl_keyboard: *mut wl_keyboard,
+    serial: u32,
+    mods_depressed: u32,
+    mods_latched: u32,
+    mods_locked: u32,
+    group: u32,
+) {
+    GLOBALS.xkb_state.update_modifiers(mods_depressed);
+}
+
+pub extern "C" fn keyboard_handle_repeat_info(
+    data: *mut ::std::os::raw::c_void,
+    wl_keyboard: *mut wl_keyboard,
+    rate: i32,
+    delay: i32,
+) {
+}
+
+static mut keyboard_listener: wl_keyboard_listener = wl_keyboard_listener {
+    keymap: Some(keyboard_handle_keymap),
+    enter: Some(keyboard_handle_enter),
+    leave: Some(keyboard_handle_leave),
+    key: Some(keyboard_handle_key),
+    modifiers: Some(keyboard_handle_modifiers),
+    repeat_info: Some(keyboard_handle_repeat_info),
+};
+
 unsafe extern "C" fn seat_handle_capabilities(
     data: *mut std::ffi::c_void,
     seat: *mut wl_seat,
@@ -218,6 +326,12 @@ unsafe extern "C" fn seat_handle_capabilities(
     if (caps & wl_seat_capability_WL_SEAT_CAPABILITY_POINTER) != 0 && GLOBALS.pointer.is_null() {
         GLOBALS.pointer = wl_request_constructor!(seat, WL_SEAT_GET_POINTER, &wl_pointer_interface);
         wl_add_listener(GLOBALS.pointer, &pointer_listener, std::ptr::null_mut());
+    }
+
+    if (caps & wl_seat_capability_WL_SEAT_CAPABILITY_KEYBOARD) != 0 && GLOBALS.keyboard.is_null() {
+        GLOBALS.keyboard =
+            wl_request_constructor!(seat, WL_SEAT_GET_KEYBOARD, &wl_keyboard_interface);
+        wl_add_listener(GLOBALS.keyboard, &keyboard_listener, std::ptr::null_mut());
     }
 }
 
@@ -235,10 +349,10 @@ unsafe extern "C" fn registry_add_object(
     interface: *const i8,
     version: u32,
 ) {
-    // println!(
-    //     "{:?}",
-    //     std::ffi::CStr::from_ptr(interface).to_str().unwrap()
-    // );
+    println!(
+        "{:?}",
+        std::ffi::CStr::from_ptr(interface).to_str().unwrap()
+    );
     if strcmp(interface, b"wl_compositor\x00" as *const u8 as *const _) == 0 {
         GLOBALS.compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 1) as _;
     } else if strcmp(interface, b"wl_subcompositor\x00" as *const u8 as *const _) == 0 {
@@ -508,7 +622,7 @@ pub fn init_window() {
                 GLOBALS.shm,
                 GLOBALS.surface,
                 512,
-                512
+                512,
             ));
         }
 

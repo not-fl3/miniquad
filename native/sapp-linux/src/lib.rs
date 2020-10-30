@@ -363,7 +363,6 @@ pub struct _sapp_gl_fbconfig {
     pub handle: libc::c_ulong,
 }
 
-
 unsafe fn init_state(desc: *const sapp_desc) {
     fn _sapp_def<T: PartialEq>(x: T, default: T, zero: T) -> T {
         if x == zero {
@@ -391,6 +390,129 @@ unsafe fn init_state(desc: *const sapp_desc) {
     _sapp.dpi_scale = 1.0;
 }
 
+unsafe fn init_keytable() {
+    // TODO: double check this, there are errors here 
+    _sapp.keycodes[0x00B] = sapp_keycode_SAPP_KEYCODE_0;
+    _sapp.keycodes[0x002] = sapp_keycode_SAPP_KEYCODE_1;
+    _sapp.keycodes[0x003] = sapp_keycode_SAPP_KEYCODE_2;
+    _sapp.keycodes[0x004] = sapp_keycode_SAPP_KEYCODE_3;
+    _sapp.keycodes[0x005] = sapp_keycode_SAPP_KEYCODE_4;
+    _sapp.keycodes[0x006] = sapp_keycode_SAPP_KEYCODE_5;
+    _sapp.keycodes[0x007] = sapp_keycode_SAPP_KEYCODE_6;
+    _sapp.keycodes[0x008] = sapp_keycode_SAPP_KEYCODE_7;
+    _sapp.keycodes[0x009] = sapp_keycode_SAPP_KEYCODE_8;
+    _sapp.keycodes[0x00A] = sapp_keycode_SAPP_KEYCODE_9;
+    _sapp.keycodes[0x01E] = sapp_keycode_SAPP_KEYCODE_A;
+    _sapp.keycodes[0x030] = sapp_keycode_SAPP_KEYCODE_B;
+    _sapp.keycodes[0x02E] = sapp_keycode_SAPP_KEYCODE_C;
+    _sapp.keycodes[0x020] = sapp_keycode_SAPP_KEYCODE_D;
+    _sapp.keycodes[0x012] = sapp_keycode_SAPP_KEYCODE_E;
+    _sapp.keycodes[0x021] = sapp_keycode_SAPP_KEYCODE_F;
+    _sapp.keycodes[0x022] = sapp_keycode_SAPP_KEYCODE_G;
+    _sapp.keycodes[0x023] = sapp_keycode_SAPP_KEYCODE_H;
+    _sapp.keycodes[0x017] = sapp_keycode_SAPP_KEYCODE_I;
+    _sapp.keycodes[0x024] = sapp_keycode_SAPP_KEYCODE_J;
+    _sapp.keycodes[0x025] = sapp_keycode_SAPP_KEYCODE_K;
+    _sapp.keycodes[0x026] = sapp_keycode_SAPP_KEYCODE_L;
+    _sapp.keycodes[0x032] = sapp_keycode_SAPP_KEYCODE_M;
+    _sapp.keycodes[0x031] = sapp_keycode_SAPP_KEYCODE_N;
+    _sapp.keycodes[0x018] = sapp_keycode_SAPP_KEYCODE_O;
+    _sapp.keycodes[0x019] = sapp_keycode_SAPP_KEYCODE_P;
+    _sapp.keycodes[0x010] = sapp_keycode_SAPP_KEYCODE_Q;
+    _sapp.keycodes[0x013] = sapp_keycode_SAPP_KEYCODE_R;
+    _sapp.keycodes[0x01F] = sapp_keycode_SAPP_KEYCODE_S;
+    _sapp.keycodes[0x014] = sapp_keycode_SAPP_KEYCODE_T;
+    _sapp.keycodes[0x016] = sapp_keycode_SAPP_KEYCODE_U;
+    _sapp.keycodes[0x02F] = sapp_keycode_SAPP_KEYCODE_V;
+    _sapp.keycodes[0x011] = sapp_keycode_SAPP_KEYCODE_W;
+    _sapp.keycodes[0x02D] = sapp_keycode_SAPP_KEYCODE_X;
+    _sapp.keycodes[0x015] = sapp_keycode_SAPP_KEYCODE_Y;
+    _sapp.keycodes[0x02C] = sapp_keycode_SAPP_KEYCODE_Z;
+    _sapp.keycodes[0x028] = sapp_keycode_SAPP_KEYCODE_APOSTROPHE;
+    _sapp.keycodes[0x02B] = sapp_keycode_SAPP_KEYCODE_BACKSLASH;
+    _sapp.keycodes[0x033] = sapp_keycode_SAPP_KEYCODE_COMMA;
+    _sapp.keycodes[0x00D] = sapp_keycode_SAPP_KEYCODE_EQUAL;
+    _sapp.keycodes[0x029] = sapp_keycode_SAPP_KEYCODE_GRAVE_ACCENT;
+    _sapp.keycodes[0x01A] = sapp_keycode_SAPP_KEYCODE_LEFT_BRACKET;
+    _sapp.keycodes[0x00C] = sapp_keycode_SAPP_KEYCODE_MINUS;
+    _sapp.keycodes[0x034] = sapp_keycode_SAPP_KEYCODE_PERIOD;
+    _sapp.keycodes[0x01B] = sapp_keycode_SAPP_KEYCODE_RIGHT_BRACKET;
+    _sapp.keycodes[0x027] = sapp_keycode_SAPP_KEYCODE_SEMICOLON;
+    _sapp.keycodes[0x035] = sapp_keycode_SAPP_KEYCODE_SLASH;
+    _sapp.keycodes[0x056] = sapp_keycode_SAPP_KEYCODE_WORLD_2;
+    _sapp.keycodes[0x00E] = sapp_keycode_SAPP_KEYCODE_BACKSPACE;
+    _sapp.keycodes[0x153] = sapp_keycode_SAPP_KEYCODE_DELETE;
+    _sapp.keycodes[0x14F] = sapp_keycode_SAPP_KEYCODE_END;
+    _sapp.keycodes[0x01C] = sapp_keycode_SAPP_KEYCODE_ENTER;
+    _sapp.keycodes[0x001] = sapp_keycode_SAPP_KEYCODE_ESCAPE;
+    _sapp.keycodes[0x147] = sapp_keycode_SAPP_KEYCODE_HOME;
+    _sapp.keycodes[0x152] = sapp_keycode_SAPP_KEYCODE_INSERT;
+    _sapp.keycodes[0x15D] = sapp_keycode_SAPP_KEYCODE_MENU;
+    _sapp.keycodes[0x151] = sapp_keycode_SAPP_KEYCODE_PAGE_DOWN;
+    _sapp.keycodes[0x149] = sapp_keycode_SAPP_KEYCODE_PAGE_UP;
+    _sapp.keycodes[0x045] = sapp_keycode_SAPP_KEYCODE_PAUSE;
+    _sapp.keycodes[0x146] = sapp_keycode_SAPP_KEYCODE_PAUSE;
+    _sapp.keycodes[0x039] = sapp_keycode_SAPP_KEYCODE_SPACE;
+    _sapp.keycodes[0x00F] = sapp_keycode_SAPP_KEYCODE_TAB;
+    _sapp.keycodes[0x03A] = sapp_keycode_SAPP_KEYCODE_CAPS_LOCK;
+    _sapp.keycodes[0x145] = sapp_keycode_SAPP_KEYCODE_NUM_LOCK;
+    _sapp.keycodes[0x046] = sapp_keycode_SAPP_KEYCODE_SCROLL_LOCK;
+    _sapp.keycodes[0x03B] = sapp_keycode_SAPP_KEYCODE_F1;
+    _sapp.keycodes[0x03C] = sapp_keycode_SAPP_KEYCODE_F2;
+    _sapp.keycodes[0x03D] = sapp_keycode_SAPP_KEYCODE_F3;
+    _sapp.keycodes[0x03E] = sapp_keycode_SAPP_KEYCODE_F4;
+    _sapp.keycodes[0x03F] = sapp_keycode_SAPP_KEYCODE_F5;
+    _sapp.keycodes[0x040] = sapp_keycode_SAPP_KEYCODE_F6;
+    _sapp.keycodes[0x041] = sapp_keycode_SAPP_KEYCODE_F7;
+    _sapp.keycodes[0x042] = sapp_keycode_SAPP_KEYCODE_F8;
+    _sapp.keycodes[0x043] = sapp_keycode_SAPP_KEYCODE_F9;
+    _sapp.keycodes[0x044] = sapp_keycode_SAPP_KEYCODE_F10;
+    _sapp.keycodes[0x057] = sapp_keycode_SAPP_KEYCODE_F11;
+    _sapp.keycodes[0x058] = sapp_keycode_SAPP_KEYCODE_F12;
+    _sapp.keycodes[0x064] = sapp_keycode_SAPP_KEYCODE_F13;
+    _sapp.keycodes[0x065] = sapp_keycode_SAPP_KEYCODE_F14;
+    _sapp.keycodes[0x066] = sapp_keycode_SAPP_KEYCODE_F15;
+    _sapp.keycodes[0x067] = sapp_keycode_SAPP_KEYCODE_UP;
+    _sapp.keycodes[0x068] = sapp_keycode_SAPP_KEYCODE_DOWN;
+    _sapp.keycodes[0x069] = sapp_keycode_SAPP_KEYCODE_LEFT;
+    _sapp.keycodes[0x06A] = sapp_keycode_SAPP_KEYCODE_RIGHT;
+    _sapp.keycodes[0x06B] = sapp_keycode_SAPP_KEYCODE_F20;
+    _sapp.keycodes[0x06C] = sapp_keycode_SAPP_KEYCODE_DOWN;
+    _sapp.keycodes[0x06D] = sapp_keycode_SAPP_KEYCODE_F22;
+    _sapp.keycodes[0x06E] = sapp_keycode_SAPP_KEYCODE_F23;
+    _sapp.keycodes[0x076] = sapp_keycode_SAPP_KEYCODE_F24;
+    _sapp.keycodes[0x06F] = sapp_keycode_SAPP_KEYCODE_DELETE;
+    _sapp.keycodes[0x038] = sapp_keycode_SAPP_KEYCODE_LEFT_ALT;
+    _sapp.keycodes[0x01D] = sapp_keycode_SAPP_KEYCODE_LEFT_CONTROL;
+    _sapp.keycodes[0x02A] = sapp_keycode_SAPP_KEYCODE_LEFT_SHIFT;
+    _sapp.keycodes[0x15B] = sapp_keycode_SAPP_KEYCODE_LEFT_SUPER;
+    _sapp.keycodes[0x137] = sapp_keycode_SAPP_KEYCODE_PRINT_SCREEN;
+    _sapp.keycodes[0x138] = sapp_keycode_SAPP_KEYCODE_RIGHT_ALT;
+    _sapp.keycodes[0x11D] = sapp_keycode_SAPP_KEYCODE_RIGHT_CONTROL;
+    _sapp.keycodes[0x036] = sapp_keycode_SAPP_KEYCODE_RIGHT_SHIFT;
+    _sapp.keycodes[0x15C] = sapp_keycode_SAPP_KEYCODE_RIGHT_SUPER;
+    _sapp.keycodes[0x150] = sapp_keycode_SAPP_KEYCODE_DOWN;
+    _sapp.keycodes[0x14B] = sapp_keycode_SAPP_KEYCODE_LEFT;
+    _sapp.keycodes[0x14D] = sapp_keycode_SAPP_KEYCODE_RIGHT;
+    _sapp.keycodes[0x148] = sapp_keycode_SAPP_KEYCODE_UP;
+    _sapp.keycodes[0x052] = sapp_keycode_SAPP_KEYCODE_KP_0;
+    _sapp.keycodes[0x04F] = sapp_keycode_SAPP_KEYCODE_KP_1;
+    _sapp.keycodes[0x050] = sapp_keycode_SAPP_KEYCODE_KP_2;
+    _sapp.keycodes[0x051] = sapp_keycode_SAPP_KEYCODE_KP_3;
+    _sapp.keycodes[0x04B] = sapp_keycode_SAPP_KEYCODE_KP_4;
+    _sapp.keycodes[0x04C] = sapp_keycode_SAPP_KEYCODE_KP_5;
+    _sapp.keycodes[0x04D] = sapp_keycode_SAPP_KEYCODE_KP_6;
+    _sapp.keycodes[0x047] = sapp_keycode_SAPP_KEYCODE_KP_7;
+    _sapp.keycodes[0x048] = sapp_keycode_SAPP_KEYCODE_KP_8;
+    _sapp.keycodes[0x049] = sapp_keycode_SAPP_KEYCODE_KP_9;
+    _sapp.keycodes[0x04E] = sapp_keycode_SAPP_KEYCODE_KP_ADD;
+    _sapp.keycodes[0x053] = sapp_keycode_SAPP_KEYCODE_KP_DECIMAL;
+    _sapp.keycodes[0x135] = sapp_keycode_SAPP_KEYCODE_KP_DIVIDE;
+    _sapp.keycodes[0x11C] = sapp_keycode_SAPP_KEYCODE_KP_ENTER;
+    _sapp.keycodes[0x037] = sapp_keycode_SAPP_KEYCODE_KP_MULTIPLY;
+    _sapp.keycodes[0x04A] = sapp_keycode_SAPP_KEYCODE_KP_SUBTRACT;
+}
+
 unsafe fn _sapp_call_init() {
     if _sapp.desc.init_cb.is_some() {
         _sapp.desc.init_cb.expect("non-null function pointer")();
@@ -407,11 +529,38 @@ unsafe fn _sapp_init_event(type_: sapp_event_type) {
     _sapp.event = std::mem::zeroed();
     _sapp.event.type_ = type_;
     _sapp.event.frame_count = _sapp.frame_count;
-    //_sapp.event.mouse_button = crate::sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID;
+    _sapp.event.mouse_button = -1;
     _sapp.event.window_width = _sapp.window_width;
     _sapp.event.window_height = _sapp.window_height;
     _sapp.event.framebuffer_width = _sapp.framebuffer_width;
     _sapp.event.framebuffer_height = _sapp.framebuffer_height;
+}
+
+unsafe fn _sapp_mouse_event(type_: sapp_event_type, btn: sapp_mousebutton) {
+    _sapp_init_event(type_);
+    //_sapp.event.modifiers = _sapp_win32_mods();
+    _sapp.event.mouse_button = btn;
+    _sapp.event.mouse_x = _sapp.mouse_x;
+    _sapp.event.mouse_y = _sapp.mouse_y;
+    _sapp_call_event(&_sapp.event);
+}
+
+unsafe fn _sapp_key_event(type_: sapp_event_type, vk: u32, repeat: bool) {
+    if vk < _sapp.keycodes.len() as _ {
+        _sapp_init_event(type_);
+        //_sapp.event.modifiers = _sapp_win32_mods();
+        _sapp.event.key_code = _sapp.keycodes[vk as usize];
+        _sapp.event.key_repeat = repeat;
+        _sapp_call_event(&_sapp.event);
+    }
+}
+
+unsafe fn _sapp_char_event(c: u32, repeat: bool) {
+    _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_CHAR);
+    //_sapp.event.modifiers = _sapp_win32_mods();
+    _sapp.event.char_code = c;
+    _sapp.event.key_repeat = repeat;
+    _sapp_call_event(&_sapp.event);
 }
 
 unsafe fn _sapp_call_event(e: *const sapp_event) {
@@ -452,6 +601,7 @@ unsafe fn _sapp_frame() {
 #[no_mangle]
 pub unsafe extern "C" fn sapp_run(mut desc: *const sapp_desc) -> libc::c_int {
     init_state(desc);
+    init_keytable();
 
     wayland::init_window();
 
