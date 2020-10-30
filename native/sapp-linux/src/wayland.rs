@@ -197,6 +197,17 @@ unsafe extern "C" fn pointer_handle_axis(
     axis: u32,
     value: wl_fixed_t,
 ) {
+    if axis == wl_pointer_axis_WL_POINTER_AXIS_HORIZONTAL_SCROLL {
+        let x = -wl_fixed_to_double(value);
+
+        crate::_sapp_scroll_event(x as _, 0.);
+    }
+    else if axis == wl_pointer_axis_WL_POINTER_AXIS_VERTICAL_SCROLL {
+        let y = -wl_fixed_to_double(value);
+
+        crate::_sapp_scroll_event(0., y as _);
+    }
+
 }
 
 unsafe extern "C" fn pointer_handle_frame(

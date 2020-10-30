@@ -391,7 +391,7 @@ unsafe fn init_state(desc: *const sapp_desc) {
 }
 
 unsafe fn init_keytable() {
-    // TODO: double check this, there are errors here 
+    // TODO: double check this, there are errors here
     _sapp.keycodes[0x00B] = sapp_keycode_SAPP_KEYCODE_0;
     _sapp.keycodes[0x002] = sapp_keycode_SAPP_KEYCODE_1;
     _sapp.keycodes[0x003] = sapp_keycode_SAPP_KEYCODE_2;
@@ -553,6 +553,14 @@ unsafe fn _sapp_key_event(type_: sapp_event_type, vk: u32, repeat: bool) {
         _sapp.event.key_repeat = repeat;
         _sapp_call_event(&_sapp.event);
     }
+}
+
+unsafe fn _sapp_scroll_event(x: f32, y: f32) {
+    _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_MOUSE_SCROLL);
+    //_sapp.event.modifiers = _sapp_win32_mods();
+    _sapp.event.scroll_x = -x / 10.0;
+    _sapp.event.scroll_y = y / 10.0;
+    _sapp_call_event(&_sapp.event);
 }
 
 unsafe fn _sapp_char_event(c: u32, repeat: bool) {
