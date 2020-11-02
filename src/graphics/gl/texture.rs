@@ -253,8 +253,7 @@ impl GraphicTexture for Texture {
         ctx.cache.restore_texture_binding(0);
     }
 
-    /// Read texture data into CPU memory
-    pub fn read_pixels(&self, bytes: &mut [u8]) {
+    fn read_pixels(&self, bytes: &mut [u8]) {
         let (_, format, pixel_type) = self.format.into();
 
         let mut fbo = 0;

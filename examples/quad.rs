@@ -77,7 +77,6 @@ impl EventHandler for Stage {
         let t = date::now();
 
         ctx.begin_default_pass(Default::default());
-
         ctx.apply_pipeline(&self.pipeline);
         ctx.apply_bindings(&self.bindings);
         for i in 0..10 {

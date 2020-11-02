@@ -8,15 +8,14 @@ use crate::graphics::*;
 use crate::GraphicContext;
 use foreign_types::ForeignType;
 use metal::{
-    CommandBuffer, CommandQueue, DepthStencilDescriptor, DepthStencilState, Device, Drawable,
-    Library, MTLBlendFactor, MTLClearColor, MTLCompareFunction, MTLCullMode, MTLIndexType,
-    MTLLoadAction, MTLPixelFormat, MTLPrimitiveType, MTLResourceOptions, MTLResourceUsage,
-    MTLSamplerState, MTLScissorRect, MTLStencilOperation, MTLStoreAction, MTLTexture,
+    CommandBuffer, CommandQueue, DepthStencilDescriptor, DepthStencilState, Device, MTLBlendFactor,
+    MTLClearColor, MTLCompareFunction, MTLCullMode, MTLIndexType, MTLLoadAction, MTLPixelFormat,
+    MTLPrimitiveType, MTLResourceOptions, MTLScissorRect, MTLStencilOperation, MTLStoreAction,
     MTLVertexFormat, MTLVertexStepFunction, MTLViewport, MTLWinding, RenderCommandEncoder,
     RenderPassDescriptor, RenderPipelineDescriptor, RenderPipelineState, StencilDescriptor,
     VertexDescriptor,
 };
-use std::{mem, path::Path};
+use std::mem;
 
 // https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
 const MAX_BUFFERS_PER_STAGE: usize = 14;
@@ -65,6 +64,7 @@ pub struct Context {
     current_pass: Option<RenderPass>,
     current_frame_index: usize,
     cache: Cache,
+    internal_pipeline: RenderPipelineState,
 }
 
 struct Cache {
@@ -73,10 +73,13 @@ struct Cache {
     uniform_buffer: Vec<metal::Buffer>,
     current_ub_offset: usize,
     cur_pipeline: Option<Pipeline>,
+    textures: Vec<metal::Texture>,
+    samplers: Vec<metal::SamplerState>,
 }
 
 impl Cache {
     pub fn clear(&mut self) {
+        // TODO: clear texture cache
         self.vertex_buffers.clear();
         self.index_buffer = None;
         self.current_ub_offset = 0;
@@ -92,6 +95,8 @@ impl Default for Cache {
             uniform_buffer: Vec::with_capacity(NUM_INFLIGHT_FRAMES),
             current_ub_offset: 0,
             cur_pipeline: None,
+            textures: vec![],
+            samplers: vec![],
         }
     }
 }
@@ -112,6 +117,8 @@ impl Context {
         let rpd = get_renderpass_descriptor();
         let () = unsafe { msg_send![rpd.as_ref(), retain] };
 
+        let internal_pipeline = Self::init_internal_pipeline(device.as_ref());
+
         Context {
             device,
             command_queue,
@@ -124,7 +131,63 @@ impl Context {
             current_pass: None,
             current_frame_index: 1,
             cache,
+            internal_pipeline,
         }
+    }
+
+    fn clear_background_color(&self, r: f32, g:f32, b:f32, a: f32) {
+        if let Some(render_encoder) = &self.render_encoder {
+            let clear_rect: &[f32] = &[
+                // x y w h
+                -1.0, -1.0, 2.0, 2.0,
+                r, g, b, a,
+            ];
+
+            let clear_rect_buffer = self.device.new_buffer_with_data(
+                clear_rect.as_ptr() as *const _,
+                mem::size_of_val(clear_rect) as u64,
+                Usage::Immutable.into(),
+            );
+
+            render_encoder.set_render_pipeline_state(&self.internal_pipeline);
+            render_encoder.set_vertex_buffer(0, Some(&clear_rect_buffer), 0);
+            render_encoder.draw_primitives_instanced(
+                metal::MTLPrimitiveType::TriangleStrip,
+                0,
+                4,
+                1,
+            );
+        }
+    }
+
+    fn init_internal_pipeline(device: &metal::DeviceRef) -> RenderPipelineState {
+        // TODO: metallib
+        let shader_source = include_str!("shaders/shaders.metal");
+        let library = device
+            .new_library_with_source(shader_source, &metal::CompileOptions::new())
+            .unwrap();
+        let vert = library.get_function("clear_rect_vertex", None).unwrap();
+        let frag = library.get_function("clear_rect_fragment", None).unwrap();
+
+        let pipeline_state_descriptor = RenderPipelineDescriptor::new();
+        pipeline_state_descriptor.set_vertex_function(Some(&vert));
+        pipeline_state_descriptor.set_fragment_function(Some(&frag));
+        let attachment = pipeline_state_descriptor
+            .color_attachments()
+            .object_at(0)
+            .unwrap();
+        attachment.set_pixel_format(DEFAULT_FRAMEBUFFER_PIXEL_FORMAT);
+        attachment.set_blending_enabled(true);
+        attachment.set_rgb_blend_operation(metal::MTLBlendOperation::Add);
+        attachment.set_alpha_blend_operation(metal::MTLBlendOperation::Add);
+        attachment.set_source_rgb_blend_factor(metal::MTLBlendFactor::SourceAlpha);
+        attachment.set_source_alpha_blend_factor(metal::MTLBlendFactor::SourceAlpha);
+        attachment.set_destination_rgb_blend_factor(metal::MTLBlendFactor::OneMinusSourceAlpha);
+        attachment.set_destination_alpha_blend_factor(metal::MTLBlendFactor::OneMinusSourceAlpha);
+
+        device
+            .new_render_pipeline_state(&pipeline_state_descriptor)
+            .unwrap()
     }
 }
 
@@ -140,23 +203,26 @@ impl RenderPass {
         color_img: Texture,
         depth_img: impl Into<Option<Texture>>,
     ) -> RenderPass {
-        let render_pass_desc = metal::RenderPassDescriptor::new().to_owned();
+        let render_pass_desc = metal::RenderPassDescriptor::new();
+
+        let color_texture = &context.cache.textures[color_img.texture];
 
         let color_attach = render_pass_desc.color_attachments().object_at(0).unwrap();
-        color_attach.set_texture(Some(color_img.texture.as_ref()));
+        color_attach.set_texture(Some(color_texture));
         color_attach.set_load_action(MTLLoadAction::Load);
         color_attach.set_store_action(MTLStoreAction::Store);
 
         let depth_img = depth_img.into().unwrap();
+        let depth_texture = &context.cache.textures[depth_img.texture];
 
         let depth_attach = render_pass_desc.depth_attachment().unwrap();
-        depth_attach.set_texture(Some(depth_img.texture.as_ref()));
+        depth_attach.set_texture(Some(depth_texture));
 
         let stencil_attach = render_pass_desc.stencil_attachment().unwrap();
-        stencil_attach.set_texture(Some(depth_img.texture.as_ref()));
+        stencil_attach.set_texture(Some(depth_texture));
 
         let pass = RenderPassInternal {
-            render_pass_desc,
+            render_pass_desc: render_pass_desc.to_owned(),
             texture: color_img,
             depth_texture: depth_img.into(),
         };
@@ -169,7 +235,7 @@ impl RenderPass {
     pub fn texture(&self, ctx: &mut Context) -> Texture {
         let render_pass = &mut ctx.passes[self.0];
 
-        render_pass.texture.clone()
+        render_pass.texture
     }
 
     pub fn delete(&self, ctx: &mut Context) {
@@ -210,6 +276,19 @@ impl GraphicContext for Context {
         todo!()
     }
 
+    fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) {
+        if let Some(render_encoder) = &self.render_encoder {
+            render_encoder.set_viewport(MTLViewport {
+                originX: 0.0,
+                originY: 0.0,
+                width: w as f64,
+                height: h as f64,
+                znear: 0.0,
+                zfar: 1.0,
+            });
+        }
+    }
+
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
         if let Some(render_encoder) = &self.render_encoder {
             //TODO: validate
@@ -227,6 +306,11 @@ impl GraphicContext for Context {
             bindings.vertex_buffers.len() <= MAX_SHADERSTAGE_BUFFERS,
             "Only {} buffers are supported right now",
             MAX_SHADERSTAGE_BUFFERS
+        );
+
+        assert!(
+            !self.cache.samplers.is_empty() || !self.cache.textures.is_empty(),
+            "Create texture first"
         );
 
         for vb_index in 0..bindings.vertex_buffers.len() {
@@ -247,15 +331,12 @@ impl GraphicContext for Context {
             let mut textures = Vec::with_capacity(img_count);
 
             for i in 0..img_count {
-                sampler_states.push(Some(bindings.images[i].sampler_state.as_ref()));
-                textures.push(Some(bindings.images[i].texture.as_ref()));
+                sampler_states.push(Some(self.cache.samplers[i].as_ref()));
+                textures.push(Some(self.cache.textures[i].as_ref()));
             }
 
-            if !sampler_states.is_empty() {
+            if img_count > 0 {
                 render_encoder.set_fragment_sampler_states(0, sampler_states.as_slice());
-            }
-
-            if !textures.is_empty() {
                 render_encoder.set_fragment_textures(0, textures.as_slice());
             }
         }
@@ -320,6 +401,8 @@ impl GraphicContext for Context {
             color_attachment.set_store_action(MTLStoreAction::Store);
             color_attachment
                 .set_clear_color(MTLClearColor::new(r as f64, g as f64, b as f64, a as f64));
+
+            self.clear_background_color(r, g, b, a);
         }
 
         if let Some(v) = depth {
@@ -345,8 +428,6 @@ impl GraphicContext for Context {
     }
 
     fn begin_pass(&mut self, pass: impl Into<Option<RenderPass>>, action: PassAction) {
-        self.cache.clear();
-
         let (ref render_pass_desc, w, h) = match pass.into() {
             None => (
                 &self.default_render_pass_desc,
@@ -431,6 +512,7 @@ impl GraphicContext for Context {
 
         self.cmd_buffer = None;
         self.cache.current_ub_offset = 0;
+        self.cache.clear();
 
         if (self.current_frame_index + 1) >= NUM_INFLIGHT_FRAMES {
             self.current_frame_index = 0;
@@ -677,6 +759,8 @@ impl Pipeline {
             .unwrap();
 
         color_attachment.set_pixel_format(DEFAULT_FRAMEBUFFER_PIXEL_FORMAT);
+        color_attachment.set_blending_enabled(true);
+
         pipeline_state_descriptor
             .set_depth_attachment_pixel_format(DEFAULT_FRAMEBUFFER_DEPTH_FORMAT);
         pipeline_state_descriptor

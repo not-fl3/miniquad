@@ -3,18 +3,19 @@ use crate::{
     Context, FilterMode, GraphicTexture, TextureAccess, TextureFormat, TextureParams, TextureWrap,
 };
 use metal::{
-    MTLCPUCacheMode, MTLOrigin, MTLPixelFormat, MTLRegion, MTLResourceOptions, MTLResourceUsage,
+    MTLCPUCacheMode, MTLOrigin, MTLPixelFormat, MTLRegion, MTLResourceOptions,
     MTLSamplerMinMagFilter, MTLSize, MTLStorageMode, MTLTextureUsage, SamplerDescriptor,
-    SamplerState, TextureDescriptor,
+    TextureDescriptor,
 };
 use metal_rs as metal;
 
-#[derive(Clone, Debug)]
+// https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
+const MAX_TEXTURE_SIZE: u32 = 8192;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Texture {
-    pub(crate) texture: metal::Texture,
-    pub(crate) texture_dsc: TextureDescriptor,
-    pub(crate) sampler_dsc: SamplerDescriptor,
-    pub(crate) sampler_state: SamplerState,
+    pub(crate) texture: usize,
+    pub(crate) sampler: usize,
     pub width: u32,
     pub height: u32,
     pub format: TextureFormat,
@@ -31,6 +32,9 @@ impl GraphicTexture for Texture {
         bytes: Option<&[u8]>,
         params: TextureParams,
     ) -> Texture {
+        assert!(params.height < MAX_TEXTURE_SIZE);
+        assert!(params.width < MAX_TEXTURE_SIZE);
+
         if let Some(bytes_data) = bytes {
             assert_eq!(
                 params.format.size(params.width, params.height) as usize,
@@ -44,6 +48,9 @@ impl GraphicTexture for Texture {
         texture_dsc.set_pixel_format(params.format.into());
 
         if access == TextureAccess::RenderTarget {
+            if params.format != TextureFormat::Depth {
+                texture_dsc.set_pixel_format(DEFAULT_FRAMEBUFFER_PIXEL_FORMAT);
+            }
             texture_dsc.set_cpu_cache_mode(MTLCPUCacheMode::DefaultCache);
             texture_dsc.set_resource_options(MTLResourceOptions::StorageModePrivate);
             texture_dsc.set_storage_mode(MTLStorageMode::Private);
@@ -60,13 +67,16 @@ impl GraphicTexture for Texture {
 
         let sampler_state = ctx.device.new_sampler(&sampler_dsc);
 
+        let texture_id = ctx.cache.textures.len();
+
         let raw_texture = ctx.device.new_texture(&texture_dsc);
 
+        ctx.cache.textures.push(raw_texture);
+        ctx.cache.samplers.push(sampler_state);
+
         let texture = Texture {
-            texture: raw_texture,
-            texture_dsc,
-            sampler_dsc,
-            sampler_state,
+            texture: texture_id,
+            sampler: texture_id,
             width: params.width,
             height: params.height,
             format: params.format,
@@ -127,7 +137,8 @@ impl GraphicTexture for Texture {
         height: i32,
         bytes: &[u8],
     ) {
-        self.texture.replace_region(
+        let raw_texture = &ctx.cache.textures[self.texture];
+        raw_texture.replace_region(
             MTLRegion {
                 origin: MTLOrigin {
                     x: x_offset as u64,
@@ -146,6 +157,10 @@ impl GraphicTexture for Texture {
         );
     }
 
+    fn read_pixels(&self, bytes: &mut [u8]) {
+        todo!();
+    }
+
     #[inline]
     fn size(&self, width: u32, height: u32) -> usize {
         self.format.size(width, height) as usize
@@ -155,8 +170,7 @@ impl GraphicTexture for Texture {
 impl From<TextureFormat> for MTLPixelFormat {
     fn from(format: TextureFormat) -> Self {
         match format {
-            //TODO: RGBA8Unorm?
-            TextureFormat::RGBA8 => MTLPixelFormat::BGRA8Unorm,
+            TextureFormat::RGBA8 => MTLPixelFormat::RGBA8Unorm,
             //TODO: Depth16Unorm ?
             TextureFormat::Depth => MTLPixelFormat::Depth32Float_Stencil8,
             _ => todo!(),

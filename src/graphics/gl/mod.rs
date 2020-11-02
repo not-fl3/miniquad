@@ -65,8 +65,8 @@ impl Display for ShaderError {
     }
 }
 
-impl Error for ShaderError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
+impl std::error::Error for ShaderError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         None
     }
 }
@@ -476,6 +476,12 @@ impl GraphicContext for Context {
         }
 
         self.cache.stencil = stencil_test;
+    }
+
+    fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) {
+        unsafe {
+            glViewport(x, y, w, h);
+        }
     }
 
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {

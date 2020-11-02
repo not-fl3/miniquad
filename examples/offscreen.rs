@@ -33,7 +33,7 @@ impl Stage {
             },
         );
 
-        let offscreen_pass = RenderPass::new(ctx, color_img.clone(), depth_img.clone());
+        let offscreen_pass = RenderPass::new(ctx, color_img, depth_img);
 
         #[rustfmt::skip]
         let vertices: &[f32] = &[

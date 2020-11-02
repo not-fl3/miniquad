@@ -9,7 +9,7 @@ pub use crate::graphics::gl::*;
 pub use crate::graphics::metal::*;
 
 use crate::sapp::{sapp_dpi_scale, sapp_height, sapp_high_dpi, sapp_width};
-use std::{error::Error, fmt::Display};
+use std::fmt::Display;
 
 type ColorMask = (bool, bool, bool, bool);
 
@@ -46,6 +46,12 @@ pub trait GraphicContext {
 
     fn set_stencil(&mut self, stencil_test: Option<StencilState>);
 
+    /// Set a new viewport rectangle.
+    /// Should be applied after begin_pass.
+    fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32);
+
+    /// Set a new scissor rectangle.
+    /// Should be applied after begin_pass.
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32);
 
     fn apply_bindings(&mut self, bindings: &Bindings);
@@ -616,6 +622,9 @@ pub trait GraphicTexture {
         height: i32,
         bytes: &[u8],
     );
+
+    /// Read texture data into CPU memory
+    fn read_pixels(&self, bytes: &mut [u8]);
 
     fn size(&self, width: u32, height: u32) -> usize;
 }

@@ -17,7 +17,7 @@ jobs:
           - { os: macos-latest, target: 'x86_64-apple-darwin', build_args: '--example quad --no-default-features --features metal' }
           - { os: macos-latest, target: 'aarch64-apple-ios', build_args: '--all-targets' }
           - { os: macos-latest, target: 'x86_64-apple-ios', build_args: '--all-targets' }
-          - { os: windows-latest, target: 'x86_64-pc-windows-msvc' }
+          - { os: windows-latest, target: 'x86_64-pc-windows-msvc', build_args: '--all-targets' }
         include:
           - os: ubuntu-latest
             packages: libx11-dev libxi-dev libgl1-mesa-dev gcc-mingw-w64
