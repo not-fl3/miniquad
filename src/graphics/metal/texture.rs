@@ -1,8 +1,10 @@
+use crate::graphics::metal::DEFAULT_FRAMEBUFFER_PIXEL_FORMAT;
 use crate::{
     Context, FilterMode, GraphicTexture, TextureAccess, TextureFormat, TextureParams, TextureWrap,
 };
 use metal::{
-    MTLOrigin, MTLPixelFormat, MTLRegion, MTLSamplerMinMagFilter, MTLSize, SamplerDescriptor,
+    MTLCPUCacheMode, MTLOrigin, MTLPixelFormat, MTLRegion, MTLResourceOptions, MTLResourceUsage,
+    MTLSamplerMinMagFilter, MTLSize, MTLStorageMode, MTLTextureUsage, SamplerDescriptor,
     SamplerState, TextureDescriptor,
 };
 use metal_rs as metal;
@@ -25,7 +27,7 @@ impl GraphicTexture for Texture {
 
     fn new(
         ctx: &mut Context,
-        _access: TextureAccess,
+        access: TextureAccess,
         bytes: Option<&[u8]>,
         params: TextureParams,
     ) -> Texture {
@@ -40,6 +42,17 @@ impl GraphicTexture for Texture {
         texture_dsc.set_width(params.width as u64);
         texture_dsc.set_height(params.height as u64);
         texture_dsc.set_pixel_format(params.format.into());
+
+        if access == TextureAccess::RenderTarget {
+            texture_dsc.set_cpu_cache_mode(MTLCPUCacheMode::DefaultCache);
+            texture_dsc.set_resource_options(MTLResourceOptions::StorageModePrivate);
+            texture_dsc.set_storage_mode(MTLStorageMode::Private);
+            texture_dsc.set_usage(
+                MTLTextureUsage::RenderTarget
+                    | MTLTextureUsage::ShaderRead
+                    | MTLTextureUsage::ShaderWrite,
+            );
+        }
 
         let sampler_dsc = SamplerDescriptor::new();
         sampler_dsc.set_min_filter(params.filter.into());
@@ -59,14 +72,16 @@ impl GraphicTexture for Texture {
             format: params.format,
         };
 
-        texture.update_texture_part(
-            ctx,
-            0,
-            0,
-            params.width as i32,
-            params.height as i32,
-            &bytes.unwrap(),
-        );
+        if let Some(bytes_data) = bytes {
+            texture.update_texture_part(
+                ctx,
+                0,
+                0,
+                params.width as i32,
+                params.height as i32,
+                &bytes_data,
+            );
+        }
 
         texture
     }
@@ -140,7 +155,10 @@ impl GraphicTexture for Texture {
 impl From<TextureFormat> for MTLPixelFormat {
     fn from(format: TextureFormat) -> Self {
         match format {
-            TextureFormat::RGBA8 => MTLPixelFormat::RGBA8Unorm,
+            //TODO: RGBA8Unorm?
+            TextureFormat::RGBA8 => MTLPixelFormat::BGRA8Unorm,
+            //TODO: Depth16Unorm ?
+            TextureFormat::Depth => MTLPixelFormat::Depth32Float_Stencil8,
             _ => todo!(),
         }
     }

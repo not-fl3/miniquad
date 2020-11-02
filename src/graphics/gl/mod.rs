@@ -42,6 +42,35 @@ impl VertexFormat {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum ShaderError {
+    CompilationError {
+        shader_type: ShaderType,
+        error_message: String,
+    },
+    LinkError(String),
+    /// Shader strings should never contains \00 in the middle
+    FFINulError(std::ffi::NulError),
+}
+
+impl From<std::ffi::NulError> for ShaderError {
+    fn from(e: std::ffi::NulError) -> ShaderError {
+        ShaderError::FFINulError(e)
+    }
+}
+
+impl Display for ShaderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self) // Display the same way as Debug
+    }
+}
+
+impl Error for ShaderError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+}
+
 impl Shader {
     pub fn new(
         ctx: &mut Context,

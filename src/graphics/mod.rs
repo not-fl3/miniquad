@@ -69,7 +69,7 @@ pub trait GraphicContext {
     fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32);
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum UniformType {
     Float1,
     Float2,
@@ -212,40 +212,10 @@ pub struct PipelineLayout {
     pub attributes: &'static [VertexAttribute],
 }
 
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug, Copy, PartialEq)]
 pub enum ShaderType {
     Vertex,
     Fragment,
-}
-
-//TODO: GL Specific
-#[derive(Clone, Debug)]
-pub enum ShaderError {
-    CompilationError {
-        shader_type: ShaderType,
-        error_message: String,
-    },
-    LinkError(String),
-    /// Shader strings should never contains \00 in the middle
-    FFINulError(std::ffi::NulError),
-}
-
-impl From<std::ffi::NulError> for ShaderError {
-    fn from(e: std::ffi::NulError) -> ShaderError {
-        ShaderError::FFINulError(e)
-    }
-}
-
-impl Display for ShaderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self) // Display the same way as Debug
-    }
-}
-
-impl Error for ShaderError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -598,6 +568,18 @@ pub struct TextureParams {
     pub filter: FilterMode,
     pub width: u32,
     pub height: u32,
+}
+
+impl Default for TextureParams {
+    fn default() -> Self {
+        TextureParams {
+            format: TextureFormat::RGBA8,
+            wrap: TextureWrap::Clamp,
+            filter: FilterMode::Linear,
+            width: 0,
+            height: 0,
+        }
+    }
 }
 
 pub trait GraphicTexture {

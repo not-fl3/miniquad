@@ -27,13 +27,13 @@ impl Stage {
         ];
         let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
 
-        #[cfg(all(target_os = "macos", feature = "metal"))]
+        #[cfg(feature = "metal")]
         vertex_buffer.with_label("QuadVertexBuffer");
 
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
         let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
 
-        #[cfg(all(target_os = "macos", feature = "metal"))]
+        #[cfg(feature = "metal")]
         index_buffer.with_label("QuadIntexBuffer");
 
         let pixels: [u8; 4 * 4 * 4] = [
@@ -47,20 +47,11 @@ impl Stage {
 
         let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
-            index_buffer: index_buffer,
+            index_buffer,
             images: vec![texture],
         };
 
-        #[cfg(not(feature = "metal"))]
         let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::meta()).unwrap();
-
-        #[cfg(all(target_os = "macos", feature = "metal"))]
-        let shader = Shader::new(
-            ctx,
-            &include_bytes!("shaders/quad/quad.metallib")[..],
-            shader::meta(),
-        )
-        .unwrap();
 
         let pipeline = Pipeline::new(
             ctx,
@@ -113,16 +104,90 @@ mod shader {
     use miniquad::*;
 
     #[cfg(not(feature = "metal"))]
-    pub const VERTEX: &str = include_str!("shaders/quad/quad_100.vert");
+    pub const VERTEX: &str = r#"#version 100
+    attribute vec2 pos;
+    attribute vec2 uv;
+
+    uniform vec2 offset;
+
+    varying lowp vec2 texcoord;
+
+    void main() {
+        gl_Position = vec4(pos + offset, 0, 1);
+        texcoord = uv;
+    }"#;
+
     #[cfg(not(feature = "metal"))]
-    pub const FRAGMENT: &str = include_str!("shaders/quad/quad_100.frag");
+    pub const FRAGMENT: &str = r#"#version 100
+    varying lowp vec2 texcoord;
+
+    uniform sampler2D tex;
+
+    void main() {
+        gl_FragColor = texture2D(tex, texcoord);
+    }"#;
+
+    #[cfg(feature = "metal")]
+    pub const VERTEX: &str = r#"
+    #include <metal_stdlib>
+    #include <simd/simd.h>
+
+    using namespace metal;
+
+    struct Uniforms
+    {
+        float2 offset;
+    };
+
+    struct vertex_function_out
+    {
+        float2 texcoord [[user(locn0)]];
+        float4 gl_Position [[position]];
+    };
+
+    struct vertex_function_in
+    {
+        float2 pos [[attribute(0)]];
+        float2 uv [[attribute(1)]];
+    };
+
+    vertex vertex_function_out vertex_function(vertex_function_in in [[stage_in]], constant Uniforms& _22 [[buffer(0)]])
+    {
+        vertex_function_out out = {};
+        out.gl_Position = float4(in.pos + _22.offset, 0.0, 1.0);
+        out.texcoord = in.uv;
+        return out;
+    }
+    "#;
+
+    #[cfg(feature = "metal")]
+    pub const FRAGMENT: &str = r#"#include <metal_stdlib>
+    #include <simd/simd.h>
+
+    using namespace metal;
+
+    struct fragment_function_out
+    {
+        float4 fragColor [[color(0)]];
+    };
+
+    struct fragment_function_in
+    {
+        float2 texcoord [[user(locn0)]];
+    };
+
+    fragment fragment_function_out fragment_function(fragment_function_in in [[stage_in]], texture2d<float> tex [[texture(0)]], sampler texSmplr [[sampler(0)]])
+    {
+        fragment_function_out out = {};
+        out.fragColor = tex.sample(texSmplr, in.texcoord);
+        return out;
+    }"#;
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {
             images: vec!["tex".to_string()],
             uniforms: UniformBlockLayout {
-                // TODO: "offset". How we can set uniform name with spirv-cross ?
-                uniforms: vec![UniformDesc::new("_22.offset", UniformType::Float2)],
+                uniforms: vec![UniformDesc::new("offset", UniformType::Float2)],
             },
         }
     }

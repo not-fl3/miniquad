@@ -19,7 +19,7 @@ default = ["sapp-darwin", "sapp-ios"]
 # Optional log-rs like macros implementation
 # disabled by default
 log-impl = []
-metal = ["sapp-metal", "objc", "metal-rs", "foreign-types", "dispatch", "block"]
+metal = ["sapp-metal", "objc", "metal-rs", "foreign-types"]
 
 [target.'cfg(windows)'.dependencies]
 sapp-windows = { path ="./native/sapp-windows", version = "=0.2.13" }
@@ -39,8 +39,6 @@ sapp-metal = { path = "native/sapp-metal", version = "=0.1.0", optional = true }
 objc = { version = "0.2.7", optional = true }
 metal-rs = { version = "0.20", optional = true, package = "metal" }
 foreign-types = { version = "0.3", optional = true }
-dispatch = { version = "0.2", optional = true }
-block = { version = "0.1.5", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 sapp-android = { path = "./native/sapp-android", version = "0.1.4" }

@@ -54,18 +54,6 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
     }
 }
 
-impl Default for TextureParams {
-    fn default() -> Self {
-        TextureParams {
-            format: TextureFormat::RGBA8,
-            wrap: TextureWrap::Clamp,
-            filter: FilterMode::Linear,
-            width: 0,
-            height: 0,
-        }
-    }
-}
-
 impl GraphicTexture for Texture {
     fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
         Self::new(ctx, TextureAccess::RenderTarget, None, params)

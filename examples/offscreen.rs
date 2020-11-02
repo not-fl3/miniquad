@@ -33,7 +33,7 @@ impl Stage {
             },
         );
 
-        let offscreen_pass = RenderPass::new(ctx, color_img, depth_img);
+        let offscreen_pass = RenderPass::new(ctx, color_img.clone(), depth_img.clone());
 
         #[rustfmt::skip]
         let vertices: &[f32] = &[
@@ -70,6 +70,8 @@ impl Stage {
         ];
 
         let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
+        #[cfg(feature = "metal")]
+        vertex_buffer.with_label("OffscreenVertexBuffer");
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
@@ -82,6 +84,8 @@ impl Stage {
         ];
 
         let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
+        #[cfg(feature = "metal")]
+        index_buffer.with_label("OffscreenIndexBuffer");
 
         let offscreen_bind = Bindings {
             vertex_buffers: vec![vertex_buffer.clone()],
@@ -91,7 +95,7 @@ impl Stage {
 
         let display_bind = Bindings {
             vertex_buffers: vec![vertex_buffer],
-            index_buffer: index_buffer,
+            index_buffer,
             images: vec![color_img],
         };
 
@@ -210,6 +214,7 @@ fn main() {
 mod display_shader {
     use miniquad::*;
 
+    #[cfg(not(feature = "metal"))]
     pub const VERTEX: &str = r#"#version 100
     attribute vec4 pos;
     attribute vec4 color0;
@@ -227,6 +232,7 @@ mod display_shader {
     }
     "#;
 
+    #[cfg(not(feature = "metal"))]
     pub const FRAGMENT: &str = r#"#version 100
     varying lowp vec4 color;
     varying lowp vec2 uv;
@@ -237,6 +243,65 @@ mod display_shader {
         gl_FragColor = color * texture2D(tex, uv);
     }
     "#;
+
+    #[cfg(feature = "metal")]
+    pub const VERTEX: &str = r#"#include <metal_stdlib>
+    #include <simd/simd.h>
+
+    using namespace metal;
+
+    struct Uniforms
+    {
+        float4x4 mvp;
+    };
+
+    struct vertex_function_out
+    {
+        float4 color [[user(locn0)]];
+        float2 uv [[user(locn1)]];
+        float4 gl_Position [[position]];
+    };
+
+    struct vertex_function_in
+    {
+        float3 pos [[attribute(0)]];
+        float4 color0 [[attribute(1)]];
+        float2 uv0 [[attribute(2)]];
+    };
+
+    vertex vertex_function_out vertex_function(vertex_function_in in [[stage_in]], constant Uniforms& _30 [[buffer(0)]])
+    {
+        vertex_function_out out = {};
+        float4 position = float4(in.pos, 1.0);
+        out.gl_Position = _30.mvp * position;
+        out.color = in.color0;
+        out.uv = in.uv0;
+        return out;
+    }"#;
+
+    #[cfg(feature = "metal")]
+    pub const FRAGMENT: &str = r#"#include <metal_stdlib>
+    #include <simd/simd.h>
+
+    using namespace metal;
+
+    struct fragment_function_out
+    {
+        float4 fragColor [[color(0)]];
+    };
+
+    struct fragment_function_in
+    {
+        float4 color [[user(locn0)]];
+        float2 uv [[user(locn1)]];
+    };
+
+    fragment fragment_function_out fragment_function(fragment_function_in in [[stage_in]], texture2d<float> tex [[texture(0)]], sampler texSmplr [[sampler(0)]])
+    {
+        fragment_function_out out = {};
+        out.fragColor = in.color * tex.sample(texSmplr, in.uv);
+        return out;
+    }"#;
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {
@@ -256,6 +321,7 @@ mod display_shader {
 mod offscreen_shader {
     use miniquad::*;
 
+    #[cfg(not(feature = "metal"))]
     pub const VERTEX: &str = r#"#version 100
     attribute vec4 pos;
     attribute vec4 color0;
@@ -270,6 +336,7 @@ mod offscreen_shader {
     }
     "#;
 
+    #[cfg(not(feature = "metal"))]
     pub const FRAGMENT: &str = r#"#version 100
     varying lowp vec4 color;
 
@@ -277,6 +344,61 @@ mod offscreen_shader {
         gl_FragColor = color;
     }
     "#;
+
+    #[cfg(feature = "metal")]
+    pub const VERTEX: &str = r#"#include <metal_stdlib>
+    #include <simd/simd.h>
+
+    using namespace metal;
+
+    struct Uniforms
+    {
+        float4x4 mvp;
+    };
+
+    struct vertex_function_out
+    {
+        float4 color [[user(locn0)]];
+        float4 gl_Position [[position]];
+    };
+
+    struct vertex_function_in
+    {
+        float3 pos [[attribute(0)]];
+        float4 color0 [[attribute(1)]];
+    };
+
+    vertex vertex_function_out vertex_function(vertex_function_in in [[stage_in]], constant Uniforms& _30 [[buffer(0)]])
+    {
+        vertex_function_out out = {};
+        float4 position = float4(in.pos, 1.0);
+        out.gl_Position = _30.mvp * position;
+        out.color = in.color0;
+        return out;
+    }"#;
+
+    #[cfg(feature = "metal")]
+    pub const FRAGMENT: &str = r#"#include <metal_stdlib>
+    #include <simd/simd.h>
+
+    using namespace metal;
+
+    struct fragment_function_out
+    {
+        float4 fragColor [[color(0)]];
+    };
+
+    struct fragment_function_in
+    {
+        float4 color [[user(locn0)]];
+    };
+
+    fragment fragment_function_out fragment_function(fragment_function_in in [[stage_in]])
+    {
+        fragment_function_out out = {};
+        out.fragColor = in.color;
+        return out;
+    }"#;
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {
