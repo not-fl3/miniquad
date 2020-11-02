@@ -684,11 +684,11 @@ unsafe extern "system" fn win32_wndproc(
                 );
             }
             WM_MOUSEWHEEL => {
-                _sapp_win32_scroll_event(0.0, HIWORD(wParam as _) as f32);
+                _sapp_win32_scroll_event(0.0, (HIWORD(wParam as _) as i16) as f32);
             }
 
             WM_MOUSEHWHEEL => {
-                _sapp_win32_scroll_event(HIWORD(wParam as _) as f32, 0.0);
+                _sapp_win32_scroll_event((HIWORD(wParam as _) as i16) as f32, 0.0);
             }
             WM_CHAR => _sapp_win32_char_event(wParam as _, !!(lParam & 0x40000000) != 0),
             WM_KEYDOWN | WM_SYSKEYDOWN => _sapp_win32_key_event(
