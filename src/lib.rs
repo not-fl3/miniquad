@@ -125,6 +125,13 @@ impl Context {
             sapp::sapp_show_mouse(shown);
         }
     }
+
+    pub fn set_window_size(&self, new_width: u32, new_height: u32) {
+        #[cfg(windows)]
+        unsafe {
+            sapp::sapp_set_window_size(new_width, new_height);
+        }
+    }
 }
 
 pub enum UserData {

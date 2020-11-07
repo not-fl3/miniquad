@@ -29,11 +29,11 @@ use winapi::{
             AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
             GetClientRect, GetCursorInfo, GetDC, GetKeyState, GetSystemMetrics, LoadCursorW,
             LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage,
-            RegisterClassW, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage,
+            RegisterClassW, SetWindowPos, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage,
             UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO, CURSOR_SHOWING,
-            CW_USEDEFAULT, HTCLIENT, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST, MSG,
+            CW_USEDEFAULT, HTCLIENT, HWND_TOP, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST, MSG,
             PM_REMOVE, SC_KEYMENU, SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN,
-            SM_CYSCREEN, SW_HIDE, SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN,
+            SM_CYSCREEN, SWP_NOMOVE, SW_HIDE, SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN,
             VK_MENU, VK_RWIN, VK_SHIFT, WM_CHAR, WM_CLOSE, WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP,
             WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
             WM_MOUSELEAVE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP,
@@ -468,6 +468,18 @@ pub unsafe fn sapp_set_cursor_grab(mut _grab: bool) {}
 
 pub unsafe fn sapp_show_mouse(shown: bool) {
     ShowCursor(shown as _);
+}
+
+pub unsafe fn sapp_set_window_size(new_width: u32, new_height: u32) {
+    SetWindowPos(
+        _sapp_win32_hwnd,
+        HWND_TOP,
+        0,
+        0,
+        new_width as i32,
+        new_height as i32,
+        SWP_NOMOVE
+    );
 }
 
 unsafe fn _sapp_init_event(type_: sapp_event_type) {
