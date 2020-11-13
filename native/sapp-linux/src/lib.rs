@@ -1260,10 +1260,10 @@ unsafe fn _sapp_x11_set_fullscreen() {
     // however, this is X, so just in case - the second method
     // send ClientMessage to the window with request to change property to fullscreen
     {
-        let mut data = [0i64; 5];
+        let mut data = [0isize; 5];
 
         data[0] = 1;
-        data[1] = wm_fullscreen as i64;
+        data[1] = wm_fullscreen as isize;
         data[2] = 0;
 
         let mut ev = XClientMessageEvent {
@@ -1274,7 +1274,7 @@ unsafe fn _sapp_x11_set_fullscreen() {
             window: _sapp_x11_window,
             display: _sapp_x11_display,
             format: 32,
-            data: ClientMessageData { l: data },
+            data: ClientMessageData { l: std::mem::transmute(data) },
         };
         XSendEvent(
             _sapp_x11_display,
