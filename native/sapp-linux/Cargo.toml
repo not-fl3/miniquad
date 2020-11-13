@@ -13,4 +13,3 @@ homepage = "https://github.com/not-fl3/miniquad"
 
 [dependencies]
 libc = "0.2"
-

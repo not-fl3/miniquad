@@ -7,7 +7,8 @@ fn main() {
         panic!("sapp_linux support only linux target");
     }
 
+    println!("cargo:rustc-link-lib=dylib=wayland-client");
+    println!("cargo:rustc-link-lib=dylib=wayland-egl");
+    println!("cargo:rustc-link-lib=dylib=EGL");
     println!("cargo:rustc-link-lib=dylib=GL");
-    println!("cargo:rustc-link-lib=dylib=X11");
-    println!("cargo:rustc-link-lib=dylib=Xi");
 }
