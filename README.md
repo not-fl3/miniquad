@@ -76,6 +76,8 @@ And then use the following .html to load .wasm:
 <details><summary>index.html</summary>
 
 ```html
+<html lang="en">
+
 <head>
     <meta charset="utf-8">
     <title>TITLE</title>
