@@ -57,7 +57,7 @@ pub struct Context {
     command_queue: CommandQueue,
     cmd_buffer: Option<CommandBuffer>,
     render_encoder: Option<RenderCommandEncoder>,
-    default_render_pass_desc: RenderPassDescriptor,
+    default_render_pass_desc: Option<RenderPassDescriptor>,
     pipelines: Vec<PipelineInternal>,
     shaders: Vec<ShaderInternal>,
     passes: Vec<RenderPassInternal>,
@@ -73,8 +73,12 @@ struct Cache {
     uniform_buffer: Vec<metal::Buffer>,
     current_ub_offset: usize,
     cur_pipeline: Option<Pipeline>,
-    textures: Vec<metal::Texture>,
-    samplers: Vec<metal::SamplerState>,
+    texture_states: Vec<TextureState>,
+}
+
+pub(crate) struct TextureState {
+    texture: metal::Texture,
+    sampler: metal::SamplerState,
 }
 
 impl Cache {
@@ -95,8 +99,7 @@ impl Default for Cache {
             uniform_buffer: Vec::with_capacity(NUM_INFLIGHT_FRAMES),
             current_ub_offset: 0,
             cur_pipeline: None,
-            textures: vec![],
-            samplers: vec![],
+            texture_states: vec![],
         }
     }
 }
@@ -124,7 +127,7 @@ impl Context {
             command_queue,
             cmd_buffer: None,
             render_encoder: None,
-            default_render_pass_desc: rpd,
+            default_render_pass_desc: Some(rpd),
             pipelines: vec![],
             shaders: vec![],
             passes: vec![],
@@ -135,12 +138,11 @@ impl Context {
         }
     }
 
-    fn clear_background_color(&self, r: f32, g:f32, b:f32, a: f32) {
+    fn clear_background_color(&self, r: f32, g: f32, b: f32, a: f32) {
         if let Some(render_encoder) = &self.render_encoder {
             let clear_rect: &[f32] = &[
                 // x y w h
-                -1.0, -1.0, 2.0, 2.0,
-                r, g, b, a,
+                -1.0, -1.0, 2.0, 2.0, r, g, b, a,
             ];
 
             let clear_rect_buffer = self.device.new_buffer_with_data(
@@ -176,6 +178,7 @@ impl Context {
             .color_attachments()
             .object_at(0)
             .unwrap();
+
         attachment.set_pixel_format(DEFAULT_FRAMEBUFFER_PIXEL_FORMAT);
         attachment.set_blending_enabled(true);
         attachment.set_rgb_blend_operation(metal::MTLBlendOperation::Add);
@@ -184,6 +187,11 @@ impl Context {
         attachment.set_source_alpha_blend_factor(metal::MTLBlendFactor::SourceAlpha);
         attachment.set_destination_rgb_blend_factor(metal::MTLBlendFactor::OneMinusSourceAlpha);
         attachment.set_destination_alpha_blend_factor(metal::MTLBlendFactor::OneMinusSourceAlpha);
+
+        pipeline_state_descriptor
+            .set_depth_attachment_pixel_format(DEFAULT_FRAMEBUFFER_DEPTH_FORMAT);
+        pipeline_state_descriptor
+            .set_stencil_attachment_pixel_format(DEFAULT_FRAMEBUFFER_DEPTH_FORMAT);
 
         device
             .new_render_pipeline_state(&pipeline_state_descriptor)
@@ -205,7 +213,7 @@ impl RenderPass {
     ) -> RenderPass {
         let render_pass_desc = metal::RenderPassDescriptor::new();
 
-        let color_texture = &context.cache.textures[color_img.texture];
+        let color_texture = &context.cache.texture_states[color_img.texture].texture;
 
         let color_attach = render_pass_desc.color_attachments().object_at(0).unwrap();
         color_attach.set_texture(Some(color_texture));
@@ -213,7 +221,7 @@ impl RenderPass {
         color_attach.set_store_action(MTLStoreAction::Store);
 
         let depth_img = depth_img.into().unwrap();
-        let depth_texture = &context.cache.textures[depth_img.texture];
+        let depth_texture = &context.cache.texture_states[depth_img.texture].texture;
 
         let depth_attach = render_pass_desc.depth_attachment().unwrap();
         depth_attach.set_texture(Some(depth_texture));
@@ -309,7 +317,7 @@ impl GraphicContext for Context {
         );
 
         assert!(
-            !self.cache.samplers.is_empty() || !self.cache.textures.is_empty(),
+            !self.cache.texture_states.is_empty(),
             "Create texture first"
         );
 
@@ -327,15 +335,17 @@ impl GraphicContext for Context {
             }
 
             let img_count = bindings.images.len();
-            let mut sampler_states = Vec::with_capacity(img_count);
-            let mut textures = Vec::with_capacity(img_count);
-
-            for i in 0..img_count {
-                sampler_states.push(Some(self.cache.samplers[i].as_ref()));
-                textures.push(Some(self.cache.textures[i].as_ref()));
-            }
-
             if img_count > 0 {
+                let mut sampler_states = Vec::with_capacity(img_count);
+                let mut textures = Vec::with_capacity(img_count);
+
+                for img in &bindings.images {
+                    let texture_state = &self.cache.texture_states[img.texture];
+
+                    sampler_states.push(Some(texture_state.sampler.as_ref()));
+                    textures.push(Some(texture_state.texture.as_ref()));
+                }
+
                 render_encoder.set_fragment_sampler_states(0, sampler_states.as_slice());
                 render_encoder.set_fragment_textures(0, textures.as_slice());
             }
@@ -391,7 +401,7 @@ impl GraphicContext for Context {
 
     fn clear(&self, color: Option<(f32, f32, f32, f32)>, depth: Option<f32>, stencil: Option<i32>) {
         let render_pass_desc = &(match self.current_pass {
-            None => self.default_render_pass_desc.as_ref(),
+            None => self.default_render_pass_desc.as_ref().unwrap(),
             Some(pass) => &self.passes[self.current_pass.unwrap().0].render_pass_desc,
         });
 
@@ -421,8 +431,11 @@ impl GraphicContext for Context {
     }
 
     fn begin_default_pass(&mut self, action: PassAction) {
-        self.default_render_pass_desc = get_renderpass_descriptor();
-        let () = unsafe { msg_send![self.default_render_pass_desc.as_ref(), retain] };
+        if self.default_render_pass_desc.is_none() {
+            let rpd = get_renderpass_descriptor();
+            let () = unsafe { msg_send![rpd, retain] };
+            self.default_render_pass_desc = Some(rpd);
+        }
 
         self.begin_pass(None, action);
     }
@@ -430,7 +443,7 @@ impl GraphicContext for Context {
     fn begin_pass(&mut self, pass: impl Into<Option<RenderPass>>, action: PassAction) {
         let (ref render_pass_desc, w, h) = match pass.into() {
             None => (
-                &self.default_render_pass_desc,
+                self.default_render_pass_desc.as_ref().unwrap(),
                 unsafe { sapp_width() } as f64,
                 unsafe { sapp_height() } as f64,
             ),
@@ -497,6 +510,7 @@ impl GraphicContext for Context {
             render_encoder.pop_debug_group();
         }
 
+        self.default_render_pass_desc = None;
         self.render_encoder = None;
         self.current_pass = None;
     }
@@ -707,18 +721,20 @@ impl Pipeline {
 
         // Uniform buffer object
         // always with buffer index = 0
-        let uniforms = &shader_internal.uniforms;
-        for (i, elem) in uniforms.iter().enumerate() {
-            let mtl_attribute_desc = vertex_descriptor
-                .attributes()
-                .object_at((MAX_VERTEX_ATTRIBUTES - 1 - i) as u64)
-                .unwrap();
-            mtl_attribute_desc.set_buffer_index(UNIFORM_BUFFER_INDEX);
-            mtl_attribute_desc.set_offset(elem.offset);
-            mtl_attribute_desc.set_format(elem.format);
-        }
+        if !shader_internal.uniforms.is_empty() {
+            let uniforms = &shader_internal.uniforms;
+            for (i, elem) in uniforms.iter().enumerate() {
+                let mtl_attribute_desc = vertex_descriptor
+                    .attributes()
+                    .object_at((MAX_VERTEX_ATTRIBUTES - 1 - i) as u64)
+                    .unwrap();
+                mtl_attribute_desc.set_buffer_index(UNIFORM_BUFFER_INDEX);
+                mtl_attribute_desc.set_offset(elem.offset);
+                mtl_attribute_desc.set_format(elem.format);
+            }
 
-        assert!(shader_internal.stride > 0);
+            assert!(shader_internal.stride > 0);
+        }
 
         let mtl_buffer_desc = vertex_descriptor.layouts().object_at(0 as u64).unwrap();
         mtl_buffer_desc.set_stride(shader_internal.stride);
@@ -760,6 +776,13 @@ impl Pipeline {
 
         color_attachment.set_pixel_format(DEFAULT_FRAMEBUFFER_PIXEL_FORMAT);
         color_attachment.set_blending_enabled(true);
+        //TODO: Set from pipe params
+        color_attachment.set_rgb_blend_operation(metal::MTLBlendOperation::Add);
+        color_attachment.set_alpha_blend_operation(metal::MTLBlendOperation::Add);
+        color_attachment.set_source_rgb_blend_factor(metal::MTLBlendFactor::SourceAlpha);
+        color_attachment.set_source_alpha_blend_factor(metal::MTLBlendFactor::SourceAlpha);
+        color_attachment.set_destination_rgb_blend_factor(metal::MTLBlendFactor::OneMinusSourceAlpha);
+        color_attachment.set_destination_alpha_blend_factor(metal::MTLBlendFactor::OneMinusSourceAlpha);
 
         pipeline_state_descriptor
             .set_depth_attachment_pixel_format(DEFAULT_FRAMEBUFFER_DEPTH_FORMAT);
@@ -880,10 +903,8 @@ impl Buffer {
 
         assert!(size <= self.size);
 
-        let content = data as *const _ as *const std::ffi::c_void;
-
         unsafe {
-            self.raw.contents().copy_from_nonoverlapping(content, size);
+            std::ptr::copy(data.as_ptr() as *const _, self.raw.contents(), size);
 
             #[cfg(target_os = "macos")]
             self.raw
@@ -932,10 +953,10 @@ impl From<VertexFormat> for MTLVertexFormat {
             VertexFormat::Float2 => MTLVertexFormat::Float2,
             VertexFormat::Float3 => MTLVertexFormat::Float3,
             VertexFormat::Float4 => MTLVertexFormat::Float4,
-            VertexFormat::Byte1 => MTLVertexFormat::Char,
-            VertexFormat::Byte2 => MTLVertexFormat::Char2,
-            VertexFormat::Byte3 => MTLVertexFormat::Char3,
-            VertexFormat::Byte4 => MTLVertexFormat::Char4,
+            VertexFormat::Byte1 => MTLVertexFormat::UChar,
+            VertexFormat::Byte2 => MTLVertexFormat::UChar2,
+            VertexFormat::Byte3 => MTLVertexFormat::UChar3,
+            VertexFormat::Byte4 => MTLVertexFormat::UChar4,
             VertexFormat::Short1 => MTLVertexFormat::Short,
             VertexFormat::Short2 => MTLVertexFormat::Short2,
             VertexFormat::Short3 => MTLVertexFormat::Short3,

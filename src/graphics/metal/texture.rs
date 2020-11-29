@@ -1,11 +1,12 @@
 use crate::graphics::metal::DEFAULT_FRAMEBUFFER_PIXEL_FORMAT;
 use crate::{
-    Context, FilterMode, GraphicTexture, TextureAccess, TextureFormat, TextureParams, TextureWrap,
+    Context, FilterMode, GraphicTexture, TextureAccess, TextureFormat, TextureParams, TextureState,
+    TextureWrap,
 };
 use metal::{
     MTLCPUCacheMode, MTLOrigin, MTLPixelFormat, MTLRegion, MTLResourceOptions,
     MTLSamplerMinMagFilter, MTLSize, MTLStorageMode, MTLTextureUsage, SamplerDescriptor,
-    TextureDescriptor,
+    TextureDescriptor, TextureDescriptorRef,
 };
 use metal_rs as metal;
 
@@ -15,7 +16,6 @@ const MAX_TEXTURE_SIZE: u32 = 8192;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Texture {
     pub(crate) texture: usize,
-    pub(crate) sampler: usize,
     pub width: u32,
     pub height: u32,
     pub format: TextureFormat,
@@ -42,41 +42,30 @@ impl GraphicTexture for Texture {
             );
         }
 
-        let texture_dsc = TextureDescriptor::new();
-        texture_dsc.set_width(params.width as u64);
-        texture_dsc.set_height(params.height as u64);
-        texture_dsc.set_pixel_format(params.format.into());
-
-        if access == TextureAccess::RenderTarget {
-            if params.format != TextureFormat::Depth {
-                texture_dsc.set_pixel_format(DEFAULT_FRAMEBUFFER_PIXEL_FORMAT);
-            }
-            texture_dsc.set_cpu_cache_mode(MTLCPUCacheMode::DefaultCache);
-            texture_dsc.set_resource_options(MTLResourceOptions::StorageModePrivate);
-            texture_dsc.set_storage_mode(MTLStorageMode::Private);
-            texture_dsc.set_usage(
-                MTLTextureUsage::RenderTarget
-                    | MTLTextureUsage::ShaderRead
-                    | MTLTextureUsage::ShaderWrite,
-            );
-        }
+        let texture_dsc = if access == TextureAccess::RenderTarget {
+            get_render_target_texture_descriptor(params)
+        } else {
+            get_target_texture_descriptor(params)
+        };
 
         let sampler_dsc = SamplerDescriptor::new();
         sampler_dsc.set_min_filter(params.filter.into());
         sampler_dsc.set_mag_filter(params.filter.into());
 
         let sampler_state = ctx.device.new_sampler(&sampler_dsc);
-
-        let texture_id = ctx.cache.textures.len();
-
         let raw_texture = ctx.device.new_texture(&texture_dsc);
 
-        ctx.cache.textures.push(raw_texture);
-        ctx.cache.samplers.push(sampler_state);
+        let texture_id = ctx.cache.texture_states.len();
+
+        let texture_state = TextureState {
+            texture: raw_texture,
+            sampler: sampler_state,
+        };
+
+        ctx.cache.texture_states.push(texture_state);
 
         let texture = Texture {
             texture: texture_id,
-            sampler: texture_id,
             width: params.width,
             height: params.height,
             format: params.format,
@@ -137,7 +126,7 @@ impl GraphicTexture for Texture {
         height: i32,
         bytes: &[u8],
     ) {
-        let raw_texture = &ctx.cache.textures[self.texture];
+        let raw_texture = &ctx.cache.texture_states[self.texture].texture;
         raw_texture.replace_region(
             MTLRegion {
                 origin: MTLOrigin {
@@ -185,4 +174,42 @@ impl From<FilterMode> for MTLSamplerMinMagFilter {
             FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
         }
     }
+}
+
+fn get_render_target_texture_descriptor(params: TextureParams) -> TextureDescriptor {
+    let texture_dsc = TextureDescriptor::new();
+    texture_dsc.set_width(params.width as u64);
+    texture_dsc.set_height(params.height as u64);
+    texture_dsc.set_pixel_format(params.format.into());
+    if params.format != TextureFormat::Depth {
+        texture_dsc.set_pixel_format(DEFAULT_FRAMEBUFFER_PIXEL_FORMAT);
+    }
+    texture_dsc.set_cpu_cache_mode(MTLCPUCacheMode::DefaultCache);
+    texture_dsc.set_resource_options(MTLResourceOptions::StorageModePrivate);
+    texture_dsc.set_storage_mode(MTLStorageMode::Private);
+    texture_dsc.set_usage(
+        MTLTextureUsage::RenderTarget | MTLTextureUsage::ShaderRead | MTLTextureUsage::ShaderWrite,
+    );
+
+    texture_dsc
+}
+fn get_target_texture_descriptor(params: TextureParams) -> TextureDescriptor {
+    let texture_dsc = TextureDescriptor::new();
+    texture_dsc.set_width(params.width as u64);
+    texture_dsc.set_height(params.height as u64);
+    texture_dsc.set_pixel_format(params.format.into());
+    texture_dsc.set_cpu_cache_mode(MTLCPUCacheMode::DefaultCache);
+    texture_dsc.set_usage(MTLTextureUsage::ShaderRead);
+    #[cfg(target_os = "macos")]
+    {
+        texture_dsc.set_storage_mode(MTLStorageMode::Managed);
+        texture_dsc.set_resource_options(MTLResourceOptions::StorageModeManaged);
+    }
+    #[cfg(target_os = "ios")]
+    {
+       texture_dsc.set_storage_mode(MTLStorageMode::Shared);
+       texture_dsc.set_resource_options(MTLResourceOptions::StorageModeShared);
+    }
+
+    texture_dsc
 }
