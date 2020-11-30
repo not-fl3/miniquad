@@ -27,8 +27,14 @@ impl Stage {
         ];
         let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
 
+        #[cfg(feature = "metal")]
+        vertex_buffer.with_label("QuadVertexBuffer");
+
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
         let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
+
+        #[cfg(feature = "metal")]
+        index_buffer.with_label("QuadIntexBuffer");
 
         let pixels: [u8; 4 * 4 * 4] = [
             0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00,
@@ -41,7 +47,7 @@ impl Stage {
 
         let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
-            index_buffer: index_buffer,
+            index_buffer,
             images: vec![texture],
         };
 
@@ -49,7 +55,10 @@ impl Stage {
 
         let pipeline = Pipeline::new(
             ctx,
-            &[BufferLayout::default()],
+            &[BufferLayout {
+                stride: std::mem::size_of::<Vertex>() as i32,
+                ..Default::default()
+            }],
             &[
                 VertexAttribute::new("pos", VertexFormat::Float2),
                 VertexAttribute::new("uv", VertexFormat::Float2),
@@ -68,7 +77,6 @@ impl EventHandler for Stage {
         let t = date::now();
 
         ctx.begin_default_pass(Default::default());
-
         ctx.apply_pipeline(&self.pipeline);
         ctx.apply_bindings(&self.bindings);
         for i in 0..10 {
@@ -94,6 +102,7 @@ fn main() {
 mod shader {
     use miniquad::*;
 
+    #[cfg(not(feature = "metal"))]
     pub const VERTEX: &str = r#"#version 100
     attribute vec2 pos;
     attribute vec2 uv;
@@ -107,6 +116,7 @@ mod shader {
         texcoord = uv;
     }"#;
 
+    #[cfg(not(feature = "metal"))]
     pub const FRAGMENT: &str = r#"#version 100
     varying lowp vec2 texcoord;
 
@@ -114,6 +124,62 @@ mod shader {
 
     void main() {
         gl_FragColor = texture2D(tex, texcoord);
+    }"#;
+
+    #[cfg(feature = "metal")]
+    pub const VERTEX: &str = r#"
+    #include <metal_stdlib>
+    #include <simd/simd.h>
+
+    using namespace metal;
+
+    struct Uniforms
+    {
+        float2 offset;
+    };
+
+    struct vertex_function_out
+    {
+        float2 texcoord [[user(locn0)]];
+        float4 gl_Position [[position]];
+    };
+
+    struct vertex_function_in
+    {
+        float2 pos [[attribute(0)]];
+        float2 uv [[attribute(1)]];
+    };
+
+    vertex vertex_function_out vertex_function(vertex_function_in in [[stage_in]], constant Uniforms& _22 [[buffer(0)]])
+    {
+        vertex_function_out out = {};
+        out.gl_Position = float4(in.pos + _22.offset, 0.0, 1.0);
+        out.texcoord = in.uv;
+        return out;
+    }
+    "#;
+
+    #[cfg(feature = "metal")]
+    pub const FRAGMENT: &str = r#"#include <metal_stdlib>
+    #include <simd/simd.h>
+
+    using namespace metal;
+
+    struct fragment_function_out
+    {
+        float4 fragColor [[color(0)]];
+    };
+
+    struct fragment_function_in
+    {
+        float2 texcoord [[user(locn0)]];
+    };
+
+    fragment fragment_function_out fragment_function(fragment_function_in in [[stage_in]], texture2d<float> tex [[texture(0)]], sampler texSmplr [[sampler(0)]])
+    {
+        fragment_function_out out = {};
+        out.fragColor = tex.sample(texSmplr, in.texcoord);
+        return out;
     }"#;
 
     pub fn meta() -> ShaderMeta {

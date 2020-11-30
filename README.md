@@ -29,7 +29,7 @@ For higher level API take a look on:
 ## Not supported, but desirable platforms
 
 * Android, GLES2 - work in progress.
-* Metal. For both MacOs and IOS metal rendering backend next to opengl one is highly desirable. But I just dont have any MacOs capable hardware to start working on it :/
+* Metal - work in progress.
 
 ## Examples
 
