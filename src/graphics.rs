@@ -1516,6 +1516,11 @@ impl Pipeline {
         ctx.pipelines.push(pipeline);
         Pipeline(ctx.pipelines.len() - 1)
     }
+
+    pub fn set_blend(&self, ctx: &mut Context, color_blend: Option<BlendState>) {
+        let mut pipeline = &mut ctx.pipelines[self.0];
+        pipeline.params.color_blend = color_blend;
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
