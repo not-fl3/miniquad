@@ -13,8 +13,11 @@ extern crate sapp_ios as sapp;
     windows
 )))]
 extern crate sapp_dummy as sapp;
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature="kms"))]
+extern crate sapp_kms as sapp;
+#[cfg(all(target_os = "linux", not(feature="kms")))]
 extern crate sapp_linux as sapp;
+
 #[cfg(target_arch = "wasm32")]
 extern crate sapp_wasm as sapp;
 #[cfg(windows)]
