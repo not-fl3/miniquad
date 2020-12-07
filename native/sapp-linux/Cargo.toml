@@ -6,11 +6,10 @@ edition = "2018"
 license = "MIT/Apache-2.0"
 build = "build.rs"
 description = """
-Part of miniquad rendering library. 
+Part of miniquad rendering library.
 Orignally this was a sokol-app C code transpiled to rust with c2rust and partially rewritten to more idiomatic rust.
 """
 homepage = "https://github.com/not-fl3/miniquad"
 
 [dependencies]
-libc = "0.2"
-
+cty = "0.2.1"
