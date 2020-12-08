@@ -1,5 +1,6 @@
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #![allow(improper_ctypes)]
+#![allow(improper_ctypes_definitions)]
 #![allow(
     unused_variables,
     dead_code,
@@ -2953,4 +2954,8 @@ pub static mut _sapp: _sapp_state = _sapp_state {
 #[no_mangle]
 pub unsafe extern "C" fn sapp_isvalid() -> bool {
     return _sapp.valid;
+}
+#[no_mangle]
+pub unsafe fn sapp_is_elapsed_timer_supported()->bool {
+    return true
 }

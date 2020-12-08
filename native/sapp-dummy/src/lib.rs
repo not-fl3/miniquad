@@ -344,3 +344,6 @@ pub unsafe extern "C" fn sapp_width() -> libc::c_int {
 pub unsafe extern "C" fn sapp_isvalid() -> bool {
     true
 }
+pub unsafe extern "C" fn sapp_is_elapsed_timer_supported() ->bool {
+    false
+}
