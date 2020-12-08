@@ -682,24 +682,17 @@ pub mod Xlib_h {
     pub type _XPrivate = ();
 
     extern "C" {
-        #[no_mangle]
         pub fn XInitThreads() -> libc::c_int;
-        #[no_mangle]
         pub fn XrmInitialize();
-        #[no_mangle]
         pub fn XOpenDisplay(_: *const libc::c_char) -> *mut Display;
-        #[no_mangle]
         pub fn XResourceManagerString(_: *mut Display) -> *mut libc::c_char;
-        #[no_mangle]
         pub fn XInternAtom(_: *mut Display, _: *const libc::c_char, _: libc::c_int) -> Atom;
-        #[no_mangle]
         pub fn XCreateColormap(
             _: *mut Display,
             _: Window,
             _: *mut Visual,
             _: libc::c_int,
         ) -> Colormap;
-        #[no_mangle]
         pub fn XCreateWindow(
             _: *mut Display,
             _: Window,
@@ -714,14 +707,12 @@ pub mod Xlib_h {
             _: libc::c_ulong,
             _: *mut XSetWindowAttributes,
         ) -> Window;
-        #[no_mangle]
         pub fn XSetWMProtocols(
             _: *mut Display,
             _: Window,
             _: *mut Atom,
             _: libc::c_int,
         ) -> libc::c_int;
-        #[no_mangle]
         pub fn XChangeProperty(
             _: *mut Display,
             _: Window,
@@ -732,34 +723,24 @@ pub mod Xlib_h {
             _: *const libc::c_uchar,
             _: libc::c_int,
         ) -> libc::c_int;
-        #[no_mangle]
         pub fn XSync(_: *mut Display, _: libc::c_int) -> libc::c_int;
-        #[no_mangle]
         pub fn XSetErrorHandler(_: XErrorHandler) -> XErrorHandler;
-        #[no_mangle]
         pub fn XGetWindowAttributes(
             _: *mut Display,
             _: Window,
             _: *mut XWindowAttributes,
         ) -> libc::c_int;
-        #[no_mangle]
         pub fn XMapWindow(_: *mut Display, _: Window) -> libc::c_int;
-        #[no_mangle]
         pub fn XLowerWindow(_: *mut Display, _: Window) -> libc::c_int;
-        #[no_mangle]
         pub fn XRaiseWindow(_: *mut Display, _: Window) -> libc::c_int;
-        #[no_mangle]
         pub fn XPending(_: *mut Display) -> libc::c_int;
-        #[no_mangle]
         pub fn XNextEvent(_: *mut Display, _: *mut XEvent) -> libc::c_int;
-        #[no_mangle]
         pub fn XGetKeyboardMapping(
             _: *mut Display,
             _: KeyCode,
             _: libc::c_int,
             _: *mut libc::c_int,
         ) -> *mut KeySym;
-        #[no_mangle]
         pub fn XGetWindowProperty(
             _: *mut Display,
             _: Window,
@@ -774,19 +755,12 @@ pub mod Xlib_h {
             _: *mut libc::c_ulong,
             _: *mut *mut libc::c_uchar,
         ) -> libc::c_int;
-        #[no_mangle]
         pub fn XFree(_: *mut libc::c_void) -> libc::c_int;
-        #[no_mangle]
         pub fn XUnmapWindow(_: *mut Display, _: Window) -> libc::c_int;
-        #[no_mangle]
         pub fn XDestroyWindow(_: *mut Display, _: Window) -> libc::c_int;
-        #[no_mangle]
         pub fn XFreeColormap(_: *mut Display, _: Colormap) -> libc::c_int;
-        #[no_mangle]
         pub fn XFlush(_: *mut Display) -> libc::c_int;
-        #[no_mangle]
         pub fn XCloseDisplay(_: *mut Display) -> libc::c_int;
-        #[no_mangle]
         pub fn XGrabPointer(
             _: *mut Display,
             _: Window,
@@ -798,7 +772,6 @@ pub mod Xlib_h {
             _: Cursor,
             _: Time,
         ) -> libc::c_int;
-        #[no_mangle]
         pub fn XUngrabPointer(_: *mut Display, _: Time) -> libc::c_int;
 
     }
@@ -930,11 +903,8 @@ pub mod Xutil_h {
     use super::X_h::{KeySym, Pixmap, VisualID, Window, XID};
     use super::Xlib_h::{Display, Visual, XKeyEvent, XPointer};
     extern "C" {
-        #[no_mangle]
         pub fn XSetWMNormalHints(_: *mut Display, _: Window, _: *mut XSizeHints);
-        #[no_mangle]
         pub fn XAllocSizeHints() -> *mut XSizeHints;
-        #[no_mangle]
         pub fn Xutf8SetWMProperties(
             _: *mut Display,
             _: Window,
@@ -946,7 +916,6 @@ pub mod Xutil_h {
             _: *mut XWMHints,
             _: *mut XClassHint,
         );
-        #[no_mangle]
         pub fn XLookupString(
             _: *mut XKeyEvent,
             _: *mut libc::c_char,
@@ -966,7 +935,6 @@ pub mod Xresource_h {
     }
     use super::Xlib_h::{XPointer, _XrmHashBucketRec};
     extern "C" {
-        #[no_mangle]
         pub fn XrmGetResource(
             _: XrmDatabase,
             _: *const libc::c_char,
@@ -974,16 +942,13 @@ pub mod Xresource_h {
             _: *mut *mut libc::c_char,
             _: *mut XrmValue,
         ) -> libc::c_int;
-        #[no_mangle]
         pub fn XrmDestroyDatabase(_: XrmDatabase);
-        #[no_mangle]
         pub fn XrmGetStringDatabase(_: *const libc::c_char) -> XrmDatabase;
     }
 }
 pub mod XKBlib_h {
     use super::Xlib_h::Display;
     extern "C" {
-        #[no_mangle]
         pub fn XkbSetDetectableAutoRepeat(
             _: *mut Display,
             _: libc::c_int,
@@ -993,16 +958,13 @@ pub mod XKBlib_h {
 }
 pub mod stdlib_h {
     extern "C" {
-        #[no_mangle]
         pub fn atof(__nptr: *const libc::c_char) -> libc::c_double;
 
     }
 }
 pub mod dlfcn_h {
     extern "C" {
-        #[no_mangle]
         pub fn dlopen(__file: *const libc::c_char, __mode: libc::c_int) -> *mut libc::c_void;
-        #[no_mangle]
         pub fn dlsym(__handle: *mut libc::c_void, __name: *const libc::c_char)
             -> *mut libc::c_void;
     }
@@ -1013,19 +975,14 @@ pub mod bits_dlfcn_h {
 }
 pub mod string_h {
     extern "C" {
-        #[no_mangle]
         pub fn strstr(_: *const libc::c_char, _: *const libc::c_char) -> *mut libc::c_char;
-        #[no_mangle]
         pub fn strlen(_: *const libc::c_char) -> libc::c_ulong;
-        #[no_mangle]
         pub fn strcmp(_: *const libc::c_char, _: *const libc::c_char) -> libc::c_int;
-        #[no_mangle]
         pub fn memset(_: *mut libc::c_void, _: libc::c_int, _: libc::c_ulong) -> *mut libc::c_void;
     }
 }
 
 extern "C" {
-    #[no_mangle]
     pub fn XSendEvent(
         _: *mut Display,
         _: Window,

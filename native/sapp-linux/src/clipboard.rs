@@ -14,7 +14,6 @@ const AnyPropertyType: libc::c_long = 0 as libc::c_long;
 type Time = libc::c_ulong;
 
 extern "C" {
-    #[no_mangle]
     pub fn XConvertSelection(
         _: *mut Display,
         _: Atom,
@@ -24,7 +23,6 @@ extern "C" {
         _: Time,
     ) -> libc::c_int;
 
-    #[no_mangle]
     pub fn XSetSelectionOwner(_: *mut Display, _: Atom, _: Window, _: Time) -> libc::c_int;
 }
 

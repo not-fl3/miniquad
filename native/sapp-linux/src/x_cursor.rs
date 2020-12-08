@@ -18,7 +18,6 @@ type Drawable = XID;
 pub type Cursor = XID;
 
 extern "C" {
-    #[no_mangle]
     fn XCreateBitmapFromData(
         _: *mut Display,
         _: Drawable,
@@ -27,7 +26,6 @@ extern "C" {
         _: libc::c_uint,
     ) -> Pixmap;
 
-    #[no_mangle]
     fn XCreatePixmapCursor(
         _: *mut Display,
         _: Pixmap,
@@ -38,10 +36,8 @@ extern "C" {
         _: libc::c_uint,
     ) -> Cursor;
 
-    #[no_mangle]
     fn XFreePixmap(_: *mut Display, _: Pixmap) -> libc::c_int;
 
-    #[no_mangle]
     pub fn XDefineCursor(_: *mut Display, _: Window, _: Cursor) -> libc::c_int;
 }
 
