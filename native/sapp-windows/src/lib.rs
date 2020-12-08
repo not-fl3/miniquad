@@ -1537,3 +1537,7 @@ pub unsafe fn sapp_run(desc: *const sapp_desc) -> i32 {
 
     return 0 as i32;
 }
+
+pub unsafe fn sapp_is_elapsed_timer_supported()->bool {
+    return true
+}

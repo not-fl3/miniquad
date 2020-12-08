@@ -10,6 +10,7 @@ pub type GLint = ::std::os::raw::c_int;
 pub type GLubyte = ::std::os::raw::c_uchar;
 pub type GLushort = ::std::os::raw::c_ushort;
 pub type GLuint = ::std::os::raw::c_uint;
+pub type GLuint64 = ::std::os::raw::c_ulonglong;
 pub type GLsizei = ::std::os::raw::c_int;
 pub type GLchar = ::std::os::raw::c_char;
 
@@ -240,6 +241,9 @@ pub const GL_TEXTURE_SWIZZLE_B: u32 = 36420;
 pub const GL_TEXTURE_SWIZZLE_A: u32 = 36421;
 pub const GL_TEXTURE_SWIZZLE_RGBA: u32 = 36422;
 pub const GL_DRAW_FRAMEBUFFER_BINDING: u32 = 36006;
+pub const GL_TIME_ELAPSED: u32 = 35007;
+pub const GL_QUERY_RESULT: u32 = 34918;
+pub const GL_QUERY_RESULT_AVAILABLE: u32 = 34919;
 
 pub const WGL_NUMBER_PIXEL_FORMATS_ARB: u32 = 0x2000;
 pub const WGL_SUPPORT_OPENGL_ARB: u32 = 0x2010;
@@ -618,5 +622,11 @@ gl_loader!(
         format: GLenum,
         type_: GLenum,
         pixels: *mut GLvoid
-    ) -> ()
+    ) -> (),
+    fn glBeginQuery(target: GLenum, id: GLuint) -> (),
+    fn glDeleteQueries(n: GLsizei, ids: *const GLuint) -> (),
+    fn glEndQuery(target: GLenum) -> (),
+    fn glGenQueries(n: GLsizei, ids: *mut GLuint) -> (),
+    fn glGetQueryObjectiv(id: GLuint, pname: GLenum, params: *mut GLint) -> (),
+    fn glGetQueryObjectui64v(id: GLuint, pname: GLenum, params: *mut GLuint64) -> ()
 );

@@ -10,3 +10,7 @@ pub use gl::*;
 
 pub mod rand;
 pub use rand::*;
+
+pub fn sapp_is_elapsed_timer_supported()->bool {
+    return false
+}

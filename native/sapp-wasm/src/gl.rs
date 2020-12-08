@@ -338,6 +338,7 @@ pub const GL_TEXTURE_COMPARE_FUNC: u32 = 34893;
 pub const GL_CURRENT_QUERY: u32 = 34917;
 pub const GL_QUERY_RESULT: u32 = 34918;
 pub const GL_QUERY_RESULT_AVAILABLE: u32 = 34919;
+pub const GL_TIME_ELAPSED: u32 = 35007;
 pub const GL_BUFFER_MAPPED: u32 = 35004;
 pub const GL_BUFFER_MAP_POINTER: u32 = 35005;
 pub const GL_STREAM_READ: u32 = 35041;
@@ -1379,7 +1380,13 @@ extern "C" {
     pub fn glGetQueryiv(target: GLenum, pname: GLenum, params: *mut GLint);
 }
 extern "C" {
-    pub fn glGetQueryObjectuiv(id: GLuint, pname: GLenum, params: *mut GLuint);
+    pub fn glQueryCounter(id: GLenum, pname: GLenum);
+}
+extern "C" {
+    pub fn glGetQueryObjectiv(id: GLuint, pname: GLenum, params: *mut GLint);
+}
+extern "C" {
+    pub fn glGetQueryObjectui64v(id: GLuint, pname: GLenum, params: *mut GLuint64);
 }
 extern "C" {
     pub fn glUnmapBuffer(target: GLenum) -> GLboolean;
