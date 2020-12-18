@@ -6,6 +6,8 @@
 //
 // TODO: split to gl.js and loader.js
 
+"use strict";
+
 const canvas = document.querySelector("#glcanvas");
 const gl = canvas.getContext("webgl");
 if (gl === null) {
@@ -15,6 +17,7 @@ if (gl === null) {
 var clipboard = null;
 
 var plugins = [];
+var wasm_memory;
 
 canvas.focus();
 
@@ -236,7 +239,7 @@ var GL = {
     }
 }
 
-_glGenObject = function (n, buffers, createFunction, objectTable, functionName) {
+function _glGenObject(n, buffers, createFunction, objectTable, functionName) {
     for (var i = 0; i < n; i++) {
         var buffer = gl[createFunction]();
         var id = buffer && GL.getNewId(objectTable);
@@ -253,7 +256,7 @@ _glGenObject = function (n, buffers, createFunction, objectTable, functionName) 
     }
 }
 
-_webglGet = function (name_, p, type) {
+function _webglGet(name_, p, type) {
     // Guard against user passing a null pointer.
     // Note that GLES2 spec does not say anything about how passing a null pointer should be treated.
     // Testing on desktop core GL 3, the application crashes on glGetIntegerv to a null pointer, but
@@ -381,7 +384,7 @@ function resize(canvas, on_resize) {
     }
 }
 
-animation = function () {
+function animation() {
     wasm_exports.frame();
     window.requestAnimationFrame(animation);
 }
@@ -396,7 +399,7 @@ const SAPP_MODIFIER_CTRL = 2;
 const SAPP_MODIFIER_ALT = 4;
 const SAPP_MODIFIER_SUPER = 8;
 
-into_sapp_mousebutton = function (btn) {
+function into_sapp_mousebutton(btn) {
     switch (btn) {
         case 0: return 0;
         case 1: return 2;
@@ -405,7 +408,7 @@ into_sapp_mousebutton = function (btn) {
     }
 }
 
-into_sapp_keycode = function (key_code) {
+function into_sapp_keycode(key_code) {
     switch (key_code) {
         case "Space": return 32;
         case "Comma": return 44;
@@ -526,7 +529,7 @@ into_sapp_keycode = function (key_code) {
     console.log("Unsupported keyboard key: ", key_code)
 }
 
-texture_size = function (internalFormat, width, height) {
+function texture_size(internalFormat, width, height) {
     if (internalFormat == gl.ALPHA) {
         return width * height;
     }
@@ -539,7 +542,7 @@ texture_size = function (internalFormat, width, height) {
     }
 }
 
-mouse_relative_position = function (clientX, clientY) {
+function mouse_relative_position(clientX, clientY) {
     var targetRect = canvas.getBoundingClientRect();
 
     var x = clientX - targetRect.left;
