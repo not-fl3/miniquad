@@ -660,10 +660,7 @@ pub unsafe extern "C" fn _sapp_glx_has_ext(
     }
     return true;
 }
-pub unsafe fn _sapp_glx_extsupported(
-    mut ext: &[u8],
-    mut extensions: *const libc::c_char,
-) -> bool {
+pub unsafe fn _sapp_glx_extsupported(mut ext: &[u8], mut extensions: *const libc::c_char) -> bool {
     if !extensions.is_null() {
         return _sapp_glx_has_ext(ext.as_ptr() as _, extensions);
     } else {
@@ -1275,7 +1272,9 @@ unsafe fn _sapp_x11_set_fullscreen() {
             window: _sapp_x11_window,
             display: _sapp_x11_display,
             format: 32,
-            data: ClientMessageData { l: std::mem::transmute(data) },
+            data: ClientMessageData {
+                l: std::mem::transmute(data),
+            },
         };
         XSendEvent(
             _sapp_x11_display,
@@ -2956,6 +2955,6 @@ pub unsafe extern "C" fn sapp_isvalid() -> bool {
     return _sapp.valid;
 }
 #[no_mangle]
-pub unsafe fn sapp_is_elapsed_timer_supported()->bool {
-    return true
+pub unsafe fn sapp_is_elapsed_timer_supported() -> bool {
+    return true;
 }

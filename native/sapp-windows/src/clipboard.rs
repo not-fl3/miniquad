@@ -80,6 +80,5 @@ pub unsafe fn set_clipboard_text(text: &str) {
 }
 
 pub unsafe fn get_clipboard_text() -> Option<String> {
-    get_raw_clipboard()
-        .map(|data| String::from_utf16_lossy(std::mem::transmute(&data[..])))
+    get_raw_clipboard().map(|data| String::from_utf16_lossy(std::mem::transmute(&data[..])))
 }

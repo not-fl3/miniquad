@@ -1,4 +1,4 @@
-use super::{_sapp_wglGetProcAddress, GetProcAddress, _sapp_opengl32};
+use super::{GetProcAddress, _sapp_opengl32, _sapp_wglGetProcAddress};
 
 pub type GLenum = ::std::os::raw::c_uint;
 pub type GLboolean = ::std::os::raw::c_uchar;

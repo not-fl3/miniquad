@@ -24,7 +24,6 @@ fn build_android() {
         .flag("-Wno-unused-parameter")
         .flag_if_supported("-Wno-unused-function");
 
-
     if is_debug {
         build.flag("-D_DEBUG").flag("-DSOKOL_DEBUG");
     }

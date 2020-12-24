@@ -2,8 +2,6 @@
 extern crate sapp_android as sapp;
 #[cfg(target_os = "macos")]
 extern crate sapp_darwin as sapp;
-#[cfg(target_os = "ios")]
-extern crate sapp_ios as sapp;
 #[cfg(not(any(
     target_os = "linux",
     target_os = "macos",
@@ -13,9 +11,11 @@ extern crate sapp_ios as sapp;
     windows
 )))]
 extern crate sapp_dummy as sapp;
-#[cfg(all(target_os = "linux", feature="kms"))]
+#[cfg(target_os = "ios")]
+extern crate sapp_ios as sapp;
+#[cfg(all(target_os = "linux", feature = "kms"))]
 extern crate sapp_kms as sapp;
-#[cfg(all(target_os = "linux", not(feature="kms")))]
+#[cfg(all(target_os = "linux", not(feature = "kms")))]
 extern crate sapp_linux as sapp;
 
 #[cfg(target_arch = "wasm32")]
