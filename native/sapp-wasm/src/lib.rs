@@ -327,7 +327,7 @@ extern "C" {
     /// "mouse_down"/"key_down" event handler functions.
     pub fn sapp_set_cursor_grab(grab: bool);
 
-    pub fn sapp_is_elapsed_timer_supported()->bool;
+    pub fn sapp_is_elapsed_timer_supported() -> bool;
 }
 
 /// Do nothing on wasm - cursor will be hidden by "sapp_set_cursor_grab" anyway.

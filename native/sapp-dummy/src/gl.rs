@@ -10966,7 +10966,6 @@ pub type GLDEBUGPROCARB = ::std::option::Option<
     ),
 >;
 
-
 pub fn glDebugMessageCallback(callback: GLDEBUGPROC, userParam: *const ::std::os::raw::c_void) {
     unimplemented!();
 }

@@ -1728,7 +1728,7 @@ impl Buffer {
 /// asynchronously effectively hiding execution time of individual operations from the user.
 /// `ElapsedQuery` allows to measure duration of individual rendering operations, as though the time
 /// was measured on GPU rather than CPU side.
-/// 
+///
 /// The query is created using [`ElapsedQuery::new()`] function.
 /// ```
 /// // initialization
@@ -1736,7 +1736,7 @@ impl Buffer {
 /// ```
 /// Measurement is performed by calling [`ElapsedQuery::begin_query()`] and
 /// [`ElapsedQuery::end_query()`]
-/// 
+///
 /// ```
 /// query.begin_query();
 /// // one or multiple calls to miniquad::Context::draw()
@@ -1768,21 +1768,19 @@ impl Buffer {
 ///
 #[derive(Clone, Copy)]
 pub struct ElapsedQuery {
-    gl_query: GLuint
+    gl_query: GLuint,
 }
 
 impl ElapsedQuery {
-    pub fn new()->ElapsedQuery {
-        ElapsedQuery {
-            gl_query: 0
-        }
+    pub fn new() -> ElapsedQuery {
+        ElapsedQuery { gl_query: 0 }
     }
 
     /// Submit a beginning of elapsed-time query.
     ///
     /// Only a single query can be measured at any moment in time.
     ///
-    /// Use [`ElapsedQuery::end_query()`] to finish the query and 
+    /// Use [`ElapsedQuery::end_query()`] to finish the query and
     /// [`ElapsedQuery::get_result()`] to read the result when rendering is complete.
     ///
     /// The query can be used again after retriving the result.
@@ -1792,9 +1790,9 @@ impl ElapsedQuery {
     /// Use [`ElapsedQuery::is_supported()`] to check if functionality is available and the method can be called.
     pub fn begin_query(&mut self) {
         if self.gl_query == 0 {
-            unsafe{ glGenQueries(1, &mut self.gl_query) };
+            unsafe { glGenQueries(1, &mut self.gl_query) };
         }
-        unsafe{ glBeginQuery(GL_TIME_ELAPSED, self.gl_query) };
+        unsafe { glBeginQuery(GL_TIME_ELAPSED, self.gl_query) };
     }
 
     /// Submit an end of elapsed-time query that can be read later when rendering is complete.
@@ -1804,7 +1802,7 @@ impl ElapsedQuery {
     ///
     /// Implemented as `glEndQuery(GL_TIME_ELAPSED)` on OpenGL/WebGL platforms.
     pub fn end_query(&mut self) {
-        unsafe{ glEndQuery(GL_TIME_ELAPSED) };
+        unsafe { glEndQuery(GL_TIME_ELAPSED) };
     }
 
     /// Retreieve measured duration in nanonseconds.
@@ -1814,15 +1812,15 @@ impl ElapsedQuery {
     /// available for retrieval.
     ///
     /// Use [`ElapsedQuery::is_supported()`] to check if functionality is available and the method can be called.
-    pub fn get_result(&self)->u64 {
+    pub fn get_result(&self) -> u64 {
         let mut time: GLuint64 = 0;
         assert!(self.gl_query != 0);
-        unsafe{ glGetQueryObjectui64v(self.gl_query, GL_QUERY_RESULT, &mut time) };
+        unsafe { glGetQueryObjectui64v(self.gl_query, GL_QUERY_RESULT, &mut time) };
         time
     }
-    
+
     /// Reports whenever elapsed timer is supported and other methods can be invoked.
-    pub fn is_supported()->bool {
+    pub fn is_supported() -> bool {
         unsafe { sapp_is_elapsed_timer_supported() }
     }
 
@@ -1833,10 +1831,10 @@ impl ElapsedQuery {
     /// command submission.
     ///
     /// Use [`ElapsedQuery::is_supported()`] to check if functionality is available and the method can be called.
-    pub fn is_available(&self)->bool {
+    pub fn is_available(&self) -> bool {
         let mut available: GLint = 0;
         assert!(self.gl_query != 0);
-        unsafe{ glGetQueryObjectiv(self.gl_query, GL_QUERY_RESULT_AVAILABLE, &mut available) };
+        unsafe { glGetQueryObjectiv(self.gl_query, GL_QUERY_RESULT_AVAILABLE, &mut available) };
         available != 0
     }
 

@@ -1,7 +1,7 @@
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 
-pub mod gl;
 pub mod clipboard;
+pub mod gl;
 mod rand;
 
 pub use gl::*;
@@ -1538,6 +1538,6 @@ pub unsafe fn sapp_run(desc: *const sapp_desc) -> i32 {
     return 0 as i32;
 }
 
-pub unsafe fn sapp_is_elapsed_timer_supported()->bool {
-    return true
+pub unsafe fn sapp_is_elapsed_timer_supported() -> bool {
+    return true;
 }
