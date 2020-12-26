@@ -65,16 +65,27 @@ pub enum Loading {
 pub struct Conf {
     pub cache: Cache,
     pub loading: Loading,
+    /// Title of the window, defaults to an empty string.
     pub window_title: String,
-    /// the preferred width of the window, ignored on wasm/android
+    /// The preferred width of the window, ignored on wasm/android.
+    ///
+    /// Default: 800
     pub window_width: i32,
-    /// the preferred height of the window, ignored on wasm/android
+    /// The preferred height of the window, ignored on wasm/android.
+    ///
+    /// Default: 600
     pub window_height: i32,
-    /// whether the rendering canvas is full-resolution on HighDPI displays
+    /// Whether the rendering canvas is full-resolution on HighDPI displays.
+    ///
+    /// Default: false
     pub high_dpi: bool,
-    /// whether the window should be created in fullscreen mode, ignored on wasm/android
+    /// Whether the window should be created in fullscreen mode, ignored on wasm/android.
+    ///
+    /// Default: false
     pub fullscreen: bool,
     /// MSAA sample count
+    ///
+    /// Default: 1
     pub sample_count: i32,
 }
 

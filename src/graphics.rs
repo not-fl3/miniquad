@@ -21,14 +21,23 @@ fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
 
 #[derive(Clone, Copy, Debug)]
 pub enum UniformType {
+    /// One 32-bit wide float (equivalent to `f32`)
     Float1,
+    /// Two 32-bit wide floats (equivalent to `[f32; 2]`)
     Float2,
+    /// Three 32-bit wide floats (equivalent to `[f32; 3]`)
     Float3,
+    /// Four 32-bit wide floats (equivalent to `[f32; 4]`)
     Float4,
+    /// One unsigned 32-bit integers (equivalent to `[u32; 1]`)
     Int1,
+    /// Two unsigned 32-bit integers (equivalent to `[u32; 2]`)
     Int2,
+    /// Three unsigned 32-bit integers (equivalent to `[u32; 3]`)
     Int3,
+    /// Four unsigned 32-bit integers (equivalent to `[u32; 4]`)
     Int4,
+    /// Four by four matrix of 32-bit floats
     Mat4,
 }
 
@@ -83,22 +92,39 @@ pub struct ShaderMeta {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum VertexFormat {
+    /// One 32-bit wide float (equivalent to `f32`)
     Float1,
+    /// Two 32-bit wide floats (equivalent to `[f32; 2]`)
     Float2,
+    /// Three 32-bit wide floats (equivalent to `[f32; 3]`)
     Float3,
+    /// Four 32-bit wide floats (equivalent to `[f32; 4]`)
     Float4,
+    /// One unsigned 8-bit integer (equivalent to `u8`)
     Byte1,
+    /// Two unsigned 8-bit integers (equivalent to `[u8; 2]`)
     Byte2,
+    /// Three unsigned 8-bit integers (equivalent to `[u8; 3]`)
     Byte3,
+    /// Four unsigned 8-bit integers (equivalent to `[u8; 4]`)
     Byte4,
+    /// One unsigned 16-bit integer (equivalent to `u16`)
     Short1,
+    /// Two unsigned 16-bit integers (equivalent to `[u16; 2]`)
     Short2,
+    /// Tree unsigned 16-bit integers (equivalent to `[u16; 3]`)
     Short3,
+    /// Four unsigned 16-bit integers (equivalent to `[u16; 4]`)
     Short4,
+    /// One unsigned 32-bit integers (equivalent to `[u32; 1]`)
     Int1,
+    /// Two unsigned 32-bit integers (equivalent to `[u32; 2]`)
     Int2,
+    /// Three unsigned 32-bit integers (equivalent to `[u32; 3]`)
     Int3,
+    /// Four unsigned 32-bit integers (equivalent to `[u32; 4]`)
     Int4,
+    /// Four by four matrix of 32-bit floats
     Mat4,
 }
 
@@ -1044,6 +1070,11 @@ impl Context {
         self.cache.clear_texture_bindings();
     }
 
+    /// Draw elements using currently applied bindings and pipeline.
+    ///
+    /// + `base_element` specifies starting offset in `index_buffer`.
+    /// + `num_elements` specifies length of the slice of `index_buffer` to draw.
+    /// + `num_instances` specifies how many instances should be rendered.
     pub fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32) {
         assert!(
             self.cache.cur_pipeline.is_some(),
@@ -1540,10 +1571,22 @@ struct PipelineInternal {
     params: PipelineParams,
 }
 
+/// Geometry bindings
 #[derive(Clone, Debug)]
 pub struct Bindings {
+    /// Vertex buffers. Data contained in the buffer must match layout
+    /// specified in the `Pipeline`.
+    ///
+    /// Most commonly vertex buffer will contain `(x,y,z,w)` coordinates of the
+    /// vertex in 3d space, as well as `(u,v)` coordinates that map the vertex
+    /// to some position in the corresponding `Texture`.
     pub vertex_buffers: Vec<Buffer>,
+    /// Index buffer which instructs the GPU in which order to draw vertices
+    /// from a vertex buffer, with each subsequent 3 indices forming a
+    /// triangle.
     pub index_buffer: Buffer,
+    /// Textures to be used with when drawing the geometry in the fragment
+    /// shader.
     pub images: Vec<Texture>,
 }
 
