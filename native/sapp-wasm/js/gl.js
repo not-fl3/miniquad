@@ -769,6 +769,12 @@ var importObject = {
         glEnable: function (cap) {
             gl.enable(cap);
         },
+        glFlush: function () {
+            gl.flush();
+        },
+        glFinish: function () {
+            gl.finish();
+        },
         glDepthFunc: function (func) {
             gl.depthFunc(func);
         },
