@@ -308,7 +308,6 @@ pub unsafe fn sapp_height() -> ::std::os::raw::c_int {
     canvas_height()
 }
 
-#[no_mangle]
 extern "C" {
     pub fn init_opengl();
     pub fn canvas_width() -> i32;
