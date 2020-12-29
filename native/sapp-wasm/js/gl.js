@@ -8,6 +8,8 @@
 
 "use strict";
 
+const version = [0, 1, 20];
+
 const canvas = document.querySelector("#glcanvas");
 const gl = canvas.getContext("webgl");
 if (gl === null) {
@@ -1195,6 +1197,21 @@ function register_plugins(plugins) {
     }
 }
 
+function validate_version(version) {
+    let crate_version = wasm_exports.crate_version();
+    let crate_major_version = (crate_version >> 24) & 0xff;
+    let crate_minor_version = (crate_version >> 16) & 0xff;
+    let crate_patch_version = crate_version & 0xffff;
+
+    if (crate_major_version != version[0] || crate_minor_version != version[1] ||  crate_patch_version != version[2]) {
+        console.error(
+            "Version mismatch: gl.js version is: " + version +
+                ", rust sapp-wasm crate version is: " +
+                crate_major_version + "," + crate_minor_version + "," + crate_patch_version
+        );
+    }
+}
+
 function init_plugins(plugins) {
     if (plugins == undefined)
         return;
@@ -1243,6 +1260,9 @@ function load(wasm_path) {
                     wasm_memory = obj.exports.memory;
                     wasm_exports = obj.exports;
 
+                    if (validate_version(version) == false) {
+                        console.error("Incompatible gl.js version!");
+                    }
                     init_plugins(plugins);
                     obj.exports.main();
                 })
@@ -1261,6 +1281,10 @@ function load(wasm_path) {
             .then(function (obj) {
                 wasm_memory = obj.exports.memory;
                 wasm_exports = obj.exports;
+
+                if (validate_version(version) == false) {
+                    console.error("Incompatible gl.js version!");
+                }
 
                 init_plugins(plugins);
                 obj.exports.main();
