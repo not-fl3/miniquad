@@ -1833,7 +1833,12 @@ impl ElapsedQuery {
     /// Use [`ElapsedQuery::is_supported()`] to check if functionality is available and the method can be called.
     pub fn is_available(&self) -> bool {
         let mut available: GLint = 0;
-        assert!(self.gl_query != 0);
+
+        // begin_query was not called yet
+        if self.gl_query == 0 {
+            return false
+        }
+
         unsafe { glGetQueryObjectiv(self.gl_query, GL_QUERY_RESULT_AVAILABLE, &mut available) };
         available != 0
     }
