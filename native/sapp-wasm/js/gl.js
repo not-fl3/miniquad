@@ -8,7 +8,7 @@
 
 "use strict";
 
-const version = [0, 1, 20];
+const version = "0.1.19";
 
 const canvas = document.querySelector("#glcanvas");
 const gl = canvas.getContext("webgl");
@@ -1197,19 +1197,12 @@ function register_plugins(plugins) {
     }
 }
 
-function validate_version(version) {
-    let crate_version = wasm_exports.crate_version();
-    let crate_major_version = (crate_version >> 24) & 0xff;
-    let crate_minor_version = (crate_version >> 16) & 0xff;
-    let crate_patch_version = crate_version & 0xffff;
+function u32_to_semver(crate_version) {
+    let major_version = (crate_version >> 24) & 0xff;
+    let minor_version = (crate_version >> 16) & 0xff;
+    let patch_version = crate_version & 0xffff;
 
-    if (crate_major_version != version[0] || crate_minor_version != version[1] ||  crate_patch_version != version[2]) {
-        console.error(
-            "Version mismatch: gl.js version is: " + version +
-                ", rust sapp-wasm crate version is: " +
-                crate_major_version + "," + crate_minor_version + "," + crate_patch_version
-        );
-    }
+    return major_version + "." + minor_version + "." + patch_version;
 }
 
 function init_plugins(plugins) {
@@ -1220,7 +1213,25 @@ function init_plugins(plugins) {
         if (plugins[i].on_init != undefined && plugins[i].on_init != null) {
             plugins[i].on_init();
         }
-    }
+        if (plugins[i].name == undefined || plugins[i].name == null ||
+            plugins[i].version == undefined || plugins[i].version == null) {
+            console.warn("Some of the registred plugins do not have name or version");
+            console.warn("Probably old version of the plugin used");
+        } else {
+            var version_func = plugins[i].name + "_crate_version";
+
+            if (wasm_exports[version_func] == undefined) {
+                console.error("Plugin " + plugins[i].name + " miss version function: " + version_func + ". Probably invalid crate version.");
+            } else {
+                var crate_version = u32_to_semver(wasm_exports[version_func]());
+
+                if (plugins[i].version != crate_version) {
+                    console.error("Plugin " + plugins[i].name + " version mismatch" +
+                                  "js version: " + plugins[i].version + ", crate version: " + crate_version)
+                }
+            }
+        }
+     }
 }
 
 
@@ -1236,9 +1247,9 @@ function add_missing_functions_stabs(obj) {
 
     for (const i in imports) {
         if (importObject["env"][imports[i].name] == undefined) {
-            console.warn("gl.js is missing " + imports[i].name + " function");
+            console.warn("No " + imports[i].name + " function in gl.js");
             importObject["env"][imports[i].name] = function() {
-                console.warn("missed function called: " + imports[i].name);
+                console.warn("Missed function: " + imports[i].name);
             };
         }
     }
@@ -1260,8 +1271,11 @@ function load(wasm_path) {
                     wasm_memory = obj.exports.memory;
                     wasm_exports = obj.exports;
 
-                    if (validate_version(version) == false) {
-                        console.error("Incompatible gl.js version!");
+                    var crate_version = u32_to_semver(wasm_exports.crate_version());
+                    if (version != crate_version) {
+                        console.error(
+                            "Version mismatch: gl.js version is: " + version +
+                                ", rust sapp-wasm crate version is: " + crate_version);
                     }
                     init_plugins(plugins);
                     obj.exports.main();
@@ -1282,10 +1296,12 @@ function load(wasm_path) {
                 wasm_memory = obj.exports.memory;
                 wasm_exports = obj.exports;
 
-                if (validate_version(version) == false) {
-                    console.error("Incompatible gl.js version!");
+                var crate_version = u32_to_semver(wasm_exports.crate_version());
+                if (version != crate_version) {
+                    console.error(
+                        "Version mismatch: gl.js version is: " + version +
+                            ", rust sapp-wasm crate version is: " + crate_version);
                 }
-
                 init_plugins(plugins);
                 obj.exports.main();
             })
