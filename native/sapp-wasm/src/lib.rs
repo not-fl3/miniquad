@@ -340,6 +340,15 @@ pub unsafe fn sapp_dpi_scale() -> f32 {
 }
 
 #[no_mangle]
+pub extern "C" fn crate_version() -> u32 {
+    let major = env!("CARGO_PKG_VERSION_MAJOR").parse::<u32>().unwrap();
+    let minor = env!("CARGO_PKG_VERSION_MINOR").parse::<u32>().unwrap();
+    let patch = env!("CARGO_PKG_VERSION_PATCH").parse::<u32>().unwrap();
+
+    (major << 24) + (minor << 16) + patch
+}
+
+#[no_mangle]
 pub extern "C" fn allocate_vec_u8(len: usize) -> *mut u8 {
     let mut string = vec![0u8; len];
     let ptr = string.as_mut_ptr();
