@@ -1211,30 +1211,63 @@ function miniquad_add_plugin(plugin) {
     plugins.push(plugin);
 }
 
+// read module imports and create fake functions in import object
+// this is will allow to successfeully link wasm even with wrong version of gl.js
+// needed to workaround firefox bug with lost error on wasm linking errors
+function add_missing_functions_stabs(obj) {
+    var imports = WebAssembly.Module.imports(obj);
+
+    for (const i in imports) {
+        if (importObject["env"][imports[i].name] == undefined) {
+            console.warn("gl.js is missing " + imports[i].name + " function");
+            importObject["env"][imports[i].name] = function() {
+                console.warn("missed function called: " + imports[i].name);
+            };
+        }
+    }
+}
+
 function load(wasm_path) {
     var req = fetch(wasm_path);
 
     register_plugins(plugins);
 
-    if (typeof WebAssembly.instantiateStreaming === 'function') {
-        WebAssembly.instantiateStreaming(req, importObject)
+    if (typeof WebAssembly.compileStreaming === 'function') {
+        WebAssembly.compileStreaming(req)
             .then(obj => {
-                wasm_memory = obj.instance.exports.memory;
-                wasm_exports = obj.instance.exports;
+                add_missing_functions_stabs(obj);
+                return WebAssembly.instantiate(obj, importObject);
+            })
+            .then(
+                obj => {
+                    wasm_memory = obj.exports.memory;
+                    wasm_exports = obj.exports;
 
-                init_plugins(plugins);
-                obj.instance.exports.main();
-            });
+                    init_plugins(plugins);
+                    obj.exports.main();
+                })
+            .catch(err => {
+                console.error("WASM failed to load, probably incompatible gl.js version");
+                console.error(err);
+            })
     } else {
         req
             .then(function (x) { return x.arrayBuffer(); })
-            .then(function (bytes) { return WebAssembly.instantiate(bytes, importObject); })
+            .then(function (bytes) { return WebAssembly.compile(bytes); })
             .then(function (obj) {
-                wasm_memory = obj.instance.exports.memory;
-                wasm_exports = obj.instance.exports;
+                add_missing_functions_stabs(obj);
+                return WebAssembly.instantiate(obj, importObject);
+            })
+            .then(function (obj) {
+                wasm_memory = obj.exports.memory;
+                wasm_exports = obj.exports;
 
                 init_plugins(plugins);
-                obj.instance.exports.main();
+                obj.exports.main();
+            })
+            .catch(err => {
+                console.error("WASM failed to load, probably incompatible gl.js version");
+                console.error(err);
             });
     }
 }
