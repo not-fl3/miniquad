@@ -29,10 +29,10 @@ use winapi::{
             AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
             GetClientRect, GetCursorInfo, GetDC, GetKeyState, GetSystemMetrics, LoadCursorW,
             LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage,
-            RegisterClassW, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage,
-            UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO, CURSOR_SHOWING,
-            CW_USEDEFAULT, HTCLIENT, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST, MSG,
-            PM_REMOVE, SC_KEYMENU, SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN,
+            RegisterClassW, ShowCursor, ShowWindow, TrackMouseEvent, SetCursorPos, ClientToScreen,
+            TranslateMessage, UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO,
+            CURSOR_SHOWING, CW_USEDEFAULT, HTCLIENT, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST,
+            MSG, PM_REMOVE, SC_KEYMENU, SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN,
             SM_CYSCREEN, SW_HIDE, SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN,
             VK_MENU, VK_RWIN, VK_SHIFT, WM_CHAR, WM_CLOSE, WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP,
             WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
@@ -47,25 +47,26 @@ use winapi::{
 
 pub type sapp_event_type = u32;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
-pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 22;
-pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
-pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
-pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
-pub const sapp_event_type_SAPP_EVENTTYPE_RESUMED: sapp_event_type = 18;
-pub const sapp_event_type_SAPP_EVENTTYPE_SUSPENDED: sapp_event_type = 17;
-pub const sapp_event_type_SAPP_EVENTTYPE_RESTORED: sapp_event_type = 16;
-pub const sapp_event_type_SAPP_EVENTTYPE_ICONIFIED: sapp_event_type = 15;
-pub const sapp_event_type_SAPP_EVENTTYPE_RESIZED: sapp_event_type = 14;
-pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED: sapp_event_type = 13;
-pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED: sapp_event_type = 12;
-pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED: sapp_event_type = 11;
-pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN: sapp_event_type = 10;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_LEAVE: sapp_event_type = 9;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_ENTER: sapp_event_type = 8;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE: sapp_event_type = 7;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_SCROLL: sapp_event_type = 6;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP: sapp_event_type = 5;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN: sapp_event_type = 4;
+pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 23;
+pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 22;
+pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 21;
+pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 20;
+pub const sapp_event_type_SAPP_EVENTTYPE_RESUMED: sapp_event_type = 19;
+pub const sapp_event_type_SAPP_EVENTTYPE_SUSPENDED: sapp_event_type = 18;
+pub const sapp_event_type_SAPP_EVENTTYPE_RESTORED: sapp_event_type = 17;
+pub const sapp_event_type_SAPP_EVENTTYPE_ICONIFIED: sapp_event_type = 16;
+pub const sapp_event_type_SAPP_EVENTTYPE_RESIZED: sapp_event_type = 15;
+pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED: sapp_event_type = 14;
+pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED: sapp_event_type = 13;
+pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED: sapp_event_type = 12;
+pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN: sapp_event_type = 11;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_LEAVE: sapp_event_type = 10;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_ENTER: sapp_event_type = 9;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE: sapp_event_type = 8;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_SCROLL: sapp_event_type = 7;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP: sapp_event_type = 6;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN: sapp_event_type = 5;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_DELTA: sapp_event_type = 4;
 pub const sapp_event_type_SAPP_EVENTTYPE_CHAR: sapp_event_type = 3;
 pub const sapp_event_type_SAPP_EVENTTYPE_KEY_UP: sapp_event_type = 2;
 pub const sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN: sapp_event_type = 1;
@@ -284,6 +285,8 @@ pub struct _sapp_state {
     pub cleanup_called: bool,
     pub quit_requested: bool,
     pub quit_ordered: bool,
+    pub cursor_grabbed: bool,
+    pub cursor_last: (f32, f32),
     pub window_title: String,
     pub frame_count: u64,
     pub mouse_x: f32,
@@ -351,6 +354,8 @@ static mut _sapp: _sapp_state = _sapp_state {
     cleanup_called: false,
     quit_requested: false,
     quit_ordered: false,
+    cursor_grabbed: false,
+    cursor_last: (0.0, 0.0),
     window_title: String::new(),
     frame_count: 0,
     mouse_x: 0.,
@@ -464,7 +469,9 @@ pub unsafe fn sapp_mouse_shown() -> bool {
     cursor_info.flags & CURSOR_SHOWING != 0
 }
 
-pub unsafe fn sapp_set_cursor_grab(mut _grab: bool) {}
+pub unsafe fn sapp_set_cursor_grab(grab: bool) {
+    _sapp.cursor_grabbed = grab;
+}
 
 pub unsafe fn sapp_show_mouse(shown: bool) {
     ShowCursor(shown as _);
@@ -629,10 +636,14 @@ unsafe extern "system" fn win32_wndproc(
                     }
                 }
             }
-            WM_LBUTTONDOWN => _sapp_win32_mouse_event(
-                sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN,
-                sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT,
-            ),
+            WM_LBUTTONDOWN => {
+                ShowCursor(!_sapp.cursor_grabbed as _);
+
+                _sapp_win32_mouse_event(
+                    sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN,
+                    sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT,
+                );
+            }
             WM_RBUTTONDOWN => _sapp_win32_mouse_event(
                 sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN,
                 sapp_mousebutton_SAPP_MOUSEBUTTON_RIGHT,
@@ -671,12 +682,34 @@ unsafe extern "system" fn win32_wndproc(
                         sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
                     );
                 }
-                _sapp_win32_mouse_event(
-                    sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE,
-                    sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
-                );
+
+                if _sapp.cursor_grabbed {
+                    let new_cursor = (_sapp.mouse_x, _sapp.mouse_y);
+                    _sapp.mouse_x -= _sapp.cursor_last.0;
+                    _sapp.mouse_y -= _sapp.cursor_last.1;
+                    _sapp.cursor_last = new_cursor;
+                    _sapp_win32_mouse_event(
+                        sapp_event_type_SAPP_EVENTTYPE_MOUSE_DELTA,
+                        sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
+                    );
+                } else {
+                    _sapp_win32_mouse_event(
+                        sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE,
+                        sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
+                    );
+                }
             }
             WM_MOUSELEAVE => {
+                if _sapp.cursor_grabbed {
+                    let mut middle_screen = POINT {
+                        x: _sapp.window_width / 2,
+                        y: _sapp.window_height / 2,
+                    };
+                    ClientToScreen(hWnd, &mut middle_screen as *mut _ as _);
+                    SetCursorPos(middle_screen.x, middle_screen.y);
+                    _sapp.cursor_last = (middle_screen.x as f32, middle_screen.y as f32);
+                }
+
                 _sapp.win32_mouse_tracked = false;
                 _sapp_win32_mouse_event(
                     sapp_event_type_SAPP_EVENTTYPE_MOUSE_LEAVE,

@@ -208,6 +208,9 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
         sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE => {
             event_call!(data, mouse_motion_event, event.mouse_x, event.mouse_y);
         }
+        sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_DELTA => {
+            event_call!(data, mouse_delta_event, event.mouse_x, event.mouse_y);
+        }
         sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_SCROLL => {
             event_call!(data, mouse_wheel_event, event.scroll_x, event.scroll_y);
         }

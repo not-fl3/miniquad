@@ -336,7 +336,17 @@ pub trait EventHandler {
     fn update(&mut self, _ctx: &mut Context);
     fn draw(&mut self, _ctx: &mut Context);
     fn resize_event(&mut self, _ctx: &mut Context, _width: f32, _height: f32) {}
+
+    /// Provides the new location of the mouse, should it happen to move.
+    ///
+    /// Does not fire if `ctx.set_cursor_grab` has been called with `true` as the first parameter.
     fn mouse_motion_event(&mut self, _ctx: &mut Context, _x: f32, _y: f32) {}
+
+    /// X and y represent how much the mouse has moved since the last frame
+    ///
+    /// Fires only if `ctx.set_cursor_grab` has been called with `true` as the first parameter.
+    fn mouse_delta_event(&mut self, _ctx: &mut Context, _x: f32, _y: f32) {}
+
     fn mouse_wheel_event(&mut self, _ctx: &mut Context, _x: f32, _y: f32) {}
     fn mouse_button_down_event(
         &mut self,
@@ -410,7 +420,15 @@ pub trait EventHandlerFree {
     fn update(&mut self);
     fn draw(&mut self);
     fn resize_event(&mut self, _width: f32, _height: f32) {}
+    /// Provides the new location of the mouse, should it happen to move.
+    ///
+    /// Does not fire if `ctx.set_cursor_grab` has been called with `true` as the first parameter.
     fn mouse_motion_event(&mut self, _x: f32, _y: f32) {}
+
+    /// X and y represent how much the mouse has moved since the last frame
+    ///
+    /// Fires only if `ctx.set_cursor_grab` has been called with `true` as the first parameter.
+    fn mouse_delta_event(&mut self, _x: f32, _y: f32) {}
     fn mouse_wheel_event(&mut self, _x: f32, _y: f32) {}
     fn mouse_button_down_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
     fn mouse_button_up_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
