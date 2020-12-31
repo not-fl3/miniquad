@@ -30,7 +30,11 @@ const MAX_OBSTACLES: usize = 512 * 1024;
 struct Stage {
     pipeline: Pipeline,
     bindings: Bindings,
-    obstacles: Vec<Vec3>,
+
+    /// Contains indexes for enemies that the player would "shoot" if they clicked right now.
+    targeted_enemies: Vec<usize>,
+    enemies: Vec<Vec3>,
+
     keys_down: [bool; 256],
     cam: Cam,
     pos: Vec3,
@@ -97,14 +101,14 @@ impl Stage {
             }
         );
 
-        let mut obstacles = vec![];
+        let mut enemies = vec![];
 
         for x in 0..10 {
             for y in 0..10 {
                 let o = (x % 2 + y % 2) as f32 / 4.0;
                 let p = vec3(x as f32 - 5.0 + o, 0.0, y as f32 - 5.0 + o);
                 if p.length() > 0.0 {
-                    obstacles.push(p);
+                    enemies.push(p);
                 }
             }
         }
@@ -112,12 +116,28 @@ impl Stage {
         Stage {
             pipeline,
             bindings,
-            obstacles,
+            targeted_enemies: Vec::with_capacity(enemies.len()),
+            enemies,
             keys_down: [false; 256],
-            pos: Vec3::zero(),
+            pos: vec3(0.0, 1.0, 0.0),
             vel: Vec3::zero(),
             cam: Default::default(),
         }
+    }
+}
+
+impl Stage {
+    fn view_proj(&self, ctx: &mut Context) -> Mat4 {
+        // model-view-projection matrix
+        let (width, height) = ctx.screen_size();
+        let proj = Mat4::perspective_rh_gl(45.0f32.to_radians(), width / height, 0.01, 50.0);
+        let view = Mat4::look_at_rh(
+            self.pos,
+            self.pos + self.cam.facing(),
+            vec3(0.0, 1.0, 0.0),
+        );
+
+        proj * view
     }
 }
 
@@ -125,19 +145,6 @@ impl EventHandler for Stage {
     fn update(&mut self, ctx: &mut Context) {
         ctx.set_cursor_grab(true);
         ctx.show_mouse(false);
-
-        if self.keys_down[KeyCode::Up as usize] {
-            self.cam.turn( 0.3,  0.0);
-        }
-        if self.keys_down[KeyCode::Down as usize] {
-            self.cam.turn(-0.3,  0.0);
-        }
-        if self.keys_down[KeyCode::Left as usize] {
-            self.cam.turn( 0.0,  0.3);
-        }
-        if self.keys_down[KeyCode::Right as usize] {
-            self.cam.turn( 0.0, -0.3);
-        }
 
         let mut move_dir = Vec3::zero();
         let facing = self.cam.facing();
@@ -154,18 +161,37 @@ impl EventHandler for Stage {
         if self.keys_down[KeyCode::D as usize] {
             move_dir += side;
         }
+        *move_dir.y_mut() = 0.0;
         let len = move_dir.length();
         if len > 0.0 {
             let norm = move_dir / len;
             self.vel += norm * 0.002;
         }
 
-        self.vel *= 0.7;
+        self.vel *= 0.95;
         self.pos += self.vel;
 
         self.cam.update();
 
-        self.bindings.vertex_buffers[1].update(ctx, &self.obstacles[..]);
+        self.targeted_enemies.clear();
+        for i in 0..self.enemies.len() {
+            let enemy = &mut self.enemies[i];
+            *enemy.y_mut() = 0.0;
+
+            let mouse_project = line_plane_intersect(
+                self.pos,
+                self.cam.facing(),
+                *enemy,
+                *enemy - self.pos
+            );
+
+            if (mouse_project - *enemy).length() < 0.3 {
+                self.targeted_enemies.push(i);
+                *enemy.y_mut() = (date::now() * 10.0).sin() as f32 * 0.05;
+            }
+        }
+
+        self.bindings.vertex_buffers[1].update(ctx, &self.enemies[..]);
     }
 
     fn key_down_event(
@@ -192,28 +218,39 @@ impl EventHandler for Stage {
     fn mouse_delta_event(&mut self, _ctx: &mut Context, x: f32, y: f32) {
         self.cam.turn_vel += vec2(x, y) * -0.025;
     }
+    
+    fn mouse_button_down_event(&mut self, _ctx: &mut Context, button: MouseButton, _x: f32, _y: f32) {
+        if MouseButton::Left == button {
+            for &targeted_enemy in self.targeted_enemies.iter().rev() {
+                self.enemies.remove(targeted_enemy);
+            }
+            *self.cam.turn_vel.y_mut() += 1.2;
+        }
+    }
 
     fn draw(&mut self, ctx: &mut Context) {
-        // model-view-projection matrix
-        let (width, height) = ctx.screen_size();
-        let proj = Mat4::perspective_rh_gl(45.0f32.to_radians(), width / height, 0.01, 50.0);
-        let view = Mat4::look_at_rh(
-            self.pos,
-            self.pos + self.cam.facing(),
-            vec3(0.0, 1.0, 0.0),
-        );
-        let view_proj = proj * view;
+        let view_proj = self.view_proj(ctx);
 
         ctx.begin_default_pass(Default::default());
 
         ctx.apply_pipeline(&self.pipeline);
         ctx.apply_bindings(&self.bindings);
         ctx.apply_uniforms(&shader::Uniforms { view_proj });
-        ctx.draw(0, 24, self.obstacles.len() as i32);
+        ctx.draw(0, 24, self.enemies.len() as i32);
         ctx.end_render_pass();
 
         ctx.commit_frame();
     }
+}
+
+fn line_plane_intersect(
+    line_origin: Vec3,
+    line: Vec3,
+    plane_origin: Vec3,
+    plane_normal: Vec3,
+) -> Vec3 {
+    let d = (plane_origin - line_origin).dot(plane_normal) / line.dot(plane_normal);
+    line_origin + line * d
 }
 
 fn main() {

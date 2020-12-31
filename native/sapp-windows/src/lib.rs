@@ -29,7 +29,7 @@ use winapi::{
             AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
             GetClientRect, GetCursorInfo, GetDC, GetKeyState, GetSystemMetrics, LoadCursorW,
             LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage, SetRect, ClipCursor,
-            RegisterClassW, ShowCursor, ShowWindow, TrackMouseEvent, SetCursorPos, ClientToScreen,
+            RegisterClassW, ShowCursor, ShowWindow, TrackMouseEvent, ClientToScreen,
             RAWINPUTHEADER, RAWINPUT, MOUSE_MOVE_ABSOLUTE, GetRawInputData,
             TranslateMessage, UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO,
             RAWINPUTDEVICE, SetCursor, RegisterRawInputDevices, RID_INPUT, WM_INPUT, WM_MOVE,
@@ -598,22 +598,13 @@ unsafe fn update_clip_rect(hWnd: HWND) {
         x: rect.left,
         y: rect.top,
     };
-
-    // Add one to the right and bottom sides, because the 
-    // coordinates retrieved by GetClientRect do not 
-    // include the far left and lowermost pixels. 
     let mut lower_right = POINT {
-        x: rect.right + 1,
-        y: rect.bottom + 1,
+        x: rect.right,
+        y: rect.bottom,
     };
 
     ClientToScreen(hWnd, &mut upper_left as *mut _ as _); 
     ClientToScreen(hWnd, &mut lower_right as *mut _ as _); 
-
-    // Copy the client coordinates of the client area 
-    // to the rcClient structure. Confine the mouse cursor 
-    // to the client area by passing the rcClient structure 
-    // to the ClipCursor function. 
 
     SetRect(&mut rect as *mut _ as _, upper_left.x, upper_left.y, 
         lower_right.x, lower_right.y); 
