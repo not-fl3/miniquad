@@ -1,11 +1,12 @@
 use miniquad::*;
 
-use glam::{vec3, Mat4, Vec3};
+use glam::{vec2, vec3, Mat4, Vec3, Vec2};
 
 #[derive(Default)]
 struct Cam {
     pitch_deg: f32,
     yaw_deg: f32,
+    turn_vel: Vec2,
 }
 
 impl Cam {
@@ -14,9 +15,14 @@ impl Cam {
         vec3(yaw.sin() * pitch.cos(), pitch.sin(), yaw.cos() * pitch.cos())
     }
 
-    fn turn(&mut self, pitch_delta_deg: f32, yaw_delta_deg: f32) {
+    fn turn(&mut self, yaw_delta_deg: f32, pitch_delta_deg: f32) {
         self.pitch_deg = (self.pitch_deg + pitch_delta_deg).max(-89.0).min(89.0);
         self.yaw_deg = (self.yaw_deg + yaw_delta_deg) % 360.0;
+    }
+
+    fn update(&mut self) {
+        self.turn_vel *= 0.9;
+        self.turn(self.turn_vel.x(), self.turn_vel.y());
     }
 }
 
@@ -25,8 +31,10 @@ struct Stage {
     pipeline: Pipeline,
     bindings: Bindings,
     obstacles: Vec<Vec3>,
+    keys_down: [bool; 256],
     cam: Cam,
     pos: Vec3,
+    vel: Vec3,
 }
 
 impl Stage {
@@ -93,7 +101,8 @@ impl Stage {
 
         for x in 0..10 {
             for y in 0..10 {
-                let p = vec3(x as f32, 0.0, y as f32);
+                let o = (x % 2 + y % 2) as f32 / 4.0;
+                let p = vec3(x as f32 - 5.0 + o, 0.0, y as f32 - 5.0 + o);
                 if p.length() > 0.0 {
                     obstacles.push(p);
                 }
@@ -104,7 +113,9 @@ impl Stage {
             pipeline,
             bindings,
             obstacles,
+            keys_down: [false; 256],
             pos: Vec3::zero(),
+            vel: Vec3::zero(),
             cam: Default::default(),
         }
     }
@@ -113,11 +124,73 @@ impl Stage {
 impl EventHandler for Stage {
     fn update(&mut self, ctx: &mut Context) {
         ctx.set_cursor_grab(true);
+        ctx.show_mouse(false);
+
+        if self.keys_down[KeyCode::Up as usize] {
+            self.cam.turn( 0.3,  0.0);
+        }
+        if self.keys_down[KeyCode::Down as usize] {
+            self.cam.turn(-0.3,  0.0);
+        }
+        if self.keys_down[KeyCode::Left as usize] {
+            self.cam.turn( 0.0,  0.3);
+        }
+        if self.keys_down[KeyCode::Right as usize] {
+            self.cam.turn( 0.0, -0.3);
+        }
+
+        let mut move_dir = Vec3::zero();
+        let facing = self.cam.facing();
+        let side = facing.cross(Vec3::unit_y());
+        if self.keys_down[KeyCode::W as usize] {
+            move_dir += facing;
+        }
+        if self.keys_down[KeyCode::S as usize] {
+            move_dir -= facing;
+        }
+        if self.keys_down[KeyCode::A as usize] {
+            move_dir -= side;
+        }
+        if self.keys_down[KeyCode::D as usize] {
+            move_dir += side;
+        }
+        let len = move_dir.length();
+        if len > 0.0 {
+            let norm = move_dir / len;
+            self.vel += norm * 0.002;
+        }
+
+        self.vel *= 0.7;
+        self.pos += self.vel;
+
+        self.cam.update();
+
         self.bindings.vertex_buffers[1].update(ctx, &self.obstacles[..]);
     }
 
+    fn key_down_event(
+        &mut self,
+        _ctx: &mut Context,
+        key: KeyCode,
+        _key_mods: KeyMods,
+        repeat: bool
+    ) {
+        if !repeat {
+            self.keys_down[key as usize] = true;
+        }
+    }
+
+    fn key_up_event(
+        &mut self,
+        _ctx: &mut Context,
+        key: KeyCode,
+        _key_mods: KeyMods,
+    ) {
+        self.keys_down[key as usize] = false;
+    }
+
     fn mouse_delta_event(&mut self, _ctx: &mut Context, x: f32, y: f32) {
-        self.cam.turn(y * 0.1, -x * 0.1);
+        self.cam.turn_vel += vec2(x, y) * -0.025;
     }
 
     fn draw(&mut self, ctx: &mut Context) {

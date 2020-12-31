@@ -28,9 +28,11 @@ use winapi::{
         winuser::{
             AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
             GetClientRect, GetCursorInfo, GetDC, GetKeyState, GetSystemMetrics, LoadCursorW,
-            LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage,
+            LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage, SetRect, ClipCursor,
             RegisterClassW, ShowCursor, ShowWindow, TrackMouseEvent, SetCursorPos, ClientToScreen,
+            RAWINPUTHEADER, RAWINPUT, MOUSE_MOVE_ABSOLUTE, GetRawInputData,
             TranslateMessage, UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO,
+            RAWINPUTDEVICE, SetCursor, RegisterRawInputDevices, RID_INPUT, WM_INPUT, WM_MOVE,
             CURSOR_SHOWING, CW_USEDEFAULT, HTCLIENT, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST,
             MSG, PM_REMOVE, SC_KEYMENU, SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN,
             SM_CYSCREEN, SW_HIDE, SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN,
@@ -286,7 +288,6 @@ pub struct _sapp_state {
     pub quit_requested: bool,
     pub quit_ordered: bool,
     pub cursor_grabbed: bool,
-    pub cursor_last: (f32, f32),
     pub window_title: String,
     pub frame_count: u64,
     pub mouse_x: f32,
@@ -355,7 +356,6 @@ static mut _sapp: _sapp_state = _sapp_state {
     quit_requested: false,
     quit_ordered: false,
     cursor_grabbed: false,
-    cursor_last: (0.0, 0.0),
     window_title: String::new(),
     frame_count: 0,
     mouse_x: 0.,
@@ -471,6 +471,21 @@ pub unsafe fn sapp_mouse_shown() -> bool {
 
 pub unsafe fn sapp_set_cursor_grab(grab: bool) {
     _sapp.cursor_grabbed = grab;
+
+    if _sapp.cursor_grabbed {
+        SetCursor(NULL as _);
+        let mut rid: RAWINPUTDEVICE = RAWINPUTDEVICE {
+            usUsagePage: 0x01,
+            usUsage: 0x02,
+            dwFlags: 0,
+            hwndTarget: _sapp_win32_hwnd
+        };
+
+        if RegisterRawInputDevices(&mut rid as *mut _ as _, 1, std::mem::size_of::<RAWINPUTDEVICE>() as _) != 1 {
+            panic!("failed to register raw input device");
+        }
+    } else {
+    }
 }
 
 pub unsafe fn sapp_show_mouse(shown: bool) {
@@ -573,6 +588,38 @@ unsafe fn _sapp_win32_key_event(type_: sapp_event_type, vk: u32, repeat: bool) {
     }
 }
 
+unsafe fn update_clip_rect(hWnd: HWND) {
+    // Retrieve the screen coordinates of the client area, 
+    // and convert them into client coordinates. 
+    let mut rect: RECT = std::mem::zeroed();
+
+    GetClientRect(hWnd, &mut rect as *mut _ as _); 
+    let mut upper_left = POINT {
+        x: rect.left,
+        y: rect.top,
+    };
+
+    // Add one to the right and bottom sides, because the 
+    // coordinates retrieved by GetClientRect do not 
+    // include the far left and lowermost pixels. 
+    let mut lower_right = POINT {
+        x: rect.right + 1,
+        y: rect.bottom + 1,
+    };
+
+    ClientToScreen(hWnd, &mut upper_left as *mut _ as _); 
+    ClientToScreen(hWnd, &mut lower_right as *mut _ as _); 
+
+    // Copy the client coordinates of the client area 
+    // to the rcClient structure. Confine the mouse cursor 
+    // to the client area by passing the rcClient structure 
+    // to the ClipCursor function. 
+
+    SetRect(&mut rect as *mut _ as _, upper_left.x, upper_left.y, 
+        lower_right.x, lower_right.y); 
+    ClipCursor(&mut rect as *mut _ as _);
+}
+
 unsafe extern "system" fn win32_wndproc(
     hWnd: HWND,
     uMsg: UINT,
@@ -618,6 +665,10 @@ unsafe extern "system" fn win32_wndproc(
                 return 1;
             }
             WM_SIZE => {
+                if _sapp.cursor_grabbed {
+                    update_clip_rect(hWnd);
+                }
+
                 let iconified = wParam == SIZE_MINIMIZED;
                 if iconified != _sapp_win32_iconified {
                     _sapp_win32_iconified = iconified;
@@ -636,14 +687,10 @@ unsafe extern "system" fn win32_wndproc(
                     }
                 }
             }
-            WM_LBUTTONDOWN => {
-                ShowCursor(!_sapp.cursor_grabbed as _);
-
-                _sapp_win32_mouse_event(
-                    sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN,
-                    sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT,
-                );
-            }
+            WM_LBUTTONDOWN => _sapp_win32_mouse_event(
+                sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN,
+                sapp_mousebutton_SAPP_MOUSEBUTTON_LEFT,
+            ),
             WM_RBUTTONDOWN => _sapp_win32_mouse_event(
                 sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN,
                 sapp_mousebutton_SAPP_MOUSEBUTTON_RIGHT,
@@ -683,33 +730,45 @@ unsafe extern "system" fn win32_wndproc(
                     );
                 }
 
-                if _sapp.cursor_grabbed {
-                    let new_cursor = (_sapp.mouse_x, _sapp.mouse_y);
-                    _sapp.mouse_x -= _sapp.cursor_last.0;
-                    _sapp.mouse_y -= _sapp.cursor_last.1;
-                    _sapp.cursor_last = new_cursor;
-                    _sapp_win32_mouse_event(
-                        sapp_event_type_SAPP_EVENTTYPE_MOUSE_DELTA,
-                        sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
-                    );
-                } else {
-                    _sapp_win32_mouse_event(
-                        sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE,
-                        sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
-                    );
-                }
+                _sapp_win32_mouse_event(
+                    sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE,
+                    sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
+                );
             }
-            WM_MOUSELEAVE => {
-                if _sapp.cursor_grabbed {
-                    let mut middle_screen = POINT {
-                        x: _sapp.window_width / 2,
-                        y: _sapp.window_height / 2,
-                    };
-                    ClientToScreen(hWnd, &mut middle_screen as *mut _ as _);
-                    SetCursorPos(middle_screen.x, middle_screen.y);
-                    _sapp.cursor_last = (middle_screen.x as f32, middle_screen.y as f32);
+
+            WM_MOVE if _sapp.cursor_grabbed => {
+                update_clip_rect(hWnd);
+            }
+
+            WM_INPUT => {
+                let mut data: RAWINPUT = std::mem::zeroed();
+                let mut size = std::mem::size_of::<RAWINPUT>();
+                let get_succeed = GetRawInputData(
+                    lParam as _,
+                    RID_INPUT,
+                    &mut data as *mut _ as _,
+                    &mut size as *mut _ as _,
+                    std::mem::size_of::<RAWINPUTHEADER>() as _,
+                );
+                if get_succeed as i32 == -1 {
+                    panic!("failed to retrieve raw input data");
                 }
 
+                if data.data.mouse().usFlags & MOUSE_MOVE_ABSOLUTE == 1 {
+                    panic!("grr absolute coords");
+                }
+
+                _sapp.mouse_x = data.data.mouse().lLastX as f32 * _sapp_win32_mouse_scale;
+                _sapp.mouse_y = data.data.mouse().lLastY as f32 * _sapp_win32_mouse_scale;
+                _sapp_win32_mouse_event(
+                    sapp_event_type_SAPP_EVENTTYPE_MOUSE_DELTA,
+                    sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
+                );
+
+                update_clip_rect(hWnd);
+            }
+
+            WM_MOUSELEAVE => {
                 _sapp.win32_mouse_tracked = false;
                 _sapp_win32_mouse_event(
                     sapp_event_type_SAPP_EVENTTYPE_MOUSE_LEAVE,
