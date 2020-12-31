@@ -1,6 +1,6 @@
 use miniquad::*;
 
-use glam::{vec2, vec3, Mat4, Vec3, Vec2};
+use glam::{vec2, vec3, Mat4, Vec2, Vec3};
 
 #[derive(Default)]
 struct Cam {
@@ -12,7 +12,11 @@ struct Cam {
 impl Cam {
     fn facing(&self) -> Vec3 {
         let (pitch, yaw) = (self.pitch_deg.to_radians(), self.yaw_deg.to_radians());
-        vec3(yaw.sin() * pitch.cos(), pitch.sin(), yaw.cos() * pitch.cos())
+        vec3(
+            yaw.sin() * pitch.cos(),
+            pitch.sin(),
+            yaw.cos() * pitch.cos(),
+        )
     }
 
     fn turn(&mut self, yaw_delta_deg: f32, pitch_delta_deg: f32) {
@@ -98,7 +102,7 @@ impl Stage {
                 depth_test: Comparison::LessOrEqual,
                 depth_write: true,
                 ..Default::default()
-            }
+            },
         );
 
         let mut enemies = vec![];
@@ -131,11 +135,7 @@ impl Stage {
         // model-view-projection matrix
         let (width, height) = ctx.screen_size();
         let proj = Mat4::perspective_rh_gl(45.0f32.to_radians(), width / height, 0.01, 50.0);
-        let view = Mat4::look_at_rh(
-            self.pos,
-            self.pos + self.cam.facing(),
-            vec3(0.0, 1.0, 0.0),
-        );
+        let view = Mat4::look_at_rh(self.pos, self.pos + self.cam.facing(), vec3(0.0, 1.0, 0.0));
 
         proj * view
     }
@@ -178,12 +178,8 @@ impl EventHandler for Stage {
             let enemy = &mut self.enemies[i];
             *enemy.y_mut() = 0.0;
 
-            let mouse_project = line_plane_intersect(
-                self.pos,
-                self.cam.facing(),
-                *enemy,
-                *enemy - self.pos
-            );
+            let mouse_project =
+                line_plane_intersect(self.pos, self.cam.facing(), *enemy, *enemy - self.pos);
 
             if (mouse_project - *enemy).length() < 0.3 {
                 self.targeted_enemies.push(i);
@@ -199,27 +195,28 @@ impl EventHandler for Stage {
         _ctx: &mut Context,
         key: KeyCode,
         _key_mods: KeyMods,
-        repeat: bool
+        repeat: bool,
     ) {
         if !repeat {
             self.keys_down[key as usize] = true;
         }
     }
 
-    fn key_up_event(
-        &mut self,
-        _ctx: &mut Context,
-        key: KeyCode,
-        _key_mods: KeyMods,
-    ) {
+    fn key_up_event(&mut self, _ctx: &mut Context, key: KeyCode, _key_mods: KeyMods) {
         self.keys_down[key as usize] = false;
     }
 
     fn mouse_delta_event(&mut self, _ctx: &mut Context, x: f32, y: f32) {
         self.cam.turn_vel += vec2(x, y) * -0.025;
     }
-    
-    fn mouse_button_down_event(&mut self, _ctx: &mut Context, button: MouseButton, _x: f32, _y: f32) {
+
+    fn mouse_button_down_event(
+        &mut self,
+        _ctx: &mut Context,
+        button: MouseButton,
+        _x: f32,
+        _y: f32,
+    ) {
         if MouseButton::Left == button {
             for &targeted_enemy in self.targeted_enemies.iter().rev() {
                 self.enemies.remove(targeted_enemy);
@@ -300,4 +297,3 @@ mod shader {
         pub view_proj: glam::Mat4,
     }
 }
-

@@ -26,23 +26,23 @@ use winapi::{
             PFD_DRAW_TO_WINDOW, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR,
         },
         winuser::{
-            AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
-            GetClientRect, GetCursorInfo, GetDC, GetKeyState, GetSystemMetrics, LoadCursorW,
-            LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage, SetRect, ClipCursor,
-            RegisterClassW, ShowCursor, ShowWindow, TrackMouseEvent, ClientToScreen,
-            RAWINPUTHEADER, RAWINPUT, MOUSE_MOVE_ABSOLUTE, GetRawInputData,
-            TranslateMessage, UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO,
-            RAWINPUTDEVICE, SetCursor, RegisterRawInputDevices, RID_INPUT, WM_INPUT, WM_MOVE,
-            CURSOR_SHOWING, CW_USEDEFAULT, HTCLIENT, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST,
-            MSG, PM_REMOVE, SC_KEYMENU, SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN,
+            AdjustWindowRectEx, ClientToScreen, ClipCursor, CreateWindowExW, DefWindowProcW,
+            DestroyWindow, DispatchMessageW, GetClientRect, GetCursorInfo, GetDC, GetKeyState,
+            GetRawInputData, GetSystemMetrics, LoadCursorW, LoadIconW, MonitorFromPoint,
+            PeekMessageW, PostMessageW, PostQuitMessage, RegisterClassW, RegisterRawInputDevices,
+            SetCursor, SetRect, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage,
+            UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO, CURSOR_SHOWING,
+            CW_USEDEFAULT, HTCLIENT, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST,
+            MOUSE_MOVE_ABSOLUTE, MSG, PM_REMOVE, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER,
+            RID_INPUT, SC_KEYMENU, SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN,
             SM_CYSCREEN, SW_HIDE, SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN,
-            VK_MENU, VK_RWIN, VK_SHIFT, WM_CHAR, WM_CLOSE, WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP,
-            WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
-            WM_MOUSELEAVE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP,
-            WM_SETCURSOR, WM_SIZE, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSW,
-            WS_CAPTION, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW, WS_EX_OVERLAPPEDWINDOW,
-            WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SIZEBOX, WS_SYSMENU,
-            WS_VISIBLE,
+            VK_MENU, VK_RWIN, VK_SHIFT, WM_CHAR, WM_CLOSE, WM_ERASEBKGND, WM_INPUT, WM_KEYDOWN,
+            WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
+            WM_MOUSELEAVE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_MOVE, WM_QUIT, WM_RBUTTONDOWN,
+            WM_RBUTTONUP, WM_SETCURSOR, WM_SIZE, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP,
+            WNDCLASSW, WS_CAPTION, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW,
+            WS_EX_OVERLAPPEDWINDOW, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP,
+            WS_SIZEBOX, WS_SYSMENU, WS_VISIBLE,
         },
     },
 };
@@ -478,10 +478,15 @@ pub unsafe fn sapp_set_cursor_grab(grab: bool) {
             usUsagePage: 0x01,
             usUsage: 0x02,
             dwFlags: 0,
-            hwndTarget: _sapp_win32_hwnd
+            hwndTarget: _sapp_win32_hwnd,
         };
 
-        if RegisterRawInputDevices(&mut rid as *mut _ as _, 1, std::mem::size_of::<RAWINPUTDEVICE>() as _) != 1 {
+        if RegisterRawInputDevices(
+            &mut rid as *mut _ as _,
+            1,
+            std::mem::size_of::<RAWINPUTDEVICE>() as _,
+        ) != 1
+        {
             panic!("failed to register raw input device");
         }
     } else {
@@ -589,11 +594,11 @@ unsafe fn _sapp_win32_key_event(type_: sapp_event_type, vk: u32, repeat: bool) {
 }
 
 unsafe fn update_clip_rect(hWnd: HWND) {
-    // Retrieve the screen coordinates of the client area, 
-    // and convert them into client coordinates. 
+    // Retrieve the screen coordinates of the client area,
+    // and convert them into client coordinates.
     let mut rect: RECT = std::mem::zeroed();
 
-    GetClientRect(hWnd, &mut rect as *mut _ as _); 
+    GetClientRect(hWnd, &mut rect as *mut _ as _);
     let mut upper_left = POINT {
         x: rect.left,
         y: rect.top,
@@ -603,11 +608,16 @@ unsafe fn update_clip_rect(hWnd: HWND) {
         y: rect.bottom,
     };
 
-    ClientToScreen(hWnd, &mut upper_left as *mut _ as _); 
-    ClientToScreen(hWnd, &mut lower_right as *mut _ as _); 
+    ClientToScreen(hWnd, &mut upper_left as *mut _ as _);
+    ClientToScreen(hWnd, &mut lower_right as *mut _ as _);
 
-    SetRect(&mut rect as *mut _ as _, upper_left.x, upper_left.y, 
-        lower_right.x, lower_right.y); 
+    SetRect(
+        &mut rect as *mut _ as _,
+        upper_left.x,
+        upper_left.y,
+        lower_right.x,
+        lower_right.y,
+    );
     ClipCursor(&mut rect as *mut _ as _);
 }
 
