@@ -16,6 +16,9 @@ pub use rand::*;
 mod egl;
 pub mod gl3;
 
+pub mod query_stab;
+pub use query_stab::*;
+
 pub use egl::*;
 pub use gl3::*;
 
