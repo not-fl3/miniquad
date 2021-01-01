@@ -30,7 +30,7 @@ impl Cam {
     }
 }
 
-const MAX_OBSTACLES: usize = 512 * 1024;
+const MAX_ENEMIES: usize = 512 * 1024;
 struct Stage {
     pipeline: Pipeline,
     bindings: Bindings,
@@ -38,6 +38,8 @@ struct Stage {
     /// Contains indexes for enemies that the player would "shoot" if they clicked right now.
     targeted_enemies: Vec<usize>,
     enemies: Vec<Vec3>,
+
+    escaped: bool,
 
     keys_down: [bool; 256],
     cam: Cam,
@@ -72,7 +74,7 @@ impl Stage {
         let positions_vertex_buffer = Buffer::stream(
             ctx,
             BufferType::VertexBuffer,
-            MAX_OBSTACLES * std::mem::size_of::<Vec3>(),
+            MAX_ENEMIES * std::mem::size_of::<Vec3>(),
         );
 
         let bindings = Bindings {
@@ -122,6 +124,7 @@ impl Stage {
             bindings,
             targeted_enemies: Vec::with_capacity(enemies.len()),
             enemies,
+            escaped: true,
             keys_down: [false; 256],
             pos: vec3(0.0, 1.0, 0.0),
             vel: Vec3::zero(),
@@ -143,8 +146,8 @@ impl Stage {
 
 impl EventHandler for Stage {
     fn update(&mut self, ctx: &mut Context) {
-        ctx.set_cursor_grab(true);
-        ctx.show_mouse(false);
+        ctx.set_cursor_grab(!self.escaped);
+        ctx.show_mouse(self.escaped);
 
         let mut move_dir = Vec3::zero();
         let facing = self.cam.facing();
@@ -200,13 +203,17 @@ impl EventHandler for Stage {
         if !repeat {
             self.keys_down[key as usize] = true;
         }
+
+        if key == KeyCode::Escape {
+            self.escaped = true;
+        }
     }
 
     fn key_up_event(&mut self, _ctx: &mut Context, key: KeyCode, _key_mods: KeyMods) {
         self.keys_down[key as usize] = false;
     }
 
-    fn mouse_delta_event(&mut self, _ctx: &mut Context, x: f32, y: f32) {
+    fn raw_mouse_motion(&mut self, _ctx: &mut Context, x: f32, y: f32) {
         self.cam.turn_vel += vec2(x, y) * -0.025;
     }
 
@@ -218,10 +225,14 @@ impl EventHandler for Stage {
         _y: f32,
     ) {
         if MouseButton::Left == button {
-            for &targeted_enemy in self.targeted_enemies.iter().rev() {
-                self.enemies.remove(targeted_enemy);
+            if self.escaped {
+                self.escaped = false;
+            } else {
+                for &targeted_enemy in self.targeted_enemies.iter().rev() {
+                    self.enemies.remove(targeted_enemy);
+                }
+                *self.cam.turn_vel.y_mut() += 1.2;
             }
-            *self.cam.turn_vel.y_mut() += 1.2;
         }
     }
 

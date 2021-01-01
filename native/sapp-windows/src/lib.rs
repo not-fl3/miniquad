@@ -30,45 +30,44 @@ use winapi::{
             DestroyWindow, DispatchMessageW, GetClientRect, GetCursorInfo, GetDC, GetKeyState,
             GetRawInputData, GetSystemMetrics, LoadCursorW, LoadIconW, MonitorFromPoint,
             PeekMessageW, PostMessageW, PostQuitMessage, RegisterClassW, RegisterRawInputDevices,
-            SetCursor, SetRect, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage,
-            UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO, CURSOR_SHOWING,
-            CW_USEDEFAULT, HTCLIENT, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST,
-            MOUSE_MOVE_ABSOLUTE, MSG, PM_REMOVE, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER,
-            RID_INPUT, SC_KEYMENU, SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN,
-            SM_CYSCREEN, SW_HIDE, SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN,
-            VK_MENU, VK_RWIN, VK_SHIFT, WM_CHAR, WM_CLOSE, WM_ERASEBKGND, WM_INPUT, WM_KEYDOWN,
-            WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
-            WM_MOUSELEAVE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_MOVE, WM_QUIT, WM_RBUTTONDOWN,
-            WM_RBUTTONUP, WM_SETCURSOR, WM_SIZE, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP,
-            WNDCLASSW, WS_CAPTION, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW,
-            WS_EX_OVERLAPPEDWINDOW, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP,
-            WS_SIZEBOX, WS_SYSMENU, WS_VISIBLE,
+            SetRect, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage, UnregisterClassW,
+            CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO, CURSOR_SHOWING, CW_USEDEFAULT, HTCLIENT,
+            IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST, MOUSE_MOVE_ABSOLUTE, MSG, PM_REMOVE,
+            RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RIDEV_REMOVE, RID_INPUT, SC_KEYMENU,
+            SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE,
+            SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+            WM_CHAR, WM_CLOSE, WM_ERASEBKGND, WM_INPUT, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
+            WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSELEAVE,
+            WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_MOVE, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP,
+            WM_SETCURSOR, WM_SIZE, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSW,
+            WS_CAPTION, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW, WS_EX_OVERLAPPEDWINDOW,
+            WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SIZEBOX, WS_SYSMENU,
+            WS_VISIBLE,
         },
     },
 };
 
 pub type sapp_event_type = u32;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
-pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 23;
-pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 22;
-pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 21;
-pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 20;
-pub const sapp_event_type_SAPP_EVENTTYPE_RESUMED: sapp_event_type = 19;
-pub const sapp_event_type_SAPP_EVENTTYPE_SUSPENDED: sapp_event_type = 18;
-pub const sapp_event_type_SAPP_EVENTTYPE_RESTORED: sapp_event_type = 17;
-pub const sapp_event_type_SAPP_EVENTTYPE_ICONIFIED: sapp_event_type = 16;
-pub const sapp_event_type_SAPP_EVENTTYPE_RESIZED: sapp_event_type = 15;
-pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED: sapp_event_type = 14;
-pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED: sapp_event_type = 13;
-pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED: sapp_event_type = 12;
-pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN: sapp_event_type = 11;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_LEAVE: sapp_event_type = 10;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_ENTER: sapp_event_type = 9;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE: sapp_event_type = 8;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_SCROLL: sapp_event_type = 7;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP: sapp_event_type = 6;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN: sapp_event_type = 5;
-pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_DELTA: sapp_event_type = 4;
+pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 22;
+pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
+pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
+pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
+pub const sapp_event_type_SAPP_EVENTTYPE_RESUMED: sapp_event_type = 18;
+pub const sapp_event_type_SAPP_EVENTTYPE_SUSPENDED: sapp_event_type = 17;
+pub const sapp_event_type_SAPP_EVENTTYPE_RESTORED: sapp_event_type = 16;
+pub const sapp_event_type_SAPP_EVENTTYPE_ICONIFIED: sapp_event_type = 15;
+pub const sapp_event_type_SAPP_EVENTTYPE_RESIZED: sapp_event_type = 14;
+pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED: sapp_event_type = 13;
+pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED: sapp_event_type = 12;
+pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED: sapp_event_type = 11;
+pub const sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN: sapp_event_type = 10;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_LEAVE: sapp_event_type = 9;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_ENTER: sapp_event_type = 8;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE: sapp_event_type = 7;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_SCROLL: sapp_event_type = 6;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP: sapp_event_type = 5;
+pub const sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN: sapp_event_type = 4;
 pub const sapp_event_type_SAPP_EVENTTYPE_CHAR: sapp_event_type = 3;
 pub const sapp_event_type_SAPP_EVENTTYPE_KEY_UP: sapp_event_type = 2;
 pub const sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN: sapp_event_type = 1;
@@ -470,26 +469,34 @@ pub unsafe fn sapp_mouse_shown() -> bool {
 }
 
 pub unsafe fn sapp_set_cursor_grab(grab: bool) {
+    if grab == _sapp.cursor_grabbed {
+        return;
+    }
+
     _sapp.cursor_grabbed = grab;
 
-    if _sapp.cursor_grabbed {
-        SetCursor(NULL as _);
-        let mut rid: RAWINPUTDEVICE = RAWINPUTDEVICE {
-            usUsagePage: 0x01,
-            usUsage: 0x02,
-            dwFlags: 0,
-            hwndTarget: _sapp_win32_hwnd,
-        };
+    let mut rid: RAWINPUTDEVICE = RAWINPUTDEVICE {
+        usUsagePage: 0x01,
+        usUsage: 0x02,
+        dwFlags: if grab { 0 } else { RIDEV_REMOVE },
+        hwndTarget: if grab { _sapp_win32_hwnd } else { NULL as _ },
+    };
 
-        if RegisterRawInputDevices(
-            &mut rid as *mut _ as _,
-            1,
-            std::mem::size_of::<RAWINPUTDEVICE>() as _,
-        ) != 1
-        {
+    if RegisterRawInputDevices(
+        &mut rid as *mut _ as _,
+        1,
+        std::mem::size_of::<RAWINPUTDEVICE>() as _,
+    ) != 1
+    {
+        if grab {
             panic!("failed to register raw input device");
+        } else {
+            panic!("failed to remove raw input device");
         }
-    } else {
+    }
+
+    if !grab {
+        ClipCursor(NULL as _);
     }
 }
 
@@ -759,12 +766,10 @@ unsafe extern "system" fn win32_wndproc(
                     panic!("grr absolute coords");
                 }
 
-                _sapp.mouse_x = data.data.mouse().lLastX as f32 * _sapp_win32_mouse_scale;
-                _sapp.mouse_y = data.data.mouse().lLastY as f32 * _sapp_win32_mouse_scale;
-                _sapp_win32_mouse_event(
-                    sapp_event_type_SAPP_EVENTTYPE_MOUSE_DELTA,
-                    sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
-                );
+                _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE);
+                _sapp.event.mouse_dx = data.data.mouse().lLastX as f32 * _sapp_win32_mouse_scale;
+                _sapp.event.mouse_dy = data.data.mouse().lLastY as f32 * _sapp_win32_mouse_scale;
+                _sapp_call_event(&_sapp.event);
 
                 update_clip_rect(hWnd);
             }
