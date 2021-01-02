@@ -13,6 +13,7 @@ use winapi::{
         ntdef::{HRESULT, LPCSTR, NULL},
         windef::{HDC, HGLRC, HMONITOR, HWND, POINT, RECT},
         windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
+		hidusage::{HID_USAGE_GENERIC_POINTER, HID_USAGE_GENERIC_MOUSE},
     },
     um::{
         errhandlingapi::GetLastError,
@@ -476,8 +477,8 @@ pub unsafe fn sapp_set_cursor_grab(grab: bool) {
     _sapp.cursor_grabbed = grab;
 
     let mut rid: RAWINPUTDEVICE = RAWINPUTDEVICE {
-        usUsagePage: 0x01,
-        usUsage: 0x02,
+        usUsagePage: HID_USAGE_GENERIC_POINTER,
+        usUsage: HID_USAGE_GENERIC_MOUSE,
         dwFlags: if grab { 0 } else { RIDEV_REMOVE },
         hwndTarget: if grab { _sapp_win32_hwnd } else { NULL as _ },
     };
