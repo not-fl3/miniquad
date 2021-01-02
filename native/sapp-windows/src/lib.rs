@@ -9,11 +9,11 @@ pub use rand::*;
 
 use winapi::{
     shared::{
+        hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_GENERIC_POINTER},
         minwindef::{DWORD, HINSTANCE, HIWORD, INT, LOWORD, LPARAM, LRESULT, PROC, UINT, WPARAM},
         ntdef::{HRESULT, LPCSTR, NULL},
         windef::{HDC, HGLRC, HMONITOR, HWND, POINT, RECT},
         windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
-		hidusage::{HID_USAGE_GENERIC_POINTER, HID_USAGE_GENERIC_MOUSE},
     },
     um::{
         errhandlingapi::GetLastError,
@@ -764,7 +764,7 @@ unsafe extern "system" fn win32_wndproc(
                 }
 
                 if data.data.mouse().usFlags & MOUSE_MOVE_ABSOLUTE == 1 {
-                    panic!("grr absolute coords");
+                    unimplemented!("Got MOUSE_MOVE_ABSOLUTE on WM_INPUT, related issue: https://github.com/not-fl3/miniquad/issues/165");
                 }
 
                 _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE);

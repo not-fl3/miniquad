@@ -1836,7 +1836,7 @@ impl ElapsedQuery {
 
         // begin_query was not called yet
         if self.gl_query == 0 {
-            return false
+            return false;
         }
 
         unsafe { glGetQueryObjectiv(self.gl_query, GL_QUERY_RESULT_AVAILABLE, &mut available) };
