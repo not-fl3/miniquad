@@ -29,18 +29,18 @@ use winapi::{
             AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
             GetClientRect, GetCursorInfo, GetDC, GetKeyState, GetSystemMetrics, LoadCursorW,
             LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage,
-            RegisterClassW, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage,
+            RegisterClassW, SetWindowPos, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage,
             UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO, CURSOR_SHOWING,
-            CW_USEDEFAULT, HTCLIENT, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST, MSG,
+            CW_USEDEFAULT, HTCLIENT, HWND_TOP, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST, MSG,
             PM_REMOVE, SC_KEYMENU, SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN,
-            SM_CYSCREEN, SW_HIDE, SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN,
+            SM_CYSCREEN, SWP_NOMOVE, SW_HIDE, SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN,
             VK_MENU, VK_RWIN, VK_SHIFT, WM_CHAR, WM_CLOSE, WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP,
             WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
             WM_MOUSELEAVE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP,
             WM_SETCURSOR, WM_SIZE, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSW,
             WS_CAPTION, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW, WS_EX_OVERLAPPEDWINDOW,
             WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SIZEBOX, WS_SYSMENU,
-            WS_VISIBLE,
+            WS_VISIBLE
         },
     },
 };
@@ -258,6 +258,7 @@ pub struct sapp_desc {
     pub fullscreen: bool,
     pub alpha: bool,
     pub window_title: *const i8,
+    pub window_resizable: bool,
     pub user_cursor: bool,
     pub html5_canvas_name: *const i8,
     pub html5_canvas_resize: bool,
@@ -403,6 +404,7 @@ static mut _sapp: _sapp_state = _sapp_state {
         fullscreen: false,
         alpha: false,
         window_title: 0 as *const i8,
+        window_resizable: false,
         user_cursor: false,
         html5_canvas_name: 0 as *const i8,
         html5_canvas_resize: false,
@@ -468,6 +470,18 @@ pub unsafe fn sapp_set_cursor_grab(mut _grab: bool) {}
 
 pub unsafe fn sapp_show_mouse(shown: bool) {
     ShowCursor(shown as _);
+}
+
+pub unsafe fn sapp_set_window_size(new_width: u32, new_height: u32) {
+    SetWindowPos(
+        _sapp_win32_hwnd,
+        HWND_TOP,
+        0,
+        0,
+        new_width as i32,
+        new_height as i32,
+        SWP_NOMOVE
+    );
 }
 
 unsafe fn _sapp_init_event(type_: sapp_event_type) {
@@ -1023,21 +1037,33 @@ unsafe fn create_window() {
         right: 0,
         bottom: 0,
     };
+
     if _sapp.desc.fullscreen {
         win_style = WS_POPUP | WS_SYSMENU | WS_VISIBLE;
         rect.right = GetSystemMetrics(SM_CXSCREEN);
         rect.bottom = GetSystemMetrics(SM_CYSCREEN);
     } else {
-        win_style = WS_CLIPSIBLINGS
+        win_style = if _sapp.desc.window_resizable {
+            WS_CLIPSIBLINGS
             | WS_CLIPCHILDREN
             | WS_CAPTION
             | WS_SYSMENU
             | WS_MINIMIZEBOX
             | WS_MAXIMIZEBOX
-            | WS_SIZEBOX;
+            | WS_SIZEBOX
+        } else {
+            WS_CLIPSIBLINGS
+            | WS_CLIPCHILDREN
+            | WS_CAPTION
+            | WS_SYSMENU
+            | WS_MINIMIZEBOX
+        };
+
+
         rect.right = (_sapp.window_width as f32 * _sapp_win32_window_scale) as _;
         rect.bottom = (_sapp.window_height as f32 * _sapp_win32_window_scale) as _;
     }
+
     AdjustWindowRectEx(&rect as *const _ as _, win_style, false as _, win_ex_style);
     let win_width = rect.right - rect.left;
     let win_height = rect.bottom - rect.top;
