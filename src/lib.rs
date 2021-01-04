@@ -337,6 +337,7 @@ where
     desc.fullscreen = conf.fullscreen as _;
     desc.high_dpi = conf.high_dpi as _;
     desc.window_title = title.as_ptr();
+    desc.window_resizable = conf.window_resizable as _;
     desc.user_data = &mut *user_data as *mut _ as *mut _;
     desc.init_userdata_cb = Some(init);
     desc.frame_userdata_cb = Some(frame);

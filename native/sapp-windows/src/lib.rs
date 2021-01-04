@@ -40,7 +40,7 @@ use winapi::{
             WM_SETCURSOR, WM_SIZE, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSW,
             WS_CAPTION, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW, WS_EX_OVERLAPPEDWINDOW,
             WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SIZEBOX, WS_SYSMENU,
-            WS_VISIBLE,
+            WS_VISIBLE
         },
     },
 };
@@ -258,6 +258,7 @@ pub struct sapp_desc {
     pub fullscreen: bool,
     pub alpha: bool,
     pub window_title: *const i8,
+    pub window_resizable: bool,
     pub user_cursor: bool,
     pub html5_canvas_name: *const i8,
     pub html5_canvas_resize: bool,
@@ -403,6 +404,7 @@ static mut _sapp: _sapp_state = _sapp_state {
         fullscreen: false,
         alpha: false,
         window_title: 0 as *const i8,
+        window_resizable: false,
         user_cursor: false,
         html5_canvas_name: 0 as *const i8,
         html5_canvas_resize: false,
@@ -1035,21 +1037,33 @@ unsafe fn create_window() {
         right: 0,
         bottom: 0,
     };
+
     if _sapp.desc.fullscreen {
         win_style = WS_POPUP | WS_SYSMENU | WS_VISIBLE;
         rect.right = GetSystemMetrics(SM_CXSCREEN);
         rect.bottom = GetSystemMetrics(SM_CYSCREEN);
     } else {
-        win_style = WS_CLIPSIBLINGS
+        win_style = if _sapp.desc.window_resizable {
+            WS_CLIPSIBLINGS
             | WS_CLIPCHILDREN
             | WS_CAPTION
             | WS_SYSMENU
             | WS_MINIMIZEBOX
             | WS_MAXIMIZEBOX
-            | WS_SIZEBOX;
+            | WS_SIZEBOX
+        } else {
+            WS_CLIPSIBLINGS
+            | WS_CLIPCHILDREN
+            | WS_CAPTION
+            | WS_SYSMENU
+            | WS_MINIMIZEBOX
+        };
+
+
         rect.right = (_sapp.window_width as f32 * _sapp_win32_window_scale) as _;
         rect.bottom = (_sapp.window_height as f32 * _sapp_win32_window_scale) as _;
     }
+
     AdjustWindowRectEx(&rect as *const _ as _, win_style, false as _, win_ex_style);
     let win_width = rect.right - rect.left;
     let win_height = rect.bottom - rect.top;
