@@ -29,11 +29,11 @@ use winapi::{
             AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
             GetClientRect, GetCursorInfo, GetDC, GetKeyState, GetSystemMetrics, LoadCursorW,
             LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage,
-            RegisterClassW, SetWindowPos, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage,
+            RegisterClassW, SetWindowPos, SetWindowLongPtrA, GWL_STYLE, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage,
             UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO, CURSOR_SHOWING,
             CW_USEDEFAULT, HTCLIENT, HWND_TOP, IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST, MSG,
             PM_REMOVE, SC_KEYMENU, SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN,
-            SM_CYSCREEN, SWP_NOMOVE, SW_HIDE, SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN,
+            SM_CYSCREEN, SWP_NOMOVE, SWP_FRAMECHANGED, SW_HIDE, SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN,
             VK_MENU, VK_RWIN, VK_SHIFT, WM_CHAR, WM_CLOSE, WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP,
             WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
             WM_MOUSELEAVE, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP,
@@ -482,6 +482,56 @@ pub unsafe fn sapp_set_window_size(new_width: u32, new_height: u32) {
         new_height as i32,
         SWP_NOMOVE
     );
+}
+
+pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
+    _sapp.desc.fullscreen = fullscreen as _;
+    
+    let win_style: DWORD = if _sapp.desc.fullscreen {
+        WS_POPUP | WS_SYSMENU | WS_VISIBLE
+    } else {
+        if _sapp.desc.window_resizable {
+            WS_CLIPSIBLINGS
+            | WS_CLIPCHILDREN
+            | WS_CAPTION
+            | WS_SYSMENU
+            | WS_MINIMIZEBOX
+            | WS_MAXIMIZEBOX
+            | WS_SIZEBOX
+        } else {
+            WS_CLIPSIBLINGS
+            | WS_CLIPCHILDREN
+            | WS_CAPTION
+            | WS_SYSMENU
+            | WS_MINIMIZEBOX
+        }
+    };
+
+    SetWindowLongPtrA(_sapp_win32_hwnd, GWL_STYLE, win_style as _);
+
+    if _sapp.desc.fullscreen {
+        SetWindowPos(
+            _sapp_win32_hwnd,
+            HWND_TOP,
+            0,
+            0,
+            GetSystemMetrics(SM_CXSCREEN),
+            GetSystemMetrics(SM_CYSCREEN),
+            SWP_FRAMECHANGED
+        );
+    } else {
+        SetWindowPos(
+            _sapp_win32_hwnd,
+            HWND_TOP,
+            0,
+            0,
+            _sapp.desc.width,
+            _sapp.desc.height,
+            SWP_FRAMECHANGED
+        );
+    }
+
+    ShowWindow(_sapp_win32_hwnd, SW_SHOW);
 }
 
 unsafe fn _sapp_init_event(type_: sapp_event_type) {
@@ -1058,7 +1108,6 @@ unsafe fn create_window() {
             | WS_SYSMENU
             | WS_MINIMIZEBOX
         };
-
 
         rect.right = (_sapp.window_width as f32 * _sapp_win32_window_scale) as _;
         rect.bottom = (_sapp.window_height as f32 * _sapp_win32_window_scale) as _;

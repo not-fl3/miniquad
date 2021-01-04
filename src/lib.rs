@@ -132,6 +132,13 @@ impl Context {
             sapp::sapp_set_window_size(new_width, new_height);
         }
     }
+
+    pub fn set_fullscreen(&self, fullscreen: bool) {
+        #[cfg(windows)]
+        unsafe {
+            sapp::sapp_set_fullscreen(fullscreen);
+        }
+    }
 }
 
 pub enum UserData {
