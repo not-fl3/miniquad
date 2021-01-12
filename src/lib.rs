@@ -127,14 +127,24 @@ impl Context {
     }
 
     pub fn set_window_size(&self, new_width: u32, new_height: u32) {
-        #[cfg(windows)]
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "android",
+        )))]
         unsafe {
             sapp::sapp_set_window_size(new_width, new_height);
         }
     }
 
     pub fn set_fullscreen(&self, fullscreen: bool) {
-        #[cfg(windows)]
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "android",
+        )))]
         unsafe {
             sapp::sapp_set_fullscreen(fullscreen);
         }

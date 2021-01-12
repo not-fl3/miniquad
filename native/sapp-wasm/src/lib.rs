@@ -268,6 +268,7 @@ pub struct sapp_desc {
     pub swap_interval: ::std::os::raw::c_int,
     pub high_dpi: bool,
     pub fullscreen: bool,
+    pub window_resizable: bool,
     pub alpha: bool,
     pub window_title: *const ::std::os::raw::c_char,
     pub user_cursor: bool,
@@ -327,7 +328,11 @@ extern "C" {
     /// Notice that this function will works only from "engaging" event callbacks - from
     /// "mouse_down"/"key_down" event handler functions.
     pub fn sapp_set_cursor_grab(grab: bool);
+
+    pub fn sapp_set_fullscreen(fullscreen: bool);
+    pub fn sapp_set_window_size(new_width: u32, new_height: u32);
 }
+
 
 /// Do nothing on wasm - cursor will be hidden by "sapp_set_cursor_grab" anyway.
 pub unsafe fn sapp_show_mouse(_shown: bool) {}
