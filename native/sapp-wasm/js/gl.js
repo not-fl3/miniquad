@@ -1170,6 +1170,23 @@ var importObject = {
             } else {
                 document.exitPointerLock();
             }
+        },
+        sapp_is_fullscreen: function() {
+            let fullscreenElement = document.fullscreenElement;
+
+            return fullscreenElement != null && fullscreenElement.id == canvas.id;
+        },
+        sapp_set_fullscreen: function(fullscreen) {
+            if (!fullscreen) {
+                document.exitFullscreen();
+            } else {
+                canvas.requestFullscreen();
+            }
+        },
+        sapp_set_window_size: function(new_width, new_height) {
+            canvas.width = new_width;
+            canvas.height = new_height;
+            resize(canvas, wasm_exports.resize);
         }
     }
 };

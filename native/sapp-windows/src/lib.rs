@@ -473,15 +473,28 @@ pub unsafe fn sapp_show_mouse(shown: bool) {
 }
 
 pub unsafe fn sapp_set_window_size(new_width: u32, new_height: u32) {
+    let mut x = 0;
+    let mut y = 0;
+
+    let mut rect: RECT = std::mem::zeroed();
+    if GetClientRect(_sapp_win32_hwnd, &mut rect as *mut _ as _) != 0 {
+        x = rect.left;
+        y = rect.bottom;
+    }
+
     SetWindowPos(
         _sapp_win32_hwnd,
         HWND_TOP,
-        0,
-        0,
+        x,
+        y,
         new_width as i32,
         new_height as i32,
         SWP_NOMOVE
     );
+}
+
+pub unsafe fn sapp_is_fullscreen() -> bool {
+    _sapp.desc.fullscreen as _
 }
 
 pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
