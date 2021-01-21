@@ -97,8 +97,6 @@ pub enum TextureWrap {
     Mirror,
     /// Samples at coord x + 1 map to coord 1.
     Clamp,
-    /// Same as Mirror, but only for one repetition.
-    MirrorClamp,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
