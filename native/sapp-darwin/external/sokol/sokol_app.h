@@ -1398,6 +1398,7 @@ _SOKOL_PRIVATE void _sapp_macos_frame(void) {
         [_sapp_macos_window_obj center];
     }
     [_sapp_macos_window_obj makeKeyAndOrderFront:nil];
+    _sapp_macos_update_dimensions();
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)sender {
