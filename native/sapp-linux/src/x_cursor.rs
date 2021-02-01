@@ -17,7 +17,23 @@ type Drawable = XID;
 
 pub type Cursor = XID;
 
+// See https://tronche.com/gui/x/xlib/appendix/b/
+pub const XC_crosshair: libc::c_ushort = 34;
+pub const XC_fleur: libc::c_ushort = 52;
+pub const XC_hand2: libc::c_ushort = 60;
+pub const XC_left_ptr: libc::c_ushort = 68;
+pub const XC_pirate: libc::c_ushort = 88;
+pub const XC_question_arrow: libc::c_ushort = 92;
+pub const XC_sb_h_double_arrow: libc::c_ushort = 108;
+pub const XC_sb_v_double_arrow: libc::c_ushort = 116;
+pub const XC_top_left_corner: libc::c_ushort = 134;
+pub const XC_top_right_corner: libc::c_ushort = 136;
+pub const XC_watch: libc::c_ushort = 150;
+pub const XC_xterm: libc::c_ushort = 152;
+
 extern "C" {
+    fn XCreateFontCursor(_: *mut Display, _: libc::c_ushort) -> Cursor;
+
     fn XCreateBitmapFromData(
         _: *mut Display,
         _: Drawable,
@@ -71,6 +87,10 @@ pub unsafe fn create_empty_cursor() -> Cursor {
     XFreePixmap(_sapp_x11_display, cursor_pixmap);
 
     empty_cursor
+}
+
+pub unsafe fn load_cursor(shape: libc::c_ushort) -> Cursor {
+    XCreateFontCursor(_sapp_x11_display, shape)
 }
 
 pub unsafe fn set_cursor(cursor: Cursor) {

@@ -205,6 +205,19 @@ pub const SAPP_MODIFIER_CTRL: u32 = 1 << 1;
 pub const SAPP_MODIFIER_ALT: u32 = 1 << 2;
 pub const SAPP_MODIFIER_SUPER: u32 = 1 << 3;
 
+pub const SAPP_CURSOR_DEFAULT: u32 = 0;
+pub const SAPP_CURSOR_HELP: u32 = 1;
+pub const SAPP_CURSOR_POINTER: u32 = 2;
+pub const SAPP_CURSOR_WAIT: u32 = 3;
+pub const SAPP_CURSOR_CROSSHAIR: u32 = 4;
+pub const SAPP_CURSOR_TEXT: u32 = 5;
+pub const SAPP_CURSOR_MOVE: u32 = 6;
+pub const SAPP_CURSOR_NOTALLOWED: u32 = 7;
+pub const SAPP_CURSOR_EWRESIZE: u32 = 8;
+pub const SAPP_CURSOR_NSRESIZE: u32 = 9;
+pub const SAPP_CURSOR_NESWRESIZE: u32 = 10;
+pub const SAPP_CURSOR_NWSERESIZE: u32 = 11;
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sapp_event {
@@ -327,11 +340,32 @@ extern "C" {
     /// "mouse_down"/"key_down" event handler functions.
     pub fn sapp_set_cursor_grab(grab: bool);
 
+    pub fn sapp_set_cursor(cursor: *const u8, len: usize);
+
     pub fn sapp_is_elapsed_timer_supported() -> bool;
 }
 
 /// Do nothing on wasm - cursor will be hidden by "sapp_set_cursor_grab" anyway.
 pub unsafe fn sapp_show_mouse(_shown: bool) {}
+
+pub unsafe fn sapp_set_mouse_cursor(cursor: u32) {
+    let css_name = match cursor {
+        SAPP_CURSOR_DEFAULT => "default",
+        SAPP_CURSOR_HELP => "help",
+        SAPP_CURSOR_POINTER => "pointer",
+        SAPP_CURSOR_WAIT => "wait",
+        SAPP_CURSOR_CROSSHAIR => "crosshair",
+        SAPP_CURSOR_TEXT => "text",
+        SAPP_CURSOR_MOVE => "move",
+        SAPP_CURSOR_NOTALLOWED => "not-allowed",
+        SAPP_CURSOR_EWRESIZE => "ew-resize",
+        SAPP_CURSOR_NSRESIZE => "ns-resize",
+        SAPP_CURSOR_NESWRESIZE => "nesw-resize",
+        SAPP_CURSOR_NWSERESIZE => "nwse-resize",
+        _ => return,
+    };
+    sapp_set_cursor(css_name.as_ptr(), css_name.len());
+}
 
 pub unsafe fn sapp_high_dpi() -> bool {
     false
