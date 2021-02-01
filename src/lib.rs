@@ -128,6 +128,47 @@ impl Context {
             sapp::sapp_show_mouse(shown);
         }
     }
+
+    /// Set the mouse cursor icon.
+    pub fn set_mouse_cursor(&self, _cursor_icon: CursorIcon) {
+        #[cfg(any(
+            target_arch = "wasm32",
+            all(target_os = "linux", not(feature = "kms")),
+            windows,
+        ))]
+        unsafe {
+            sapp::sapp_set_mouse_cursor(match _cursor_icon {
+                CursorIcon::Default => sapp::SAPP_CURSOR_DEFAULT,
+                CursorIcon::Help => sapp::SAPP_CURSOR_HELP,
+                CursorIcon::Pointer => sapp::SAPP_CURSOR_POINTER,
+                CursorIcon::Wait => sapp::SAPP_CURSOR_WAIT,
+                CursorIcon::Crosshair => sapp::SAPP_CURSOR_CROSSHAIR,
+                CursorIcon::Text => sapp::SAPP_CURSOR_TEXT,
+                CursorIcon::Move => sapp::SAPP_CURSOR_MOVE,
+                CursorIcon::NotAllowed => sapp::SAPP_CURSOR_NOTALLOWED,
+                CursorIcon::EWResize => sapp::SAPP_CURSOR_EWRESIZE,
+                CursorIcon::NSResize => sapp::SAPP_CURSOR_NSRESIZE,
+                CursorIcon::NESWResize => sapp::SAPP_CURSOR_NESWRESIZE,
+                CursorIcon::NWSEResize => sapp::SAPP_CURSOR_NWSERESIZE,
+            });
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
+pub enum CursorIcon {
+    Default,
+    Help,
+    Pointer,
+    Wait,
+    Crosshair,
+    Text,
+    Move,
+    NotAllowed,
+    EWResize,
+    NSResize,
+    NESWResize,
+    NWSEResize,
 }
 
 pub enum UserData {

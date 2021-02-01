@@ -12,7 +12,7 @@ use winapi::{
         hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_GENERIC_POINTER},
         minwindef::{DWORD, HINSTANCE, HIWORD, INT, LOWORD, LPARAM, LRESULT, PROC, UINT, WPARAM},
         ntdef::{HRESULT, LPCSTR, NULL},
-        windef::{HDC, HGLRC, HMONITOR, HWND, POINT, RECT},
+        windef::{HCURSOR, HDC, HGLRC, HMONITOR, HWND, POINT, RECT},
         windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
     },
     um::{
@@ -44,6 +44,8 @@ use winapi::{
             WS_CAPTION, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW, WS_EX_OVERLAPPEDWINDOW,
             WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SIZEBOX, WS_SYSMENU,
             WS_VISIBLE,
+            SetCursor, IDC_CROSS, IDC_HAND, IDC_HELP, IDC_IBEAM, IDC_NO, IDC_SIZEALL, IDC_SIZENESW,
+            IDC_SIZENS, IDC_SIZENWSE, IDC_SIZEWE, IDC_WAIT,
         },
     },
 };
@@ -216,6 +218,19 @@ pub const SAPP_MODIFIER_CTRL: u32 = 1 << 1;
 pub const SAPP_MODIFIER_ALT: u32 = 1 << 2;
 pub const SAPP_MODIFIER_SUPER: u32 = 1 << 3;
 
+pub const SAPP_CURSOR_DEFAULT: u32 = 0;
+pub const SAPP_CURSOR_HELP: u32 = 1;
+pub const SAPP_CURSOR_POINTER: u32 = 2;
+pub const SAPP_CURSOR_WAIT: u32 = 3;
+pub const SAPP_CURSOR_CROSSHAIR: u32 = 4;
+pub const SAPP_CURSOR_TEXT: u32 = 5;
+pub const SAPP_CURSOR_MOVE: u32 = 6;
+pub const SAPP_CURSOR_NOTALLOWED: u32 = 7;
+pub const SAPP_CURSOR_EWRESIZE: u32 = 8;
+pub const SAPP_CURSOR_NSRESIZE: u32 = 9;
+pub const SAPP_CURSOR_NESWRESIZE: u32 = 10;
+pub const SAPP_CURSOR_NWSERESIZE: u32 = 11;
+
 #[derive(Copy, Clone, Default)]
 pub struct sapp_event {
     pub frame_count: u64,
@@ -311,6 +326,7 @@ static mut _sapp_opengl32: HINSTANCE = std::ptr::null_mut();
 static mut _sapp_gl_ctx: HGLRC = std::ptr::null_mut();
 static mut _sapp_win32_msg_hwnd: HWND = std::ptr::null_mut();
 static mut _sapp_win32_msg_dc: HDC = std::ptr::null_mut();
+static mut _sapp_cursor: HCURSOR = std::ptr::null_mut();
 static mut _sapp_ext_swap_control: bool = false;
 static mut _sapp_arb_multisample: bool = false;
 static mut _sapp_arb_pixel_format: bool = false;
@@ -505,6 +521,28 @@ pub unsafe fn sapp_show_mouse(shown: bool) {
     ShowCursor(shown as _);
 }
 
+pub unsafe fn sapp_set_mouse_cursor(cursor_icon: u32) {
+    let cursor_name = match cursor_icon {
+        SAPP_CURSOR_DEFAULT => IDC_ARROW,
+        SAPP_CURSOR_HELP => IDC_HELP,
+        SAPP_CURSOR_POINTER => IDC_HAND,
+        SAPP_CURSOR_WAIT => IDC_WAIT,
+        SAPP_CURSOR_CROSSHAIR => IDC_CROSS,
+        SAPP_CURSOR_TEXT => IDC_IBEAM,
+        SAPP_CURSOR_MOVE => IDC_SIZEALL,
+        SAPP_CURSOR_NOTALLOWED => IDC_NO,
+        SAPP_CURSOR_EWRESIZE => IDC_SIZEWE,
+        SAPP_CURSOR_NSRESIZE => IDC_SIZENS,
+        SAPP_CURSOR_NESWRESIZE => IDC_SIZENESW,
+        SAPP_CURSOR_NWSERESIZE => IDC_SIZENWSE,
+        _ => return,
+    };
+    _sapp_cursor = LoadCursorW(NULL as _, cursor_name);
+    SetCursor(_sapp_cursor);
+
+    _sapp.desc.user_cursor = cursor_icon != SAPP_CURSOR_DEFAULT;
+}
+
 unsafe fn _sapp_init_event(type_: sapp_event_type) {
     _sapp.event = std::mem::zeroed();
     _sapp.event.type_ = type_;
@@ -691,6 +729,7 @@ unsafe extern "system" fn win32_wndproc(
             WM_SETCURSOR => {
                 if _sapp.desc.user_cursor {
                     if LOWORD(lParam as _) == HTCLIENT as _ {
+                        SetCursor(_sapp_cursor);
                         _sapp_win32_app_event(sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR);
                         return 1;
                     }

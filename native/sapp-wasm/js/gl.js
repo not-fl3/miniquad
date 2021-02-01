@@ -1228,6 +1228,9 @@ var importObject = {
             } else {
                 document.exitPointerLock();
             }
+        },
+        sapp_set_cursor: function(ptr, len) {
+            canvas.style.cursor = UTF8ToString(ptr, len);
         }
     }
 };

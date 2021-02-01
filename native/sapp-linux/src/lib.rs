@@ -194,6 +194,20 @@ pub const SAPP_MODIFIER_CTRL: libc::c_uint = 1 << 1;
 pub const SAPP_MODIFIER_ALT: libc::c_uint = 1 << 2;
 pub const SAPP_MODIFIER_SUPER: libc::c_uint = 1 << 3;
 
+pub const SAPP_CURSOR_DEFAULT: u32 = 0;
+pub const SAPP_CURSOR_HELP: u32 = 1;
+pub const SAPP_CURSOR_POINTER: u32 = 2;
+pub const SAPP_CURSOR_WAIT: u32 = 3;
+pub const SAPP_CURSOR_CROSSHAIR: u32 = 4;
+pub const SAPP_CURSOR_TEXT: u32 = 5;
+pub const SAPP_CURSOR_MOVE: u32 = 6;
+pub const SAPP_CURSOR_NOTALLOWED: u32 = 7;
+pub const SAPP_CURSOR_EWRESIZE: u32 = 8;
+pub const SAPP_CURSOR_NSRESIZE: u32 = 9;
+pub const SAPP_CURSOR_NESWRESIZE: u32 = 10;
+pub const SAPP_CURSOR_NWSERESIZE: u32 = 11;
+pub const SAPP_CURSOR_NUM: usize = 12; // number of cursors
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct sapp_event {
@@ -285,6 +299,7 @@ pub struct _sapp_state {
 static mut _sapp_xi_extension_opcode: i32 = -1;
 
 static mut _sapp_empty_cursor: x_cursor::Cursor = 0;
+static mut _sapp_cursor_cache: [x_cursor::Cursor; SAPP_CURSOR_NUM] = [0; SAPP_CURSOR_NUM];
 
 pub type GLXContext = *mut __GLXcontext;
 pub type PFNGLXDESTROYCONTEXTPROC =
@@ -2829,6 +2844,33 @@ pub unsafe extern "C" fn sapp_set_cursor_grab(mut grab: bool) {
     }
 
     XFlush(_sapp_x11_display);
+}
+
+pub unsafe extern "C" fn sapp_set_mouse_cursor(cursor_icon: u32) {
+    let mut cursor = _sapp_cursor_cache[cursor_icon as usize];
+
+    if cursor == 0 {
+        cursor = x_cursor::load_cursor(
+            match cursor_icon {
+                SAPP_CURSOR_DEFAULT => x_cursor::XC_left_ptr,
+                SAPP_CURSOR_HELP => x_cursor::XC_question_arrow,
+                SAPP_CURSOR_POINTER => x_cursor::XC_hand2,
+                SAPP_CURSOR_WAIT => x_cursor::XC_watch,
+                SAPP_CURSOR_CROSSHAIR => x_cursor::XC_crosshair,
+                SAPP_CURSOR_TEXT => x_cursor::XC_xterm,
+                SAPP_CURSOR_MOVE => x_cursor::XC_fleur,
+                SAPP_CURSOR_NOTALLOWED => x_cursor::XC_pirate,
+                SAPP_CURSOR_EWRESIZE => x_cursor::XC_sb_h_double_arrow,
+                SAPP_CURSOR_NSRESIZE => x_cursor::XC_sb_v_double_arrow,
+                SAPP_CURSOR_NESWRESIZE => x_cursor::XC_top_right_corner,
+                SAPP_CURSOR_NWSERESIZE => x_cursor::XC_top_left_corner,
+                _ => return,
+            }
+        );
+        _sapp_cursor_cache[cursor_icon as usize] = cursor;
+    }
+
+    x_cursor::set_cursor(cursor);
 }
 
 #[no_mangle]
