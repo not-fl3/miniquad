@@ -39,6 +39,8 @@ impl SappContext {
 }
 
 static mut SAPP_CONTEXT: Option<SappContext> = None;
+static mut sapp_cursor_icon: u32 = SAPP_CURSOR_DEFAULT;
+static mut sapp_cursor_shown: bool = true;
 
 unsafe fn sapp_context() -> &'static mut SappContext {
     SAPP_CONTEXT.as_mut().unwrap()
@@ -345,24 +347,41 @@ extern "C" {
     pub fn sapp_is_elapsed_timer_supported() -> bool;
 }
 
-/// Do nothing on wasm - cursor will be hidden by "sapp_set_cursor_grab" anyway.
-pub unsafe fn sapp_show_mouse(_shown: bool) {}
+pub unsafe fn sapp_show_mouse(shown: bool) {
+    if shown != sapp_cursor_shown {
+        sapp_cursor_shown = shown;
+        update_cursor();
+    }
+}
 
-pub unsafe fn sapp_set_mouse_cursor(cursor: u32) {
-    let css_name = match cursor {
-        SAPP_CURSOR_DEFAULT => "default",
-        SAPP_CURSOR_HELP => "help",
-        SAPP_CURSOR_POINTER => "pointer",
-        SAPP_CURSOR_WAIT => "wait",
-        SAPP_CURSOR_CROSSHAIR => "crosshair",
-        SAPP_CURSOR_TEXT => "text",
-        SAPP_CURSOR_MOVE => "move",
-        SAPP_CURSOR_NOTALLOWED => "not-allowed",
-        SAPP_CURSOR_EWRESIZE => "ew-resize",
-        SAPP_CURSOR_NSRESIZE => "ns-resize",
-        SAPP_CURSOR_NESWRESIZE => "nesw-resize",
-        SAPP_CURSOR_NWSERESIZE => "nwse-resize",
-        _ => return,
+pub unsafe fn sapp_set_mouse_cursor(cursor_icon: u32) {
+    if cursor_icon != sapp_cursor_icon {
+        sapp_cursor_icon = cursor_icon;
+        if sapp_cursor_shown {
+            update_cursor();
+        }
+    }
+}
+
+pub unsafe fn update_cursor() {
+    let css_name = if !sapp_cursor_shown {
+        "none"
+    } else {
+        match sapp_cursor_icon {
+            SAPP_CURSOR_DEFAULT => "default",
+            SAPP_CURSOR_HELP => "help",
+            SAPP_CURSOR_POINTER => "pointer",
+            SAPP_CURSOR_WAIT => "wait",
+            SAPP_CURSOR_CROSSHAIR => "crosshair",
+            SAPP_CURSOR_TEXT => "text",
+            SAPP_CURSOR_MOVE => "move",
+            SAPP_CURSOR_NOTALLOWED => "not-allowed",
+            SAPP_CURSOR_EWRESIZE => "ew-resize",
+            SAPP_CURSOR_NSRESIZE => "ns-resize",
+            SAPP_CURSOR_NESWRESIZE => "nesw-resize",
+            SAPP_CURSOR_NWSERESIZE => "nwse-resize",
+            _ => return,
+        }
     };
     sapp_set_cursor(css_name.as_ptr(), css_name.len());
 }
