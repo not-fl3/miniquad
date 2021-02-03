@@ -300,6 +300,8 @@ static mut _sapp_xi_extension_opcode: i32 = -1;
 
 static mut _sapp_empty_cursor: x_cursor::Cursor = 0;
 static mut _sapp_cursor_cache: [x_cursor::Cursor; SAPP_CURSOR_NUM] = [0; SAPP_CURSOR_NUM];
+static mut _sapp_cursor_icon: u32 = SAPP_CURSOR_DEFAULT;
+static mut _sapp_cursor_shown: bool = true;
 
 pub type GLXContext = *mut __GLXcontext;
 pub type PFNGLXDESTROYCONTEXTPROC =
@@ -2847,11 +2849,20 @@ pub unsafe extern "C" fn sapp_set_cursor_grab(mut grab: bool) {
 }
 
 pub unsafe extern "C" fn sapp_set_mouse_cursor(cursor_icon: u32) {
-    let mut cursor = _sapp_cursor_cache[cursor_icon as usize];
+    _sapp_cursor_icon = cursor_icon;
+    update_cursor();
+}
 
-    if cursor == 0 {
-        cursor = x_cursor::load_cursor(
-            match cursor_icon {
+unsafe fn update_cursor() {
+    let mut cursor;
+
+    if !_sapp_cursor_shown {
+        cursor = _sapp_empty_cursor
+    } else {
+        cursor = _sapp_cursor_cache[_sapp_cursor_icon as usize];
+
+        if cursor == 0 {
+            cursor = x_cursor::load_cursor(match _sapp_cursor_icon {
                 SAPP_CURSOR_DEFAULT => x_cursor::XC_left_ptr,
                 SAPP_CURSOR_HELP => x_cursor::XC_question_arrow,
                 SAPP_CURSOR_POINTER => x_cursor::XC_hand2,
@@ -2865,9 +2876,9 @@ pub unsafe extern "C" fn sapp_set_mouse_cursor(cursor_icon: u32) {
                 SAPP_CURSOR_NESWRESIZE => x_cursor::XC_top_right_corner,
                 SAPP_CURSOR_NWSERESIZE => x_cursor::XC_top_left_corner,
                 _ => return,
-            }
-        );
-        _sapp_cursor_cache[cursor_icon as usize] = cursor;
+            });
+            _sapp_cursor_cache[_sapp_cursor_icon as usize] = cursor;
+        }
     }
 
     x_cursor::set_cursor(cursor);
@@ -2875,11 +2886,8 @@ pub unsafe extern "C" fn sapp_set_mouse_cursor(cursor_icon: u32) {
 
 #[no_mangle]
 pub unsafe extern "C" fn sapp_show_mouse(mut shown: bool) {
-    if shown {
-        x_cursor::set_cursor(0);
-    } else {
-        x_cursor::set_cursor(_sapp_empty_cursor);
-    }
+    _sapp_cursor_shown = shown;
+    update_cursor();
 }
 #[no_mangle]
 pub unsafe extern "C" fn sapp_keyboard_shown() -> bool {
