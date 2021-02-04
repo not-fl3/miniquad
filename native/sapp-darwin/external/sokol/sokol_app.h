@@ -911,6 +911,7 @@ typedef enum sapp_event_type {
     SAPP_EVENTTYPE_QUIT_REQUESTED,
     SAPP_EVENTTYPE_CLIPBOARD_PASTED,
     SAPP_EVENTTYPE_FILES_DROPPED,
+    SAPP_EVENTTYPE_RAW_DEVICE,
     _SAPP_EVENTTYPE_NUM,
     _SAPP_EVENTTYPE_FORCE_U32 = 0x7FFFFFFF
 } sapp_event_type;
@@ -1180,7 +1181,7 @@ SOKOL_APP_API_DECL void sapp_show_mouse(bool show);
 /* show or hide the mouse cursor */
 SOKOL_APP_API_DECL bool sapp_mouse_shown();
 /* enable/disable mouse-pointer-lock mode */
-SOKOL_APP_API_DECL void sapp_lock_mouse(bool lock);
+SOKOL_APP_API_DECL void sapp_set_cursor_grab(bool lock);
 /* return true if in mouse-pointer-lock mode (this may toggle a few frames later) */
 SOKOL_APP_API_DECL bool sapp_mouse_locked(void);
 /* return the userdata pointer optionally provided in sapp_desc */
@@ -10258,7 +10259,7 @@ SOKOL_API_IMPL bool sapp_mouse_shown(void) {
     return _sapp.mouse.shown;
 }
 
-SOKOL_API_IMPL void sapp_lock_mouse(bool lock) {
+SOKOL_API_IMPL void sapp_set_cursor_grab(bool lock) {
     #if defined(_SAPP_MACOS)
     _sapp_macos_lock_mouse(lock);
     #elif defined(_SAPP_EMSCRIPTEN)
