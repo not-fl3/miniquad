@@ -639,6 +639,10 @@ var importObject = {
             gl.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type,
                 pixels ? getArray(pixels, Uint8Array, texture_size(format, width, height)) : null);
         },
+        glReadPixels: function(x, y, width, height, format, type, pixels) {
+            var pixelData = getArray(pixels, Uint8Array, texture_size(format, width, height));
+            gl.readPixels(x, y, width, height, format, type, pixelData);
+        },
         glTexParameteri: function (target, pname, param) {
             gl.texParameteri(target, pname, param);
         },
