@@ -244,6 +244,8 @@ pub const GL_DRAW_FRAMEBUFFER_BINDING: u32 = 36006;
 pub const GL_TIME_ELAPSED: u32 = 35007;
 pub const GL_QUERY_RESULT: u32 = 34918;
 pub const GL_QUERY_RESULT_AVAILABLE: u32 = 34919;
+pub const GL_VENDOR: u32 = 0x1F00;
+pub const GL_VERSION: u32 = 0x1F02;
 
 pub const WGL_NUMBER_PIXEL_FORMATS_ARB: u32 = 0x2000;
 pub const WGL_SUPPORT_OPENGL_ARB: u32 = 0x2010;
@@ -331,6 +333,7 @@ macro_rules! gl_loader {
 
 gl_loader!(
     fn glGetStringi(name: GLenum, index: GLuint) -> *const GLubyte,
+    fn glGetString(name: GLenum) -> *const GLubyte,
     fn glFramebufferTextureLayer(
         target: GLenum,
         attachment: GLenum,
