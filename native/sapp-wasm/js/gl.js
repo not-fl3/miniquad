@@ -11,7 +11,9 @@
 const version = "0.1.20";
 
 const canvas = document.querySelector("#glcanvas");
-const gl = canvas.getContext("webgl");
+
+const gl = tryCreateWebGl2Context() || tryCreateWebGl1Context();
+
 if (gl === null) {
     alert("Unable to initialize WebGL. Your browser or machine may not support it.");
 }
@@ -29,9 +31,36 @@ document.exitPointerLock = document.exitPointerLock ||
     document.mozExitPointerLock;
 
 function assert(flag, message) {
-    if (flag == false) {
+    if (flag === false) {
         alert(message)
     }
+}
+
+function tryCreateWebGl1Context() {
+    console.info("trying to create webgl 1 context")
+    let gl = canvas.getContext("webgl");
+    if( gl === null ) return null;
+    acquireVertexArrayObjectExtension(gl);
+    acquireInstancedArraysExtension(gl);
+    acquireDisjointTimerQueryExtension(gl);
+    // https://developer.mozilla.org/en-US/docs/Web/API/WEBGL_depth_texture
+    if (gl.getExtension('WEBGL_depth_texture') === null) {
+        alert("Cant initialize WEBGL_depth_texture extension");
+    }
+    if (gl.getExtension("OES_standard_derivatives") === null ) {
+        console.warn("OES_standard_derivatives is not available");
+    }
+    console.info("created webgl 1 context")
+    return gl;
+}
+
+function tryCreateWebGl2Context() {
+    console.info("trying to create webgl 2 context")
+    let gl = canvas.getContext("webgl2");
+    if( gl === null ) return null;
+    gl['getQueryObject'] = gl['getQueryParameter']
+    console.info("created webgl 2 context")
+    return gl;
 }
 
 function acquireVertexArrayObjectExtension(ctx) {
@@ -70,14 +99,6 @@ function acquireDisjointTimerQueryExtension(ctx) {
     }
 }
 
-acquireVertexArrayObjectExtension(gl);
-acquireInstancedArraysExtension(gl);
-acquireDisjointTimerQueryExtension(gl);
-
-// https://developer.mozilla.org/en-US/docs/Web/API/WEBGL_depth_texture
-if (gl.getExtension('WEBGL_depth_texture') == null) {
-    alert("Cant initialize WEBGL_depth_texture extension");
-}
 
 function getArray(ptr, arr, n) {
     return new arr(wasm_memory.buffer, ptr, n);
@@ -103,13 +124,13 @@ function UTF8ToString(ptr, maxBytesToRead) {
 
         if (!(u0 & 0x80)) { str += String.fromCharCode(u0); continue; }
         var u1 = u8Array[idx++] & 63;
-        if ((u0 & 0xE0) == 0xC0) { str += String.fromCharCode(((u0 & 31) << 6) | u1); continue; }
+        if ((u0 & 0xE0) === 0xC0) { str += String.fromCharCode(((u0 & 31) << 6) | u1); continue; }
         var u2 = u8Array[idx++] & 63;
-        if ((u0 & 0xF0) == 0xE0) {
+        if ((u0 & 0xF0) === 0xE0) {
             u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
         } else {
 
-            if ((u0 & 0xF8) != 0xF0) console.warn('Invalid UTF-8 leading byte 0x' + u0.toString(16) + ' encountered when deserializing a UTF-8 string on the asm.js/wasm heap to a JS string!');
+            if ((u0 & 0xF8) !== 0xF0) console.warn('Invalid UTF-8 leading byte 0x' + u0.toString(16) + ' encountered when deserializing a UTF-8 string on the asm.js/wasm heap to a JS string!');
 
             u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (u8Array[idx++] & 63);
         }
@@ -191,7 +212,7 @@ var GL = {
     },
 
     validateGLObjectID: function (objectHandleArray, objectID, callerFunctionName, objectReadableType) {
-        if (objectID != 0) {
+        if (objectID !== 0) {
             if (objectHandleArray[objectID] === null) {
                 console.error(callerFunctionName + ' called with an already deleted ' + objectReadableType + ' ID ' + objectID + '!');
             } else if (!objectHandleArray[objectID]) {
@@ -202,7 +223,7 @@ var GL = {
     getSource: function (shader, count, string, length) {
         var source = '';
         for (var i = 0; i < count; ++i) {
-            var len = length == 0 ? undefined : getArray(length + i * 4, Uint32Array, 1)[0];
+            var len = length === 0 ? undefined : getArray(length + i * 4, Uint32Array, 1)[0];
             source += UTF8ToString(getArray(string + i * 4, Uint32Array, 1)[0], len);
         }
         return source;
@@ -229,7 +250,7 @@ var GL = {
 
             // If we are dealing with an array, e.g. vec4 foo[3], strip off the array index part to canonicalize that "foo", "foo[]",
             // and "foo[0]" will mean the same. Loop below will populate foo[1] and foo[2].
-            if (name.slice(-1) == ']') {
+            if (name.slice(-1) === ']') {
                 name = name.slice(0, name.lastIndexOf('['));
             }
 
@@ -287,7 +308,7 @@ function _webglGet(name_, p, type) {
             ret = 1;
             break;
         case 0x8DF8: // GL_SHADER_BINARY_FORMATS
-            if (type != 'EM_FUNC_SIG_PARAM_I' && type != 'EM_FUNC_SIG_PARAM_I64') {
+            if (type !== 'EM_FUNC_SIG_PARAM_I' && type !== 'EM_FUNC_SIG_PARAM_I64') {
                 GL.recordError(0x500); // GL_INVALID_ENUM
 
                 err('GL_INVALID_ENUM in glGet' + type + 'v(GL_SHADER_BINARY_FORMATS): Invalid parameter type!');
@@ -390,11 +411,11 @@ function resize(canvas, on_resize) {
     var displayWidth = canvas.clientWidth;
     var displayHeight = canvas.clientHeight;
 
-    if (canvas.width != displayWidth ||
-        canvas.height != displayHeight) {
+    if (canvas.width !== displayWidth ||
+        canvas.height !== displayHeight) {
         canvas.width = displayWidth;
         canvas.height = displayHeight;
-        if (on_resize != undefined)
+        if (on_resize !== undefined)
             on_resize(Math.floor(displayWidth), Math.floor(displayHeight))
     }
 }
@@ -545,12 +566,12 @@ function into_sapp_keycode(key_code) {
 }
 
 function texture_size(internalFormat, width, height) {
-    if (internalFormat == gl.ALPHA) {
+    if (internalFormat === gl.ALPHA) {
         return width * height;
     }
-    else if (internalFormat == gl.RGB) {
+    else if (internalFormat === gl.RGB) {
         return width * height * 3;
-    } else if (internalFormat == gl.RGBA) {
+    } else if (internalFormat === gl.RGBA) {
         return width * height * 4;
     } else { // TextureFormat::RGB565 | TextureFormat::RGBA4 | TextureFormat::RGBA5551
         return width * height * 3;
@@ -648,49 +669,49 @@ var importObject = {
         },
         glUniform1fv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform1fv', 'location');
-            assert((value & 3) == 0, 'Pointer to float data passed to glUniform1fv must be aligned to four bytes!');
+            assert((value & 3) === 0, 'Pointer to float data passed to glUniform1fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 1 * count);
             gl.uniform1fv(GL.uniforms[location], view);
         },
         glUniform2fv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform2fv', 'location');
-            assert((value & 3) == 0, 'Pointer to float data passed to glUniform2fv must be aligned to four bytes!');
+            assert((value & 3) === 0, 'Pointer to float data passed to glUniform2fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 2 * count);
             gl.uniform2fv(GL.uniforms[location], view);
         },
         glUniform3fv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform3fv', 'location');
-            assert((value & 3) == 0, 'Pointer to float data passed to glUniform3fv must be aligned to four bytes!');
+            assert((value & 3) === 0, 'Pointer to float data passed to glUniform3fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 3 * count);
             gl.uniform3fv(GL.uniforms[location], view);
         },
         glUniform4fv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform4fv', 'location');
-            assert((value & 3) == 0, 'Pointer to float data passed to glUniform4fv must be aligned to four bytes!');
+            assert((value & 3) === 0, 'Pointer to float data passed to glUniform4fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 4 * count);
             gl.uniform4fv(GL.uniforms[location], view);
         },
         glUniform1iv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform1fv', 'location');
-            assert((value & 3) == 0, 'Pointer to i32 data passed to glUniform1iv must be aligned to four bytes!');
+            assert((value & 3) === 0, 'Pointer to i32 data passed to glUniform1iv must be aligned to four bytes!');
             var view = getArray(value, Int32Array, 1 * count);
             gl.uniform1iv(GL.uniforms[location], view);
         },
         glUniform2iv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform2fv', 'location');
-            assert((value & 3) == 0, 'Pointer to i32 data passed to glUniform2iv must be aligned to four bytes!');
+            assert((value & 3) === 0, 'Pointer to i32 data passed to glUniform2iv must be aligned to four bytes!');
             var view = getArray(value, Int32Array, 2 * count);
             gl.uniform2iv(GL.uniforms[location], view);
         },
         glUniform3iv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform3fv', 'location');
-            assert((value & 3) == 0, 'Pointer to i32 data passed to glUniform3iv must be aligned to four bytes!');
+            assert((value & 3) === 0, 'Pointer to i32 data passed to glUniform3iv must be aligned to four bytes!');
             var view = getArray(value, Int32Array, 3 * count);
             gl.uniform3iv(GL.uniforms[location], view);
         },
         glUniform4iv: function (location, count, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform4fv', 'location');
-            assert((value & 3) == 0, 'Pointer to i32 data passed to glUniform4iv must be aligned to four bytes!');
+            assert((value & 3) === 0, 'Pointer to i32 data passed to glUniform4iv must be aligned to four bytes!');
             var view = getArray(value, Int32Array, 4 * count);
             gl.uniform4iv(GL.uniforms[location], view);
         },
@@ -734,9 +755,9 @@ var importObject = {
             name = UTF8ToString(name);
             var arrayIndex = 0;
             // If user passed an array accessor "[index]", parse the array index off the accessor.
-            if (name[name.length - 1] == ']') {
+            if (name[name.length - 1] === ']') {
                 var leftBrace = name.lastIndexOf('[');
-                arrayIndex = name[leftBrace + 1] != ']' ? parseInt(name.slice(leftBrace + 1)) : 0; // "index]", parseInt will ignore the ']' at the end; but treat "foo[]" as "foo[0]"
+                arrayIndex = name[leftBrace + 1] !== ']' ? parseInt(name.slice(leftBrace + 1)) : 0; // "index]", parseInt will ignore the ']' at the end; but treat "foo[]" as "foo[0]"
                 name = name.slice(0, leftBrace);
             }
 
@@ -749,7 +770,7 @@ var importObject = {
         },
         glUniformMatrix4fv: function (location, count, transpose, value) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniformMatrix4fv', 'location');
-            assert((value & 3) == 0, 'Pointer to float data passed to glUniformMatrix4fv must be aligned to four bytes!');
+            assert((value & 3) === 0, 'Pointer to float data passed to glUniformMatrix4fv must be aligned to four bytes!');
             var view = getArray(value, Float32Array, 16);
             gl.uniformMatrix4fv(GL.uniforms[location], !!transpose, view);
         },
@@ -842,18 +863,18 @@ var importObject = {
                 console.error('GL_INVALID_OPERATION in glGetProgramiv(program=' + program + ', pname=' + pname + ', p=0x' + p.toString(16) + '): The specified GL object name does not refer to a program object!');
                 return;
             }
-            if (pname == 0x8B84) { // GL_INFO_LOG_LENGTH
+            if (pname === 0x8B84) { // GL_INFO_LOG_LENGTH
                 var log = gl.getProgramInfoLog(GL.programs[program]);
                 assert(log !== null);
 
                 getArray(p, Int32Array, 1)[0] = log.length + 1;
-            } else if (pname == 0x8B87 /* GL_ACTIVE_UNIFORM_MAX_LENGTH */) {
+            } else if (pname === 0x8B87 /* GL_ACTIVE_UNIFORM_MAX_LENGTH */) {
                 console.error("unsupported operation");
                 return;
-            } else if (pname == 0x8B8A /* GL_ACTIVE_ATTRIBUTE_MAX_LENGTH */) {
+            } else if (pname === 0x8B8A /* GL_ACTIVE_ATTRIBUTE_MAX_LENGTH */) {
                 console.error("unsupported operation");
                 return;
-            } else if (pname == 0x8A35 /* GL_ACTIVE_UNIFORM_BLOCK_MAX_NAME_LENGTH */) {
+            } else if (pname === 0x8A35 /* GL_ACTIVE_UNIFORM_BLOCK_MAX_NAME_LENGTH */) {
                 console.error("unsupported operation");
                 return;
             } else {
@@ -893,11 +914,11 @@ var importObject = {
                 source = source.replace(/#extension GL_OES_standard_derivatives : enable/g, "");
                 source = source.replace(/#extension GL_EXT_shader_texture_lod : enable/g, '');
                 var prelude = '';
-                if (source.indexOf('gl_FragColor') != -1) {
+                if (source.indexOf('gl_FragColor') !== -1) {
                     prelude += 'out mediump vec4 GL_FragColor;\n';
                     source = source.replace(/gl_FragColor/g, 'GL_FragColor');
                 }
-                if (source.indexOf('attribute') != -1) {
+                if (source.indexOf('attribute') !== -1) {
                     source = source.replace(/attribute/g, 'in');
                     source = source.replace(/varying/g, 'out');
                 } else {
@@ -936,15 +957,15 @@ var importObject = {
         glGetShaderiv: function (shader, pname, p) {
             assert(p);
             GL.validateGLObjectID(GL.shaders, shader, 'glGetShaderiv', 'shader');
-            if (pname == 0x8B84) { // GL_INFO_LOG_LENGTH
+            if (pname === 0x8B84) { // GL_INFO_LOG_LENGTH
                 var log = gl.getShaderInfoLog(GL.shaders[shader]);
                 assert(log !== null);
 
                 getArray(p, Int32Array, 1)[0] = log.length + 1;
 
-            } else if (pname == 0x8B88) { // GL_SHADER_SOURCE_LENGTH
+            } else if (pname === 0x8B88) { // GL_SHADER_SOURCE_LENGTH
                 var source = gl.getShaderSource(GL.shaders[shader]);
-                var sourceLength = (source === null || source.length == 0) ? 0 : source.length + 1;
+                var sourceLength = (source === null || source.length === 0) ? 0 : source.length + 1;
                 getArray(p, Int32Array, 1)[0] = sourceLength;
             } else {
                 getArray(p, Int32Array, 1)[0] = gl.getShaderParameter(GL.shaders[shader], pname);
@@ -1007,40 +1028,40 @@ var importObject = {
                 GL.textures[id] = null;
             }
         },
-		glGenQueries: function (n, ids) {
-			_glGenObject(n, ids, 'createQuery', GL.timerQueries, 'glGenQueries');
-		},
-		glDeleteQueries: function (n, ids) {
+        glGenQueries: function (n, ids) {
+            _glGenObject(n, ids, 'createQuery', GL.timerQueries, 'glGenQueries');
+        },
+        glDeleteQueries: function (n, ids) {
             for (var i = 0; i < n; i++) {
                 var id = getArray(textures + i * 4, Uint32Array, 1)[0];
                 var query = GL.timerQueries[id];
                 if (!query) {
-					continue;
-				}
+                    continue;
+                }
                 gl.deleteQuery(query);
                 query.name = 0;
                 GL.timerQueries[id] = null;
             }
-		},
-		glBeginQuery: function (target, id) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glBeginQuery', 'id');
-			gl.beginQuery(target, GL.timerQueries[id]);
-		},
-		glEndQuery: function (target) {
-			gl.endQuery(target);
-		},
-		glGetQueryObjectiv: function (id, pname, ptr) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectiv', 'id');
-			let result = gl.getQueryObject(GL.timerQueries[id], pname);
-			getArray(ptr, Uint32Array, 1)[0] = result;
-		},
-		glGetQueryObjectui64v: function (id, pname, ptr) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectui64v', 'id');
-			let result = gl.getQueryObject(GL.timerQueries[id], pname);
-			let heap = getArray(ptr, Uint32Array, 2);
-			heap[0] = result;
-			heap[1] = (result - heap[0])/4294967296;
-		},
+        },
+        glBeginQuery: function (target, id) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glBeginQuery', 'id');
+            gl.beginQuery(target, GL.timerQueries[id]);
+        },
+        glEndQuery: function (target) {
+            gl.endQuery(target);
+        },
+        glGetQueryObjectiv: function (id, pname, ptr) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectiv', 'id');
+            let result = gl.getQueryObject(GL.timerQueries[id], pname);
+            getArray(ptr, Uint32Array, 1)[0] = result;
+        },
+        glGetQueryObjectui64v: function (id, pname, ptr) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectui64v', 'id');
+            let result = gl.getQueryObject(GL.timerQueries[id], pname);
+            let heap = getArray(ptr, Uint32Array, 2);
+            heap[0] = result;
+            heap[1] = (result - heap[0])/4294967296;
+        },
         init_opengl: function (ptr) {
             canvas.onmousemove = function (event) {
                 var relative_position = mouse_relative_position(event.clientX, event.clientY);
@@ -1051,7 +1072,7 @@ var importObject = {
                 wasm_exports.mouse_move(Math.floor(x), Math.floor(y));
 
                 // TODO: check that mouse is captured?
-                if (event.movementX != 0 || event.movementY != 0) {
+                if (event.movementX !== 0 || event.movementY !== 0) {
                     wasm_exports.raw_mouse_move(Math.floor(event.movementX), Math.floor(event.movementY));
                 }
             };
@@ -1103,7 +1124,7 @@ var importObject = {
                 wasm_exports.key_down(sapp_key_code, modifiers, event.repeat);
                 // for "space" preventDefault will prevent
                 // key_press event, so send it here instead
-                if (sapp_key_code == 32) {
+                if (sapp_key_code === 32) {
                     wasm_exports.key_press(sapp_key_code);
                 }
             };
@@ -1116,8 +1137,8 @@ var importObject = {
 
                 // firefox do not send onkeypress events for ctrl+keys and delete key while chrome do
                 // workaround to make this behavior consistent
-                let chrome_only = sapp_key_code == 261 || event.ctrlKey;
-                if (chrome_only == false) {
+                let chrome_only = sapp_key_code === 261 || event.ctrlKey;
+                if (chrome_only === false) {
                     wasm_exports.key_press(event.charCode);
                 }
             };
@@ -1170,10 +1191,10 @@ var importObject = {
             window.addEventListener("paste", function(e) {
                 e.stopPropagation();
                 e.preventDefault();
-                clipboardData = e.clipboardData || window.clipboardData;
-                pastedData = clipboardData.getData('Text');
+                const clipboardData = e.clipboardData || window.clipboardData;
+                const pastedData = clipboardData.getData('Text');
 
-                if (pastedData != undefined && pastedData != null && pastedData.length != 0) {
+                if (pastedData !== undefined && pastedData != null && pastedData.length !== 0) {
                     var len = pastedData.length;
                     var msg = wasm_exports.allocate_vec_u8(len);
                     var heap = new Uint8Array(wasm_memory.buffer, msg, len);
@@ -1193,7 +1214,7 @@ var importObject = {
             xhr.open('GET', url, true);
             xhr.responseType = 'arraybuffer';
             xhr.onload = function (e) {
-                if (this.status == 200) {
+                if (this.status === 200) {
                     var uInt8Array = new Uint8Array(this.response);
 
                     FS.loaded_files[file_id] = uInt8Array;
@@ -1232,20 +1253,17 @@ var importObject = {
             } else {
                 document.exitPointerLock();
             }
-        },
-        sapp_set_cursor: function(ptr, len) {
-            canvas.style.cursor = UTF8ToString(ptr, len);
         }
     }
 };
 
 
 function register_plugins(plugins) {
-    if (plugins == undefined)
+    if (plugins === undefined)
         return;
 
     for (var i = 0; i < plugins.length; i++) {
-        if (plugins[i].register_plugin != undefined && plugins[i].register_plugin != null) {
+        if (plugins[i].register_plugin !== undefined && plugins[i].register_plugin != null) {
             plugins[i].register_plugin(importObject);
         }
     }
@@ -1260,32 +1278,32 @@ function u32_to_semver(crate_version) {
 }
 
 function init_plugins(plugins) {
-    if (plugins == undefined)
+    if (plugins === undefined)
         return;
 
     for (var i = 0; i < plugins.length; i++) {
-        if (plugins[i].on_init != undefined && plugins[i].on_init != null) {
+        if (plugins[i].on_init !== undefined && plugins[i].on_init != null) {
             plugins[i].on_init();
         }
-        if (plugins[i].name == undefined || plugins[i].name == null ||
-            plugins[i].version == undefined || plugins[i].version == null) {
+        if (plugins[i].name === undefined || plugins[i].name == null ||
+            plugins[i].version === undefined || plugins[i].version == null) {
             console.warn("Some of the registred plugins do not have name or version");
             console.warn("Probably old version of the plugin used");
         } else {
             var version_func = plugins[i].name + "_crate_version";
 
-            if (wasm_exports[version_func] == undefined) {
+            if (wasm_exports[version_func] === undefined) {
                 console.error("Plugin " + plugins[i].name + " miss version function: " + version_func + ". Probably invalid crate version.");
             } else {
                 var crate_version = u32_to_semver(wasm_exports[version_func]());
 
-                if (plugins[i].version != crate_version) {
+                if (plugins[i].version !== crate_version) {
                     console.error("Plugin " + plugins[i].name + " version mismatch" +
-                                  "js version: " + plugins[i].version + ", crate version: " + crate_version)
+                        "js version: " + plugins[i].version + ", crate version: " + crate_version)
                 }
             }
         }
-     }
+    }
 }
 
 
@@ -1300,7 +1318,7 @@ function add_missing_functions_stabs(obj) {
     var imports = WebAssembly.Module.imports(obj);
 
     for (const i in imports) {
-        if (importObject["env"][imports[i].name] == undefined) {
+        if (importObject["env"][imports[i].name] === undefined) {
             console.warn("No " + imports[i].name + " function in gl.js");
             importObject["env"][imports[i].name] = function() {
                 console.warn("Missed function: " + imports[i].name);
@@ -1326,10 +1344,10 @@ function load(wasm_path) {
                     wasm_exports = obj.exports;
 
                     var crate_version = u32_to_semver(wasm_exports.crate_version());
-                    if (version != crate_version) {
+                    if (version !== crate_version) {
                         console.error(
                             "Version mismatch: gl.js version is: " + version +
-                                ", rust sapp-wasm crate version is: " + crate_version);
+                            ", rust sapp-wasm crate version is: " + crate_version);
                     }
                     init_plugins(plugins);
                     obj.exports.main();
@@ -1351,10 +1369,10 @@ function load(wasm_path) {
                 wasm_exports = obj.exports;
 
                 var crate_version = u32_to_semver(wasm_exports.crate_version());
-                if (version != crate_version) {
+                if (version !== crate_version) {
                     console.error(
                         "Version mismatch: gl.js version is: " + version +
-                            ", rust sapp-wasm crate version is: " + crate_version);
+                        ", rust sapp-wasm crate version is: " + crate_version);
                 }
                 init_plugins(plugins);
                 obj.exports.main();
