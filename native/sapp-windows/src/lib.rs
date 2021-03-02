@@ -503,21 +503,17 @@ pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
     let win_style: DWORD = if _sapp.desc.fullscreen {
         WS_POPUP | WS_SYSMENU | WS_VISIBLE
     } else {
+        let mut win_style: DWORD = WS_CLIPSIBLINGS
+            | WS_CLIPCHILDREN
+            | WS_CAPTION
+            | WS_SYSMENU
+            | WS_MINIMIZEBOX;
+
         if _sapp.desc.window_resizable {
-            WS_CLIPSIBLINGS
-            | WS_CLIPCHILDREN
-            | WS_CAPTION
-            | WS_SYSMENU
-            | WS_MINIMIZEBOX
-            | WS_MAXIMIZEBOX
-            | WS_SIZEBOX
-        } else {
-            WS_CLIPSIBLINGS
-            | WS_CLIPCHILDREN
-            | WS_CAPTION
-            | WS_SYSMENU
-            | WS_MINIMIZEBOX
+            win_style |= WS_MAXIMIZEBOX | WS_SIZEBOX;
         }
+
+        win_style
     };
 
     SetWindowLongPtrA(_sapp_win32_hwnd, GWL_STYLE, win_style as _);

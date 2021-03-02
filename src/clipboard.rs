@@ -48,9 +48,7 @@ mod windows {
     }
 
     pub fn set(_ctx: &mut Context, data: &str) {
-        unsafe {
-            sapp_windows::clipboard::set_clipboard_text(data)
-        };
+        unsafe { sapp_windows::clipboard::set_clipboard_text(data) };
     }
 }
 
@@ -67,12 +65,12 @@ mod dummy {
 
 #[cfg(not(any(target_os = "linux", target_os = "windows", target_arch = "wasm32")))]
 use dummy as clipboard;
+#[cfg(target_os = "linux")]
+use linux as clipboard;
 #[cfg(target_arch = "wasm32")]
 use wasm as clipboard;
 #[cfg(target_os = "windows")]
 use windows as clipboard;
-#[cfg(target_os = "linux")]
-use linux as clipboard;
 
 /// Get current OS clipboard value
 pub fn get(ctx: &mut Context) -> Option<String> {

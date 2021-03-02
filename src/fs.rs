@@ -2,7 +2,7 @@
 pub enum Error {
     IOError(std::io::Error),
     DownloadFailed,
-    AndroidAssetLoadingError
+    AndroidAssetLoadingError,
 }
 
 impl std::fmt::Display for Error {
