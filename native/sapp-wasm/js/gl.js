@@ -389,12 +389,7 @@ var Module;
 var wasm_exports;
 
 function resize(canvas, on_resize) {
-    var dpr;
-    if (high_dpi) {
-        dpr = window.devicePixelRatio || 1;
-    } else {
-        dpr = 1;
-    }
+    var dpr = dpi_scale();
     var displayWidth = canvas.clientWidth * dpr;
     var displayHeight = canvas.clientHeight * dpr;
 
@@ -552,6 +547,14 @@ function into_sapp_keycode(key_code) {
     console.log("Unsupported keyboard key: ", key_code)
 }
 
+function dpi_scale()  {
+    if (high_dpi) {
+        return window.devicePixelRatio || 1.0;
+    } else {
+        return 1.0;
+    }
+}
+
 function texture_size(internalFormat, width, height) {
     if (internalFormat == gl.ALPHA) {
         return width * height;
@@ -568,8 +571,8 @@ function texture_size(internalFormat, width, height) {
 function mouse_relative_position(clientX, clientY) {
     var targetRect = canvas.getBoundingClientRect();
 
-    var x = clientX - targetRect.left;
-    var y = clientY - targetRect.top;
+    var x = (clientX - targetRect.left) * dpi_scale();
+    var y = (clientY - targetRect.top) * dpi_scale();
 
     return { x, y };
 }
@@ -599,9 +602,7 @@ var importObject = {
         sapp_set_clipboard: function(ptr, len) {
             clipboard = UTF8ToString(ptr, len);
         },
-        dpi_scale: function() {
-            return window.devicePixelRatio || 1;
-        },
+        dpi_scale,
         rand: function () {
             return Math.floor(Math.random() * 2147483647);
         },
