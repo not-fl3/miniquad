@@ -8,7 +8,7 @@
 
 "use strict";
 
-const version = "0.1.20";
+const version = "0.1.22";
 
 const canvas = document.querySelector("#glcanvas");
 const gl = canvas.getContext("webgl");
@@ -20,6 +20,8 @@ var clipboard = null;
 
 var plugins = [];
 var wasm_memory;
+
+var high_dpi = false;
 
 canvas.focus();
 
@@ -387,8 +389,14 @@ var Module;
 var wasm_exports;
 
 function resize(canvas, on_resize) {
-    var displayWidth = canvas.clientWidth;
-    var displayHeight = canvas.clientHeight;
+    var dpr;
+    if (high_dpi) {
+        dpr = window.devicePixelRatio || 1;
+    } else {
+        dpr = 1;
+    }
+    var displayWidth = canvas.clientWidth * dpr;
+    var displayHeight = canvas.clientHeight * dpr;
 
     if (canvas.width != displayWidth ||
         canvas.height != displayHeight) {
@@ -591,6 +599,9 @@ var importObject = {
         sapp_set_clipboard: function(ptr, len) {
             clipboard = UTF8ToString(ptr, len);
         },
+        dpi_scale: function() {
+            return window.devicePixelRatio || 1;
+        },
         rand: function () {
             return Math.floor(Math.random() * 2147483647);
         },
@@ -598,10 +609,10 @@ var importObject = {
             return Date.now() / 1000.0;
         },
         canvas_width: function () {
-            return Math.floor(canvas.clientWidth);
+            return Math.floor(canvas.width);
         },
         canvas_height: function () {
-            return Math.floor(canvas.clientHeight);
+            return Math.floor(canvas.height);
         },
         glClearDepthf: function (depth) {
             gl.clearDepth(depth);
@@ -1041,7 +1052,11 @@ var importObject = {
 			heap[0] = result;
 			heap[1] = (result - heap[0])/4294967296;
 		},
-        init_opengl: function (ptr) {
+        setup_canvas_size: function(high_dpi) {
+            window.high_dpi = high_dpi;
+            resize(canvas);
+        },
+        run_animation_loop: function (ptr) {
             canvas.onmousemove = function (event) {
                 var relative_position = mouse_relative_position(event.clientX, event.clientY);
                 var x = relative_position.x;
@@ -1365,5 +1380,3 @@ function load(wasm_path) {
             });
     }
 }
-
-resize(canvas);

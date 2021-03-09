@@ -308,9 +308,14 @@ pub unsafe fn sapp_run(desc: *const sapp_desc) -> ::std::os::raw::c_int {
         }));
     }
 
-    init_opengl();
+    // setup initial canvas size
+    setup_canvas_size((*desc).high_dpi);
 
+    // run user intialisation code
     SappContext::init(*desc);
+
+    // start requestAnimationFrame loop
+    run_animation_loop();
 
     0
 }
@@ -324,9 +329,11 @@ pub unsafe fn sapp_height() -> ::std::os::raw::c_int {
 }
 
 extern "C" {
-    pub fn init_opengl();
+    pub fn setup_canvas_size(high_dpi: bool);
+    pub fn run_animation_loop();
     pub fn canvas_width() -> i32;
     pub fn canvas_height() -> i32;
+    pub fn dpi_scale() -> f32;
     pub fn console_debug(msg: *const ::std::os::raw::c_char);
     pub fn console_log(msg: *const ::std::os::raw::c_char);
     pub fn console_info(msg: *const ::std::os::raw::c_char);
@@ -387,11 +394,11 @@ pub unsafe fn update_cursor() {
 }
 
 pub unsafe fn sapp_high_dpi() -> bool {
-    false
+    sapp_context().desc.high_dpi
 }
 
 pub unsafe fn sapp_dpi_scale() -> f32 {
-    1.
+    dpi_scale()
 }
 
 #[no_mangle]
