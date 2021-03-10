@@ -930,22 +930,30 @@ impl Context {
     }
 
     pub fn apply_uniforms<U>(&mut self, uniforms: &U) {
+        self.apply_uniforms_buffer(unsafe {
+            std::slice::from_raw_parts(std::mem::transmute(uniforms), std::mem::size_of::<U>())
+        })
+    }
+
+    pub fn apply_uniforms_buffer(&mut self, uniforms: &[u8]) {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let shader = &self.shaders[pip.shader.0];
 
         let mut offset = 0;
 
+        let size = uniforms.len();
+
         for (_, uniform) in shader.uniforms.iter().enumerate() {
             use UniformType::*;
 
             assert!(
-                offset <= std::mem::size_of::<U>() - uniform.uniform_type.size() / 4,
+                offset <= size - uniform.uniform_type.size() / 4,
                 "Uniforms struct does not match shader uniforms layout"
             );
 
             unsafe {
-                let data = (uniforms as *const _ as *const f32).offset(offset as isize);
-                let data_int = (uniforms as *const _ as *const i32).offset(offset as isize);
+                let data = (uniforms.as_ptr() as *const f32).offset(offset as isize);
+                let data_int = (uniforms.as_ptr() as *const i32).offset(offset as isize);
 
                 if let Some(gl_loc) = uniform.gl_loc {
                     match uniform.uniform_type {
