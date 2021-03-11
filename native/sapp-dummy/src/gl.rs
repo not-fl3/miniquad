@@ -1452,7 +1452,6 @@ pub const GL_TEXTURE_SWIZZLE_G: u32 = 36419;
 pub const GL_TEXTURE_SWIZZLE_B: u32 = 36420;
 pub const GL_TEXTURE_SWIZZLE_A: u32 = 36421;
 pub const GL_TEXTURE_SWIZZLE_RGBA: u32 = 36422;
-pub const GL_TIME_ELAPSED: u32 = 35007;
 pub const GL_TIMESTAMP: u32 = 36392;
 pub const GL_INT_2_10_10_10_REV: u32 = 36255;
 pub const GL_VERSION_4_0: u32 = 1;
