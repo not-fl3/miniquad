@@ -1,9 +1,6 @@
 #[cfg(target_os = "android")]
 extern crate sapp_android as sapp;
 
-// if on android we need to expose sapp_android
-// to the user so they can call the appropriate sapp init
-// functions
 #[cfg(target_os = "android")]
 pub use sapp_android;
 
