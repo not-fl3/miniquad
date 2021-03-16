@@ -1,5 +1,9 @@
 #[cfg(target_os = "android")]
 extern crate sapp_android as sapp;
+
+#[cfg(target_os = "android")]
+pub use sapp_android;
+
 #[cfg(target_os = "macos")]
 extern crate sapp_darwin as sapp;
 #[cfg(not(any(
