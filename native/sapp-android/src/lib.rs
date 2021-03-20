@@ -11,6 +11,8 @@ pub mod gl3;
 mod rand;
 mod sokol_app_android;
 
+use ndk_sys::ANativeActivity;
+
 pub use egl::*;
 pub use gl3::*;
 pub use rand::*;
@@ -28,4 +30,19 @@ pub use query_stab::*;
 
 pub unsafe fn sapp_is_elapsed_timer_supported() -> bool {
     return false;
+}
+
+/// glue code for android. this is called by
+/// android-ndk-rs because we specify an override
+/// in the glue code crate:
+/// ```
+/// #[cfg_attr(target_os = "android", ndk_glue::main(ndk_glue = "::miniquad::sapp_android"))]
+/// ```
+pub unsafe fn init(
+    activity: *mut ANativeActivity,
+    _saved_state: *mut u8,
+    _saved_state_size: usize,
+    main: fn(),
+) {
+
 }

@@ -13,3 +13,8 @@ homepage = "https://github.com/not-fl3/miniquad"
 
 [build-dependencies]
 cc = "1.0"
+
+[dependencies]
+ndk = { path = "../../../android-ndk-rs/ndk" }
+ndk-glue = { path = "../../../android-ndk-rs/ndk-glue" }
+ndk-sys = { path = "../../../android-ndk-rs/ndk-sys" }
