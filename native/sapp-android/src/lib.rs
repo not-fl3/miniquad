@@ -32,6 +32,10 @@ pub unsafe fn sapp_is_elapsed_timer_supported() -> bool {
     return false;
 }
 
+#[link(name = "EGL")]
+#[link(name = "GLESv3")]
+extern "C" {}
+
 fn noop() {
     panic!("Unexpected noop invocation. Something is wrong with the android initialization glue code");
 }
