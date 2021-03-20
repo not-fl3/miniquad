@@ -32,6 +32,12 @@ pub unsafe fn sapp_is_elapsed_timer_supported() -> bool {
     return false;
 }
 
+fn noop() {
+    panic!("Unexpected noop invocation. Something is wrong with the android initialization glue code");
+}
+
+static mut usermain: fn() = noop;
+
 /// glue code for android. this is called by
 /// android-ndk-rs because we specify an override
 /// in the glue code crate:
@@ -44,5 +50,12 @@ pub unsafe fn init(
     _saved_state_size: usize,
     main: fn(),
 ) {
+    usermain = main;
+    sokol_app_android::sapp_ANativeActivity_onCreate(
+        activity as _, _saved_state as _, _saved_state_size as _);
+}
 
+#[no_mangle]
+pub unsafe extern "C" fn sokol_main() {
+    let _ = usermain();
 }
