@@ -85,7 +85,7 @@ impl EventHandler for Stage {
     }
 }
 
-#[cfg_attr(target_os = "android", ndk_glue::main(ndk_glue = "::miniquad::sapp_android"))]
+#[miniquad::main]
 fn main() {
     miniquad::start(conf::Conf::default(), |mut ctx| {
         UserData::owning(Stage::new(&mut ctx), ctx)

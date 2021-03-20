@@ -36,6 +36,9 @@ pub mod graphics;
 #[cfg(feature = "log-impl")]
 pub mod log;
 
+#[cfg(feature = "minimain")]
+pub use miniquad_main::main;
+
 pub use event::*;
 
 pub use graphics::*;

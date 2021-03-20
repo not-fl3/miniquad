@@ -14,8 +14,9 @@ keywords = ["graphics", "3D", "opengl", "gamedev", "windowing"]
 categories = ["rendering::graphics-api"]
 
 [features]
-default = ["sapp-linux"]
+default = ["sapp-linux", "minimain"]
 kms = ["sapp-kms"]
+minimain = ["miniquad-main"]
 
 # Optional log-rs like macros implementation
 # disabled by default
@@ -37,14 +38,18 @@ sapp-ios = { path = "./native/sapp-ios", version = "=0.1.2" }
 
 [target.'cfg(target_os = "android")'.dependencies]
 sapp-android = { path = "./native/sapp-android", version = "0.1.5" }
-ndk = { path = "../android-ndk-rs/ndk" }
-ndk-glue = { path = "../android-ndk-rs/ndk-glue" }
+ndk = "0.3"
+ndk-glue = "0.3"
+
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 sapp-wasm = { path ="./native/sapp-wasm", version = "=0.1.22" }
 
 [target.'cfg(not(any(target_os="linux", target_os="macos", target_os="android", target_os="ios", target_arch="wasm32", windows)))'.dependencies]
 sapp-dummy = { path ="./native/sapp-dummy", version = "=0.1.5" }
+
+[dependencies]
+miniquad-main = { path = "./miniquad-main", optional = true }
 
 [dev-dependencies]
 glam = {version = "0.8", features = ["scalar-math"] }
