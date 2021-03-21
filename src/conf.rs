@@ -87,6 +87,9 @@ pub struct Conf {
     ///
     /// Default: 1
     pub sample_count: i32,
+
+    /// Determines if the application user can resize the window
+    pub window_resizable: bool,
 }
 
 impl Default for Conf {
@@ -100,6 +103,7 @@ impl Default for Conf {
             high_dpi: false,
             fullscreen: false,
             sample_count: 1,
+            window_resizable: true,
         }
     }
 }

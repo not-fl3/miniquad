@@ -30,7 +30,8 @@ use winapi::{
             AdjustWindowRectEx, ClientToScreen, ClipCursor, CreateWindowExW, DefWindowProcW,
             DestroyWindow, DispatchMessageW, GetClientRect, GetCursorInfo, GetDC, GetKeyState,
             GetRawInputData, GetSystemMetrics, LoadCursorW, LoadIconW, MonitorFromPoint,
-            PeekMessageW, PostMessageW, PostQuitMessage, RegisterClassW, RegisterRawInputDevices,
+            PeekMessageW, PostMessageW, PostQuitMessage, RegisterClassW, SetWindowPos, SetWindowLongPtrA, GWL_STYLE,
+            RegisterRawInputDevices, HWND_TOP, SWP_NOMOVE, SWP_FRAMECHANGED,
             SetRect, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage, UnregisterClassW,
             CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO, CURSOR_SHOWING, CW_USEDEFAULT, HTCLIENT,
             IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST, MOUSE_MOVE_ABSOLUTE, MSG, PM_REMOVE,
@@ -270,6 +271,7 @@ pub struct sapp_desc {
         Option<unsafe extern "C" fn(_: *const i8, _: *mut std::ffi::c_void) -> ()>,
     pub width: i32,
     pub height: i32,
+    pub window_resizable: bool,
     pub sample_count: i32,
     pub swap_interval: i32,
     pub high_dpi: bool,
@@ -418,6 +420,7 @@ static mut _sapp: _sapp_state = _sapp_state {
         fail_userdata_cb: None,
         width: 0,
         height: 0,
+        window_resizable: false,
         sample_count: 0,
         swap_interval: 0,
         high_dpi: false,
@@ -517,6 +520,7 @@ pub unsafe fn sapp_set_cursor_grab(grab: bool) {
     }
 }
 
+
 pub unsafe fn sapp_show_mouse(shown: bool) {
     ShowCursor(shown as _);
 }
@@ -541,6 +545,78 @@ pub unsafe fn sapp_set_mouse_cursor(cursor_icon: u32) {
     SetCursor(_sapp_cursor);
 
     _sapp.desc.user_cursor = cursor_icon != SAPP_CURSOR_DEFAULT;
+}
+
+
+pub unsafe fn sapp_set_window_size(new_width: u32, new_height: u32) {
+    let mut x = 0;
+    let mut y = 0;
+
+    let mut rect: RECT = std::mem::zeroed();
+    if GetClientRect(_sapp_win32_hwnd, &mut rect as *mut _ as _) != 0 {
+        x = rect.left;
+        y = rect.bottom;
+    }
+
+    SetWindowPos(
+        _sapp_win32_hwnd,
+        HWND_TOP,
+        x,
+        y,
+        new_width as i32,
+        new_height as i32,
+        SWP_NOMOVE
+    );
+}
+
+pub unsafe fn sapp_is_fullscreen() -> bool {
+    _sapp.desc.fullscreen as _
+}
+
+pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
+    _sapp.desc.fullscreen = fullscreen as _;
+
+    let win_style: DWORD = if _sapp.desc.fullscreen {
+        WS_POPUP | WS_SYSMENU | WS_VISIBLE
+    } else {
+        let mut win_style: DWORD = WS_CLIPSIBLINGS
+            | WS_CLIPCHILDREN
+            | WS_CAPTION
+            | WS_SYSMENU
+            | WS_MINIMIZEBOX;
+
+        if _sapp.desc.window_resizable {
+            win_style |= WS_MAXIMIZEBOX | WS_SIZEBOX;
+        }
+
+        win_style
+    };
+
+    SetWindowLongPtrA(_sapp_win32_hwnd, GWL_STYLE, win_style as _);
+
+    if _sapp.desc.fullscreen {
+        SetWindowPos(
+            _sapp_win32_hwnd,
+            HWND_TOP,
+            0,
+            0,
+            GetSystemMetrics(SM_CXSCREEN),
+            GetSystemMetrics(SM_CYSCREEN),
+            SWP_FRAMECHANGED
+        );
+    } else {
+        SetWindowPos(
+            _sapp_win32_hwnd,
+            HWND_TOP,
+            0,
+            0,
+            _sapp.desc.width,
+            _sapp.desc.height,
+            SWP_FRAMECHANGED
+        );
+    }
+
+    ShowWindow(_sapp_win32_hwnd, SW_SHOW);
 }
 
 unsafe fn _sapp_init_event(type_: sapp_event_type) {
@@ -1161,21 +1237,32 @@ unsafe fn create_window() {
         right: 0,
         bottom: 0,
     };
+
     if _sapp.desc.fullscreen {
         win_style = WS_POPUP | WS_SYSMENU | WS_VISIBLE;
         rect.right = GetSystemMetrics(SM_CXSCREEN);
         rect.bottom = GetSystemMetrics(SM_CYSCREEN);
     } else {
-        win_style = WS_CLIPSIBLINGS
+        win_style = if _sapp.desc.window_resizable {
+            WS_CLIPSIBLINGS
             | WS_CLIPCHILDREN
             | WS_CAPTION
             | WS_SYSMENU
             | WS_MINIMIZEBOX
             | WS_MAXIMIZEBOX
-            | WS_SIZEBOX;
+            | WS_SIZEBOX
+        } else {
+            WS_CLIPSIBLINGS
+            | WS_CLIPCHILDREN
+            | WS_CAPTION
+            | WS_SYSMENU
+            | WS_MINIMIZEBOX
+        };
+
         rect.right = (_sapp.window_width as f32 * _sapp_win32_window_scale) as _;
         rect.bottom = (_sapp.window_height as f32 * _sapp_win32_window_scale) as _;
     }
+
     AdjustWindowRectEx(&rect as *const _ as _, win_style, false as _, win_ex_style);
     let win_width = rect.right - rect.left;
     let win_height = rect.bottom - rect.top;
