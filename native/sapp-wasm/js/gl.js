@@ -1186,8 +1186,8 @@ var importObject = {
             window.addEventListener("paste", function(e) {
                 e.stopPropagation();
                 e.preventDefault();
-                clipboardData = e.clipboardData || window.clipboardData;
-                pastedData = clipboardData.getData('Text');
+                var clipboardData = e.clipboardData || window.clipboardData;
+                var pastedData = clipboardData.getData('Text');
 
                 if (pastedData != undefined && pastedData != null && pastedData.length != 0) {
                     var len = pastedData.length;
