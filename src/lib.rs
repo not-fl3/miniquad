@@ -157,6 +157,37 @@ impl Context {
             });
         }
     }
+
+    /// Set the application's window size.
+    pub fn set_window_size(&self, new_width: u32, new_height: u32) {
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "android",
+        )))]
+        unsafe {
+            if sapp::sapp_is_fullscreen() {
+                #[cfg(feature = "log-impl")]
+                warn!("Unable to set windowsize while fullscreen: https://github.com/not-fl3/miniquad/issues/179");
+                return;
+            }
+
+            sapp::sapp_set_window_size(new_width, new_height);
+        }
+    }
+
+    pub fn set_fullscreen(&self, fullscreen: bool) {
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "android",
+        )))]
+        unsafe {
+            sapp::sapp_set_fullscreen(fullscreen);
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
@@ -378,6 +409,7 @@ where
     desc.fullscreen = conf.fullscreen as _;
     desc.high_dpi = conf.high_dpi as _;
     desc.window_title = title.as_ptr();
+    desc.window_resizable = conf.window_resizable as _;
     desc.user_data = &mut *user_data as *mut _ as *mut _;
     desc.init_userdata_cb = Some(init);
     desc.frame_userdata_cb = Some(frame);

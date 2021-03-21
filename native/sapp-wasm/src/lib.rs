@@ -279,6 +279,7 @@ pub struct sapp_desc {
     >,
     pub width: ::std::os::raw::c_int,
     pub height: ::std::os::raw::c_int,
+    pub window_resizable: bool,
     pub sample_count: ::std::os::raw::c_int,
     pub swap_interval: ::std::os::raw::c_int,
     pub high_dpi: bool,
@@ -352,7 +353,12 @@ extern "C" {
     pub fn sapp_set_cursor(cursor: *const u8, len: usize);
 
     pub fn sapp_is_elapsed_timer_supported() -> bool;
+
+    pub fn sapp_set_fullscreen(fullscreen: bool);
+    pub fn sapp_is_fullscreen() -> bool;
+    pub fn sapp_set_window_size(new_width: u32, new_height: u32);
 }
+
 
 pub unsafe fn sapp_show_mouse(shown: bool) {
     if shown != sapp_cursor_shown {
