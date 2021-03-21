@@ -19,7 +19,7 @@ pub fn main(attr_input: TokenStream, item_input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item_input as ItemFn);
 
     let expanded = quote! {
-        #[cfg_attr(target_os = "android", ndk_glue::main(ndk_glue = "::miniquad::sapp_android"))]
+        #[cfg_attr(target_os = "android", ::miniquad::sapp_android::ndk_glue::main(ndk_glue = "::miniquad::sapp_android"))]
         #input
     };
 

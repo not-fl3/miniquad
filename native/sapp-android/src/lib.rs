@@ -12,6 +12,7 @@ mod rand;
 mod sokol_app_android;
 
 use ndk_sys::ANativeActivity;
+pub use ndk_glue;
 
 pub use egl::*;
 pub use gl3::*;
