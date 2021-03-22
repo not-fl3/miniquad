@@ -930,6 +930,13 @@ impl Context {
     }
 
     pub fn apply_uniforms<U>(&mut self, uniforms: &U) {
+        self.apply_uniforms_from_bytes(uniforms as *const _ as *const u8, std::mem::size_of::<U>())
+    }
+
+    #[doc(hidden)]
+    /// Apply uniforms data from array of bytes with very special layout.
+    /// Hidden because `apply_uniforms` is the recommended and safer way to work with uniforms.
+    pub fn apply_uniforms_from_bytes(&mut self, uniform_ptr: *const u8, size: usize) {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let shader = &self.shaders[pip.shader.0];
 
@@ -939,13 +946,13 @@ impl Context {
             use UniformType::*;
 
             assert!(
-                offset <= std::mem::size_of::<U>() - uniform.uniform_type.size() / 4,
+                offset <= size - uniform.uniform_type.size() / 4,
                 "Uniforms struct does not match shader uniforms layout"
             );
 
             unsafe {
-                let data = (uniforms as *const _ as *const f32).offset(offset as isize);
-                let data_int = (uniforms as *const _ as *const i32).offset(offset as isize);
+                let data = (uniform_ptr as *const f32).offset(offset as isize);
+                let data_int = (uniform_ptr as *const i32).offset(offset as isize);
 
                 if let Some(gl_loc) = uniform.gl_loc {
                     match uniform.uniform_type {
