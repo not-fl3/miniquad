@@ -2,6 +2,7 @@
 
 pub mod fs;
 pub mod gl;
+pub mod link;
 mod rand;
 
 pub use gl::*;

@@ -1242,6 +1242,16 @@ var importObject = {
             }
             delete FS.loaded_files[file_id];
         },
+
+        link_open: function (ptr, len, new_tab) {
+            var url = UTF8ToString(ptr, len);
+            if (new_tab == 0) {
+                window.open(url, "_self"); // https://stackoverflow.com/questions/8454510/open-url-in-same-window-and-in-same-tab
+            } else {
+                window.open(url);
+            }
+        },
+
         sapp_set_cursor_grab: function (grab) {
             if (grab) {
                 canvas.requestPointerLock();

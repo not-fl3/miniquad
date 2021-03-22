@@ -44,6 +44,9 @@ sapp-wasm = { path ="./native/sapp-wasm", version = "=0.1.22" }
 [target.'cfg(not(any(target_os="linux", target_os="macos", target_os="android", target_os="ios", target_arch="wasm32", windows)))'.dependencies]
 sapp-dummy = { path ="./native/sapp-dummy", version = "=0.1.5" }
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+webbrowser = "0.5.5"
+
 [dev-dependencies]
 glam = {version = "0.8", features = ["scalar-math"] }
 quad-rand = "0.1"

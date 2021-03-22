@@ -32,6 +32,7 @@ pub mod conf;
 mod event;
 pub mod fs;
 pub mod graphics;
+pub mod link;
 
 #[cfg(feature = "log-impl")]
 pub mod log;
