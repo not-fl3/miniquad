@@ -930,18 +930,17 @@ impl Context {
     }
 
     pub fn apply_uniforms<U>(&mut self, uniforms: &U) {
-        self.apply_uniforms_buffer(unsafe {
-            std::slice::from_raw_parts(std::mem::transmute(uniforms), std::mem::size_of::<U>())
-        })
+        self.apply_uniforms_from_bytes(uniforms as *const _ as *const u8, std::mem::size_of::<U>())
     }
 
-    pub fn apply_uniforms_buffer(&mut self, uniforms: &[u8]) {
+    #[doc(hidden)]
+    /// Apply uniforms data from array of bytes with very special layout.
+    /// Hidden because `apply_uniforms` is the recommended and safer way to work with uniforms.
+    pub fn apply_uniforms_from_bytes(&mut self, uniform_ptr: *const u8, size: usize) {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let shader = &self.shaders[pip.shader.0];
 
         let mut offset = 0;
-
-        let size = uniforms.len();
 
         for (_, uniform) in shader.uniforms.iter().enumerate() {
             use UniformType::*;
@@ -952,8 +951,8 @@ impl Context {
             );
 
             unsafe {
-                let data = (uniforms.as_ptr() as *const f32).offset(offset as isize);
-                let data_int = (uniforms.as_ptr() as *const i32).offset(offset as isize);
+                let data = (uniform_ptr as *const f32).offset(offset as isize);
+                let data_int = (uniform_ptr as *const i32).offset(offset as isize);
 
                 if let Some(gl_loc) = uniform.gl_loc {
                     match uniform.uniform_type {
