@@ -159,6 +159,7 @@ impl Context {
     }
 
     /// Set the application's window size.
+    #[allow(unused_variables)]
     pub fn set_window_size(&self, new_width: u32, new_height: u32) {
         #[cfg(not(any(
             target_os = "linux",
@@ -177,6 +178,7 @@ impl Context {
         }
     }
 
+    #[allow(unused_variables)]
     pub fn set_fullscreen(&self, fullscreen: bool) {
         #[cfg(not(any(
             target_os = "linux",
@@ -415,7 +417,8 @@ where
         target_os = "macos",
         target_os = "ios",
         target_os = "android",
-    )))] {
+    )))]
+    {
         desc.window_resizable = conf.window_resizable as _;
     }
 
