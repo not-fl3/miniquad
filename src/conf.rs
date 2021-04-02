@@ -53,18 +53,8 @@ pub enum Cache {
 }
 
 #[derive(Debug)]
-pub enum Loading {
-    /// No progressbar at all, no html special requirements
-    No,
-    /// Will look for some specific html elements and show default progress bar
-    Embedded,
-    //Custom(Box<dyn LoadingPage>),
-}
-
-#[derive(Debug)]
 pub struct Conf {
     pub cache: Cache,
-    pub loading: Loading,
     /// Title of the window, defaults to an empty string.
     pub window_title: String,
     /// The preferred width of the window, ignored on wasm/android.
@@ -96,7 +86,6 @@ impl Default for Conf {
     fn default() -> Conf {
         Conf {
             cache: Cache::No,
-            loading: Loading::No,
             window_title: "".to_owned(),
             window_width: 800,
             window_height: 600,
