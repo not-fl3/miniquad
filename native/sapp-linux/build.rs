@@ -1,7 +1,7 @@
 use std::env;
 
 fn main() {
-    let target = env::var("TARGET").unwrap_or_else(|e| panic!(e));
+    let target = env::var("TARGET").unwrap_or_else(|e| panic!("{}", e));
 
     if target.contains("linux") == false {
         panic!("sapp_linux support only linux target");

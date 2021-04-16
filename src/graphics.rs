@@ -9,7 +9,7 @@ use std::{error::Error, fmt::Display};
 pub use texture::{FilterMode, Texture, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 
 fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
-    let cname = CString::new(name).unwrap_or_else(|e| panic!(e));
+    let cname = CString::new(name).unwrap_or_else(|e| panic!("{}", e));
     let location = unsafe { glGetUniformLocation(program, cname.as_ptr()) };
 
     if location == -1 {
@@ -1500,7 +1500,7 @@ impl Pipeline {
                 .unwrap_or_else(|| panic!());
             let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());
 
-            let cname = CString::new(*name).unwrap_or_else(|e| panic!(e));
+            let cname = CString::new(*name).unwrap_or_else(|e| panic!("{}", e));
             let attr_loc = unsafe { glGetAttribLocation(program, cname.as_ptr() as *const _) };
             let attr_loc = if attr_loc == -1 { None } else { Some(attr_loc) };
             let divisor = if layout.step_func == VertexStep::PerVertex {
@@ -1533,11 +1533,9 @@ impl Pipeline {
 
                     assert!(
                         attr_loc < vertex_layout.len() as u32,
-                        format!(
-                            "attribute: {} outside of allocated attributes array len: {}",
-                            name,
-                            vertex_layout.len()
-                        )
+                        "attribute: {} outside of allocated attributes array len: {}",
+                        name,
+                        vertex_layout.len()
                     );
                     vertex_layout[attr_loc as usize] = Some(attr);
                 }
