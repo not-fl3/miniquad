@@ -6,7 +6,7 @@ use std::env;
 
 fn build_new() -> (Build, Tool) {
     let build = Build::new();
-    let tool = build.try_get_compiler().unwrap_or_else(|e| panic!(e));
+    let tool = build.try_get_compiler().unwrap_or_else(|e| panic!("{}", e));
 
     (build, tool)
 }
@@ -32,7 +32,7 @@ fn build_android() {
 }
 
 fn main() {
-    let target = env::var("TARGET").unwrap_or_else(|e| panic!(e));
+    let target = env::var("TARGET").unwrap_or_else(|e| panic!("{}", e));
 
     if target.contains("android") == false {
         panic!("Trying to build sapp_android not for android!");
