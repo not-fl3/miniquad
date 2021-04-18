@@ -8,7 +8,7 @@
 
 "use strict";
 
-const version = "0.1.23";
+const version = "0.1.24";
 
 const canvas = document.querySelector("#glcanvas");
 const gl = canvas.getContext("webgl");
@@ -1102,6 +1102,8 @@ var importObject = {
                     case 290: case 291: case 292: case 293: case 294: case 295: case 296: case 297: case 298: case 299:
                     // backspace is Back on Firefox/Windows
                     case 259:
+                    // tab - for UI
+                    case 258:
                         event.preventDefault();
                         break;
                 }
