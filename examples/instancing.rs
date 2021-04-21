@@ -102,8 +102,8 @@ impl EventHandler for Stage {
             self.vel[i] -= vec3(0., frame_time, 0.);
             self.pos[i] += self.vel[i] * frame_time;
             /* bounce back from 'ground' */
-            if self.pos[i].y() < -2.0 {
-                self.pos[i].set_y(-1.8);
+            if self.pos[i].y < -2.0 {
+                self.pos[i].y = -1.8;
                 self.vel[i] *= vec3(0.8, -0.8, 0.8);
             }
         }
@@ -167,7 +167,7 @@ mod shader {
 
     pub const FRAGMENT: &str = r#"#version 100
     varying lowp vec4 color;
-    
+
     void main() {
         gl_FragColor = color;
     }
