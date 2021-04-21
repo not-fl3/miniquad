@@ -27,9 +27,12 @@ canvas.focus();
 
 canvas.requestPointerLock = canvas.requestPointerLock ||
     canvas.mozRequestPointerLock ||
+    // pointer lock in any form is not supported on iOS safari 
+    // https://developer.mozilla.org/en-US/docs/Web/API/Pointer_Lock_API#browser_compatibility
     (function () {});
 document.exitPointerLock = document.exitPointerLock ||
     document.mozExitPointerLock ||
+    // pointer lock in any form is not supported on iOS safari
     (function () {});
 
 function assert(flag, message) {
