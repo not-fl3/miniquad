@@ -26,9 +26,11 @@ var high_dpi = false;
 canvas.focus();
 
 canvas.requestPointerLock = canvas.requestPointerLock ||
-    canvas.mozRequestPointerLock;
+    canvas.mozRequestPointerLock ||
+    (function () {});
 document.exitPointerLock = document.exitPointerLock ||
-    document.mozExitPointerLock;
+    document.mozExitPointerLock ||
+    (function () {});
 
 function assert(flag, message) {
     if (flag == false) {
