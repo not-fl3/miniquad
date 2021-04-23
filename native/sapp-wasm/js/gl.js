@@ -1315,7 +1315,7 @@ function init_plugins(plugins) {
             var version_func = plugins[i].name + "_crate_version";
 
             if (wasm_exports[version_func] == undefined) {
-                console.error("Plugin " + plugins[i].name + " miss version function: " + version_func + ". Probably invalid crate version.");
+                console.log("Plugin " + plugins[i].name + " is present in JS bundle, but is not used in the rust code.");
             } else {
                 var crate_version = u32_to_semver(wasm_exports[version_func]());
 
