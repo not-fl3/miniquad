@@ -526,7 +526,6 @@ unsafe extern "C" fn init_gl() -> libc::c_int {
         0 as EGLContext,
         context_attribs.as_ptr(),
     );
-    free(configs as *mut libc::c_void);
     if gl.context.is_null() {
         println!("failed to create context");
         return -1;
@@ -547,6 +546,7 @@ unsafe extern "C" fn init_gl() -> libc::c_int {
         b"GL Extensions: \"%s\"\n\x00" as *const u8 as *const libc::c_char,
         glGetString(0x1f03 as libc::c_int as GLenum),
     );
+    free(configs as *mut libc::c_void);
     return 0 as libc::c_int;
 }
 unsafe extern "C" fn drm_fb_destroy_callback(_bo_0: *mut gbm_bo, data: *mut libc::c_void) {
