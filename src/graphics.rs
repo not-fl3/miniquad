@@ -1189,9 +1189,14 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderEr
             );
 
             assert!(max_length >= 1);
-            let error_message =
+            let mut error_message =
                 std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1])
                     .to_string();
+
+            // On Wasm + Chrome, for unknown reason, string with zero-terminator is returned. On Firefox there is no zero-terminators in JavaScript string.
+            if error_message.chars().last() == Some('\0') {
+                error_message.pop();
+            }
 
             return Err(ShaderError::CompilationError {
                 shader_type: match shader_type {
