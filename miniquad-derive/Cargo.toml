@@ -1,0 +1,16 @@
+[package]
+name = "miniquad-derive"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.26"
+# need `extra-traits` feature for `Attribute` to implement `PartialEq`
+syn = { version = "1.0.70", features = ["derive", "parsing", "printing", "clone-impls", "proc-macro", "extra-traits"] }
+quote = "1.0.9"
+
+[dev-dependencies]
+miniquad = { path = "../" }

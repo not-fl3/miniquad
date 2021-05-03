@@ -6,6 +6,8 @@ use crate::sapp::*;
 
 use std::{error::Error, fmt::Display};
 
+pub use miniquad_derive::VertexLayout;
+
 pub use texture::{FilterMode, Texture, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 
 fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
@@ -225,7 +227,7 @@ impl Default for BufferLayout {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct VertexAttribute {
     pub name: &'static str,
     pub format: VertexFormat,

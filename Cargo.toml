@@ -44,6 +44,9 @@ sapp-wasm = { path ="./native/sapp-wasm", version = "=0.1.25" }
 [target.'cfg(not(any(target_os="linux", target_os="macos", target_os="android", target_os="ios", target_arch="wasm32", windows)))'.dependencies]
 sapp-dummy = { path ="./native/sapp-dummy", version = "=0.1.5" }
 
+[dependencies]
+miniquad-derive = { path = "miniquad-derive", version = "0.1.0" }
+
 [dev-dependencies]
 glam = {version = "0.14", features = ["scalar-math"] }
 quad-rand = "0.1"
