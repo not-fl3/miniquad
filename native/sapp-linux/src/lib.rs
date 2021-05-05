@@ -249,6 +249,7 @@ pub struct sapp_desc {
         Option<unsafe extern "C" fn(_: *const libc::c_char, _: *mut libc::c_void) -> ()>,
     pub width: libc::c_int,
     pub height: libc::c_int,
+    pub window_resizable: bool,
     pub sample_count: libc::c_int,
     pub swap_interval: libc::c_int,
     pub high_dpi: bool,
@@ -473,8 +474,14 @@ pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut de
         1 as libc::c_int,
     );
     let mut hints = XAllocSizeHints();
-    (*hints).flags |= PWinGravity;
+    (*hints).flags |= PWinGravity | PMinSize | PMaxSize;
     (*hints).win_gravity = StaticGravity;
+    if _sapp.desc.window_resizable == false {
+        (*hints).min_width = _sapp.desc.width;
+        (*hints).min_height = _sapp.desc.height;
+        (*hints).max_width = _sapp.desc.width;
+        (*hints).max_height = _sapp.desc.height;
+    }
     XSetWMNormalHints(_sapp_x11_display, _sapp_x11_window, hints);
     XFree(hints as *mut libc::c_void);
     _sapp_x11_update_window_title();
@@ -2983,6 +2990,7 @@ pub static mut _sapp: _sapp_state = _sapp_state {
         fail_userdata_cb: None,
         width: 0,
         height: 0,
+        window_resizable: false,
         sample_count: 0,
         swap_interval: 0,
         high_dpi: false,

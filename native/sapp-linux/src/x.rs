@@ -27,7 +27,7 @@ pub use Xresource_h::{
     XrmDatabase, XrmDestroyDatabase, XrmGetResource, XrmGetStringDatabase, XrmValue,
 };
 pub use Xutil_h::{
-    IconicState, NormalState, PWinGravity, WithdrawnState, XAllocSizeHints, XClassHint,
+    IconicState, NormalState, PMinSize, PMaxSize, PWinGravity, WithdrawnState, XAllocSizeHints, XClassHint,
     XComposeStatus, XLookupString, XSetWMNormalHints, XSizeHints, XVisualInfo, XWMHints,
     Xutf8SetWMProperties,
 };
@@ -896,6 +896,8 @@ pub mod Xutil_h {
         pub colormap_size: libc::c_int,
         pub bits_per_rgb: libc::c_int,
     }
+    pub const PMinSize: libc::c_long = (1 as libc::c_long) << 4 as libc::c_int;
+    pub const PMaxSize: libc::c_long = (1 as libc::c_long) << 5 as libc::c_int;
     pub const PWinGravity: libc::c_long = (1 as libc::c_long) << 9 as libc::c_int;
     pub const IconicState: libc::c_int = 3 as libc::c_int;
     pub const WithdrawnState: libc::c_int = 0 as libc::c_int;
