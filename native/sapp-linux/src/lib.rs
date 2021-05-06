@@ -474,14 +474,15 @@ pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut de
         1 as libc::c_int,
     );
     let mut hints = XAllocSizeHints();
-    (*hints).flags |= PWinGravity | PMinSize | PMaxSize;
-    (*hints).win_gravity = StaticGravity;
+    (*hints).flags |= PWinGravity;
     if _sapp.desc.window_resizable == false {
+        (*hints).flags |= PMinSize | PMaxSize;
         (*hints).min_width = _sapp.desc.width;
         (*hints).min_height = _sapp.desc.height;
         (*hints).max_width = _sapp.desc.width;
         (*hints).max_height = _sapp.desc.height;
     }
+    (*hints).win_gravity = StaticGravity;
     XSetWMNormalHints(_sapp_x11_display, _sapp_x11_window, hints);
     XFree(hints as *mut libc::c_void);
     _sapp_x11_update_window_title();
