@@ -1,0 +1,12 @@
+[package]
+name = "miniquad-main"
+version = "0.1.0"
+authors = ["nikita-skobov"]
+edition = "2018"
+
+[dependencies]
+syn = { version = "1.0", features = ["full"] }
+quote = "1.0"
+
+[lib]
+proc-macro = true

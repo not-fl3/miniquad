@@ -85,6 +85,7 @@ impl EventHandler for Stage {
     }
 }
 
+#[miniquad::main]
 fn main() {
     miniquad::start(conf::Conf::default(), |mut ctx| {
         UserData::owning(Stage::new(&mut ctx), ctx)
