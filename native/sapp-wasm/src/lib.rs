@@ -552,6 +552,9 @@ pub extern "C" fn resize(width: i32, height: i32) {
     event.type_ = sapp_event_type_SAPP_EVENTTYPE_RESIZED;
     event.window_width = width;
     event.window_height = height;
+    event.framebuffer_width = width;
+    event.framebuffer_height = height;
+
     unsafe {
         sapp_context().event(event);
     }
