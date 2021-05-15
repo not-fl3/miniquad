@@ -1,6 +1,6 @@
 [package]
 name = "miniquad"
-version = "0.3.0-alpha.30"
+version = "0.3.0-alpha.31"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -36,10 +36,10 @@ sapp-darwin = { path = "./native/sapp-darwin", version = "=0.1.6" }
 sapp-ios = { path = "./native/sapp-ios", version = "=0.1.2" }
 
 [target.'cfg(target_os = "android")'.dependencies]
-sapp-android = { path = "./native/sapp-android", version = "0.1.5" }
+sapp-android = { path = "./native/sapp-android", version = "0.1.6" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-sapp-wasm = { path ="./native/sapp-wasm", version = "=0.1.25" }
+sapp-wasm = { path ="./native/sapp-wasm", version = "=0.1.26" }
 
 [target.'cfg(not(any(target_os="linux", target_os="macos", target_os="android", target_os="ios", target_arch="wasm32", windows)))'.dependencies]
 sapp-dummy = { path ="./native/sapp-dummy", version = "=0.1.5" }

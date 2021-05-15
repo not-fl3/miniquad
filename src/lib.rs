@@ -330,8 +330,8 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
             event_call!(
                 data,
                 resize_event,
-                event.window_width as f32,
-                event.window_height as f32
+                event.framebuffer_width as f32,
+                event.framebuffer_height as f32
             );
         }
         sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN
