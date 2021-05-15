@@ -1365,7 +1365,6 @@ _SOKOL_PRIVATE void _sapp_android_cleanup_egl_surface(void) {
 _SOKOL_PRIVATE void _sapp_android_app_event(sapp_event_type type) {
     if (_sapp_events_enabled()) {
         _sapp_init_event(type);
-        SOKOL_LOG("event_cb()");
         _sapp_call_event(&_sapp.event);
     }
 }
@@ -1382,6 +1381,7 @@ _SOKOL_PRIVATE void _sapp_android_update_dimensions(ANativeWindow* window, bool 
     SOKOL_ASSERT(win_w >= 0 && win_h >= 0);
     const bool win_changed = (win_w != _sapp.window_width) || (win_h != _sapp.window_height);
     _sapp.window_width = win_w;
+        
     _sapp.window_height = win_h;
     if (win_changed || force_update) {
         if (!_sapp.desc.high_dpi) {
@@ -1410,9 +1410,9 @@ _SOKOL_PRIVATE void _sapp_android_update_dimensions(ANativeWindow* window, bool 
     _sapp.framebuffer_width = fb_w;
     _sapp.framebuffer_height = fb_h;
     _sapp.dpi_scale = (float)_sapp.framebuffer_width / (float)_sapp.window_width;
+
     if (win_changed || fb_changed || force_update) {
         if (!_sapp.first_frame) {
-            SOKOL_LOG("SAPP_EVENTTYPE_RESIZED");
             _sapp_android_app_event(SAPP_EVENTTYPE_RESIZED);
         }
     }
@@ -1424,7 +1424,6 @@ _SOKOL_PRIVATE void _sapp_android_cleanup(void) {
     if (state->surface != EGL_NO_SURFACE) {
         /* egl context is bound, cleanup gracefully */
         if (_sapp.init_called && !_sapp.cleanup_called) {
-            SOKOL_LOG("cleanup_cb()");
             _sapp_call_cleanup();
         }
     }
@@ -1461,22 +1460,17 @@ _SOKOL_PRIVATE bool _sapp_android_touch_event(const AInputEvent* e) {
     sapp_event_type type = SAPP_EVENTTYPE_INVALID;
     switch (action) {
         case AMOTION_EVENT_ACTION_DOWN:
-            SOKOL_LOG("Touch: down");
         case AMOTION_EVENT_ACTION_POINTER_DOWN:
-            SOKOL_LOG("Touch: ptr down");
             type = SAPP_EVENTTYPE_TOUCHES_BEGAN;
             break;
         case AMOTION_EVENT_ACTION_MOVE:
             type = SAPP_EVENTTYPE_TOUCHES_MOVED;
             break;
         case AMOTION_EVENT_ACTION_UP:
-            SOKOL_LOG("Touch: up");
         case AMOTION_EVENT_ACTION_POINTER_UP:
-            SOKOL_LOG("Touch: ptr up");
             type = SAPP_EVENTTYPE_TOUCHES_ENDED;
             break;
         case AMOTION_EVENT_ACTION_CANCEL:
-            SOKOL_LOG("Touch: cancel");
             type = SAPP_EVENTTYPE_TOUCHES_CANCELLED;
             break;
         default:
