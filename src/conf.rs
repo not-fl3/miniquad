@@ -1,6 +1,6 @@
 //! Context creation configuration
 //!
-//! A [`Conf`](struct.Conf.html) struct is used to descrbe a hardware and platform specific setup,
+//! A [`Conf`](struct.Conf.html) struct is used to describe a hardware and platform specific setup,
 //! mostly video display settings.
 //!
 //! ## High DPI rendering
