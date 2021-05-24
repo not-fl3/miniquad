@@ -458,7 +458,7 @@ pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut de
     );
     _sapp_x11_release_error_handler();
     if _sapp_x11_window == 0 {
-        _sapp_fail(b"X11: Failed to create window\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail("X11: Failed to create window");
     }
 
     _sapp_xi_extension_opcode = xi_input::query_xi_extension()
@@ -708,7 +708,7 @@ pub unsafe extern "C" fn _sapp_glx_init() {
         i += 1
     }
     if _sapp_glx_libgl.is_null() {
-        _sapp_fail(b"GLX: failed to load libGL\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail("GLX: failed to load libGL");
     }
 
     unsafe fn load<T: Sized>(lib: *mut libc::c_void, symbol: &[u8]) -> T {
@@ -745,9 +745,7 @@ pub unsafe extern "C" fn _sapp_glx_init() {
         || _sapp_glx_GetProcAddressARB.is_none()
         || _sapp_glx_GetVisualFromFBConfig.is_none()
     {
-        _sapp_fail(
-            b"GLX: failed to load required entry points\x00" as *const u8 as *const libc::c_char,
-        );
+        _sapp_fail("GLX: failed to load required entry points");
     }
     if _sapp_glx_QueryExtension.expect("non-null function pointer")(
         _sapp_x11_display,
@@ -755,7 +753,7 @@ pub unsafe extern "C" fn _sapp_glx_init() {
         &mut _sapp_glx_eventbase,
     ) == 0
     {
-        _sapp_fail(b"GLX: GLX extension not found\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail("GLX: GLX extension not found");
     }
     if _sapp_glx_QueryVersion.expect("non-null function pointer")(
         _sapp_x11_display,
@@ -763,10 +761,10 @@ pub unsafe extern "C" fn _sapp_glx_init() {
         &mut _sapp_glx_minor,
     ) == 0
     {
-        _sapp_fail(b"GLX: Failed to query GLX version\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail("GLX: Failed to query GLX version");
     }
     if _sapp_glx_major == 1 as libc::c_int && _sapp_glx_minor < 3 as libc::c_int {
-        _sapp_fail(b"GLX: GLX version 1.3 is required\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail("GLX: GLX version 1.3 is required");
     }
     let mut exts = _sapp_glx_QueryExtensionsString.expect("non-null function pointer")(
         _sapp_x11_display,
@@ -799,19 +797,14 @@ pub unsafe extern "C" fn _sapp_glx_choose_visual(
 ) {
     let mut native = _sapp_glx_choosefbconfig();
     if native.is_null() {
-        _sapp_fail(
-            b"GLX: Failed to find a suitable GLXFBConfig\x00" as *const u8 as *const libc::c_char,
-        );
+        _sapp_fail("GLX: Failed to find a suitable GLXFBConfig");
     }
     let mut result = _sapp_glx_GetVisualFromFBConfig.expect("non-null function pointer")(
         _sapp_x11_display,
         native,
     );
     if result.is_null() {
-        _sapp_fail(
-            b"GLX: Failed to retrieve Visual for GLXFBConfig\x00" as *const u8
-                as *const libc::c_char,
-        );
+        _sapp_fail("GLX: Failed to retrieve Visual for GLXFBConfig");
     }
     *visual = (*result).visual;
     *depth = (*result).depth;
@@ -1079,7 +1072,7 @@ pub unsafe extern "C" fn _sapp_glx_choosefbconfig() -> GLXFBConfig {
         &mut native_count,
     );
     if native_configs.is_null() || native_count == 0 {
-        _sapp_fail(b"GLX: No GLXFBConfigs returned\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail("GLX: No GLXFBConfigs returned");
     }
     let mut usable_configs: Vec<_sapp_gl_fbconfig> = Vec::new();
     usable_count = 0 as libc::c_int;
@@ -1138,40 +1131,19 @@ pub unsafe extern "C" fn _sapp_glx_choosefbconfig() -> GLXFBConfig {
     XFree(native_configs as *mut libc::c_void);
     return result;
 }
-pub unsafe extern "C" fn _sapp_fail(mut msg: *const libc::c_char) {
-    if _sapp.desc.fail_cb.is_some() {
-        _sapp.desc.fail_cb.expect("non-null function pointer")(msg);
-    } else if _sapp.desc.fail_userdata_cb.is_some() {
-        _sapp
-            .desc
-            .fail_userdata_cb
-            .expect("non-null function pointer")(msg, _sapp.desc.user_data);
-    } else {
-        if msg.is_null() {
-            println!("_sapp_fail with empty message");
-        } else {
-            use std::ffi::CString;
 
-            let rust_msg = CString::from_raw(msg as *mut _);
-
-            println!("{}", rust_msg.to_str().unwrap());
-        }
-    }
+pub unsafe extern "C" fn _sapp_fail(msg: &str) {
+    println!("{}", msg);
     std::process::exit(0);
 }
+
 pub unsafe extern "C" fn _sapp_glx_create_context() {
     let mut native = _sapp_glx_choosefbconfig();
     if native.is_null() {
-        _sapp_fail(
-            b"GLX: Failed to find a suitable GLXFBConfig (2)\x00" as *const u8
-                as *const libc::c_char,
-        );
+        _sapp_fail("GLX: Failed to find a suitable GLXFBConfig (2)");
     }
     if !(_sapp_glx_ARB_create_context && _sapp_glx_ARB_create_context_profile) {
-        _sapp_fail(
-            b"GLX: ARB_create_context and ARB_create_context_profile required\x00" as *const u8
-                as *const libc::c_char,
-        );
+        _sapp_fail("GLX: ARB_create_context and ARB_create_context_profile required");
     }
     _sapp_x11_grab_error_handler();
     let attribs: [libc::c_int; 10] = [
@@ -1194,7 +1166,7 @@ pub unsafe extern "C" fn _sapp_glx_create_context() {
         attribs.as_ptr(),
     );
     if _sapp_glx_ctx.is_null() {
-        _sapp_fail(b"GLX: failed to create GL context\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail("GLX: failed to create GL context");
     }
     _sapp_x11_release_error_handler();
     _sapp_glx_window = _sapp_glx_CreateWindow.expect("non-null function pointer")(
@@ -1204,7 +1176,7 @@ pub unsafe extern "C" fn _sapp_glx_create_context() {
         std::ptr::null(),
     );
     if _sapp_glx_window == 0 {
-        _sapp_fail(b"GLX: failed to create window\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail("GLX: failed to create window");
     };
 }
 pub unsafe extern "C" fn _sapp_x11_window_visible() -> bool {
@@ -2736,7 +2708,7 @@ pub unsafe extern "C" fn sapp_run(mut desc: *const sapp_desc) {
     XrmInitialize();
     _sapp_x11_display = XOpenDisplay(std::ptr::null());
     if _sapp_x11_display.is_null() {
-        _sapp_fail(b"XOpenDisplay() failed!\n\x00" as *const u8 as *const libc::c_char);
+        _sapp_fail("XOpenDisplay() failed!");
     }
     _sapp_x11_screen = (*(_sapp_x11_display as _XPrivDisplay)).default_screen;
     _sapp_x11_root = (*(*(_sapp_x11_display as _XPrivDisplay))
