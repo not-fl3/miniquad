@@ -577,6 +577,8 @@ unsafe extern "C" fn sapp_ANativeActivity_onCreate(
     (*callbacks).onLowMemory = Some(on_low_memory);
 
     console_info(b"NativeActivity successfully created\0".as_ptr() as _);
+
+    auto_hide_nav_bar(activity);
 }
 
 fn android_should_update(state: &AndroidState) -> bool {
@@ -1053,9 +1055,10 @@ unsafe extern "C" fn on_start(_activity: *mut ANativeActivity) {
     console_info(b"NativeActivity onStart()\0".as_ptr() as _);
 }
 
-unsafe extern "C" fn on_resume(_activity: *mut ANativeActivity) {
+unsafe extern "C" fn on_resume(activity: *mut ANativeActivity) {
     console_info(b"NativeActivity onResume()\0".as_ptr() as _);
     android_msg(AndroidMessage::Resume);
+    auto_hide_nav_bar(activity);
 }
 
 unsafe extern "C" fn on_save_instance_state(
@@ -1181,6 +1184,92 @@ pub unsafe fn console_error(msg: *const ::std::os::raw::c_char) {
         b"SAPP\0".as_ptr() as _,
         msg,
     );
+}
+
+unsafe fn auto_hide_nav_bar(activity: *mut ANativeActivity) {
+    console_info(b"auto_hide_nav_bar: Start\0".as_ptr() as _);
+
+    let mut env: *mut ndk_sys::JNIEnv = std::ptr::null_mut();
+    let java_vm: *mut ndk_sys::JavaVM = (*activity).vm;
+
+    let attach_current_thread = (**java_vm).AttachCurrentThread.unwrap();
+    //let detach_current_thread = (**java_vm).DetachCurrentThread.unwrap();
+    let res = attach_current_thread(java_vm, &mut env, std::ptr::null_mut());
+    assert!(res == 0);
+
+    console_info(b"auto_hide_nav_bar: Current thread attached\0".as_ptr() as _);
+
+    let find_class = (**env).FindClass.unwrap();
+    let get_method_id = (**env).GetMethodID.unwrap();
+    let call_object_method = (**env).CallObjectMethod.unwrap();
+    let get_static_field_id = (**env).GetStaticFieldID.unwrap();
+    let get_static_int_field = (**env).GetStaticIntField.unwrap();
+    let call_void_method = (**env).CallVoidMethod.unwrap();
+
+    let activity_class = find_class(env, b"android/app/NativeActivity\0".as_ptr() as _);
+
+    console_info(b"auto_hide_nav_bar: Got activity class\0".as_ptr() as _);
+
+    let get_window = get_method_id(
+        env,
+        activity_class,
+        b"getWindow\0".as_ptr() as _,
+        b"()Landroid/view/Window;\0".as_ptr() as _,
+    );
+
+    let window_class = find_class(env, b"android/view/Window\0".as_ptr() as _);
+    let get_decor_view = get_method_id(
+        env,
+        window_class,
+        b"getDecorView\0".as_ptr() as _,
+        b"()Landroid/view/View;\0".as_ptr() as _,
+    );
+
+    let view_class = find_class(env, b"android/view/View\0".as_ptr() as _);
+    let set_system_ui_visibility = get_method_id(
+        env,
+        view_class,
+        b"setSystemUiVisibility\0".as_ptr() as _,
+        b"(I)V\0".as_ptr() as _,
+    );
+
+    console_info(b"auto_hide_nav_bar: Got set_system_ui_visibility\0".as_ptr() as _);
+
+    let window = call_object_method(env, (*activity).clazz, get_window);
+    let decor_view = call_object_method(env, window, get_decor_view);
+
+    let flag_fullscreen_id = get_static_field_id(
+        env,
+        view_class,
+        b"SYSTEM_UI_FLAG_FULLSCREEN\0".as_ptr() as _,
+        b"I\0".as_ptr() as _,
+    );
+    let flag_hide_navigation_id = get_static_field_id(
+        env,
+        view_class,
+        b"SYSTEM_UI_FLAG_HIDE_NAVIGATION\0".as_ptr() as _,
+        b"I\0".as_ptr() as _,
+    );
+    let flag_immersive_sticky_id = get_static_field_id(
+        env,
+        view_class,
+        b"SYSTEM_UI_FLAG_IMMERSIVE_STICKY\0".as_ptr() as _,
+        b"I\0".as_ptr() as _,
+    );
+
+    console_info(b"auto_hide_nav_bar: Got flags\0".as_ptr() as _);
+
+    let flag_fullscreen = get_static_int_field(env, view_class, flag_fullscreen_id);
+    let flag_hide_navigation = get_static_int_field(env, view_class, flag_hide_navigation_id);
+    let flag_immersive_sticky = get_static_int_field(env, view_class, flag_immersive_sticky_id);
+
+    let flag = flag_fullscreen | flag_hide_navigation | flag_immersive_sticky;
+
+    call_void_method(env, decor_view, set_system_ui_visibility, flag);
+
+    // detach_current_thread(java_vm);
+
+    console_info(b"auto_hide_nav_bar: Nav bar should be hidden!\0".as_ptr() as _);
 }
 
 #[repr(C)]
