@@ -1709,7 +1709,7 @@ impl Buffer {
         assert!(size <= self.size);
 
         let gl_target = gl_buffer_target(&self.buffer_type);
-
+        ctx.cache.store_buffer_binding(gl_target);
         ctx.cache.bind_buffer(gl_target, self.gl_buf);
         unsafe { glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _) };
         ctx.cache.restore_buffer_binding(gl_target);
