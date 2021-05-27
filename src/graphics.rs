@@ -475,9 +475,15 @@ impl GlCache {
 
     fn restore_buffer_binding(&mut self, target: GLenum) {
         if target == GL_ARRAY_BUFFER {
-            self.bind_buffer(target, self.stored_vertex_buffer);
+            if self.stored_vertex_buffer != 0 {
+                self.bind_buffer(target, self.stored_vertex_buffer);
+                self.stored_vertex_buffer = 0;
+            }
         } else {
-            self.bind_buffer(target, self.stored_index_buffer);
+            if self.stored_index_buffer != 0 {
+                self.bind_buffer(target, self.stored_index_buffer);
+                self.stored_index_buffer = 0;
+            }
         }
     }
 
