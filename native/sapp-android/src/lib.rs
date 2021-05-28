@@ -997,9 +997,9 @@ unsafe fn android_touch_event(data: &mut UiThreadData, e: *const ndk_sys::AInput
     for i in 0..event.num_touches {
         let mut dst = &mut event.touches[i as usize];
         dst.identifier = ndk_sys::AMotionEvent_getPointerId(e, i as _) as _;
-        dst.pos_x = (ndk_sys::AMotionEvent_getRawX(e, i as _) / shared_state.window_width as f32)
+        dst.pos_x = (ndk_sys::AMotionEvent_getX(e, i as _) / shared_state.window_width as f32)
             * shared_state.framebuffer_width as f32;
-        dst.pos_y = (ndk_sys::AMotionEvent_getRawY(e, i as _) / shared_state.window_height as f32)
+        dst.pos_y = (ndk_sys::AMotionEvent_getY(e, i as _) / shared_state.window_height as f32)
             * shared_state.framebuffer_height as f32;
 
         if action == ndk_sys::AMOTION_EVENT_ACTION_POINTER_DOWN as _
