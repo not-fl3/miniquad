@@ -25,7 +25,9 @@ impl Drop for ClipboardGuard {
     }
 }
 
-unsafe fn get_raw_clipboard() -> Option<Vec<u8>> {
+unsafe fn get_raw_clipboard() -> Option<Vec<u16>> {
+    // https://docs.microsoft.com/en-us/windows/win32/dataxchg/about-the-clipboard
+
     let guard = ClipboardGuard::open();
 
     if guard.is_none() {
@@ -33,19 +35,25 @@ unsafe fn get_raw_clipboard() -> Option<Vec<u8>> {
         return None;
     }
 
+    // Returns a handle to a clipboard object
     let clipboard_data = GetClipboardData(CF_UNICODETEXT);
     if clipboard_data.is_null() {
         return None;
     }
 
-    let data_ptr = GlobalLock(clipboard_data) as *const u8;
+    let data_ptr = GlobalLock(clipboard_data) as *const u16;
     if data_ptr.is_null() {
         return None;
     }
     let data_size = GlobalSize(clipboard_data) as usize;
-    let mut res = vec![0; data_size];
 
-    ptr::copy_nonoverlapping(data_ptr, res.as_mut_ptr(), data_size);
+    let slice = std::slice::from_raw_parts(data_ptr, data_size);
+    let len = slice.iter().position(|b| *b == 0).unwrap_or(data_size);
+
+    // search for the first null byte to see where the string ends.
+
+    let mut res = vec![0; len];
+    ptr::copy_nonoverlapping(data_ptr, res.as_mut_ptr(), len);
 
     Some(res)
 }
@@ -80,5 +88,5 @@ pub unsafe fn set_clipboard_text(text: &str) {
 }
 
 pub unsafe fn get_clipboard_text() -> Option<String> {
-    get_raw_clipboard().map(|data| String::from_utf16_lossy(std::mem::transmute(&data[..])))
+    get_raw_clipboard().map(|data| String::from_utf16_lossy(&data))
 }

@@ -412,11 +412,7 @@ where
     desc.high_dpi = conf.high_dpi as _;
     desc.window_title = title.as_ptr();
 
-    #[cfg(not(any(
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "android",
-    )))]
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "android",)))]
     {
         desc.window_resizable = conf.window_resizable as _;
     }
