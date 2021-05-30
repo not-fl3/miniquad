@@ -1,6 +1,6 @@
 [package]
 name = "miniquad"
-version = "0.3.0-alpha.34"
+version = "0.3.0-alpha.35"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -22,7 +22,7 @@ kms = ["sapp-kms"]
 log-impl = []
 
 [target.'cfg(windows)'.dependencies]
-sapp-windows = { path ="./native/sapp-windows", version = "=0.2.16" }
+sapp-windows = { path ="./native/sapp-windows", version = "=0.2.17" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 sapp-linux = { path ="./native/sapp-linux", version = "=0.1.13", optional = true }
@@ -36,7 +36,7 @@ sapp-darwin = { path = "./native/sapp-darwin", version = "=0.1.6" }
 sapp-ios = { path = "./native/sapp-ios", version = "=0.1.2" }
 
 [target.'cfg(target_os = "android")'.dependencies]
-sapp-android = { path = "./native/sapp-android", version = "0.1.6" }
+sapp-android = { path = "./native/sapp-android", version = "0.1.7" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 sapp-wasm = { path ="./native/sapp-wasm", version = "=0.1.26" }
