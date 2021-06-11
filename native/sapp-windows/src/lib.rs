@@ -1165,7 +1165,7 @@ unsafe fn init_dpi() {
 
     if shcore.is_null() == false {
         _sapp_win32_setprocessdpiawareness = get_proc_address(shcore, b"SetProcessDpiAwareness\0");
-        _sapp_win32_getdpiformonitor = get_proc_address(user32, b"GetDpiForMonitor\0");
+        _sapp_win32_getdpiformonitor = get_proc_address(shcore, b"GetDpiForMonitor\0");
     }
 
     if let Some(setprocessdpiawareness) = _sapp_win32_setprocessdpiawareness {
@@ -1194,7 +1194,7 @@ unsafe fn init_dpi() {
                 &mut dpix as *mut _ as _,
                 &mut dpiy as *mut _ as _,
             );
-            assert!(hr != 0);
+            assert_eq!(hr, 0);
             //  clamp window scale to an integer factor
             _sapp_win32_window_scale = dpix as f32 / 96.0;
         }
