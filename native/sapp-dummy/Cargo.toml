@@ -9,6 +9,7 @@ Part of miniquad rendering library.
 Stub sapp definitions.
 """
 homepage = "https://github.com/not-fl3/miniquad"
+include = ["src/", "Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md"]
 
 [dependencies]
 libc = "0.2"

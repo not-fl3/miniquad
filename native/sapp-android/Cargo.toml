@@ -9,6 +9,7 @@ Part of miniquad rendering library.
 Native bindings to slightly modified sokol-app.
 """
 homepage = "https://github.com/not-fl3/miniquad"
+include = ["src/", "Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md"]
 
 [dependencies]
 libc = "0.2"
