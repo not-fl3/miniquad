@@ -630,6 +630,11 @@ pub struct Context {
     passes: Vec<RenderPassInternal>,
     default_framebuffer: GLuint,
     cache: GlCache,
+
+    /// Multiplier to `dpi_scale()`.
+    ///
+    /// You can use this to allow user change DPI in a settings of your game (for example, to scale interface). This value is multiplied to result of the `dpi_scale()` function. By default it's equal `1.0`.
+    pub user_dpi: f32,
 }
 
 impl Context {
@@ -664,6 +669,7 @@ impl Context {
                     textures: [0; MAX_SHADERSTAGE_IMAGES],
                     attributes: [None; MAX_VERTEX_ATTRIBUTES],
                 },
+                user_dpi: 1.0,
             }
         }
     }
@@ -677,7 +683,7 @@ impl Context {
     /// The dpi scaling factor (window pixels to framebuffer pixels)
     /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
     pub fn dpi_scale(&self) -> f32 {
-        unsafe { sapp_dpi_scale() }
+        self.user_dpi * unsafe { sapp_dpi_scale() }
     }
 
     /// True when high_dpi was requested and actually running in a high-dpi scenario
