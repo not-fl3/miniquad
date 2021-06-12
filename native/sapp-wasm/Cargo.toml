@@ -9,4 +9,5 @@ Part of miniquad rendering library.
 Binding and JS implementation of GL and sokol-app API.
 """
 homepage = "https://github.com/not-fl3/miniquad"
+include = ["src/", "js/", "build.rs", "Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md"]
 

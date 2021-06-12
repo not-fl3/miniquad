@@ -10,6 +10,7 @@ Part of miniquad rendering library.
 Orignally this was a sokol-app C code transpiled to rust with c2rust and partially rewritten to more idiomatic rust.
 """
 homepage = "https://github.com/not-fl3/miniquad"
+include = ["src/", "build.rs", "Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md"]
 
 [dependencies]
 libc = "0.2"
