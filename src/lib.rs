@@ -422,7 +422,7 @@ where
     desc.frame_userdata_cb = Some(frame);
     desc.event_userdata_cb = Some(event);
 
-    std::mem::forget(user_data);
+    Box::leak(user_data);
 
     unsafe { sapp::sapp_run(&desc as *const _) };
 }

@@ -359,7 +359,6 @@ extern "C" {
     pub fn sapp_set_window_size(new_width: u32, new_height: u32);
 }
 
-
 pub unsafe fn sapp_show_mouse(shown: bool) {
     if shown != sapp_cursor_shown {
         sapp_cursor_shown = shown;
@@ -420,7 +419,7 @@ pub extern "C" fn crate_version() -> u32 {
 pub extern "C" fn allocate_vec_u8(len: usize) -> *mut u8 {
     let mut string = vec![0u8; len];
     let ptr = string.as_mut_ptr();
-    std::mem::forget(string);
+    string.leak();
     ptr
 }
 
