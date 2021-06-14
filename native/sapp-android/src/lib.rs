@@ -887,14 +887,23 @@ unsafe extern "C" fn android_main_cb(fd: RawFd, events: i32, _data: *mut std::ff
         }
         AndroidMessage::Resume => {
             UI_THREAD_DATA.with(|data| {
-                let mut state = &mut data.borrow_mut().android_state;
-                state.has_resumed = true;
+                let mut data = &mut *data.borrow_mut();
+                data.android_state.has_resumed = true;
+
+                if data.first_frame == false {
+                    let event = data.init_event(sapp_event_type_SAPP_EVENTTYPE_RESUMED);
+                    data.call_event(event);
+                }
             });
         }
         AndroidMessage::Pause => {
             UI_THREAD_DATA.with(|data| {
-                let mut state = &mut data.borrow_mut().android_state;
-                state.has_resumed = false;
+                let mut data = &mut *data.borrow_mut();
+                data.android_state.has_resumed = false;
+                if data.first_frame == false {
+                    let event = data.init_event(sapp_event_type_SAPP_EVENTTYPE_SUSPENDED);
+                    data.call_event(event);
+                }
             });
         }
         AndroidMessage::Focus => {
