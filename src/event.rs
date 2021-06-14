@@ -395,6 +395,14 @@ pub trait EventHandler {
     /// hardware units instead. And those units may be different from pixels depending on the target platform
     fn raw_mouse_motion(&mut self, _ctx: &mut Context, _dx: f32, _dy: f32) {}
 
+    /// Window has been minimized
+    /// Right now is only implemented on Android, and is called on a Pause ndk callback
+    fn window_minimized_event(&mut self, _ctx: &mut Context) {}
+
+    /// Window has been restored
+    /// Right now is only implemented on Android, and is called on a Resume ndk callback
+    fn window_restored_event(&mut self, _ctx: &mut Context) {}
+
     /// This event is sent when the userclicks the window's close button
     /// or application code calls the ctx.request_quit() function. The event
     /// handler callback code can handle this event by calling
@@ -437,6 +445,14 @@ pub trait EventHandlerFree {
     /// Note that these events are delivered regardless of input focus and not in pixels, but in
     /// hardware units instead. And those units may be different from pixels depending on the target platform
     fn raw_mouse_motion(&mut self, _dx: f32, _dy: f32) {}
+
+    /// Window has been minimized
+    /// Right now is only implemented on Android, and is called on a Pause ndk callback
+    fn window_minimized_event(&mut self) {}
+
+    /// Window has been restored
+    /// Right now is only implemented on Android, and is called on a Resume ndk callback
+    fn window_restored_event(&mut self) {}
 
     /// This event is sent when the userclicks the window's close button
     /// or application code calls the ctx.request_quit() function. The event

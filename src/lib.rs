@@ -358,6 +358,12 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
         sapp::sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE => {
             event_call!(data, raw_mouse_motion, event.mouse_dx, event.mouse_dy);
         }
+        sapp::sapp_event_type_SAPP_EVENTTYPE_RESUMED => {
+            event_call!(data, window_restored_event);
+        }
+        sapp::sapp_event_type_SAPP_EVENTTYPE_SUSPENDED => {
+            event_call!(data, window_minimized_event);
+        }
         _ => {}
     }
 }
