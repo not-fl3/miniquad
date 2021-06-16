@@ -22,6 +22,15 @@ impl Texture {
         self.texture
     }
 
+    pub unsafe fn from_raw_id(texture: GLuint) -> Self {
+        Self {
+            texture,
+            width: 0,
+            height: 0,
+            format: TextureFormat::RGBA8, // assumed for now
+        }
+    }
+
     /// Delete GPU texture, leaving handle unmodified.
     ///
     /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
