@@ -55,6 +55,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       
-      - name: cargo apk
+      - name: cargo quad-apk
         run: |
-          cargo apk build 
+          cargo quad-apk build 
