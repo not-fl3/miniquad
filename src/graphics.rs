@@ -1200,7 +1200,7 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderEr
                     .to_string();
 
             // On Wasm + Chrome, for unknown reason, string with zero-terminator is returned. On Firefox there is no zero-terminators in JavaScript string.
-            if error_message.chars().last() == Some('\0') {
+            if error_message.ends_with('\0') {
                 error_message.pop();
             }
 
