@@ -1066,7 +1066,7 @@ var importObject = {
             resize(canvas);
         },
         run_animation_loop: function (ptr) {
-            canvas.onmousemove = function (event) {
+            canvas.addEventListener("mousemove", function (event) {
                 var relative_position = mouse_relative_position(event.clientX, event.clientY);
                 var x = relative_position.x;
                 var y = relative_position.y;
@@ -1078,30 +1078,29 @@ var importObject = {
                 if (event.movementX != 0 || event.movementY != 0) {
                     wasm_exports.raw_mouse_move(Math.floor(event.movementX), Math.floor(event.movementY));
                 }
-            };
-            canvas.onmousedown = function (event) {
+            });
+            canvas.addEventListener("mousedown", function (event) {
                 var relative_position = mouse_relative_position(event.clientX, event.clientY);
                 var x = relative_position.x;
                 var y = relative_position.y;
 
                 var btn = into_sapp_mousebutton(event.button);
                 wasm_exports.mouse_down(x, y, btn);
-            };
+            });
             // SO WEB SO CONSISTENT
-            canvas.addEventListener('wheel',
-                function (event) {
-                    event.preventDefault();
-                    wasm_exports.mouse_wheel(-event.deltaX, -event.deltaY);
-                });
-            canvas.onmouseup = function (event) {
+            canvas.addEventListener("wheel", function (event) {
+                event.preventDefault();
+                wasm_exports.mouse_wheel(-event.deltaX, -event.deltaY);
+            });
+            canvas.addEventListener("mouseup", function (event) {
                 var relative_position = mouse_relative_position(event.clientX, event.clientY);
                 var x = relative_position.x;
                 var y = relative_position.y;
 
                 var btn = into_sapp_mousebutton(event.button);
                 wasm_exports.mouse_up(x, y, btn);
-            };
-            canvas.onkeydown = function (event) {
+            });
+            canvas.addEventListener("keydown", function (event) {
                 var sapp_key_code = into_sapp_keycode(event.code);
                 switch (sapp_key_code) {
                     //  space, arrows - prevent scrolling of the page
@@ -1134,12 +1133,12 @@ var importObject = {
                 if (sapp_key_code == 32 || sapp_key_code == 39 || sapp_key_code == 47) {
                     wasm_exports.key_press(sapp_key_code);
                 }
-            };
-            canvas.onkeyup = function (event) {
+            });
+            canvas.addEventListener("keyup", function (event) {
                 var sapp_key_code = into_sapp_keycode(event.code);
                 wasm_exports.key_up(sapp_key_code);
-            };
-            canvas.onkeypress = function (event) {
+            });
+            canvas.addEventListener("keypress", function (event) {
                 var sapp_key_code = into_sapp_keycode(event.code);
 
                 // firefox do not send onkeypress events for ctrl+keys and delete key while chrome do
@@ -1148,7 +1147,7 @@ var importObject = {
                 if (chrome_only == false) {
                     wasm_exports.key_press(event.charCode);
                 }
-            };
+            });
             canvas.addEventListener("touchstart", function (event) {
                 event.preventDefault();
 
@@ -1177,26 +1176,25 @@ var importObject = {
                     wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_MOVED, touch.identifier, Math.floor(touch.clientX) * dpi_scale(), Math.floor(touch.clientY) * dpi_scale());
                 }
             });
-
-            window.onresize = function () {
+            window.addEventListener("resize", function () {
                 resize(canvas, wasm_exports.resize);
-            };
-            window.addEventListener("copy", function(e) {
+            });
+            window.addEventListener("copy", function (event) {
                 if (clipboard != null) {
                     event.clipboardData.setData('text/plain', clipboard);
                     event.preventDefault();
                 }
             });
-            window.addEventListener("cut", function(e) {
+            window.addEventListener("cut", function (event) {
                 if (clipboard != null) {
                     event.clipboardData.setData('text/plain', clipboard);
                     event.preventDefault();
                 }
             });
-            window.addEventListener("paste", function(e) {
-                e.stopPropagation();
-                e.preventDefault();
-                var clipboardData = e.clipboardData || window.clipboardData;
+            window.addEventListener("paste", function (event) {
+                event.stopPropagation();
+                event.preventDefault();
+                var clipboardData = event.clipboardData || window.clipboardData;
                 var pastedData = clipboardData.getData('Text');
 
                 if (pastedData != undefined && pastedData != null && pastedData.length != 0) {
