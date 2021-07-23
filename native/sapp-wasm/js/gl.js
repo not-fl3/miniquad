@@ -37,7 +37,7 @@ document.exitPointerLock = document.exitPointerLock ||
 
 function assert(flag, message) {
     if (flag == false) {
-        alert(message)
+        alert(message);
     }
 }
 
@@ -196,7 +196,6 @@ var GL = {
         }
         return ret;
     },
-
     validateGLObjectID: function (objectHandleArray, objectID, callerFunctionName, objectReadableType) {
         if (objectID != 0) {
             if (objectHandleArray[objectID] === null) {
@@ -259,7 +258,7 @@ var GL = {
             }
         }
     }
-}
+};
 
 function _glGenObject(n, buffers, createFunction, objectTable, functionName) {
     for (var i = 0; i < n; i++) {
@@ -361,7 +360,7 @@ function _webglGet(name_, p, type) {
                     result instanceof Int32Array ||
                     result instanceof Array) {
                     for (var i = 0; i < result.length; ++i) {
-                        assert(false, "unimplemented")
+                        assert(false, "unimplemented");
                     }
                     return;
                 } else {
@@ -382,7 +381,7 @@ function _webglGet(name_, p, type) {
     }
 
     switch (type) {
-        case 'EM_FUNC_SIG_PARAM_I64': getArray(p, Int32Array, 1)[0] = ret;
+        case 'EM_FUNC_SIG_PARAM_I64': getArray(p, Int32Array, 1)[0] = ret; break;
         case 'EM_FUNC_SIG_PARAM_I': getArray(p, Int32Array, 1)[0] = ret; break;
         case 'EM_FUNC_SIG_PARAM_F': getArray(p, Float32Array, 1)[0] = ret; break;
         case 'EM_FUNC_SIG_PARAM_B': getArray(p, Int8Array, 1)[0] = ret ? 1 : 0; break;
@@ -403,7 +402,7 @@ function resize(canvas, on_resize) {
         canvas.width = displayWidth;
         canvas.height = displayHeight;
         if (on_resize != undefined)
-            on_resize(Math.floor(displayWidth), Math.floor(displayHeight))
+            on_resize(Math.floor(displayWidth), Math.floor(displayHeight));
     }
 }
 
@@ -552,7 +551,7 @@ function into_sapp_keycode(key_code) {
         case "ContextMenu": return 348;
     }
 
-    console.log("Unsupported keyboard key: ", key_code)
+    console.log("Unsupported keyboard key: ", key_code);
 }
 
 function dpi_scale()  {
@@ -642,10 +641,10 @@ var importObject = {
             gl.clear(mask);
         },
         glGenTextures: function (n, textures) {
-            _glGenObject(n, textures, "createTexture", GL.textures, "glGenTextures")
+            _glGenObject(n, textures, "createTexture", GL.textures, "glGenTextures");
         },
         glActiveTexture: function (texture) {
-            gl.activeTexture(texture)
+            gl.activeTexture(texture);
         },
         glBindTexture: function (target, texture) {
             GL.validateGLObjectID(GL.textures, texture, 'glBindTexture', 'texture');
@@ -903,7 +902,6 @@ var importObject = {
         glCopyTexImage2D: function (target, level, internalformat, x, y, width, height, border) {
             gl.copyTexImage2D(target, level, internalformat, x, y, width, height, border);
         },
-
         glShaderSource: function (shader, count, string, length) {
             GL.validateGLObjectID(GL.shaders, shader, 'glShaderSource', 'shader');
             var source = GL.getSource(shader, count, string, length);
@@ -988,7 +986,9 @@ var importObject = {
         glDrawElementsInstanced: function (mode, count, type, indices, primcount) {
             gl.drawElementsInstanced(mode, count, type, indices, primcount);
         },
-        glDeleteShader: function (shader) { gl.deleteShader(shader) },
+        glDeleteShader: function (shader) {
+            gl.deleteShader(shader);
+        },
         glDeleteBuffers: function (n, buffers) {
             for (var i = 0; i < n; i++) {
                 var id = getArray(buffers + i * 4, Uint32Array, 1)[0];
@@ -1027,41 +1027,41 @@ var importObject = {
                 GL.textures[id] = null;
             }
         },
-		glGenQueries: function (n, ids) {
-			_glGenObject(n, ids, 'createQuery', GL.timerQueries, 'glGenQueries');
-		},
-		glDeleteQueries: function (n, ids) {
+        glGenQueries: function (n, ids) {
+            _glGenObject(n, ids, 'createQuery', GL.timerQueries, 'glGenQueries');
+        },
+        glDeleteQueries: function (n, ids) {
             for (var i = 0; i < n; i++) {
                 var id = getArray(textures + i * 4, Uint32Array, 1)[0];
                 var query = GL.timerQueries[id];
                 if (!query) {
-					continue;
-				}
+                    continue;
+                }
                 gl.deleteQuery(query);
                 query.name = 0;
                 GL.timerQueries[id] = null;
             }
-		},
-		glBeginQuery: function (target, id) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glBeginQuery', 'id');
-			gl.beginQuery(target, GL.timerQueries[id]);
-		},
-		glEndQuery: function (target) {
-			gl.endQuery(target);
-		},
-		glGetQueryObjectiv: function (id, pname, ptr) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectiv', 'id');
-			let result = gl.getQueryObject(GL.timerQueries[id], pname);
-			getArray(ptr, Uint32Array, 1)[0] = result;
-		},
-		glGetQueryObjectui64v: function (id, pname, ptr) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectui64v', 'id');
-			let result = gl.getQueryObject(GL.timerQueries[id], pname);
-			let heap = getArray(ptr, Uint32Array, 2);
-			heap[0] = result;
-			heap[1] = (result - heap[0])/4294967296;
-		},
-        setup_canvas_size: function(high_dpi) {
+        },
+        glBeginQuery: function (target, id) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glBeginQuery', 'id');
+            gl.beginQuery(target, GL.timerQueries[id]);
+        },
+        glEndQuery: function (target) {
+            gl.endQuery(target);
+        },
+        glGetQueryObjectiv: function (id, pname, ptr) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectiv', 'id');
+            let result = gl.getQueryObject(GL.timerQueries[id], pname);
+            getArray(ptr, Uint32Array, 1)[0] = result;
+        },
+        glGetQueryObjectui64v: function (id, pname, ptr) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectui64v', 'id');
+            let result = gl.getQueryObject(GL.timerQueries[id], pname);
+            let heap = getArray(ptr, Uint32Array, 2);
+            heap[0] = result;
+            heap[1] = (result - heap[0]) / 4294967296;
+        },
+        setup_canvas_size: function (high_dpi) {
             window.high_dpi = high_dpi;
             resize(canvas);
         },
@@ -1149,7 +1149,6 @@ var importObject = {
                     wasm_exports.key_press(event.charCode);
                 }
             };
-
             canvas.addEventListener("touchstart", function (event) {
                 event.preventDefault();
 
@@ -1194,7 +1193,6 @@ var importObject = {
                     event.preventDefault();
                 }
             });
-
             window.addEventListener("paste", function(e) {
                 e.stopPropagation();
                 e.preventDefault();
@@ -1227,7 +1225,7 @@ var importObject = {
                     FS.loaded_files[file_id] = uInt8Array;
                     wasm_exports.file_loaded(file_id);
                 }
-            }
+            };
             xhr.onerror = function (e) {
                 FS.loaded_files[file_id] = null;
                 wasm_exports.file_loaded(file_id);
@@ -1326,7 +1324,7 @@ function init_plugins(plugins) {
 
                 if (plugins[i].version != crate_version) {
                     console.error("Plugin " + plugins[i].name + " version mismatch" +
-                                  "js version: " + plugins[i].version + ", crate version: " + crate_version)
+                                  "js version: " + plugins[i].version + ", crate version: " + crate_version);
                 }
             }
         }
@@ -1382,7 +1380,7 @@ function load(wasm_path) {
             .catch(err => {
                 console.error("WASM failed to load, probably incompatible gl.js version");
                 console.error(err);
-            })
+            });
     } else {
         req
             .then(function (x) { return x.arrayBuffer(); })
