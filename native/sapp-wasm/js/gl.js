@@ -1101,20 +1101,10 @@ var importObject = {
                 wasm_exports.mouse_up(x, y, btn);
             });
             canvas.addEventListener("keydown", function (event) {
-                var sapp_key_code = into_sapp_keycode(event.code);
-                switch (sapp_key_code) {
-                    //  space, arrows - prevent scrolling of the page
-                    case 32: case 262: case 263: case 264: case 265:
-                    // F1-F10
-                    case 290: case 291: case 292: case 293: case 294: case 295: case 296: case 297: case 298: case 299:
-                    // backspace is Back on Firefox/Windows
-                    case 259:
-                    // tab - for UI
-                    case 258:
-                    // quote and slash are Quick Find on Firefox
-                    case 39: case 47:
-                        event.preventDefault();
-                        break;
+                // whitelist for key default
+                switch (event.code) {
+                    case "F11": case "F12": break;
+                    default: event.preventDefault(); break;
                 }
 
                 var modifiers = 0;
@@ -1127,26 +1117,27 @@ var importObject = {
                 if (event.altKey) {
                     modifiers |= SAPP_MODIFIER_ALT;
                 }
-                wasm_exports.key_down(sapp_key_code, modifiers, event.repeat);
-                // for "space", "quote", and "slash" preventDefault will prevent
-                // key_press event, so send it here instead
-                if (sapp_key_code == 32 || sapp_key_code == 39 || sapp_key_code == 47) {
-                    wasm_exports.key_press(sapp_key_code);
+
+                wasm_exports.key_down(into_sapp_keycode(event.code), modifiers, event.repeat);
+
+                // Since the keypress event is deprecated, we check to see if
+                // the key pressed is one character long (accounting for characters
+                // past U+FFFF with Array.from) since any special keys are going
+                // to be more than one character long [1]. We then send the key_press
+                // event with the u32 codepoint.
+                // [1]: https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key/Key_Values
+                if (Array.from(event.key.normalize()).length == 1) {
+                    wasm_exports.key_press(event.key.codePointAt(0));
+                }
+                // The only exception to the above is spacebar, in some older browsers
+                // the " " character is sent as "Spacebar", so we have to account for it.
+                if (event.key == "Spacebar") {
+                    wasm_exports.key_press(32);
                 }
             });
             canvas.addEventListener("keyup", function (event) {
                 var sapp_key_code = into_sapp_keycode(event.code);
                 wasm_exports.key_up(sapp_key_code);
-            });
-            canvas.addEventListener("keypress", function (event) {
-                var sapp_key_code = into_sapp_keycode(event.code);
-
-                // firefox do not send onkeypress events for ctrl+keys and delete key while chrome do
-                // workaround to make this behavior consistent
-                let chrome_only = sapp_key_code == 261 || event.ctrlKey;
-                if (chrome_only == false) {
-                    wasm_exports.key_press(event.charCode);
-                }
             });
             canvas.addEventListener("touchstart", function (event) {
                 event.preventDefault();
