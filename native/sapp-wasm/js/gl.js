@@ -1202,7 +1202,7 @@ var importObject = {
                 var pastedData = clipboardData.getData('Text');
 
                 if (pastedData != undefined && pastedData != null && pastedData.length != 0) {
-                    var len = pastedData.length;
+                    var len = (new TextEncoder().encode(pastedData)).length;
                     var msg = wasm_exports.allocate_vec_u8(len);
                     var heap = new Uint8Array(wasm_memory.buffer, msg, len);
                     stringToUTF8(pastedData, heap, 0, len);
