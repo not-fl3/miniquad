@@ -78,30 +78,39 @@ pub unsafe fn get_clipboard(
         }
     }
     if event.xselection.property != 0 {
-        XGetWindowProperty(
-            _sapp_x11_display,
-            _sapp_x11_window,
-            propid,
-            0 as libc::c_int as libc::c_long,
-            (1024 as u32 * std::mem::size_of::<Atom>() as u32) as _,
-            false as _,
-            AnyPropertyType as Atom,
-            &mut fmtid,
-            &mut resbits,
-            &mut ressize,
-            &mut restail,
-            &mut result as *mut *mut libc::c_char as *mut *mut libc::c_uchar,
-        );
-        if fmtid == incrid {
-            XFree(result as *mut libc::c_void);
-            panic!("Buffer is too large and INCR reading is not implemented yet.");
-        } else {
-            let slice = std::slice::from_raw_parts(result as *const _, ressize as _);
-            let str_result = std::str::from_utf8(slice).map(|s| s.to_owned()).ok();
+        let read_size = (100 as u32 * std::mem::size_of::<Atom>() as u32) as libc::c_long;
+        let mut bytes: Vec<u8> = vec![];
+        let mut offset: libc::c_long = 0 as libc::c_long;
+        loop {
+            XGetWindowProperty(
+                _sapp_x11_display,
+                _sapp_x11_window,
+                propid,
+                offset,
+                read_size,
+                false as _,
+                AnyPropertyType as Atom,
+                &mut fmtid,
+                &mut resbits,
+                &mut ressize,
+                &mut restail,
+                &mut result as *mut *mut libc::c_char as *mut *mut libc::c_uchar,
+            );
+            if fmtid == incrid {
+                XFree(result as *mut libc::c_void);
+                panic!("Buffer is too large and INCR reading is not implemented yet.");
+            } else {
+                let slice = std::slice::from_raw_parts(result as *const _, ressize as _);
+                let str_result = bytes.extend(slice);
 
-            XFree(result as *mut libc::c_void);
+                XFree(result as *mut libc::c_void);
 
-            return str_result;
+                if restail == 0 {
+                    return std::str::from_utf8(&bytes[..]).map(|s| s.to_owned()).ok();
+                } else {
+                    offset += read_size;
+                }
+            }
         }
     }
 
