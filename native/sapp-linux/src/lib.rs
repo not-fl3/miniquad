@@ -1216,6 +1216,7 @@ pub unsafe extern "C" fn _sapp_x11_show_window() {
     };
 }
 
+#[deprecated(note = "Should be removed")]
 unsafe fn _sapp_x11_set_fullscreen() {
     let mut wm_state = XInternAtom(
         _sapp_x11_display,
@@ -1281,6 +1282,37 @@ unsafe fn _sapp_x11_set_fullscreen() {
             &mut ev as *mut XClientMessageEvent as *mut XEvent,
         );
     }
+}
+
+unsafe fn _sapp_x11_send_event(t: Atom, a: isize, b: isize, c: isize, d: isize, e: isize) {
+    let mut data = [0isize; 5];
+
+    data[0] = a;
+    data[1] = b;
+    data[2] = c;
+    data[3] = d;
+    data[4] = e;
+
+    let mut ev = XClientMessageEvent {
+        type_0: 33,
+        serial: 0,
+        send_event: true as _,
+        message_type: t,
+        window: _sapp_x11_window,
+        display: _sapp_x11_display,
+        format: 32,
+        data: ClientMessageData {
+            l: std::mem::transmute(data),
+        },
+    };
+
+    XSendEvent(
+        _sapp_x11_display,
+        _sapp_x11_root,
+        false as _,
+        (1048576 | 131072) as _,
+        &mut ev as *mut XClientMessageEvent as *mut XEvent,
+    );
 }
 
 pub static mut _sapp_glx_EXT_swap_control: bool = false;
@@ -2734,7 +2766,7 @@ pub unsafe extern "C" fn sapp_run(mut desc: *const sapp_desc) {
     _sapp.valid = true;
     _sapp_x11_show_window();
     if (*desc).fullscreen {
-        _sapp_x11_set_fullscreen();
+        sapp_set_fullscreen(true);
     }
     _sapp_glx_swapinterval(_sapp.swap_interval);
     XFlush(_sapp_x11_display);
@@ -2862,6 +2894,40 @@ unsafe fn update_cursor() {
     }
 
     x_cursor::set_cursor(cursor);
+}
+
+pub unsafe fn sapp_is_fullscreen() -> bool {
+    _sapp.desc.fullscreen as _
+}
+
+pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
+    _sapp.desc.fullscreen = fullscreen as _;
+
+    let mut wm_state = XInternAtom(
+        _sapp_x11_display,
+        b"_NET_WM_STATE\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    let wm_fullscreen = XInternAtom(
+        _sapp_x11_display,
+        b"_NET_WM_STATE_FULLSCREEN\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+
+    if fullscreen {
+        let _NET_WM_STATE_ADD = 1;
+        _sapp_x11_send_event(wm_state, _NET_WM_STATE_ADD, wm_fullscreen as isize, 0, 1, 0);
+    } else {
+        let _NET_WM_STATE_REMOVE = 0;
+        _sapp_x11_send_event(
+            wm_state,
+            _NET_WM_STATE_REMOVE,
+            wm_fullscreen as isize,
+            0,
+            1,
+            0,
+        );
+    }
 }
 
 #[no_mangle]

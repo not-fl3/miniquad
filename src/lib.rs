@@ -181,7 +181,6 @@ impl Context {
     #[allow(unused_variables)]
     pub fn set_fullscreen(&self, fullscreen: bool) {
         #[cfg(not(any(
-            target_os = "linux",
             target_os = "macos",
             target_os = "ios",
             target_os = "android",
