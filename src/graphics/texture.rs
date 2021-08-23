@@ -54,6 +54,7 @@ pub enum TextureFormat {
     RGBA8,
     Depth,
     Alpha,
+    DepthStencil,
 }
 
 /// Converts from TextureFormat to (internal_format, format, pixel_type)
@@ -67,6 +68,9 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
             TextureFormat::Alpha => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
             #[cfg(not(target_arch = "wasm32"))]
             TextureFormat::Alpha => (GL_R8, GL_RED, GL_UNSIGNED_BYTE), // texture updates will swizzle Red -> Alpha to match WASM
+            TextureFormat::DepthStencil => {
+                (GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8)
+            }
         }
     }
 }
@@ -80,6 +84,7 @@ impl TextureFormat {
             TextureFormat::RGBA8 => 4 * square,
             TextureFormat::Depth => 2 * square,
             TextureFormat::Alpha => 1 * square,
+            TextureFormat::DepthStencil => 4 * square,
         }
     }
 }
@@ -147,6 +152,9 @@ impl Texture {
                 params.format.size(params.width, params.height) as usize,
                 bytes_data.len()
             );
+        }
+        if params.format == TextureFormat::DepthStencil {
+            assert_eq!(params.filter, FilterMode::Nearest);
         }
 
         let (internal_format, format, pixel_type) = params.format.into();

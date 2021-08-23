@@ -584,7 +584,10 @@ impl RenderPass {
             if let Some(depth_img) = depth_img {
                 glFramebufferTexture2D(
                     GL_FRAMEBUFFER,
-                    GL_DEPTH_ATTACHMENT,
+                    match depth_img.format {
+                        TextureFormat::DepthStencil => GL_DEPTH_ATTACHMENT | GL_STENCIL_ATTACHMENT,
+                        _ => GL_DEPTH_ATTACHMENT,
+                    },
                     GL_TEXTURE_2D,
                     depth_img.texture,
                     0,
