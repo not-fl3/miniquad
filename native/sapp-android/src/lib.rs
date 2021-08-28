@@ -481,7 +481,7 @@ pub unsafe fn sapp_high_dpi() -> bool {
 }
 
 pub unsafe fn sapp_dpi_scale() -> f32 {
-    unimplemented!()
+    lock_shared_state().dpi_scale
 }
 
 pub unsafe fn sapp_set_cursor_grab(_grab: bool) {}
