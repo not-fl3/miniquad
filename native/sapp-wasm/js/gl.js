@@ -537,7 +537,7 @@ function into_sapp_keycode(key_code) {
         case "NumpadDecimal": return 330;
         case "NumpadDivide": return 331;
         case "NumpadMultiply": return 332;
-        case "NumpadSubstract": return 333;
+        case "NumpadSubtract": return 333;
         case "NumpadAdd": return 334;
         case "NumpadEnter": return 335;
         case "NumpadEqual": return 336;
