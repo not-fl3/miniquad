@@ -40,21 +40,7 @@
 //! ```
 
 #[derive(Debug)]
-pub enum Cache {
-    /// No preloading at all, filesystem::open will always panic.
-    No,
-    /// Load /index.txt first, and cache all the files specified.
-    /// Game will not start until all the files will be cached
-    Index,
-    /// Same as Index, but with the files list instead of index.txt
-    List(Vec<&'static str>),
-    /// Tar archive contents, usually from include_bytes!
-    Tar(&'static [u8]),
-}
-
-#[derive(Debug)]
 pub struct Conf {
-    pub cache: Cache,
     /// Title of the window, defaults to an empty string.
     pub window_title: String,
     /// The preferred width of the window, ignored on wasm/android.
@@ -85,7 +71,6 @@ pub struct Conf {
 impl Default for Conf {
     fn default() -> Conf {
         Conf {
-            cache: Cache::No,
             window_title: "".to_owned(),
             window_width: 800,
             window_height: 600,
