@@ -1747,13 +1747,17 @@ impl Buffer {
 ///
 /// The query is created using [`ElapsedQuery::new()`] function.
 /// ```
+/// use miniquad::graphics::ElapsedQuery;
 /// // initialization
-/// let query = ElapsedQuery::new();
+/// let mut query = ElapsedQuery::new();
 /// ```
 /// Measurement is performed by calling [`ElapsedQuery::begin_query()`] and
 /// [`ElapsedQuery::end_query()`]
 ///
 /// ```
+/// # use miniquad::graphics::ElapsedQuery;
+/// # let mut query = ElapsedQuery::new();
+///
 /// query.begin_query();
 /// // one or multiple calls to miniquad::Context::draw()
 /// query.end_query();
@@ -1764,6 +1768,10 @@ impl Buffer {
 ///
 /// ```
 /// // couple frames later:
+/// # use miniquad::graphics::ElapsedQuery;
+/// # let mut query = ElapsedQuery::new();
+/// # query.begin_query();
+/// # query.end_query();
 /// if query.is_available() {
 ///   let duration_nanoseconds = query.get_result();
 ///   // use/display duration_nanoseconds
@@ -1773,6 +1781,14 @@ impl Buffer {
 /// And during finalization:
 /// ```
 /// // clean-up
+/// # use miniquad::graphics::ElapsedQuery;
+/// # let mut query = ElapsedQuery::new();
+/// # query.begin_query();
+/// # query.end_query();
+/// # if query.is_available() {
+/// #   let duration_nanoseconds = query.get_result();
+/// #   // use/display duration_nanoseconds
+/// # }
 /// query.delete();
 /// ```
 ///
