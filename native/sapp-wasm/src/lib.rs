@@ -534,11 +534,12 @@ pub extern "C" fn key_press(key: u32) {
 }
 
 #[no_mangle]
-pub extern "C" fn key_up(key: u32) {
+pub extern "C" fn key_up(key: u32, modifiers: u32) {
     let mut event: sapp_event = unsafe { std::mem::zeroed() };
 
     event.type_ = sapp_event_type_SAPP_EVENTTYPE_KEY_UP;
     event.key_code = key;
+    event.modifiers = modifiers;
     unsafe {
         sapp_context().event(event);
     }
