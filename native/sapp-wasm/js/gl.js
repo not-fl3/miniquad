@@ -1137,7 +1137,19 @@ var importObject = {
             };
             canvas.onkeyup = function (event) {
                 var sapp_key_code = into_sapp_keycode(event.code);
-                wasm_exports.key_up(sapp_key_code);
+
+                var modifiers = 0;
+                if (event.ctrlKey) {
+                    modifiers |= SAPP_MODIFIER_CTRL;
+                }
+                if (event.shiftKey) {
+                    modifiers |= SAPP_MODIFIER_SHIFT;
+                }
+                if (event.altKey) {
+                    modifiers |= SAPP_MODIFIER_ALT;
+                }
+
+                wasm_exports.key_up(sapp_key_code, modifiers);
             };
             canvas.onkeypress = function (event) {
                 var sapp_key_code = into_sapp_keycode(event.code);
