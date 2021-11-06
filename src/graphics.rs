@@ -432,9 +432,11 @@ struct CachedAttribute {
 
 struct GlCache {
     stored_index_buffer: GLuint,
+    stored_index_type: Option<IndexType>,
     stored_vertex_buffer: GLuint,
     stored_texture: GLuint,
     index_buffer: GLuint,
+    index_type: Option<IndexType>,
     vertex_buffer: GLuint,
     textures: [GLuint; MAX_SHADERSTAGE_IMAGES],
     cur_pipeline: Option<Pipeline>,
@@ -447,7 +449,7 @@ struct GlCache {
 }
 
 impl GlCache {
-    fn bind_buffer(&mut self, target: GLenum, buffer: GLuint) {
+    fn bind_buffer(&mut self, target: GLenum, buffer: GLuint, index_type: Option<IndexType>) {
         if target == GL_ARRAY_BUFFER {
             if self.vertex_buffer != buffer {
                 self.vertex_buffer = buffer;
@@ -462,6 +464,7 @@ impl GlCache {
                     glBindBuffer(target, buffer);
                 }
             }
+            self.index_type = index_type;
         }
     }
 
@@ -470,18 +473,19 @@ impl GlCache {
             self.stored_vertex_buffer = self.vertex_buffer;
         } else {
             self.stored_index_buffer = self.index_buffer;
+            self.stored_index_type = self.index_type;
         }
     }
 
     fn restore_buffer_binding(&mut self, target: GLenum) {
         if target == GL_ARRAY_BUFFER {
             if self.stored_vertex_buffer != 0 {
-                self.bind_buffer(target, self.stored_vertex_buffer);
+                self.bind_buffer(target, self.stored_vertex_buffer, None);
                 self.stored_vertex_buffer = 0;
             }
         } else {
             if self.stored_index_buffer != 0 {
-                self.bind_buffer(target, self.stored_index_buffer);
+                self.bind_buffer(target, self.stored_index_buffer, self.stored_index_type);
                 self.stored_index_buffer = 0;
             }
         }
@@ -506,10 +510,10 @@ impl GlCache {
     }
 
     fn clear_buffer_bindings(&mut self) {
-        self.bind_buffer(GL_ARRAY_BUFFER, 0);
+        self.bind_buffer(GL_ARRAY_BUFFER, 0, None);
         self.vertex_buffer = 0;
 
-        self.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        self.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0, None);
         self.index_buffer = 0;
     }
 
@@ -651,8 +655,10 @@ impl Context {
                 passes: vec![],
                 cache: GlCache {
                     stored_index_buffer: 0,
+                    stored_index_type: None,
                     stored_vertex_buffer: 0,
                     index_buffer: 0,
+                    index_type: None,
                     vertex_buffer: 0,
                     cur_pipeline: None,
                     color_blend: None,
@@ -887,8 +893,11 @@ impl Context {
             }
         }
 
-        self.cache
-            .bind_buffer(GL_ELEMENT_ARRAY_BUFFER, bindings.index_buffer.gl_buf);
+        self.cache.bind_buffer(
+            GL_ELEMENT_ARRAY_BUFFER,
+            bindings.index_buffer.gl_buf,
+            bindings.index_buffer.index_type,
+        );
 
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
 
@@ -903,7 +912,8 @@ impl Context {
                 if cached_attr.map_or(true, |cached_attr| {
                     attribute != cached_attr.attribute || cached_attr.gl_vbuf != vb.gl_buf
                 }) {
-                    self.cache.bind_buffer(GL_ARRAY_BUFFER, vb.gl_buf);
+                    self.cache
+                        .bind_buffer(GL_ARRAY_BUFFER, vb.gl_buf, vb.index_type);
 
                     unsafe {
                         glVertexAttribPointer(
@@ -1073,8 +1083,8 @@ impl Context {
     pub fn end_render_pass(&mut self) {
         unsafe {
             glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
-            self.cache.bind_buffer(GL_ARRAY_BUFFER, 0);
-            self.cache.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            self.cache.bind_buffer(GL_ARRAY_BUFFER, 0, None);
+            self.cache.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0, None);
         }
     }
 
@@ -1096,13 +1106,14 @@ impl Context {
 
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let primitive_type = pip.params.primitive_type.into();
+        let index_type = self.cache.index_type.expect("Unset index buffer type");
 
         unsafe {
             glDrawElementsInstanced(
                 primitive_type,
                 num_elements,
-                GL_UNSIGNED_SHORT,
-                (2 * base_element) as *mut _,
+                index_type.into(),
+                (index_type.size() as i32 * base_element) as *mut _,
                 num_instances,
             );
         }
@@ -1375,6 +1386,42 @@ impl From<PrimitiveType> for GLenum {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+pub enum IndexType {
+    Byte,
+    Short,
+    Int,
+}
+
+impl From<IndexType> for GLenum {
+    fn from(index_type: IndexType) -> Self {
+        match index_type {
+            IndexType::Byte => GL_UNSIGNED_BYTE,
+            IndexType::Short => GL_UNSIGNED_SHORT,
+            IndexType::Int => GL_UNSIGNED_INT,
+        }
+    }
+}
+
+impl IndexType {
+    pub fn for_type<T>() -> IndexType {
+        match std::mem::size_of::<T>() {
+            1 => IndexType::Byte,
+            2 => IndexType::Short,
+            4 => IndexType::Int,
+            _ => panic!("Unsupported index buffer index type"),
+        }
+    }
+
+    pub fn size(self) -> u8 {
+        match self {
+            IndexType::Byte => 1,
+            IndexType::Short => 2,
+            IndexType::Int => 4,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct PipelineParams {
     pub cull_face: CullFace,
     pub front_face_order: FrontFaceOrder,
@@ -1639,6 +1686,7 @@ pub struct Buffer {
     gl_buf: GLuint,
     buffer_type: BufferType,
     size: usize,
+    index_type: Option<IndexType>,
 }
 
 impl Buffer {
@@ -1658,23 +1706,22 @@ impl Buffer {
     /// let buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
     /// ```
     pub fn immutable<T>(ctx: &mut Context, buffer_type: BufferType, data: &[T]) -> Buffer {
-        if buffer_type == BufferType::IndexBuffer {
-            assert!(
-                mem::size_of::<T>() == 2,
-                "Only u16/i16 index buffers are implemented right now"
-            );
-        }
-
         //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
+        let index_type = if buffer_type == BufferType::IndexBuffer {
+            Some(IndexType::for_type::<T>())
+        } else {
+            None
+        };
+
         let gl_target = gl_buffer_target(&buffer_type);
         let gl_usage = gl_usage(&Usage::Immutable);
-        let size = mem::size_of_val(data) as i64;
+        let size = mem::size_of_val(data);
         let mut gl_buf: u32 = 0;
 
         unsafe {
             glGenBuffers(1, &mut gl_buf as *mut _);
             ctx.cache.store_buffer_binding(gl_target);
-            ctx.cache.bind_buffer(gl_target, gl_buf);
+            ctx.cache.bind_buffer(gl_target, gl_buf, index_type);
             glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
             glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _);
             ctx.cache.restore_buffer_binding(gl_target);
@@ -1683,11 +1730,18 @@ impl Buffer {
         Buffer {
             gl_buf,
             buffer_type,
-            size: size as usize,
+            size,
+            index_type,
         }
     }
 
     pub fn stream(ctx: &mut Context, buffer_type: BufferType, size: usize) -> Buffer {
+        let index_type = if buffer_type == BufferType::IndexBuffer {
+            Some(IndexType::Short)
+        } else {
+            None
+        };
+
         let gl_target = gl_buffer_target(&buffer_type);
         let gl_usage = gl_usage(&Usage::Stream);
         let mut gl_buf: u32 = 0;
@@ -1695,7 +1749,7 @@ impl Buffer {
         unsafe {
             glGenBuffers(1, &mut gl_buf as *mut _);
             ctx.cache.store_buffer_binding(gl_target);
-            ctx.cache.bind_buffer(gl_target, gl_buf);
+            ctx.cache.bind_buffer(gl_target, gl_buf, None);
             glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
             ctx.cache.restore_buffer_binding(gl_target);
         }
@@ -1704,11 +1758,36 @@ impl Buffer {
             gl_buf,
             buffer_type,
             size,
+            index_type,
         }
     }
 
+    pub fn index_stream(ctx: &mut Context, index_type: IndexType, size: usize) -> Buffer {
+        let gl_target = gl_buffer_target(&BufferType::IndexBuffer);
+        let gl_usage = gl_usage(&Usage::Stream);
+        let mut gl_buf: u32 = 0;
+
+        unsafe {
+            glGenBuffers(1, &mut gl_buf as *mut _);
+            ctx.cache.store_buffer_binding(gl_target);
+            ctx.cache.bind_buffer(gl_target, gl_buf, None);
+            glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
+            ctx.cache.restore_buffer_binding(gl_target);
+        }
+
+        Buffer {
+            gl_buf,
+            buffer_type: BufferType::IndexBuffer,
+            size,
+            index_type: Some(index_type),
+        }
+    }
     pub fn update<T>(&self, ctx: &mut Context, data: &[T]) {
         //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
+        if self.buffer_type == BufferType::IndexBuffer {
+            assert!(self.index_type.is_some());
+            assert!(self.index_type.unwrap() == IndexType::for_type::<T>());
+        };
 
         let size = mem::size_of_val(data);
 
@@ -1716,7 +1795,8 @@ impl Buffer {
 
         let gl_target = gl_buffer_target(&self.buffer_type);
         ctx.cache.store_buffer_binding(gl_target);
-        ctx.cache.bind_buffer(gl_target, self.gl_buf);
+        ctx.cache
+            .bind_buffer(gl_target, self.gl_buf, self.index_type);
         unsafe { glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _) };
         ctx.cache.restore_buffer_binding(gl_target);
     }
