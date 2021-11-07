@@ -631,5 +631,7 @@ gl_loader!(
     fn glEndQuery(target: GLenum) -> (),
     fn glGenQueries(n: GLsizei, ids: *mut GLuint) -> (),
     fn glGetQueryObjectiv(id: GLuint, pname: GLenum, params: *mut GLint) -> (),
-    fn glGetQueryObjectui64v(id: GLuint, pname: GLenum, params: *mut GLuint64) -> ()
+    fn glGetQueryObjectui64v(id: GLuint, pname: GLenum, params: *mut GLuint64) -> (),
+    fn glFlush() -> (),
+    fn glFinish() -> ()
 );
