@@ -12,7 +12,7 @@ use winapi::{
         hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_GENERIC_POINTER},
         minwindef::{DWORD, HINSTANCE, HIWORD, INT, LOWORD, LPARAM, LRESULT, PROC, UINT, WPARAM},
         ntdef::{HRESULT, LPCSTR, NULL},
-        windef::{HCURSOR, HDC, HGLRC, HMONITOR, HWND, POINT, RECT},
+        windef::{HCURSOR, HDC, HGLRC, HICON, HMONITOR, HWND, POINT, RECT},
         windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
     },
     um::{
@@ -23,30 +23,34 @@ use winapi::{
             PROCESS_SYSTEM_DPI_AWARE,
         },
         wingdi::{
-            ChoosePixelFormat, DescribePixelFormat, SetPixelFormat, SwapBuffers, PFD_DOUBLEBUFFER,
-            PFD_DRAW_TO_WINDOW, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR,
+            ChoosePixelFormat, CreateBitmap, CreateDIBSection, DeleteObject, DescribePixelFormat,
+            SetPixelFormat, SwapBuffers, BITMAPINFO, BITMAPV5HEADER, BI_BITFIELDS, DIB_RGB_COLORS,
+            PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA,
+            PIXELFORMATDESCRIPTOR,
         },
         winuser::{
-            AdjustWindowRectEx, ClientToScreen, ClipCursor, CreateWindowExW, DefWindowProcW,
-            DestroyWindow, DispatchMessageW, GetClientRect, GetCursorInfo, GetDC, GetKeyState,
-            GetRawInputData, GetSystemMetrics, LoadCursorW, LoadIconW, MonitorFromPoint,
-            PeekMessageW, PostMessageW, PostQuitMessage, RegisterClassW, SetWindowPos, SetWindowLongPtrA, GWL_STYLE,
-            RegisterRawInputDevices, HWND_TOP, SWP_NOMOVE, SWP_FRAMECHANGED,
-            SetRect, ShowCursor, ShowWindow, TrackMouseEvent, TranslateMessage, UnregisterClassW,
-            CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO, CURSOR_SHOWING, CW_USEDEFAULT, HTCLIENT,
-            IDC_ARROW, IDI_WINLOGO, MONITOR_DEFAULTTONEAREST, MOUSE_MOVE_ABSOLUTE, MSG, PM_REMOVE,
-            RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RIDEV_REMOVE, RID_INPUT, SC_KEYMENU,
-            SC_MONITORPOWER, SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE,
-            SW_SHOW, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
-            WM_CHAR, WM_CLOSE, WM_ERASEBKGND, WM_INPUT, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
-            WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSELEAVE,
-            WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_MOVE, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP,
-            WM_SETCURSOR, WM_SIZE, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSW,
-            WS_CAPTION, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW, WS_EX_OVERLAPPEDWINDOW,
+            AdjustWindowRectEx, ClientToScreen, ClipCursor, CreateIconIndirect, CreateWindowExW,
+            DefWindowProcW, DestroyIcon, DestroyWindow, DispatchMessageW, GetClientRect,
+            GetCursorInfo, GetDC, GetKeyState, GetRawInputData, GetSystemMetrics, LoadCursorW,
+            LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage,
+            RegisterClassW, RegisterRawInputDevices, ReleaseDC, SendMessageW, SetCursor, SetRect,
+            SetWindowLongPtrA, SetWindowPos, ShowCursor, ShowWindow, TrackMouseEvent,
+            TranslateMessage, UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO,
+            CURSOR_SHOWING, CW_USEDEFAULT, GWL_STYLE, HTCLIENT, HWND_TOP, ICONINFO, ICON_BIG,
+            ICON_SMALL, IDC_ARROW, IDC_CROSS, IDC_HAND, IDC_HELP, IDC_IBEAM, IDC_NO, IDC_SIZEALL,
+            IDC_SIZENESW, IDC_SIZENS, IDC_SIZENWSE, IDC_SIZEWE, IDC_WAIT, IDI_WINLOGO,
+            MONITOR_DEFAULTTONEAREST, MOUSE_MOVE_ABSOLUTE, MSG, PM_REMOVE, RAWINPUT,
+            RAWINPUTDEVICE, RAWINPUTHEADER, RIDEV_REMOVE, RID_INPUT, SC_KEYMENU, SC_MONITORPOWER,
+            SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXICON, SM_CXSCREEN, SM_CXSMICON, SM_CYICON,
+            SM_CYSCREEN, SM_CYSMICON, SWP_FRAMECHANGED, SWP_NOMOVE, SW_HIDE, SW_SHOW, TME_LEAVE,
+            TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT, WM_CHAR, WM_CLOSE,
+            WM_ERASEBKGND, WM_INPUT, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP,
+            WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSELEAVE, WM_MOUSEMOVE,
+            WM_MOUSEWHEEL, WM_MOVE, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SETCURSOR,
+            WM_SETICON, WM_SIZE, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSW, WS_CAPTION,
+            WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW, WS_EX_OVERLAPPEDWINDOW,
             WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SIZEBOX, WS_SYSMENU,
             WS_VISIBLE,
-            SetCursor, IDC_CROSS, IDC_HAND, IDC_HELP, IDC_IBEAM, IDC_NO, IDC_SIZEALL, IDC_SIZENESW,
-            IDC_SIZENS, IDC_SIZENWSE, IDC_SIZEWE, IDC_WAIT,
         },
     },
 };
@@ -254,6 +258,14 @@ pub struct sapp_event {
     pub framebuffer_width: i32,
     pub framebuffer_height: i32,
 }
+
+#[derive(Copy, Clone)]
+pub struct sapp_icon {
+    pub small: *const u8,
+    pub medium: *const u8,
+    pub big: *const u8,
+}
+
 #[derive(Copy, Clone)]
 pub struct sapp_desc {
     pub init_cb: Option<unsafe extern "C" fn() -> ()>,
@@ -286,6 +298,7 @@ pub struct sapp_desc {
     pub html5_ask_leave_site: bool,
     pub ios_keyboard_resizes_canvas: bool,
     pub gl_force_gles2: bool,
+    pub icon: Option<sapp_icon>,
 }
 
 #[derive(Clone)]
@@ -435,6 +448,7 @@ static mut _sapp: _sapp_state = _sapp_state {
         html5_ask_leave_site: false,
         ios_keyboard_resizes_canvas: false,
         gl_force_gles2: false,
+        icon: None,
     },
     keycodes: [sapp_keycode_SAPP_KEYCODE_INVALID; 512],
 };
@@ -520,7 +534,6 @@ pub unsafe fn sapp_set_cursor_grab(grab: bool) {
     }
 }
 
-
 pub unsafe fn sapp_show_mouse(shown: bool) {
     ShowCursor(shown as _);
 }
@@ -547,7 +560,6 @@ pub unsafe fn sapp_set_mouse_cursor(cursor_icon: u32) {
     _sapp.desc.user_cursor = cursor_icon != SAPP_CURSOR_DEFAULT;
 }
 
-
 pub unsafe fn sapp_set_window_size(new_width: u32, new_height: u32) {
     let mut x = 0;
     let mut y = 0;
@@ -565,7 +577,7 @@ pub unsafe fn sapp_set_window_size(new_width: u32, new_height: u32) {
         y,
         new_width as i32,
         new_height as i32,
-        SWP_NOMOVE
+        SWP_NOMOVE,
     );
 }
 
@@ -579,11 +591,8 @@ pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
     let win_style: DWORD = if _sapp.desc.fullscreen {
         WS_POPUP | WS_SYSMENU | WS_VISIBLE
     } else {
-        let mut win_style: DWORD = WS_CLIPSIBLINGS
-            | WS_CLIPCHILDREN
-            | WS_CAPTION
-            | WS_SYSMENU
-            | WS_MINIMIZEBOX;
+        let mut win_style: DWORD =
+            WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
 
         if _sapp.desc.window_resizable {
             win_style |= WS_MAXIMIZEBOX | WS_SIZEBOX;
@@ -602,7 +611,7 @@ pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
             0,
             GetSystemMetrics(SM_CXSCREEN),
             GetSystemMetrics(SM_CYSCREEN),
-            SWP_FRAMECHANGED
+            SWP_FRAMECHANGED,
         );
     } else {
         SetWindowPos(
@@ -612,7 +621,7 @@ pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
             0,
             _sapp.desc.width,
             _sapp.desc.height,
-            SWP_FRAMECHANGED
+            SWP_FRAMECHANGED,
         );
     }
 
@@ -1217,6 +1226,98 @@ unsafe fn init_dpi() {
     }
 }
 
+unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: *const u8) -> Option<HICON> {
+    let mut bi: BITMAPV5HEADER = std::mem::zeroed();
+
+    bi.bV5Size = std::mem::size_of::<BITMAPV5HEADER>() as _;
+    bi.bV5Width = width as i32;
+    bi.bV5Height = -(height as i32); // NOTE the '-' here to indicate that origin is top-left
+    bi.bV5Planes = 1;
+    bi.bV5BitCount = 32;
+    bi.bV5Compression = BI_BITFIELDS;
+    bi.bV5RedMask = 0x00FF0000;
+    bi.bV5GreenMask = 0x0000FF00;
+    bi.bV5BlueMask = 0x000000FF;
+    bi.bV5AlphaMask = 0xFF000000;
+
+    let mut target = std::ptr::null_mut();
+    // const uint8_t* source = (const uint8_t*)desc->pixels.ptr;
+
+    let dc = GetDC(std::ptr::null_mut());
+    let color = CreateDIBSection(
+        dc,
+        &bi as *const _ as *const BITMAPINFO,
+        DIB_RGB_COLORS,
+        &mut target,
+        std::ptr::null_mut(),
+        0,
+    );
+    ReleaseDC(std::ptr::null_mut(), dc);
+    if color.is_null() {
+        return None;
+    }
+    assert!(target.is_null() == false);
+
+    let mask = CreateBitmap(width as _, height as _, 1, 1, std::ptr::null());
+    if mask.is_null() {
+        DeleteObject(color as *mut _);
+        return None;
+    }
+
+    let source = std::slice::from_raw_parts(colors, width as usize * height as usize * 4);
+    for i in 0..width as usize * height as usize {
+        *(target as *mut u8).offset(i as isize * 4 + 0) = source[i * 4 + 2];
+        *(target as *mut u8).offset(i as isize * 4 + 1) = source[i * 4 + 1];
+        *(target as *mut u8).offset(i as isize * 4 + 2) = source[i * 4 + 0];
+        *(target as *mut u8).offset(i as isize * 4 + 3) = source[i * 4 + 3];
+    }
+
+    let mut icon_info: ICONINFO = std::mem::zeroed();
+    icon_info.fIcon = 1;
+    icon_info.xHotspot = 0;
+    icon_info.yHotspot = 0;
+    icon_info.hbmMask = mask;
+    icon_info.hbmColor = color;
+    let icon_handle = CreateIconIndirect(&mut icon_info);
+    DeleteObject(color as *mut _);
+    DeleteObject(mask as *mut _);
+
+    Some(icon_handle)
+}
+
+unsafe fn set_icon(icon: sapp_icon) {
+    let big_icon_w = GetSystemMetrics(SM_CXICON);
+    let big_icon_h = GetSystemMetrics(SM_CYICON);
+    let small_icon_w = GetSystemMetrics(SM_CXSMICON);
+    let small_icon_h = GetSystemMetrics(SM_CYSMICON);
+
+    let big_icon = if big_icon_w * big_icon_h >= 64 * 64 {
+        (icon.big, 64, 64)
+    } else {
+        (icon.medium, 32, 32)
+    };
+
+    let small_icon = if small_icon_w * small_icon_h <= 16 * 16 {
+        (icon.small, 16, 16)
+    } else {
+        (icon.medium, 32, 32)
+    };
+
+    let big_icon = create_win_icon_from_image(big_icon.1, big_icon.2, big_icon.0);
+    let small_icon = create_win_icon_from_image(small_icon.1, small_icon.2, small_icon.0);
+    if let Some(icon) = big_icon {
+        SendMessageW(_sapp_win32_hwnd, WM_SETICON, ICON_BIG as _, icon as LPARAM);
+    }
+    if let Some(icon) = small_icon {
+        SendMessageW(
+            _sapp_win32_hwnd,
+            WM_SETICON,
+            ICON_SMALL as _,
+            icon as LPARAM,
+        );
+    }
+}
+
 unsafe fn create_window() {
     let mut wndclassw: WNDCLASSW = std::mem::zeroed();
 
@@ -1245,18 +1346,14 @@ unsafe fn create_window() {
     } else {
         win_style = if _sapp.desc.window_resizable {
             WS_CLIPSIBLINGS
-            | WS_CLIPCHILDREN
-            | WS_CAPTION
-            | WS_SYSMENU
-            | WS_MINIMIZEBOX
-            | WS_MAXIMIZEBOX
-            | WS_SIZEBOX
+                | WS_CLIPCHILDREN
+                | WS_CAPTION
+                | WS_SYSMENU
+                | WS_MINIMIZEBOX
+                | WS_MAXIMIZEBOX
+                | WS_SIZEBOX
         } else {
-            WS_CLIPSIBLINGS
-            | WS_CLIPCHILDREN
-            | WS_CAPTION
-            | WS_SYSMENU
-            | WS_MINIMIZEBOX
+            WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
         };
 
         rect.right = (_sapp.window_width as f32 * _sapp_win32_window_scale) as _;
@@ -1723,6 +1820,9 @@ pub unsafe fn sapp_run(desc: *const sapp_desc) -> i32 {
     init_keytable();
     init_dpi();
     create_window();
+    if let Some(icon) = (&*desc).icon {
+        set_icon(icon);
+    }
 
     wgl_init();
     wgl_load_extensions();

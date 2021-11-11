@@ -44,6 +44,8 @@ pub use sapp::gl;
 
 use std::ffi::CString;
 
+mod default_icon;
+
 #[deprecated(
     since = "0.3",
     note = "libc rand is slow and incosistent across platforms. Please use quad-rnd crate instead."
@@ -417,6 +419,14 @@ where
     desc.fullscreen = conf.fullscreen as _;
     desc.high_dpi = conf.high_dpi as _;
     desc.window_title = title.as_ptr();
+    #[cfg(target_os = "windows")]
+    if let Some(icon) = conf.icon {
+        desc.icon = Some(sapp_windows::sapp_icon {
+            small: icon.small.as_ptr(),
+            medium: icon.medium.as_ptr(),
+            big: icon.big.as_ptr(),
+        });
+    }
 
     #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "android",)))]
     {

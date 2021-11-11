@@ -66,6 +66,37 @@ pub struct Conf {
 
     /// Determines if the application user can resize the window
     pub window_resizable: bool,
+
+    /// Miniquad allows to change the window icon programmatically.
+    /// The icon will be used as
+    /// - taskbar and titlebar icons on Windows.
+    /// - TODO: favicon on HTML5
+    /// - TODO: taskbar and titlebar(highly dependent on the WM) icons on Linux
+    /// - TODO: dock and titlebar icon on  MacOs
+    pub icon: Option<Icon>,
+}
+
+pub struct Icon {
+    pub small: [u8; 16 * 16 * 4],
+    pub medium: [u8; 32 * 32 * 4],
+    pub big: [u8; 64 * 64 * 4],
+}
+
+impl Icon {
+    pub fn miniquad_logo() -> Icon {
+        Icon {
+            small: crate::default_icon::SMALL,
+            medium: crate::default_icon::MEDIUM,
+            big: crate::default_icon::BIG,
+        }
+    }
+}
+// Printing 64x64 array with a default formatter is not meaningfull,
+// so debug will skip the data fields of an Icon
+impl std::fmt::Debug for Icon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Icon").finish()
+    }
 }
 
 impl Default for Conf {
@@ -78,6 +109,7 @@ impl Default for Conf {
             fullscreen: false,
             sample_count: 1,
             window_resizable: true,
+            icon: Some(Icon::miniquad_logo()),
         }
     }
 }

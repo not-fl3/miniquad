@@ -202,9 +202,13 @@ impl EventHandler for Stage {
 }
 
 fn main() {
-    miniquad::start(conf::Conf::default(), |mut ctx| {
-        UserData::owning(Stage::new(&mut ctx), ctx)
-    });
+    miniquad::start(
+        conf::Conf {
+            window_title: "Miniquad".to_string(),
+            ..Default::default()
+        },
+        |mut ctx| UserData::owning(Stage::new(&mut ctx), ctx),
+    );
 }
 
 mod display_shader {
