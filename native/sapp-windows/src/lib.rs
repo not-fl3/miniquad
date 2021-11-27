@@ -30,7 +30,7 @@ use winapi::{
         },
         winuser::{
             AdjustWindowRectEx, ClientToScreen, ClipCursor, CreateIconIndirect, CreateWindowExW,
-            DefWindowProcW, DestroyIcon, DestroyWindow, DispatchMessageW, GetClientRect,
+            DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect,
             GetCursorInfo, GetDC, GetKeyState, GetRawInputData, GetSystemMetrics, LoadCursorW,
             LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage,
             RegisterClassW, RegisterRawInputDevices, ReleaseDC, SendMessageW, SetCursor, SetRect,
@@ -561,22 +561,25 @@ pub unsafe fn sapp_set_mouse_cursor(cursor_icon: u32) {
 }
 
 pub unsafe fn sapp_set_window_size(new_width: u32, new_height: u32) {
-    let mut x = 0;
-    let mut y = 0;
+    let win_style: DWORD = get_win_style();
+    let win_ex_style: DWORD = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
 
     let mut rect: RECT = std::mem::zeroed();
-    if GetClientRect(_sapp_win32_hwnd, &mut rect as *mut _ as _) != 0 {
-        x = rect.left;
-        y = rect.bottom;
+    if _sapp.desc.fullscreen {
+        rect.right = GetSystemMetrics(SM_CXSCREEN);
+        rect.bottom = GetSystemMetrics(SM_CYSCREEN);
+    } else {
+        rect.right = (new_width as f32 * _sapp_win32_window_scale) as _;
+        rect.bottom = (new_height as f32 * _sapp_win32_window_scale) as _;
     }
-
+    AdjustWindowRectEx(&rect as *const _ as _, win_style, false as _, win_ex_style);
     SetWindowPos(
         _sapp_win32_hwnd,
         HWND_TOP,
-        x,
-        y,
-        new_width as i32,
-        new_height as i32,
+        0,
+        0,
+        rect.right - rect.left,
+        rect.bottom - rect.top,
         SWP_NOMOVE,
     );
 }
@@ -585,10 +588,8 @@ pub unsafe fn sapp_is_fullscreen() -> bool {
     _sapp.desc.fullscreen as _
 }
 
-pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
-    _sapp.desc.fullscreen = fullscreen as _;
-
-    let win_style: DWORD = if _sapp.desc.fullscreen {
+unsafe fn get_win_style() -> DWORD {
+    if _sapp.desc.fullscreen {
         WS_POPUP | WS_SYSMENU | WS_VISIBLE
     } else {
         let mut win_style: DWORD =
@@ -599,7 +600,13 @@ pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
         }
 
         win_style
-    };
+    }
+}
+
+pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
+    _sapp.desc.fullscreen = fullscreen as _;
+
+    let win_style: DWORD = get_win_style();
 
     SetWindowLongPtrA(_sapp_win32_hwnd, GWL_STYLE, win_style as _);
 
@@ -614,15 +621,7 @@ pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
             SWP_FRAMECHANGED,
         );
     } else {
-        SetWindowPos(
-            _sapp_win32_hwnd,
-            HWND_TOP,
-            0,
-            0,
-            _sapp.desc.width,
-            _sapp.desc.height,
-            SWP_FRAMECHANGED,
-        );
+        sapp_set_window_size(_sapp.desc.width as _, _sapp.desc.height as _);
     }
 
     ShowWindow(_sapp_win32_hwnd, SW_SHOW);
@@ -1330,7 +1329,6 @@ unsafe fn create_window() {
     wndclassw.lpszClassName = class_name.as_ptr() as _;
     RegisterClassW(&wndclassw);
 
-    let win_style: DWORD;
     let win_ex_style: DWORD = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
     let mut rect = RECT {
         left: 0,
@@ -1339,23 +1337,11 @@ unsafe fn create_window() {
         bottom: 0,
     };
 
+    let win_style: DWORD = get_win_style();
     if _sapp.desc.fullscreen {
-        win_style = WS_POPUP | WS_SYSMENU | WS_VISIBLE;
         rect.right = GetSystemMetrics(SM_CXSCREEN);
         rect.bottom = GetSystemMetrics(SM_CYSCREEN);
     } else {
-        win_style = if _sapp.desc.window_resizable {
-            WS_CLIPSIBLINGS
-                | WS_CLIPCHILDREN
-                | WS_CAPTION
-                | WS_SYSMENU
-                | WS_MINIMIZEBOX
-                | WS_MAXIMIZEBOX
-                | WS_SIZEBOX
-        } else {
-            WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
-        };
-
         rect.right = (_sapp.window_width as f32 * _sapp_win32_window_scale) as _;
         rect.bottom = (_sapp.window_height as f32 * _sapp_win32_window_scale) as _;
     }

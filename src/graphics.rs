@@ -1587,7 +1587,6 @@ impl Pipeline {
                         buffer_index: *buffer_index,
                         divisor,
                     };
-                    //println!("{}: {:?}", name, attr);
 
                     assert!(
                         attr_loc < vertex_layout.len() as u32,
@@ -1706,7 +1705,6 @@ impl Buffer {
     /// let buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
     /// ```
     pub fn immutable<T>(ctx: &mut Context, buffer_type: BufferType, data: &[T]) -> Buffer {
-        //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
         let index_type = if buffer_type == BufferType::IndexBuffer {
             Some(IndexType::for_type::<T>())
         } else {
@@ -1783,7 +1781,6 @@ impl Buffer {
         }
     }
     pub fn update<T>(&self, ctx: &mut Context, data: &[T]) {
-        //println!("{} {}", mem::size_of::<T>(), mem::size_of_val(data));
         if self.buffer_type == BufferType::IndexBuffer {
             assert!(self.index_type.is_some());
             assert!(self.index_type.unwrap() == IndexType::for_type::<T>());
