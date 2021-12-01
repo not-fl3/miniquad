@@ -36,11 +36,13 @@ pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
 #[cfg(target_os = "android")]
 fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
     fn load_file_sync(path: &str) -> Response {
+        use crate::native;
+        
         let filename = std::ffi::CString::new(path).unwrap();
 
-        let mut data: sapp_android::android_asset = unsafe { std::mem::zeroed() };
+        let mut data: native::android_asset = unsafe { std::mem::zeroed() };
 
-        unsafe { sapp_android::sapp_load_asset(filename.as_ptr(), &mut data as _) };
+        unsafe { native::sapp_load_asset(filename.as_ptr(), &mut data as _) };
 
         if data.content.is_null() == false {
             let slice =
@@ -60,10 +62,9 @@ fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
 #[cfg(target_arch = "wasm32")]
 mod wasm {
     use super::Response;
+    use crate::native;
 
-    use std::cell::RefCell;
-    use std::collections::HashMap;
-    use std::thread_local;
+    use std::{cell::RefCell, collections::HashMap, thread_local};
 
     thread_local! {
         static FILES: RefCell<HashMap<u32, Box<dyn Fn(Response)>>> = RefCell::new(HashMap::new());
@@ -72,7 +73,7 @@ mod wasm {
     #[no_mangle]
     pub extern "C" fn file_loaded(file_id: u32) {
         use super::Error;
-        use sapp_wasm::fs;
+        use native::wasm::fs;
 
         FILES.with(|files| {
             let mut files = files.borrow_mut();
@@ -92,7 +93,7 @@ mod wasm {
     }
 
     pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
-        use sapp_wasm::fs;
+        use native::wasm::fs;
         use std::ffi::CString;
 
         let url = CString::new(path).unwrap();

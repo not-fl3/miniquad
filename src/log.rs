@@ -216,11 +216,11 @@ pub fn __private_api_log_lit(
     use std::ffi::CString;
 
     let log_fn = match level {
-        Level::Debug => sapp_android::console_debug,
-        Level::Warn => sapp_android::console_warn,
-        Level::Info => sapp_android::console_info,
-        Level::Trace => sapp_android::console_debug,
-        Level::Error => sapp_android::console_error,
+        Level::Debug => crate::native::android::console_debug,
+        Level::Warn => crate::native::android::console_warn,
+        Level::Info => crate::native::android::console_info,
+        Level::Trace => crate::native::android::console_debug,
+        Level::Error => crate::native::android::console_error,
     };
     let msg = CString::new(message).unwrap_or_else(|_| panic!());
 

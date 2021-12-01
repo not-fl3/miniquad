@@ -1,54 +1,9 @@
-#[cfg(target_os = "android")]
-extern crate sapp_android as sapp;
-
-#[cfg(target_os = "android")]
-pub use sapp_android;
-
-#[cfg(target_os = "macos")]
-extern crate sapp_darwin as sapp;
-#[cfg(not(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "android",
-    target_arch = "wasm32",
-    windows
-)))]
-extern crate sapp_dummy as sapp;
-#[cfg(target_os = "ios")]
-extern crate sapp_ios as sapp;
-#[cfg(all(feature = "kms", any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-)))]
-extern crate sapp_kms as sapp;
-#[cfg(all(not(feature = "kms"), any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-)))]
-extern crate sapp_linux as sapp;
-
-#[cfg(target_arch = "wasm32")]
-extern crate sapp_wasm as sapp;
-#[cfg(windows)]
-extern crate sapp_windows as sapp;
-
-pub mod clipboard;
 pub mod conf;
 mod event;
 pub mod fs;
 pub mod graphics;
-pub mod dnd;
+
+pub mod native;
 
 #[cfg(feature = "log-impl")]
 pub mod log;
@@ -57,25 +12,9 @@ pub use event::*;
 
 pub use graphics::*;
 
-pub use sapp::gl;
-
-use std::ffi::CString;
-
-#[rustfmt::skip]
 mod default_icon;
 
-#[deprecated(
-    since = "0.3",
-    note = "libc rand is slow and incosistent across platforms. Please use quad-rnd crate instead."
-)]
-pub unsafe fn rand() -> i32 {
-    sapp::rand()
-}
-#[deprecated(
-    since = "0.3",
-    note = "libc rand is slow and incosistent across platforms. Please use quad-rnd crate instead."
-)]
-pub const RAND_MAX: u32 = sapp::RAND_MAX;
+pub use native::{gl, NativeDisplay};
 
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
@@ -90,21 +29,40 @@ pub mod date {
 
     #[cfg(target_arch = "wasm32")]
     pub fn now() -> f64 {
-        unsafe { sapp::now() }
+        use crate::native;
+
+        unsafe { native::wasm::now() }
     }
 }
 
-impl Context {
+/// Main miniquad struct, the only struct exposed to the event handler.
+/// All the drawing and window manipulation are done through the Context.
+///
+/// (impl details) a and b fields are here due to unresolved problem
+/// of relationship between GraphicsContext and NativeDisplay
+/// Should we expose both of them to the user? Should one of them be
+/// consumed by another (technically very complicated, they have a bit different lifetimes)? Or, maybe, just expose both to each EventHandler's functions?
+/// From implementation perspective "fn update(&mut self, context: &mut GraphicsContext, &mut dyn NativeDisplay)" feels really nice
+/// But looks a bit heavy in the trait declaration and is a bit too much of a breaking change
+/// Conclusion for now - leave it with a/b, think during 0.4 and make a final decision in 0.5
+pub struct Context<'a, 'b> {
+    pub(crate) a: &'a mut GraphicsContext,
+    pub(crate) b: &'b mut dyn NativeDisplay,
+}
+
+impl<'a, 'b> Context<'a, 'b> {
+    pub(crate) fn new(a: &'a mut GraphicsContext, b: &'b mut dyn NativeDisplay) -> Context<'a, 'b> {
+        Context { a, b }
+    }
     /// This function simply quits the application without
     /// giving the user a chance to intervene. Usually this might
     /// be called when the user clicks the 'Ok' button in a 'Really Quit?'
     /// dialog box
-    pub fn quit(&self) {
-        // its not possible to quit wasm anyway
-        #[cfg(not(target_arch = "wasm32"))]
-        unsafe {
-            sapp::sapp_quit();
-        }
+    /// Window might not be actually closed right away (exit(0) might not
+    /// happen in the order_quit implmentation) and execution might continue for some time after
+    /// But the window is going to be inevitably closed at some point.
+    pub fn order_quit(&mut self) {
+        self.b.order_quit();
     }
 
     /// Calling request_quit() will trigger "quit_requested_event" event , giving
@@ -112,12 +70,8 @@ impl Context {
     /// (for instance to show a 'Really Quit?' dialog box).
     /// If the event handler callback does nothing, the application will be quit as usual.
     /// To prevent this, call the function "cancel_quit()"" from inside the event handler.
-    pub fn request_quit(&self) {
-        // its not possible to quit wasm anyway
-        #[cfg(not(target_arch = "wasm32"))]
-        unsafe {
-            sapp::sapp_request_quit();
-        }
+    pub fn request_quit(&mut self) {
+        self.b.request_quit();
     }
 
     /// Cancels a pending quit request, either initiated
@@ -125,12 +79,8 @@ impl Context {
     /// by calling "request_quit()". The only place where calling this
     /// function makes sense is from inside the event handler callback when
     /// the "quit_requested_event" event has been received
-    pub fn cancel_quit(&self) {
-        // its not possible to quit wasm anyway
-        #[cfg(not(target_arch = "wasm32"))]
-        unsafe {
-            sapp::sapp_cancel_quit();
-        }
+    pub fn cancel_quit(&mut self) {
+        self.b.cancel_quit();
     }
 
     /// Capture mouse cursor to the current window
@@ -139,94 +89,51 @@ impl Context {
     /// NOTICE: on desktop cursor will not be automatically released after window lost focus
     ///         so set_cursor_grab(false) on window's focus lost is recommended.
     /// TODO: implement window focus events
-    pub fn set_cursor_grab(&self, grab: bool) {
-        #[cfg(not(target_os = "ios"))]
-        unsafe {
-            sapp::sapp_set_cursor_grab(grab);
-        }
+    pub fn set_cursor_grab(&mut self, grab: bool) {
+        self.b.set_cursor_grab(grab);
     }
 
     /// Show or hide the mouse cursor
-    pub fn show_mouse(&self, shown: bool) {
-        unsafe {
-            sapp::sapp_show_mouse(shown);
-        }
+    pub fn show_mouse(&mut self, shown: bool) {
+        self.b.show_mouse(shown);
     }
 
     /// Set the mouse cursor icon.
-    pub fn set_mouse_cursor(&self, _cursor_icon: CursorIcon) {
-        #[cfg(any(
-            target_arch = "wasm32",
-            all(not(feature = "kms"), any(
-                target_os = "linux",
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "netbsd",
-                target_os = "openbsd",
-            )),
-            windows,
-        ))]
-        unsafe {
-            sapp::sapp_set_mouse_cursor(match _cursor_icon {
-                CursorIcon::Default => sapp::SAPP_CURSOR_DEFAULT,
-                CursorIcon::Help => sapp::SAPP_CURSOR_HELP,
-                CursorIcon::Pointer => sapp::SAPP_CURSOR_POINTER,
-                CursorIcon::Wait => sapp::SAPP_CURSOR_WAIT,
-                CursorIcon::Crosshair => sapp::SAPP_CURSOR_CROSSHAIR,
-                CursorIcon::Text => sapp::SAPP_CURSOR_TEXT,
-                CursorIcon::Move => sapp::SAPP_CURSOR_MOVE,
-                CursorIcon::NotAllowed => sapp::SAPP_CURSOR_NOTALLOWED,
-                CursorIcon::EWResize => sapp::SAPP_CURSOR_EWRESIZE,
-                CursorIcon::NSResize => sapp::SAPP_CURSOR_NSRESIZE,
-                CursorIcon::NESWResize => sapp::SAPP_CURSOR_NESWRESIZE,
-                CursorIcon::NWSEResize => sapp::SAPP_CURSOR_NWSERESIZE,
-            });
-        }
+    pub fn set_mouse_cursor(&mut self, cursor_icon: CursorIcon) {
+        self.b.set_mouse_cursor(cursor_icon);
     }
 
     /// Set the application's window size.
-    #[allow(unused_variables)]
-    pub fn set_window_size(&self, new_width: u32, new_height: u32) {
-        #[cfg(not(any(
-            target_os = "linux",
-            target_os = "dragonfly",
-            target_os = "freebsd",
-            target_os = "netbsd",
-            target_os = "openbsd",
-            target_os = "macos",
-            target_os = "ios",
-            target_os = "android",
-        )))]
-        unsafe {
-            if sapp::sapp_is_fullscreen() {
-                #[cfg(feature = "log-impl")]
-                warn!("Unable to set windowsize while fullscreen: https://github.com/not-fl3/miniquad/issues/179");
-                return;
-            }
-
-            sapp::sapp_set_window_size(new_width, new_height);
-        }
-
-        #[cfg(any(target_os = "macos"))]
-        unsafe {
-            sapp::sapp_set_window_size(new_width as _, new_height as _);
-        }
+    pub fn set_window_size(&mut self, new_width: u32, new_height: u32) {
+        self.b.set_window_size(new_width, new_height);
     }
 
-    #[allow(unused_variables)]
-    pub fn set_fullscreen(&self, fullscreen: bool) {
-        #[cfg(not(any(
-            target_os = "linux",
-            target_os = "dragonfly",
-            target_os = "freebsd",
-            target_os = "netbsd",
-            target_os = "openbsd",
-            target_os = "ios",
-            target_os = "android",
-	)))]
-        unsafe {
-            sapp::sapp_set_fullscreen(fullscreen);
-        }
+    pub fn set_fullscreen(&mut self, fullscreen: bool) {
+        self.b.set_fullscreen(fullscreen);
+    }
+
+    /// Get current OS clipboard value
+    pub fn clipboard_get(&mut self) -> Option<String> {
+        self.b.clipboard_get()
+    }
+
+    /// Save value to OS clipboard
+    pub fn clipboard_set(&mut self, data: &str) {
+        self.b.clipboard_set(data);
+    }
+    pub fn dropped_file_count(&mut self) -> usize {
+        self.b.dropped_file_count()
+    }
+    pub fn dropped_file_bytes(&mut self, index: usize) -> Option<Vec<u8>> {
+        self.b.dropped_file_bytes(index)
+    }
+    pub fn dropped_file_path(&mut self, index: usize) -> Option<std::path::PathBuf> {
+        self.b.dropped_file_path(index)
+    }
+
+    /// Shortcut for `order_quit`. Will add a legacy attribute at some point.
+    pub fn quit(&mut self) {
+        self.b.order_quit()
     }
 }
 
@@ -244,170 +151,6 @@ pub enum CursorIcon {
     NSResize,
     NESWResize,
     NWSEResize,
-}
-
-pub enum UserData {
-    Owning((Box<dyn EventHandler>, Context)),
-    Free(Box<dyn EventHandlerFree>),
-}
-
-impl UserData {
-    pub fn owning(event_handler: impl EventHandler + 'static, ctx: Context) -> UserData {
-        UserData::Owning((Box::new(event_handler), ctx))
-    }
-
-    pub fn free(event_handler: impl EventHandlerFree + 'static) -> UserData {
-        UserData::Free(Box::new(event_handler))
-    }
-}
-
-/// call appropriate event handler function - with or without Context reference
-macro_rules! event_call {
-    ( $event_handler:expr, $fn:ident $(, $args:expr)*) => {{
-        match $event_handler {
-            UserData::Owning((ref mut event_handler, ref mut context)) => {
-                event_handler.$fn(context, $($args,)*);
-            }
-            UserData::Free(ref mut event_handler) => {
-                event_handler.$fn($($args,)*);
-            }
-        }
-    }};
-}
-
-enum UserDataState {
-    Uninitialized(Box<dyn 'static + FnOnce(Context) -> UserData>),
-    Intialized(UserData),
-    Empty,
-}
-
-extern "C" fn init(user_data: *mut ::std::os::raw::c_void) {
-    let data: &mut UserDataState = unsafe { &mut *(user_data as *mut UserDataState) };
-    let empty = UserDataState::Empty;
-
-    let f = std::mem::replace(data, empty);
-    let f = if let UserDataState::Uninitialized(f) = f {
-        f
-    } else {
-        panic!();
-    };
-    let context = graphics::Context::new();
-
-    let user_data = f(context);
-    *data = UserDataState::Intialized(user_data);
-}
-
-extern "C" fn frame(user_data: *mut ::std::os::raw::c_void) {
-    let data: &mut UserDataState = unsafe { &mut *(user_data as *mut UserDataState) };
-
-    let data = if let UserDataState::Intialized(ref mut data) = data {
-        data
-    } else {
-        panic!()
-    };
-
-    event_call!(data, update);
-    event_call!(data, draw);
-}
-
-extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::raw::c_void) {
-    let data: &mut UserDataState = unsafe { &mut *(user_data as *mut UserDataState) };
-    let event = unsafe { &*event };
-
-    let data = if let UserDataState::Intialized(ref mut data) = data {
-        data
-    } else {
-        panic!()
-    };
-
-    match event.type_ {
-        sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_MOVE => {
-            event_call!(data, mouse_motion_event, event.mouse_x, event.mouse_y);
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_SCROLL => {
-            event_call!(data, mouse_wheel_event, event.scroll_x, event.scroll_y);
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_DOWN => {
-            event_call!(
-                data,
-                mouse_button_down_event,
-                MouseButton::from(event.mouse_button),
-                event.mouse_x,
-                event.mouse_y
-            );
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_MOUSE_UP => {
-            event_call!(
-                data,
-                mouse_button_up_event,
-                MouseButton::from(event.mouse_button),
-                event.mouse_x,
-                event.mouse_y
-            );
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_CHAR => {
-            if let Some(character) = std::char::from_u32(event.char_code) {
-                let key_mods = KeyMods::from(event.modifiers);
-
-                event_call!(data, char_event, character, key_mods, event.key_repeat)
-            }
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_KEY_DOWN => {
-            let keycode = KeyCode::from(event.key_code);
-            let key_mods = KeyMods::from(event.modifiers);
-
-            event_call!(data, key_down_event, keycode, key_mods, event.key_repeat)
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_KEY_UP => {
-            let keycode = KeyCode::from(event.key_code);
-            let key_mods = KeyMods::from(event.modifiers);
-
-            event_call!(data, key_up_event, keycode, key_mods);
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_RESIZED => {
-            event_call!(
-                data,
-                resize_event,
-                event.framebuffer_width as f32,
-                event.framebuffer_height as f32
-            );
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_BEGAN
-        | sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_ENDED
-        | sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_CANCELLED
-        | sapp::sapp_event_type_SAPP_EVENTTYPE_TOUCHES_MOVED => {
-            for i in 0..(event.num_touches as usize) {
-                if event.touches[i].changed {
-                    event_call!(
-                        data,
-                        touch_event,
-                        event.type_.into(),
-                        event.touches[i].identifier as u64,
-                        event.touches[i].pos_x,
-                        event.touches[i].pos_y
-                    );
-                }
-            }
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED => {
-            event_call!(data, quit_requested_event);
-        }
-        #[cfg(not(target_os = "ios"))]
-        sapp::sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE => {
-            event_call!(data, raw_mouse_motion, event.mouse_dx, event.mouse_dy);
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_RESUMED => {
-            event_call!(data, window_restored_event);
-        }
-        sapp::sapp_event_type_SAPP_EVENTTYPE_SUSPENDED => {
-            event_call!(data, window_minimized_event);
-        }
-        #[cfg(any(target_os = "windows", target_os = "linux", target_arch = "wasm32"))]
-        sapp::sapp_event_type_SAPP_EVENTTYPE_FILES_DROPPED => {
-            event_call!(data, files_dropped_event);
-        }
-        _ => {}
-    }
 }
 
 /// Start miniquad.
@@ -445,40 +188,51 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
 /// ```
 pub fn start<F>(conf: conf::Conf, f: F)
 where
-    F: 'static + FnOnce(Context) -> UserData,
+    F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler>,
 {
-    let mut desc: sapp::sapp_desc = unsafe { std::mem::zeroed() };
-
-    let title = CString::new(conf.window_title.as_bytes()).unwrap_or_else(|e| panic!("{}", e));
-
-    let mut user_data = Box::new(UserDataState::Uninitialized(Box::new(f)));
-
-    desc.sample_count = conf.sample_count;
-    desc.width = conf.window_width;
-    desc.height = conf.window_height;
-    desc.fullscreen = conf.fullscreen as _;
-    desc.high_dpi = conf.high_dpi as _;
-    desc.window_title = title.as_ptr();
-    #[cfg(target_os = "windows")]
-    if let Some(icon) = conf.icon {
-        desc.icon = Some(sapp_windows::sapp_icon {
-            small: icon.small.to_vec(),
-            medium: icon.medium.to_vec(),
-            big: icon.big.to_vec(),
-        });
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "android",)))]
+    #[cfg(target_os = "linux")]
     {
-        desc.window_resizable = conf.window_resizable as _;
+        let mut f = Some(f);
+        let f = &mut f;
+        match conf.platform.linux_backend {
+            conf::LinuxBackend::X11Only => {
+                native::linux_x11::run(&conf, f).expect("X11 backend failed")
+            }
+            conf::LinuxBackend::WaylandOnly => {
+                native::linux_wayland::run(&conf, f).expect("Wayland backend failed")
+            }
+            conf::LinuxBackend::X11WithWaylandFallback => {
+                if native::linux_x11::run(&conf, f).is_none() {
+                    println!("Failed to initialize through X11! Trying wayland instead");
+                    native::linux_wayland::run(&conf, f);
+                }
+            }
+            conf::LinuxBackend::WaylandWithX11Fallback => {
+                if native::linux_x11::run(&conf, f).is_none() {
+                    println!("Failed to initialize through wayland! Trying X11 instead");
+                    native::linux_wayland::run(&conf, f);
+                }
+            }
+        }
     }
 
-    desc.user_data = &mut *user_data as *mut _ as *mut _;
-    desc.init_userdata_cb = Some(init);
-    desc.frame_userdata_cb = Some(frame);
-    desc.event_userdata_cb = Some(event);
+    #[cfg(target_os = "android")]
+    {
+        native::android::run(conf, f);
+    }
 
-    Box::leak(user_data);
+    #[cfg(target_arch = "wasm32")]
+    {
+        native::wasm::run(&conf, f);
+    }
 
-    unsafe { sapp::sapp_run(&desc as *const _) };
+    #[cfg(target_os = "windows")]
+    {
+        native::windows::run(&conf, f);
+    }
+
+    #[cfg(target_os = "macos")]
+    unsafe {
+        native::macos::run(conf, f);
+    }
 }
