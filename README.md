@@ -6,17 +6,9 @@
 [![Discord chat](https://img.shields.io/discord/710177966440579103.svg?label=discord%20chat)](https://discord.gg/WfEp6ut)
 [![Matrix](https://img.shields.io/matrix/quad-general:matrix.org?label=matrix%20chat)](https://matrix.to/#/#quad-general:matrix.org)
 
-Miniquad is safe and cross-platform rendering library focused on portability and low-end platforms support
+Miniquad is a manifestation of a dream in a world where we do not need a deep dependencies tree and thousands lines of code to draw things with a computer.
 
-API is highly inspired by [sokol-gfx](https://github.com/floooh/sokol) ([sokol overview](https://floooh.github.io/2017/07/29/sokol-gfx-tour.html), [2019 update](https://floooh.github.io/2019/01/12/sokol-apply-pipeline.html)). Implementation influenced by [crayon](https://docs.rs/crayon/0.7.1/crayon/video/index.html).
-
-For context management and input on Windows/Linux(and potentially mobiles) "sokol-app" was used. And no external dependencies for WASM.
-
-For higher level API take a look on:
-
-[good-web-game](https://github.com/not-fl3/good-web-game): implementation of some [ggez](https://github.com/ggez/ggez) subset on top of miniquad, made as compatibility layer to run ggez games on wasm
-
-[macroquad](https://github.com/not-fl3/macroquad): raylib-like library on top of miniquad. [100loc arkanoid with macroquad](https://github.com/not-fl3/macroquad/blob/master/examples/arkanoid.rs)
+Miniquad aims to provide a graphics abstraction that works the same way on any platform with a GPU, being as light weight as possible while covering as many machines as possible. 
 
 ## Supported platforms
 
@@ -41,16 +33,11 @@ For higher level API take a look on:
 
 [PonasKovas/miniquad-mandelbrot](https://github.com/PonasKovas/miniquad-mandelbrot): [web demo](https://ponaskovas.github.io/miniquad-mandelbrot-wasm-demo/)
 
-Worth to mention [zemeroth port](https://not-fl3.github.io/miniquad-samples/zemeroth.html) and [astroblasto](https://not-fl3.github.io/miniquad-samples/astroblasto.html), built with miniquad-powered [good-web-game](https://github.com/not-fl3/good-web-game)
-
 # Building examples
 
 ## linux
 
 ```bash
-# ubuntu system dependencies
-apt install libx11-dev libxi-dev libgl1-mesa-dev
-
 cargo run --example quad
 ```
 
@@ -154,13 +141,13 @@ cargo run --example quad --target x86_64-pc-windows-gnu
 
 * Hackability. Working on your own game, highly probable some hardware incompability will be found. Working around that kind of bugs should be easy, implementation details should not be hidden under layers of abstraction.
 
+* Forkability. Each platform implementation is, usually, just one pure rust file. And this file is very copy-paste friendly - it doesnt use any miniquad specific abstractions. It is very easy to just copy some part of miniquad's platform implementation and use it standalone.
+
 # Non goals
 
 * Ultimate type safety. Library should be entirely safe in Rust's definition of safe - no UB or memory unsafety. But correct GPU state is not type guaranteed. Feel free to provide safety abstraction in the user code then!
 
 * High end API, like Vulkan/DirectX 12. Take a look on [gfx-rs](https://github.com/gfx-rs/gfx) or [vulkano](https://github.com/vulkano-rs/vulkano) instead!
-
-* sokol-gfx api compatibility. While sokol is absolutely great as an API design foundation, just reimplementing sokol in rust is not a goal. The idea is to learn from sokol, but make a library in a rust way when it is possible.
 
 # Platinum sponsors
 

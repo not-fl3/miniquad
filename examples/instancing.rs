@@ -80,7 +80,7 @@ impl Stage {
 }
 
 impl EventHandler for Stage {
-    fn update(&mut self, ctx: &mut Context) {
+    fn update(&mut self, _: &mut Context) {
         let frame_time = 1. / 60.;
 
         // emit new particles
@@ -107,16 +107,17 @@ impl EventHandler for Stage {
                 self.vel[i] *= vec3(0.8, -0.8, 0.8);
             }
         }
+    }
 
+    fn draw(&mut self, ctx: &mut Context) {
         // by default glam-rs can vec3 as u128 or #[reprc(C)](f32, f32, f32). need to ensure that the second option was used
         assert_eq!(std::mem::size_of::<Vec3>(), 12);
 
         self.bindings.vertex_buffers[1].update(ctx, &self.pos[..]);
-    }
 
-    fn draw(&mut self, ctx: &mut Context) {
         // model-view-projection matrix
         let (width, height) = ctx.screen_size();
+
         let proj = Mat4::perspective_rh_gl(60.0f32.to_radians(), width / height, 0.01, 50.0);
         let view = Mat4::look_at_rh(
             vec3(0.0, 1.5, 12.0),
@@ -142,7 +143,7 @@ impl EventHandler for Stage {
 
 fn main() {
     miniquad::start(conf::Conf::default(), |mut ctx| {
-        UserData::owning(Stage::new(&mut ctx), ctx)
+        Box::new(Stage::new(&mut ctx))
     });
 }
 

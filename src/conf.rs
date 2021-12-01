@@ -40,6 +40,70 @@
 //! ```
 
 #[derive(Debug)]
+pub enum LinuxX11Gl {
+    /// Use libGLX.so/libGLX.so.0 and its funciton for creating OpenGL context
+    /// If there is no libGLX - just panic right away
+    GLXOnly,
+    /// Use libEGL.so/libEGL.so.0 and its funciton for creating OpenGL context
+    /// If there is no libEGL - just panic right away
+    EGLOnly,
+    /// Use libGLX and if there is not libGLX - try libEGL.
+    /// The default option.
+    GLXWithEGLFallback,
+    /// Use libEGL and if there is not libEGL - try libGLX.
+    EGLWithGLXFallback,
+}
+
+#[derive(Debug)]
+pub enum LinuxBackend {
+    X11Only,
+    WaylandOnly,
+    X11WithWaylandFallback,
+    WaylandWithX11Fallback,
+}
+
+/// Platform specific settings.
+#[derive(Debug)]
+pub struct Platform {
+    /// On X11 there are two ways to get OpenGl context: libglx.so and libegl.so
+    /// Default is GLXWithEGLFallback - will try to create glx context and if fails -
+    /// try EGL. If EGL also fails - panic.
+    pub linux_x11_gl: LinuxX11Gl,
+
+    /// Wayland or X11. Defaults to X11WithWaylandFallback - miniquad will try
+    /// to load "libX11.so", but if there is no - will try to initialize
+    /// through wayland natively. If both  fails (no graphics server at
+    /// all, like KMS) - will panic.
+    ///
+    /// Defaults to X11Only. Wayland implementation is way too unstable right now.
+    pub linux_backend: LinuxBackend,
+
+    /// On some platform it is possible to ask the OS for a specific swap interval.
+    /// Note that this is highly platform and implementation dependent,
+    /// there is no guarantee that FPS will be equal to swap_interval.
+    /// In other words - "swap_interval" is a hint for a GPU driver, this is not
+    /// the way to limit FPS in the game!
+    pub swap_interval: Option<i32>,
+
+    /// Whether the framebuffer should have an alpha channel.
+    /// Currently supported only on Android
+    /// TODO: Make it works on web, on web it should make a transparent HTML5 canvas
+    /// TODO: Document(and check) what does it actually mean on android. Transparent window?
+    pub framebuffer_alpha: bool,
+}
+
+impl Default for Platform {
+    fn default() -> Platform {
+        Platform {
+            linux_x11_gl: LinuxX11Gl::GLXWithEGLFallback,
+            swap_interval: None,
+            linux_backend: LinuxBackend::X11Only,
+            framebuffer_alpha: false,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Conf {
     /// Title of the window, defaults to an empty string.
     pub window_title: String,
@@ -74,6 +138,10 @@ pub struct Conf {
     /// - TODO: taskbar and titlebar(highly dependent on the WM) icons on Linux
     /// - TODO: dock and titlebar icon on  MacOs
     pub icon: Option<Icon>,
+
+    /// Platform specific settings. Hints to OS for context creation, driver-specific
+    /// settings etc.
+    pub platform: Platform,
 }
 
 #[derive(Clone)]
@@ -111,6 +179,7 @@ impl Default for Conf {
             sample_count: 1,
             window_resizable: true,
             icon: Some(Icon::miniquad_logo()),
+            platform: Default::default(),
         }
     }
 }
