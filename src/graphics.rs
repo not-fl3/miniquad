@@ -2,7 +2,7 @@ use std::{ffi::CString, mem};
 
 mod texture;
 
-use crate::sapp::*;
+use crate::{native::gl::*, Context};
 
 use std::{error::Error, fmt::Display};
 
@@ -302,8 +302,8 @@ impl Shader {
         meta: ShaderMeta,
     ) -> Result<Shader, ShaderError> {
         let shader = load_shader_internal(vertex_shader, fragment_shader, meta)?;
-        ctx.shaders.push(shader);
-        Ok(Shader(ctx.shaders.len() - 1))
+        ctx.a.shaders.push(shader);
+        Ok(Shader(ctx.a.shaders.len() - 1))
     }
 }
 
@@ -317,8 +317,8 @@ pub struct ShaderImage {
 #[derive(Debug)]
 pub struct ShaderUniform {
     gl_loc: UniformLocation,
-    offset: usize,
-    size: usize,
+    _offset: usize,
+    _size: usize,
     uniform_type: UniformType,
     array_count: i32,
 }
@@ -568,7 +568,7 @@ struct RenderPassInternal {
 
 impl RenderPass {
     pub fn new(
-        context: &mut Context,
+        ctx: &mut Context,
         color_img: Texture,
         depth_img: impl Into<Option<Texture>>,
     ) -> RenderPass {
@@ -595,7 +595,7 @@ impl RenderPass {
                     0,
                 );
             }
-            glBindFramebuffer(GL_FRAMEBUFFER, context.default_framebuffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, ctx.a.default_framebuffer);
         }
         let pass = RenderPassInternal {
             gl_fb,
@@ -603,19 +603,19 @@ impl RenderPass {
             depth_texture: depth_img,
         };
 
-        context.passes.push(pass);
+        ctx.a.passes.push(pass);
 
-        RenderPass(context.passes.len() - 1)
+        RenderPass(ctx.a.passes.len() - 1)
     }
 
     pub fn texture(&self, ctx: &mut Context) -> Texture {
-        let render_pass = &mut ctx.passes[self.0];
+        let render_pass = &mut ctx.a.passes[self.0];
 
         render_pass.texture
     }
 
     pub fn delete(&self, ctx: &mut Context) {
-        let render_pass = &mut ctx.passes[self.0];
+        let render_pass = &mut ctx.a.passes[self.0];
 
         unsafe { glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _) }
 
@@ -629,7 +629,7 @@ impl RenderPass {
 pub const MAX_VERTEX_ATTRIBUTES: usize = 16;
 pub const MAX_SHADERSTAGE_IMAGES: usize = 12;
 
-pub struct Context {
+pub(crate) struct GraphicsContext {
     shaders: Vec<ShaderInternal>,
     pipelines: Vec<PipelineInternal>,
     passes: Vec<RenderPassInternal>,
@@ -637,8 +637,8 @@ pub struct Context {
     cache: GlCache,
 }
 
-impl Context {
-    pub fn new() -> Context {
+impl GraphicsContext {
+    pub fn new() -> GraphicsContext {
         unsafe {
             let mut default_framebuffer: GLuint = 0;
             glGetIntegerv(
@@ -649,7 +649,7 @@ impl Context {
 
             glGenVertexArrays(1, &mut vao as *mut _);
             glBindVertexArray(vao);
-            Context {
+            GraphicsContext {
                 default_framebuffer,
                 shaders: vec![],
                 pipelines: vec![],
@@ -674,31 +674,49 @@ impl Context {
             }
         }
     }
+}
 
+impl Context<'_, '_> {
+    /// Very unsafe and highly not recommended to use.
+    /// Use case: emulate an old, pre 0.3 EventHandlerFree
+    /// Known caveats: using this alongside ctx: &mut Context from
+    /// event handler functions is 100% UB
+    /// It works cause Context is actually never moved and it's location
+    /// is sort of pinned. But, still, don't use it, please!
+    pub unsafe fn static_context(&mut self) -> Context<'static, 'static> {
+        Context {
+            a: std::mem::transmute(&mut *self.a),
+            b: std::mem::transmute(&mut *self.b),
+        }
+    }
+
+    // pub(crate) fn native_display<T: std::any::Any>(&mut self) -> &mut T {
+    //     self.a.native_display.as_any().downcast_mut::<T>().unwrap()
+    // }
     /// The current framebuffer size in pixels
     /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
     pub fn screen_size(&self) -> (f32, f32) {
-        unsafe { (sapp_width() as f32, sapp_height() as f32) }
+        self.b.screen_size()
     }
 
     /// The dpi scaling factor (window pixels to framebuffer pixels)
     /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
     pub fn dpi_scale(&self) -> f32 {
-        unsafe { sapp_dpi_scale() }
+        self.b.dpi_scale()
     }
 
     /// True when high_dpi was requested and actually running in a high-dpi scenario
     /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
     pub fn high_dpi(&self) -> bool {
-        unsafe { sapp_high_dpi() }
+        self.b.high_dpi()
     }
 
     pub fn apply_pipeline(&mut self, pipeline: &Pipeline) {
-        self.cache.cur_pipeline = Some(*pipeline);
+        self.a.cache.cur_pipeline = Some(*pipeline);
 
         {
-            let pipeline = &self.pipelines[pipeline.0];
-            let shader = &mut self.shaders[pipeline.shader.0];
+            let pipeline = &self.a.pipelines[pipeline.0];
+            let shader = &mut self.a.shaders[pipeline.shader.0];
             unsafe {
                 glUseProgram(shader.program);
             }
@@ -728,18 +746,18 @@ impl Context {
             }
         }
 
-        self.set_cull_face(self.pipelines[pipeline.0].params.cull_face);
+        self.set_cull_face(self.a.pipelines[pipeline.0].params.cull_face);
         self.set_blend(
-            self.pipelines[pipeline.0].params.color_blend,
-            self.pipelines[pipeline.0].params.alpha_blend,
+            self.a.pipelines[pipeline.0].params.color_blend,
+            self.a.pipelines[pipeline.0].params.alpha_blend,
         );
 
-        self.set_stencil(self.pipelines[pipeline.0].params.stencil_test);
-        self.set_color_write(self.pipelines[pipeline.0].params.color_write);
+        self.set_stencil(self.a.pipelines[pipeline.0].params.stencil_test);
+        self.set_color_write(self.a.pipelines[pipeline.0].params.color_write);
     }
 
     pub fn set_cull_face(&mut self, cull_face: CullFace) {
-        if self.cache.cull_face == cull_face {
+        if self.a.cache.cull_face == cull_face {
             return;
         }
 
@@ -756,29 +774,29 @@ impl Context {
                 glCullFace(GL_BACK);
             },
         }
-        self.cache.cull_face = cull_face;
+        self.a.cache.cull_face = cull_face;
     }
 
     pub fn set_color_write(&mut self, color_write: ColorMask) {
-        if self.cache.color_write == color_write {
+        if self.a.cache.color_write == color_write {
             return;
         }
         let (r, g, b, a) = color_write;
         unsafe { glColorMask(r as _, g as _, b as _, a as _) }
-        self.cache.color_write = color_write;
+        self.a.cache.color_write = color_write;
     }
 
     pub fn set_blend(&mut self, color_blend: Option<BlendState>, alpha_blend: Option<BlendState>) {
         if color_blend.is_none() && alpha_blend.is_some() {
             panic!("AlphaBlend without ColorBlend");
         }
-        if self.cache.color_blend == color_blend && self.cache.alpha_blend == alpha_blend {
+        if self.a.cache.color_blend == color_blend && self.a.cache.alpha_blend == alpha_blend {
             return;
         }
 
         unsafe {
             if let Some(color_blend) = color_blend {
-                if self.cache.color_blend.is_none() {
+                if self.a.cache.color_blend.is_none() {
                     glEnable(GL_BLEND);
                 }
 
@@ -805,22 +823,22 @@ impl Context {
                     glBlendFunc(src_rgb.into(), dst_rgb.into());
                     glBlendEquationSeparate(eq_rgb.into(), eq_rgb.into());
                 }
-            } else if self.cache.color_blend.is_some() {
+            } else if self.a.cache.color_blend.is_some() {
                 glDisable(GL_BLEND);
             }
         }
 
-        self.cache.color_blend = color_blend;
-        self.cache.alpha_blend = alpha_blend;
+        self.a.cache.color_blend = color_blend;
+        self.a.cache.alpha_blend = alpha_blend;
     }
 
     pub fn set_stencil(&mut self, stencil_test: Option<StencilState>) {
-        if self.cache.stencil == stencil_test {
+        if self.a.cache.stencil == stencil_test {
             return;
         }
         unsafe {
             if let Some(stencil) = stencil_test {
-                if self.cache.stencil.is_none() {
+                if self.a.cache.stencil.is_none() {
                     glEnable(GL_STENCIL_TEST);
                 }
 
@@ -853,12 +871,12 @@ impl Context {
                     back.test_mask,
                 );
                 glStencilMaskSeparate(GL_BACK, back.write_mask);
-            } else if self.cache.stencil.is_some() {
+            } else if self.a.cache.stencil.is_some() {
                 glDisable(GL_STENCIL_TEST);
             }
         }
 
-        self.cache.stencil = stencil_test;
+        self.a.cache.stencil = stencil_test;
     }
 
     /// Set a new viewport rectangle.
@@ -878,8 +896,8 @@ impl Context {
     }
 
     pub fn apply_bindings(&mut self, bindings: &Bindings) {
-        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
-        let shader = &self.shaders[pip.shader.0];
+        let pip = &self.a.pipelines[self.a.cache.cur_pipeline.unwrap().0];
+        let shader = &self.a.shaders[pip.shader.0];
 
         for (n, shader_image) in shader.images.iter().enumerate() {
             let bindings_image = bindings
@@ -888,22 +906,22 @@ impl Context {
                 .unwrap_or_else(|| panic!("Image count in bindings and shader did not match!"));
             if let Some(gl_loc) = shader_image.gl_loc {
                 unsafe {
-                    self.cache.bind_texture(n, bindings_image.texture);
+                    self.a.cache.bind_texture(n, bindings_image.texture);
                     glUniform1i(gl_loc, n as i32);
                 }
             }
         }
 
-        self.cache.bind_buffer(
+        self.a.cache.bind_buffer(
             GL_ELEMENT_ARRAY_BUFFER,
             bindings.index_buffer.gl_buf,
             bindings.index_buffer.index_type,
         );
 
-        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
+        let pip = &self.a.pipelines[self.a.cache.cur_pipeline.unwrap().0];
 
         for attr_index in 0..MAX_VERTEX_ATTRIBUTES {
-            let cached_attr = &mut self.cache.attributes[attr_index];
+            let cached_attr = &mut self.a.cache.attributes[attr_index];
 
             let pip_attribute = pip.layout.get(attr_index).copied();
 
@@ -913,7 +931,8 @@ impl Context {
                 if cached_attr.map_or(true, |cached_attr| {
                     attribute != cached_attr.attribute || cached_attr.gl_vbuf != vb.gl_buf
                 }) {
-                    self.cache
+                    self.a
+                        .cache
                         .bind_buffer(GL_ARRAY_BUFFER, vb.gl_buf, vb.index_type);
 
                     unsafe {
@@ -929,7 +948,7 @@ impl Context {
                         glEnableVertexAttribArray(attr_index as GLuint);
                     };
 
-                    let cached_attr = &mut self.cache.attributes[attr_index];
+                    let cached_attr = &mut self.a.cache.attributes[attr_index];
                     *cached_attr = Some(CachedAttribute {
                         attribute,
                         gl_vbuf: vb.gl_buf,
@@ -954,8 +973,8 @@ impl Context {
     /// Apply uniforms data from array of bytes with very special layout.
     /// Hidden because `apply_uniforms` is the recommended and safer way to work with uniforms.
     pub fn apply_uniforms_from_bytes(&mut self, uniform_ptr: *const u8, size: usize) {
-        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
-        let shader = &self.shaders[pip.shader.0];
+        let pip = &self.a.pipelines[self.a.cache.cur_pipeline.unwrap().0];
+        let shader = &self.a.shaders[pip.shader.0];
 
         let mut offset = 0;
 
@@ -1050,13 +1069,16 @@ impl Context {
     /// start rendering to an offscreen framebuffer
     pub fn begin_pass(&mut self, pass: impl Into<Option<RenderPass>>, action: PassAction) {
         let (framebuffer, w, h) = match pass.into() {
-            None => (
-                self.default_framebuffer,
-                unsafe { sapp_width() } as i32,
-                unsafe { sapp_height() } as i32,
-            ),
+            None => {
+                let (screen_width, screen_height) = self.b.screen_size();
+                (
+                    self.a.default_framebuffer,
+                    screen_width as i32,
+                    screen_height as i32,
+                )
+            }
             Some(pass) => {
-                let pass = &self.passes[pass.0];
+                let pass = &self.a.passes[pass.0];
                 (
                     pass.gl_fb,
                     pass.texture.width as i32,
@@ -1083,15 +1105,15 @@ impl Context {
 
     pub fn end_render_pass(&mut self) {
         unsafe {
-            glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
-            self.cache.bind_buffer(GL_ARRAY_BUFFER, 0, None);
-            self.cache.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0, None);
+            glBindFramebuffer(GL_FRAMEBUFFER, self.a.default_framebuffer);
+            self.a.cache.bind_buffer(GL_ARRAY_BUFFER, 0, None);
+            self.a.cache.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0, None);
         }
     }
 
     pub fn commit_frame(&mut self) {
-        self.cache.clear_buffer_bindings();
-        self.cache.clear_texture_bindings();
+        self.a.cache.clear_buffer_bindings();
+        self.a.cache.clear_texture_bindings();
     }
 
     /// Draw elements using currently applied bindings and pipeline.
@@ -1101,13 +1123,13 @@ impl Context {
     /// + `num_instances` specifies how many instances should be rendered.
     pub fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32) {
         assert!(
-            self.cache.cur_pipeline.is_some(),
+            self.a.cache.cur_pipeline.is_some(),
             "Drawing without any binded pipeline"
         );
 
-        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
+        let pip = &self.a.pipelines[self.a.cache.cur_pipeline.unwrap().0];
         let primitive_type = pip.params.primitive_type.into();
-        let index_type = self.cache.index_type.expect("Unset index buffer type");
+        let index_type = self.a.cache.index_type.expect("Unset index buffer type");
 
         unsafe {
             glDrawElementsInstanced(
@@ -1165,8 +1187,8 @@ fn load_shader_internal(
         let uniforms = meta.uniforms.uniforms.iter().scan(0, |offset, uniform| {
             let res = ShaderUniform {
                 gl_loc: get_uniform_location(program, &uniform.name),
-                offset: *offset,
-                size: uniform.uniform_type.size(),
+                _offset: *offset,
+                _size: uniform.uniform_type.size(),
                 uniform_type: uniform.uniform_type,
                 array_count: uniform.array_count as _,
             };
@@ -1536,7 +1558,7 @@ impl Pipeline {
             assert!(cache.stride <= 255);
         }
 
-        let program = ctx.shaders[shader.0].program;
+        let program = ctx.a.shaders[shader.0].program;
 
         let attributes_len = attributes
             .iter()
@@ -1607,12 +1629,12 @@ impl Pipeline {
             params,
         };
 
-        ctx.pipelines.push(pipeline);
-        Pipeline(ctx.pipelines.len() - 1)
+        ctx.a.pipelines.push(pipeline);
+        Pipeline(ctx.a.pipelines.len() - 1)
     }
 
     pub fn set_blend(&self, ctx: &mut Context, color_blend: Option<BlendState>) {
-        let mut pipeline = &mut ctx.pipelines[self.0];
+        let mut pipeline = &mut ctx.a.pipelines[self.0];
         pipeline.params.color_blend = color_blend;
     }
 }
@@ -1719,11 +1741,11 @@ impl Buffer {
 
         unsafe {
             glGenBuffers(1, &mut gl_buf as *mut _);
-            ctx.cache.store_buffer_binding(gl_target);
-            ctx.cache.bind_buffer(gl_target, gl_buf, index_type);
+            ctx.a.cache.store_buffer_binding(gl_target);
+            ctx.a.cache.bind_buffer(gl_target, gl_buf, index_type);
             glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
             glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _);
-            ctx.cache.restore_buffer_binding(gl_target);
+            ctx.a.cache.restore_buffer_binding(gl_target);
         }
 
         Buffer {
@@ -1747,10 +1769,10 @@ impl Buffer {
 
         unsafe {
             glGenBuffers(1, &mut gl_buf as *mut _);
-            ctx.cache.store_buffer_binding(gl_target);
-            ctx.cache.bind_buffer(gl_target, gl_buf, None);
+            ctx.a.cache.store_buffer_binding(gl_target);
+            ctx.a.cache.bind_buffer(gl_target, gl_buf, None);
             glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
-            ctx.cache.restore_buffer_binding(gl_target);
+            ctx.a.cache.restore_buffer_binding(gl_target);
         }
 
         Buffer {
@@ -1768,10 +1790,10 @@ impl Buffer {
 
         unsafe {
             glGenBuffers(1, &mut gl_buf as *mut _);
-            ctx.cache.store_buffer_binding(gl_target);
-            ctx.cache.bind_buffer(gl_target, gl_buf, None);
+            ctx.a.cache.store_buffer_binding(gl_target);
+            ctx.a.cache.bind_buffer(gl_target, gl_buf, None);
             glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
-            ctx.cache.restore_buffer_binding(gl_target);
+            ctx.a.cache.restore_buffer_binding(gl_target);
         }
 
         Buffer {
@@ -1792,11 +1814,12 @@ impl Buffer {
         assert!(size <= self.size);
 
         let gl_target = gl_buffer_target(&self.buffer_type);
-        ctx.cache.store_buffer_binding(gl_target);
-        ctx.cache
+        ctx.a.cache.store_buffer_binding(gl_target);
+        ctx.a
+            .cache
             .bind_buffer(gl_target, self.gl_buf, self.index_type);
         unsafe { glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _) };
-        ctx.cache.restore_buffer_binding(gl_target);
+        ctx.a.cache.restore_buffer_binding(gl_target);
     }
 
     /// Size of buffer in bytes
@@ -1931,7 +1954,8 @@ impl ElapsedQuery {
 
     /// Reports whenever elapsed timer is supported and other methods can be invoked.
     pub fn is_supported() -> bool {
-        unsafe { sapp_is_elapsed_timer_supported() }
+        unimplemented!();
+        //unsafe { sapp_is_elapsed_timer_supported() }
     }
 
     /// Reports whenever result of submitted query is available for retrieval with

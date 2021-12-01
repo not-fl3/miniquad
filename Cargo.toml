@@ -1,6 +1,6 @@
 [package]
 name = "miniquad"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -14,36 +14,25 @@ keywords = ["graphics", "3D", "opengl", "gamedev", "windowing"]
 categories = ["rendering::graphics-api"]
 
 [features]
-default = ["sapp-linux"]
-kms = ["sapp-kms"]
 
 # Optional log-rs like macros implementation
 # disabled by default
 log-impl = []
 
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
 [target.'cfg(windows)'.dependencies]
-sapp-windows = { path ="./native/sapp-windows", version = "=0.2.20" }
-
-[target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
-sapp-linux = { path ="./native/sapp-linux", version = "=0.1.14", optional = true }
-
-sapp-kms = { path ="./native/sapp-kms", version = "=0.1.1", optional = true }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-sapp-darwin = { path = "./native/sapp-darwin", version = "=0.1.8" }
-
-[target.'cfg(target_os = "ios")'.dependencies]
-sapp-ios = { path = "./native/sapp-ios", version = "=0.1.2" }
+winapi = { version = "0.3", features = ["wingdi", "winuser", "libloaderapi", "windef", "shellscalingapi", "errhandlingapi", "windowsx", "winbase", "hidusage"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
-sapp-android = { path = "./native/sapp-android", version = "=0.1.10" }
+libc = "0.2"
+ndk-sys = "0.2"
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-sapp-wasm = { path ="./native/sapp-wasm", version = "=0.1.26" }
-
-[target.'cfg(not(any(target_os="linux", target_os="dragonfly", target_os="freebsd", target_os="netbsd", target_os="openbsd", target_os="macos", target_os="android", target_os="ios", target_arch="wasm32", windows)))'.dependencies]
-sapp-dummy = { path ="./native/sapp-dummy", version = "=0.1.5" }
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2"
 
 [dev-dependencies]
 glam = {version = "0.14", features = ["scalar-math"] }
 quad-rand = "0.1"
+

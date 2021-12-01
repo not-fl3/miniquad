@@ -207,7 +207,7 @@ fn main() {
             window_title: "Miniquad".to_string(),
             ..Default::default()
         },
-        |mut ctx| UserData::owning(Stage::new(&mut ctx), ctx),
+        |mut ctx| Box::new(Stage::new(&mut ctx)),
     );
 }
 
