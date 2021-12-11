@@ -234,6 +234,16 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
     }
 
+    pub fn set_wrap(&self, ctx: &mut Context, wrap: TextureWrap) {
+        ctx.cache.store_texture_binding(0);
+        ctx.cache.bind_texture(0, self.texture);
+        unsafe {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap as i32);
+        }
+        ctx.cache.restore_texture_binding(0);
+    }
+
     pub fn resize(&mut self, ctx: &mut Context, width: u32, height: u32, bytes: Option<&[u8]>) {
         ctx.cache.store_texture_binding(0);
 
