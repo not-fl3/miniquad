@@ -751,6 +751,10 @@ SOKOL_API_DECL void sapp_show_keyboard(bool visible);
 SOKOL_API_DECL bool sapp_keyboard_shown(void);
 /* show or hide the mouse cursor */
 SOKOL_API_DECL void sapp_show_mouse(bool visible);
+/* set the window size */
+SOKOL_API_DECL void sapp_set_window_size(int width, int height);
+/* set to fullscreen or exit fullscreen */
+SOKOL_API_DECL void sapp_set_fullscreen(bool set_fullscreen);
 /* show or hide the mouse cursor */
 SOKOL_API_DECL bool sapp_mouse_shown();
 /* return the userdata pointer optionally provided in sapp_desc */
@@ -1259,6 +1263,7 @@ _SOKOL_PRIVATE void _sapp_run(const sapp_desc* desc) {
     [NSApp run];
 }
 
+
 /* MacOS entry function */
 #if !defined(SOKOL_NO_ENTRY)
 int main(int argc, char* argv[]) {
@@ -1267,6 +1272,7 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 #endif /* SOKOL_NO_ENTRY */
+
 
 _SOKOL_PRIVATE void _sapp_macos_update_dimensions(void) {
     #if defined(SOKOL_METAL)
@@ -1283,6 +1289,19 @@ _SOKOL_PRIVATE void _sapp_macos_update_dimensions(void) {
     _sapp.window_height = bounds.size.height;
     SOKOL_ASSERT((_sapp.framebuffer_width > 0) && (_sapp.framebuffer_height > 0));
     _sapp.dpi_scale = (float)_sapp.framebuffer_width / (float)_sapp.window_width;
+}
+
+_SOKOL_PRIVATE void _sapp_macos_set_window_size(int width, int height) {
+    NSRect frame = [_sapp_macos_window_obj frame];
+    frame.size.width = width;
+    frame.size.height = height;
+    [_sapp_macos_window_obj setFrame: frame display: YES animate: YES];
+
+    _sapp_macos_update_dimensions();
+}
+
+_SOKOL_PRIVATE void _sapp_macos_toggle_fullscreen() {
+    [_sapp_macos_window_obj toggleFullScreen:_sapp_macos_window_obj];
 }
 
 _SOKOL_PRIVATE void _sapp_macos_frame(void) {
@@ -3815,6 +3834,7 @@ _SOKOL_PRIVATE void _sapp_d3d11_resize_default_render_target(void) {
     }
 }
 #endif
+
 
 #if defined(SOKOL_GLCORE33)
 _SOKOL_PRIVATE void _sapp_wgl_init(void) {
@@ -6747,6 +6767,7 @@ _SOKOL_PRIVATE bool _sapp_x11_window_visible(void) {
     return wa.map_state == IsViewable;
 }
 
+
 _SOKOL_PRIVATE void _sapp_x11_show_window(void) {
     if (!_sapp_x11_window_visible()) {
         XMapWindow(_sapp_x11_display, _sapp_x11_window);
@@ -7296,6 +7317,20 @@ SOKOL_API_IMPL void sapp_show_mouse(bool shown) {
     #else
     _SOKOL_UNUSED(shown);
     #endif
+}
+
+
+SOKOL_API_IMPL void sapp_set_window_size(int width, int height) {
+    _sapp_macos_set_window_size(width, height);
+}
+
+SOKOL_API_IMPL void sapp_set_fullscreen(bool set_fullscreen) {
+    if (_sapp.desc.fullscreen == set_fullscreen) {
+        return;
+    }
+
+    _sapp.desc.fullscreen = set_fullscreen;
+    _sapp_macos_toggle_fullscreen();
 }
 
 SOKOL_API_IMPL bool sapp_mouse_shown(void) {

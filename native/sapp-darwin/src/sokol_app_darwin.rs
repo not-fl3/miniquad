@@ -285,6 +285,12 @@ extern "C" {
 extern "C" {
     pub fn sapp_show_mouse(visible: bool);
 }
+extern "C" {
+    pub fn sapp_set_window_size(width: ::std::os::raw::c_int, height: ::std::os::raw::c_int);
+}
+extern "C" {
+    pub fn sapp_set_fullscreen(set_fullscreen: bool);
+}
 pub unsafe extern "C" fn sapp_set_cursor_grab(mut _shown: bool) {}
 
 extern "C" {
