@@ -76,6 +76,7 @@ pub struct Conf {
     pub icon: Option<Icon>,
 }
 
+#[derive(Clone)]
 pub struct Icon {
     pub small: [u8; 16 * 16 * 4],
     pub medium: [u8; 32 * 32 * 4],
