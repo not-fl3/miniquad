@@ -44,6 +44,7 @@ pub use sapp::gl;
 
 use std::ffi::CString;
 
+#[rustfmt::skip]
 mod default_icon;
 
 #[deprecated(
@@ -179,9 +180,7 @@ impl Context {
             sapp::sapp_set_window_size(new_width, new_height);
         }
 
-        #[cfg(any(
-            target_os="macos"
-        ))]
+        #[cfg(any(target_os = "macos"))]
         unsafe {
             sapp::sapp_set_window_size(new_width as _, new_height as _);
         }
@@ -189,11 +188,7 @@ impl Context {
 
     #[allow(unused_variables)]
     pub fn set_fullscreen(&self, fullscreen: bool) {
-        #[cfg(not(any(
-            target_os = "linux",
-            target_os = "ios",
-            target_os = "android",
-        )))]
+        #[cfg(not(any(target_os = "linux", target_os = "ios", target_os = "android",)))]
         unsafe {
             sapp::sapp_set_fullscreen(fullscreen);
         }
