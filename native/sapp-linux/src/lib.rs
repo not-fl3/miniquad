@@ -2755,7 +2755,11 @@ pub unsafe extern "C" fn sapp_run(mut desc: *const sapp_desc) {
     _sapp_x11_dpi = 96.0f32;
 
     _sapp_x11_query_system_dpi();
-    _sapp.dpi_scale = _sapp_x11_dpi / 96.0f32;
+    _sapp.dpi_scale = if _sapp.desc.high_dpi {
+        _sapp_x11_dpi / 96.0f32
+    } else {
+        1.0
+    };
     _sapp_x11_init_extensions();
     _sapp_glx_init();
     let mut visual = 0 as *mut Visual;
