@@ -22,6 +22,7 @@ pub mod clipboard;
 
 pub use gl::*;
 pub use rand::*;
+use x::Xlib_h::{XResizeWindow, XSetWindowBorderWidth};
 
 use crate::x::*;
 
@@ -2900,9 +2901,16 @@ pub unsafe fn sapp_is_fullscreen() -> bool {
     _sapp.desc.fullscreen as _
 }
 
+pub unsafe fn sapp_set_window_size(width: u32, height: u32) {
+    XResizeWindow(_sapp_x11_display, _sapp_x11_window, width as _, height as _);
+    XSetWindowBorderWidth(_sapp_x11_display, _sapp_x11_window, width as _);
+    _sapp.framebuffer_width = width as _;
+    _sapp.framebuffer_height = height as _;
+    XFlush(_sapp_x11_display);
+}
+
 pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
     _sapp.desc.fullscreen = fullscreen as _;
-
     let mut wm_state = XInternAtom(
         _sapp_x11_display,
         b"_NET_WM_STATE\x00" as *const u8 as *const libc::c_char,
@@ -2911,7 +2919,7 @@ pub unsafe fn sapp_set_fullscreen(fullscreen: bool) {
     let wm_fullscreen = XInternAtom(
         _sapp_x11_display,
         b"_NET_WM_STATE_FULLSCREEN\x00" as *const u8 as *const libc::c_char,
-        false as _,
+        true as _,
     );
 
     if fullscreen {

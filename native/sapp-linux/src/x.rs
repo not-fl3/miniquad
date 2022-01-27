@@ -16,7 +16,7 @@ pub use Xlib_h::{
     ClientMessageData, Display, Screen, Visual, XChangeProperty, XClientMessageEvent,
     XCloseDisplay, XCreateColormap, XCreateWindow, XDestroyWindow, XErrorEvent, XErrorHandler,
     XEvent, XFlush, XFree, XFreeColormap, XGetKeyboardMapping, XGetWindowAttributes,
-    XGetWindowProperty, XGrabPointer, XInitThreads, XInternAtom, XKeyEvent, XLowerWindow,
+    XGetWindowProperty, XGrabPointer, XInitThreads, XInternAtom, XConfigureWindow, XKeyEvent, XLowerWindow,
     XMapWindow, XNextEvent, XOpenDisplay, XPending, XPointer, XRaiseWindow, XResourceManagerString,
     XSelectionEvent, XSelectionRequestEvent, XSetErrorHandler, XSetWMProtocols,
     XSetWindowAttributes, XSync, XUngrabPointer, XUnmapWindow, XWindowAttributes, XrmInitialize,
@@ -543,6 +543,19 @@ pub mod Xlib_h {
         pub override_redirect: libc::c_int,
         pub screen: *mut Screen,
     }
+
+    #[derive(Copy, Clone)]
+    #[repr(C)]
+    pub struct XWindowChanges {
+        pub x: libc::c_int,
+        pub y: libc::c_int,
+        pub width: libc::c_int,
+        pub height: libc::c_int,
+        pub border_width: libc::c_int,
+        pub sibling: Window,
+        pub stack_mode: libc::c_int,
+    }
+
     #[derive(Copy, Clone)]
     #[repr(C)]
     pub struct Screen {
@@ -733,6 +746,9 @@ pub mod Xlib_h {
         pub fn XMapWindow(_: *mut Display, _: Window) -> libc::c_int;
         pub fn XLowerWindow(_: *mut Display, _: Window) -> libc::c_int;
         pub fn XRaiseWindow(_: *mut Display, _: Window) -> libc::c_int;
+        pub fn XConfigureWindow(_: *mut Display, _: Window, _: libc::c_uint, _: *mut XWindowChanges);
+        pub fn XResizeWindow(_: *mut Display, _: Window, _: libc::c_uint, _: libc::c_uint);
+        pub fn XSetWindowBorderWidth(_: *mut Display, _: Window, _: libc::c_uint);
         pub fn XPending(_: *mut Display) -> libc::c_int;
         pub fn XNextEvent(_: *mut Display, _: *mut XEvent) -> libc::c_int;
         pub fn XGetKeyboardMapping(
