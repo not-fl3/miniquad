@@ -180,7 +180,7 @@ impl Context {
             sapp::sapp_set_window_size(new_width, new_height);
         }
 
-        #[cfg(any(target_os = "macos"))]
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
         unsafe {
             sapp::sapp_set_window_size(new_width as _, new_height as _);
         }
@@ -188,7 +188,7 @@ impl Context {
 
     #[allow(unused_variables)]
     pub fn set_fullscreen(&self, fullscreen: bool) {
-        #[cfg(not(any(target_os = "linux", target_os = "ios", target_os = "android",)))]
+        #[cfg(not(any(target_os = "ios", target_os = "android",)))]
         unsafe {
             sapp::sapp_set_fullscreen(fullscreen);
         }
@@ -421,12 +421,18 @@ where
     desc.high_dpi = conf.high_dpi as _;
     desc.window_title = title.as_ptr();
     #[cfg(target_os = "windows")]
-    if let Some(icon) = conf.icon {
+    if let Some(icon) = conf.icon.clone() {
+        let small = icon.small.to_vec().clone();
+        let medium = icon.medium.to_vec().clone();
+        let big = icon.big.to_vec().clone();
         desc.icon = Some(sapp_windows::sapp_icon {
-            small: icon.small.as_ptr(),
-            medium: icon.medium.as_ptr(),
-            big: icon.big.as_ptr(),
+            small: small.as_ptr(),
+            medium: medium.as_ptr(),
+            big: big.as_ptr(),
         });
+        std::mem::forget(small);
+        std::mem::forget(medium);
+        std::mem::forget(big);
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "android",)))]
