@@ -535,7 +535,17 @@ pub unsafe fn sapp_set_cursor_grab(grab: bool) {
 }
 
 pub unsafe fn sapp_show_mouse(shown: bool) {
-    ShowCursor(shown as _);
+    if shown {
+        let mut display_count = ShowCursor(shown as _);
+        while display_count < 0 {
+            display_count = ShowCursor(shown as _);
+        } 
+    } else {
+        let mut display_count = ShowCursor(shown as _);
+        while display_count >= 0 {
+            display_count = ShowCursor(shown as _);
+        }
+    }
 }
 
 pub unsafe fn sapp_set_mouse_cursor(cursor_icon: u32) {
