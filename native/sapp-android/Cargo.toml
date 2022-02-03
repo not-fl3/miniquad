@@ -14,3 +14,4 @@ include = ["src/", "Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md"]
 [dependencies]
 libc = "0.2"
 ndk-sys = "0.2.1"
+ndk = "0.3.0"

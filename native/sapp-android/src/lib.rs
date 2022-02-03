@@ -4,7 +4,7 @@
     non_upper_case_globals,
     dead_code
 )]
-use std::ptr::NonNull;
+
 mod egl;
 pub mod gl3;
 mod rand;
@@ -32,7 +32,7 @@ use std::{
 };
 
 use libc::pipe;
-
+use std::ptr::NonNull;
 pub const SAPP_MAX_TOUCHPOINTS: usize = 8;
 
 pub const sapp_event_type_SAPP_EVENTTYPE_INVALID: sapp_event_type = 0;
@@ -439,8 +439,15 @@ unsafe fn lock_shared_state() -> std::sync::MutexGuard<'static, SharedState> {
     SHARED_STATE.as_mut().unwrap().lock().unwrap()
 }
 
-pub unsafe fn get_native_activity_pointer() -> Option<NonNull<ANativeActivity>> {
-    NonNull::new(lock_shared_state().activity)
+pub fn get_native_activity() -> Option<ndk::native_activity::NativeActivity> {
+    unsafe {
+        if let Some(activity) = NonNull::new(lock_shared_state().activity) {
+            Some(ndk::native_activity::NativeActivity::from_ptr(activity))
+        } else {
+            None
+        }
+    }
+    
 }
 
 unsafe fn read_shared_state() -> SharedState {
