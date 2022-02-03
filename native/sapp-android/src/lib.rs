@@ -4,7 +4,7 @@
     non_upper_case_globals,
     dead_code
 )]
-
+use std::ptr::NonNull;
 mod egl;
 pub mod gl3;
 mod rand;
@@ -437,6 +437,10 @@ unsafe fn lock_shared_state() -> std::sync::MutexGuard<'static, SharedState> {
     }
 
     SHARED_STATE.as_mut().unwrap().lock().unwrap()
+}
+
+pub unsafe fn get_native_activity_pointer() -> Option<NonNull<ANativeActivity>> {
+    NonNull::new(lock_shared_state().activity)
 }
 
 unsafe fn read_shared_state() -> SharedState {
