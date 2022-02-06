@@ -236,6 +236,7 @@ impl Texture {
 
     pub fn resize(&mut self, ctx: &mut Context, width: u32, height: u32, bytes: Option<&[u8]>) {
         ctx.cache.store_texture_binding(0);
+        ctx.cache.bind_texture(0, self.texture);
 
         let (internal_format, format, pixel_type) = self.format.into();
 
