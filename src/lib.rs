@@ -8,6 +8,10 @@ pub use sapp_android;
 extern crate sapp_darwin as sapp;
 #[cfg(not(any(
     target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
     target_os = "macos",
     target_os = "ios",
     target_os = "android",
@@ -17,9 +21,21 @@ extern crate sapp_darwin as sapp;
 extern crate sapp_dummy as sapp;
 #[cfg(target_os = "ios")]
 extern crate sapp_ios as sapp;
-#[cfg(all(target_os = "linux", feature = "kms"))]
+#[cfg(all(feature = "kms", any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+)))]
 extern crate sapp_kms as sapp;
-#[cfg(all(target_os = "linux", not(feature = "kms")))]
+#[cfg(all(not(feature = "kms"), any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+)))]
 extern crate sapp_linux as sapp;
 
 #[cfg(target_arch = "wasm32")]
@@ -140,7 +156,13 @@ impl Context {
     pub fn set_mouse_cursor(&self, _cursor_icon: CursorIcon) {
         #[cfg(any(
             target_arch = "wasm32",
-            all(target_os = "linux", not(feature = "kms")),
+            all(not(feature = "kms"), any(
+                target_os = "linux",
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "openbsd",
+            )),
             windows,
         ))]
         unsafe {
@@ -166,6 +188,10 @@ impl Context {
     pub fn set_window_size(&self, new_width: u32, new_height: u32) {
         #[cfg(not(any(
             target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd",
             target_os = "macos",
             target_os = "ios",
             target_os = "android",
@@ -188,7 +214,15 @@ impl Context {
 
     #[allow(unused_variables)]
     pub fn set_fullscreen(&self, fullscreen: bool) {
-        #[cfg(not(any(target_os = "linux", target_os = "ios", target_os = "android",)))]
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "ios",
+            target_os = "android",
+	)))]
         unsafe {
             sapp::sapp_set_fullscreen(fullscreen);
         }

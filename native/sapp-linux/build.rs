@@ -3,7 +3,12 @@ use std::env;
 fn main() {
     let target = env::var("TARGET").unwrap_or_else(|e| panic!("{}", e));
 
-    if target.contains("linux") == false {
+    if target.contains("linux") == false
+       && target.contains("dragonfly") == false
+       && target.contains("freebsd") == false
+       && target.contains("netbsd") == false
+       && target.contains("openbsd") == false
+    {
         panic!("sapp_linux support only linux target");
     }
 
