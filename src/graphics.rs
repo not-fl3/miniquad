@@ -1047,12 +1047,12 @@ impl Context {
     }
 
     /// start rendering to an offscreen framebuffer
-    pub fn begin_pass(&mut self, pass: impl Into<Option<RenderPass>>, action: PassAction) {
+    pub fn begin_pass(&mut self, pass: impl Into<Option<RenderPass>>, action: PassAction, _width: u32, _height: u32) {
         let (framebuffer, w, h) = match pass.into() {
             None => (
                 self.default_framebuffer,
-                unsafe { sapp_width() } as i32,
-                unsafe { sapp_height() } as i32,
+                _width as i32,
+                _height as i32,
             ),
             Some(pass) => {
                 let pass = &self.passes[pass.0];
