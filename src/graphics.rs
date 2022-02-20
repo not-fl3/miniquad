@@ -1042,8 +1042,8 @@ impl Context {
     }
 
     /// start rendering to the default frame buffer
-    pub fn begin_default_pass(&mut self, action: PassAction) {
-        self.begin_pass(None, action);
+    pub fn begin_default_pass(&mut self, action: PassAction, _width: u32, _height: u32) {
+        self.begin_pass(None, action, _width, _height);
     }
 
     /// start rendering to an offscreen framebuffer
