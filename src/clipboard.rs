@@ -2,7 +2,13 @@
 
 use crate::Context;
 
-#[cfg(all(target_os = "linux", feature = "sapp-linux"))]
+#[cfg(all(feature = "sapp-linux", any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+)))]
 mod linux_x11 {
     use crate::Context;
 
@@ -53,7 +59,13 @@ mod windows {
 }
 
 #[cfg(not(any(
-    all(target_os = "linux", feature = "sapp-linux"),
+    all(feature = "sapp-linux", any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    )),
     target_os = "windows",
     target_arch = "wasm32"
 )))]
@@ -68,12 +80,24 @@ mod dummy {
 }
 
 #[cfg(not(any(
-    all(target_os = "linux", feature = "sapp-linux"),
+    all(feature = "sapp-linux", any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    )),
     target_os = "windows",
     target_arch = "wasm32"
 )))]
 use dummy as clipboard;
-#[cfg(all(target_os = "linux", feature = "sapp-linux"))]
+#[cfg(all(feature = "sapp-linux", any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+)))]
 use linux_x11 as clipboard;
 #[cfg(target_arch = "wasm32")]
 use wasm as clipboard;
