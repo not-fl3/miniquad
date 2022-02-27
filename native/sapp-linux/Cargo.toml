@@ -1,6 +1,6 @@
 [package]
 name = "sapp-linux"
-version = "0.1.13"
+version = "0.1.14"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
