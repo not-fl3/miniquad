@@ -247,6 +247,10 @@ pub const GL_QUERY_RESULT_AVAILABLE: u32 = 34919;
 pub const GL_VENDOR: u32 = 0x1F00;
 pub const GL_VERSION: u32 = 0x1F02;
 
+pub const GL_TEXTURE_BINDING_2D: u32 = 32873u32;
+pub const GL_TEXTURE_COMPARE_MODE: u32 = 0x884C;
+pub const GL_COMPARE_REF_TO_TEXTURE: u32 = 0x884E;
+
 pub const WGL_NUMBER_PIXEL_FORMATS_ARB: u32 = 0x2000;
 pub const WGL_SUPPORT_OPENGL_ARB: u32 = 0x2010;
 pub const WGL_DRAW_TO_WINDOW_ARB: u32 = 0x2001;
@@ -632,5 +636,6 @@ gl_loader!(
     fn glGenQueries(n: GLsizei, ids: *mut GLuint) -> (),
     fn glGetQueryObjectiv(id: GLuint, pname: GLenum, params: *mut GLint) -> (),
     fn glGetQueryObjectui64v(id: GLuint, pname: GLenum, params: *mut GLuint64) -> (),
-    fn glFinish() -> ()
+    fn glFinish() -> (),
+    fn glGenerateMipmap(target: u32) -> ()
 );
