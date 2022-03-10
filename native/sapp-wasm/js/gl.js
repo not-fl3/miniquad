@@ -1166,28 +1166,32 @@ var importObject = {
                 event.preventDefault();
 
                 for (const touch of event.changedTouches) {
-                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_BEGAN, touch.identifier, Math.floor(touch.clientX) * dpi_scale(), Math.floor(touch.clientY) * dpi_scale());
+                    let relative_position = mouse_relative_position(touch.clientX, touch.clientY);
+                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_BEGAN, touch.identifier, relative_position.x, relative_position.y);
                 }
             });
             canvas.addEventListener("touchend", function (event) {
                 event.preventDefault();
 
                 for (const touch of event.changedTouches) {
-                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_ENDED, touch.identifier, Math.floor(touch.clientX) * dpi_scale(), Math.floor(touch.clientY) * dpi_scale());
+                    let relative_position = mouse_relative_position(touch.clientX, touch.clientY);
+                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_ENDED, touch.identifier, relative_position.x, relative_position.y);
                 }
             });
             canvas.addEventListener("touchcancel", function (event) {
                 event.preventDefault();
 
                 for (const touch of event.changedTouches) {
-                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_CANCELED, touch.identifier, Math.floor(touch.clientX) * dpi_scale(), Math.floor(touch.clientY) * dpi_scale());
+                    let relative_position = mouse_relative_position(touch.clientX, touch.clientY);
+                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_CANCELED, touch.identifier, relative_position.x, relative_position.y);
                 }
             });
             canvas.addEventListener("touchmove", function (event) {
                 event.preventDefault();
 
                 for (const touch of event.changedTouches) {
-                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_MOVED, touch.identifier, Math.floor(touch.clientX) * dpi_scale(), Math.floor(touch.clientY) * dpi_scale());
+                    let relative_position = mouse_relative_position(touch.clientX, touch.clientY);
+                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_MOVED, touch.identifier, relative_position.x, relative_position.y);
                 }
             });
 
