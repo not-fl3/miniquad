@@ -313,6 +313,7 @@ pub struct ShaderImage {
     gl_loc: UniformLocation,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct ShaderUniform {
     gl_loc: UniformLocation,
