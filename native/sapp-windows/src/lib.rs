@@ -30,10 +30,10 @@ use winapi::{
         },
         winuser::{
             AdjustWindowRectEx, ClientToScreen, ClipCursor, CreateIconIndirect, CreateWindowExW,
-            DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect,
-            GetCursorInfo, GetDC, GetKeyState, GetRawInputData, GetSystemMetrics, LoadCursorW,
-            LoadIconW, MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage,
-            RegisterClassW, RegisterRawInputDevices, ReleaseDC, SendMessageW, SetCursor, SetRect,
+            DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, GetCursorInfo, GetDC,
+            GetKeyState, GetRawInputData, GetSystemMetrics, LoadCursorW, LoadIconW,
+            MonitorFromPoint, PeekMessageW, PostMessageW, PostQuitMessage, RegisterClassW,
+            RegisterRawInputDevices, ReleaseDC, SendMessageW, SetCursor, SetRect,
             SetWindowLongPtrA, SetWindowPos, ShowCursor, ShowWindow, TrackMouseEvent,
             TranslateMessage, UnregisterClassW, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CURSORINFO,
             CURSOR_SHOWING, CW_USEDEFAULT, GWL_STYLE, HTCLIENT, HWND_TOP, ICONINFO, ICON_BIG,
@@ -259,14 +259,14 @@ pub struct sapp_event {
     pub framebuffer_height: i32,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct sapp_icon {
-    pub small: *const u8,
-    pub medium: *const u8,
-    pub big: *const u8,
+    pub small: Vec<u8>,
+    pub medium: Vec<u8>,
+    pub big: Vec<u8>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct sapp_desc {
     pub init_cb: Option<unsafe extern "C" fn() -> ()>,
     pub frame_cb: Option<unsafe extern "C" fn() -> ()>,
@@ -939,7 +939,7 @@ unsafe fn init_state(desc: *const sapp_desc) {
         }
     }
 
-    _sapp.desc = *desc;
+    _sapp.desc = (*desc).clone();
     _sapp.first_frame = true;
     _sapp.window_width = _sapp_def(_sapp.desc.width, 640, 0);
     _sapp.window_height = _sapp_def(_sapp.desc.height, 480, 0);
@@ -1225,7 +1225,7 @@ unsafe fn init_dpi() {
     }
 }
 
-unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: *const u8) -> Option<HICON> {
+unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: &[u8]) -> Option<HICON> {
     let mut bi: BITMAPV5HEADER = std::mem::zeroed();
 
     bi.bV5Size = std::mem::size_of::<BITMAPV5HEADER>() as _;
@@ -1240,8 +1240,6 @@ unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: *const u8)
     bi.bV5AlphaMask = 0xFF000000;
 
     let mut target = std::ptr::null_mut();
-    // const uint8_t* source = (const uint8_t*)desc->pixels.ptr;
-
     let dc = GetDC(std::ptr::null_mut());
     let color = CreateDIBSection(
         dc,
@@ -1263,12 +1261,11 @@ unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: *const u8)
         return None;
     }
 
-    let source = std::slice::from_raw_parts(colors, width as usize * height as usize * 4);
     for i in 0..width as usize * height as usize {
-        *(target as *mut u8).offset(i as isize * 4 + 0) = source[i * 4 + 2];
-        *(target as *mut u8).offset(i as isize * 4 + 1) = source[i * 4 + 1];
-        *(target as *mut u8).offset(i as isize * 4 + 2) = source[i * 4 + 0];
-        *(target as *mut u8).offset(i as isize * 4 + 3) = source[i * 4 + 3];
+        *(target as *mut u8).offset(i as isize * 4 + 0) = colors[i * 4 + 2];
+        *(target as *mut u8).offset(i as isize * 4 + 1) = colors[i * 4 + 1];
+        *(target as *mut u8).offset(i as isize * 4 + 2) = colors[i * 4 + 0];
+        *(target as *mut u8).offset(i as isize * 4 + 3) = colors[i * 4 + 3];
     }
 
     let mut icon_info: ICONINFO = std::mem::zeroed();
@@ -1284,26 +1281,26 @@ unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: *const u8)
     Some(icon_handle)
 }
 
-unsafe fn set_icon(icon: sapp_icon) {
+unsafe fn set_icon(icon: &sapp_icon) {
     let big_icon_w = GetSystemMetrics(SM_CXICON);
     let big_icon_h = GetSystemMetrics(SM_CYICON);
     let small_icon_w = GetSystemMetrics(SM_CXSMICON);
     let small_icon_h = GetSystemMetrics(SM_CYSMICON);
 
     let big_icon = if big_icon_w * big_icon_h >= 64 * 64 {
-        (icon.big, 64, 64)
+        (icon.big.clone(), 64, 64)
     } else {
-        (icon.medium, 32, 32)
+        (icon.medium.clone(), 32, 32)
     };
 
     let small_icon = if small_icon_w * small_icon_h <= 16 * 16 {
-        (icon.small, 16, 16)
+        (icon.small.clone(), 16, 16)
     } else {
-        (icon.medium, 32, 32)
+        (icon.medium.clone(), 32, 32)
     };
 
-    let big_icon = create_win_icon_from_image(big_icon.1, big_icon.2, big_icon.0);
-    let small_icon = create_win_icon_from_image(small_icon.1, small_icon.2, small_icon.0);
+    let big_icon = create_win_icon_from_image(big_icon.1, big_icon.2, &big_icon.0);
+    let small_icon = create_win_icon_from_image(small_icon.1, small_icon.2, &small_icon.0);
     if let Some(icon) = big_icon {
         SendMessageW(_sapp_win32_hwnd, WM_SETICON, ICON_BIG as _, icon as LPARAM);
     }
@@ -1806,7 +1803,7 @@ pub unsafe fn sapp_run(desc: *const sapp_desc) -> i32 {
     init_keytable();
     init_dpi();
     create_window();
-    if let Some(icon) = (&*desc).icon {
+    if let Some(ref icon) = (&*desc).icon {
         set_icon(icon);
     }
 

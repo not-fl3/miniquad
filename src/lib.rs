@@ -457,9 +457,9 @@ where
     #[cfg(target_os = "windows")]
     if let Some(icon) = conf.icon {
         desc.icon = Some(sapp_windows::sapp_icon {
-            small: icon.small.as_ptr(),
-            medium: icon.medium.as_ptr(),
-            big: icon.big.as_ptr(),
+            small: icon.small.to_vec(),
+            medium: icon.medium.to_vec(),
+            big: icon.big.to_vec(),
         });
     }
 
