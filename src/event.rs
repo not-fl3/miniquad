@@ -1,4 +1,5 @@
 use crate::Context;
+use std::path::PathBuf;
 
 use crate::sapp::{self, sapp_keycode, sapp_mousebutton};
 
@@ -409,6 +410,15 @@ pub trait EventHandler {
     /// ctx.cancel_quit() to cancel the quit.
     /// If the event is ignored, the application will quit as usual.
     fn quit_requested_event(&mut self, _ctx: &mut Context) {}
+
+    /// A file has been dropped over the application.
+    fn file_dropped_event(
+        &mut self,
+        _ctx: &mut Context,
+        _path: Option<PathBuf>,
+        _bytes: Option<Vec<u8>>,
+    ) {
+    }
 }
 
 /// A trait defining event callbacks.
@@ -460,4 +470,6 @@ pub trait EventHandlerFree {
     /// ctx.cancel_quit() to cancel the quit.
     /// If the event is ignored, the application will quit as usual.
     fn quit_requested_event(&mut self) {}
+
+    fn file_dropped_event(&mut self, _path: Option<PathBuf>, _bytes: Option<Vec<u8>>) {}
 }

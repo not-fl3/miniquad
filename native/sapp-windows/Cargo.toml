@@ -12,4 +12,4 @@ homepage = "https://github.com/not-fl3/miniquad"
 include = ["src/", "Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md"]
 
 [dependencies]
-winapi = { version = "0.3", features = ["wingdi", "winuser", "libloaderapi", "windef", "shellscalingapi", "errhandlingapi", "windowsx", "winbase", "hidusage"] }
+winapi = { version = "0.3", features = ["wingdi", "winuser", "libloaderapi", "windef", "shellscalingapi", "errhandlingapi", "windowsx", "winbase", "hidusage", "shellapi"] }

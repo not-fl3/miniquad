@@ -10,7 +10,9 @@ pub use rand::*;
 use winapi::{
     shared::{
         hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_GENERIC_POINTER},
-        minwindef::{DWORD, HINSTANCE, HIWORD, INT, LOWORD, LPARAM, LRESULT, PROC, UINT, WPARAM},
+        minwindef::{
+            DWORD, HINSTANCE, HIWORD, INT, LOWORD, LPARAM, LRESULT, PROC, UINT, WPARAM, TRUE, MAX_PATH
+        },
         ntdef::{HRESULT, LPCSTR, NULL},
         windef::{HCURSOR, HDC, HGLRC, HICON, HMONITOR, HWND, POINT, RECT},
         windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
@@ -18,6 +20,7 @@ use winapi::{
     um::{
         errhandlingapi::GetLastError,
         libloaderapi::{FreeLibrary, GetModuleHandleW, GetProcAddress, LoadLibraryA},
+        shellapi::{DragAcceptFiles, DragFinish, DragQueryFileW, HDROP},
         shellscalingapi::{
             MDT_EFFECTIVE_DPI, MONITOR_DPI_TYPE, PROCESS_DPI_AWARENESS, PROCESS_DPI_UNAWARE,
             PROCESS_SYSTEM_DPI_AWARE,
@@ -44,20 +47,21 @@ use winapi::{
             SC_SCREENSAVE, SIZE_MINIMIZED, SM_CXICON, SM_CXSCREEN, SM_CXSMICON, SM_CYICON,
             SM_CYSCREEN, SM_CYSMICON, SWP_FRAMECHANGED, SWP_NOMOVE, SW_HIDE, SW_SHOW, TME_LEAVE,
             TRACKMOUSEEVENT, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT, WM_CHAR, WM_CLOSE,
-            WM_ERASEBKGND, WM_INPUT, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP,
-            WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSELEAVE, WM_MOUSEMOVE,
-            WM_MOUSEWHEEL, WM_MOVE, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SETCURSOR,
-            WM_SETICON, WM_SIZE, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSW, WS_CAPTION,
-            WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW, WS_EX_OVERLAPPEDWINDOW,
-            WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SIZEBOX, WS_SYSMENU,
-            WS_VISIBLE,
+            WM_DROPFILES, WM_ERASEBKGND, WM_INPUT, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
+            WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSELEAVE,
+            WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_MOVE, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP,
+            WM_SETCURSOR, WM_SETICON, WM_SIZE, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP,
+            WNDCLASSW, WS_CAPTION, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_APPWINDOW,
+            WS_EX_OVERLAPPEDWINDOW, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP,
+            WS_SIZEBOX, WS_SYSMENU, WS_VISIBLE,
         },
     },
 };
 
 pub type sapp_event_type = u32;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
-pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 22;
+pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 23;
+pub const sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED: sapp_event_type = 22;
 pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
 pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
 pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
@@ -236,7 +240,7 @@ pub const SAPP_CURSOR_NSRESIZE: u32 = 9;
 pub const SAPP_CURSOR_NESWRESIZE: u32 = 10;
 pub const SAPP_CURSOR_NWSERESIZE: u32 = 11;
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 pub struct sapp_event {
     pub frame_count: u64,
     pub type_: sapp_event_type,
@@ -257,6 +261,10 @@ pub struct sapp_event {
     pub window_height: i32,
     pub framebuffer_width: i32,
     pub framebuffer_height: i32,
+    pub file_path: Option<[u16; MAX_PATH]>,
+    pub file_path_length: usize,
+    pub file_buf: *mut u8,
+    pub file_buf_length: usize
 }
 
 #[derive(Clone)]
@@ -418,6 +426,10 @@ static mut _sapp: _sapp_state = _sapp_state {
         window_height: 0,
         framebuffer_width: 0,
         framebuffer_height: 0,
+        file_path: None,
+        file_path_length: 0,
+        file_buf: std::ptr::null_mut(),
+        file_buf_length: 0,
     },
     desc: sapp_desc {
         init_cb: None,
@@ -923,6 +935,24 @@ unsafe extern "system" fn win32_wndproc(
                 HIWORD(lParam as _) as u32 & 0x1FF,
                 false,
             ),
+            WM_DROPFILES => {
+                let hdrop = wParam as HDROP;
+                let mut path: [u16; MAX_PATH] = std::mem::zeroed();
+                let num_drops = DragQueryFileW(hdrop, 0xFFFFFFFF, std::ptr::null_mut(), 0);
+
+                for i in 0..num_drops {
+                    let path_len =
+                        DragQueryFileW(hdrop, i, path.as_mut_ptr(), MAX_PATH as u32) as usize;
+                    if path_len > 0 {
+                        _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED);
+                        _sapp.event.file_path = Some(path);
+                        _sapp.event.file_path_length = path_len;
+                        _sapp_call_event(&_sapp.event);
+                    }
+                }
+
+                DragFinish(hdrop);
+            }
             _ => {}
         }
     }
@@ -1365,6 +1395,7 @@ unsafe fn create_window() {
         NULL as _,                   // lParam
     );
     assert!(_sapp_win32_hwnd.is_null() == false);
+    DragAcceptFiles(_sapp_win32_hwnd, TRUE);
     ShowWindow(_sapp_win32_hwnd, SW_SHOW);
     _sapp_win32_in_create_window = false;
     let dc = GetDC(_sapp_win32_hwnd);
