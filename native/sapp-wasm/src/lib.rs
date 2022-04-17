@@ -72,7 +72,8 @@ pub const sapp_event_type_SAPP_EVENTTYPE_RESUMED: sapp_event_type = 18;
 pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
 pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
 pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
-pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 22;
+pub const sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED: sapp_event_type = 22;
+pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 23;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
 
 pub const sapp_keycode_SAPP_KEYCODE_INVALID: sapp_keycode = 0;
@@ -242,6 +243,10 @@ pub struct sapp_event {
     pub window_height: ::std::os::raw::c_int,
     pub framebuffer_width: ::std::os::raw::c_int,
     pub framebuffer_height: ::std::os::raw::c_int,
+    pub file_path: Option<[u16; 4096]>,
+    pub file_path_length: usize,
+    pub file_buf: *mut u8,
+    pub file_buf_length: usize,
 }
 
 #[repr(C)]
@@ -570,6 +575,29 @@ pub extern "C" fn touch(event_type: u32, id: u32, x: f32, y: f32) {
     event.touches[0].pos_x = x;
     event.touches[0].pos_y = y;
     event.touches[0].changed = true;
+    unsafe {
+        sapp_context().event(event);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn on_file_dropped(name: *mut u8, name_len: usize, bytes: *mut u8, bytes_len: usize) {
+    let name_utf16 = unsafe {
+        String::from_raw_parts(name, name_len, name_len).encode_utf16().collect::<Vec<_>>()
+    };
+
+    let mut name_array = [0; 4096];
+    let actual_len = name_array.len().min(name_utf16.len());
+    name_array[0..actual_len].copy_from_slice(&name_utf16[0..actual_len]);
+
+    let mut event: sapp_event = unsafe { std::mem::zeroed() };
+
+    event.type_ = sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED as u32;
+    event.file_path = Some(name_array);
+    event.file_path_length = actual_len;
+    event.file_buf = bytes;
+    event.file_buf_length = bytes_len;
+
     unsafe {
         sapp_context().event(event);
     }

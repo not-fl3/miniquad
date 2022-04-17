@@ -1226,6 +1226,29 @@ var importObject = {
                 }
             });
 
+            window.ondragover = function(e) {
+                e.preventDefault();
+            };
+
+            window.ondrop = async function(e) {
+                e.preventDefault();
+
+                for (let file of e.dataTransfer.files) {
+                    const nameLen = file.name.length;
+                    const nameVec = wasm_exports.allocate_vec_u8(nameLen);
+                    const nameHeap = new Uint8Array(wasm_memory.buffer, nameVec, nameLen);
+                    stringToUTF8(file.name, nameHeap, 0, nameLen);
+
+                    const fileBuf = await file.arrayBuffer();
+                    const fileLen = fileBuf.byteLength;
+                    const fileVec = wasm_exports.allocate_vec_u8(fileLen);
+                    const fileHeap = new Uint8Array(wasm_memory.buffer, fileVec, fileLen);
+                    fileHeap.set(new Uint8Array(fileBuf), 0);
+
+                    wasm_exports.on_file_dropped(nameVec, nameLen, fileVec, fileLen);
+                }
+            };
+
             window.requestAnimationFrame(animation);
         },
 
