@@ -48,6 +48,7 @@ pub mod conf;
 mod event;
 pub mod fs;
 pub mod graphics;
+pub mod dnd;
 
 #[cfg(feature = "log-impl")]
 pub mod log;
@@ -59,7 +60,6 @@ pub use graphics::*;
 pub use sapp::gl;
 
 use std::ffi::CString;
-use std::path::PathBuf;
 
 #[rustfmt::skip]
 mod default_icon;
@@ -403,31 +403,8 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
             event_call!(data, window_minimized_event);
         }
         #[cfg(any(target_os = "windows", target_os = "linux", target_arch = "wasm32"))]
-        sapp::sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED => {
-            let path = event.file_path.map(|path| {
-                #[cfg(target_os = "windows")]
-                {
-                    use std::os::windows::ffi::OsStringExt;
-                    PathBuf::from(std::ffi::OsString::from_wide(&path[0..event.file_path_length]))
-                }
-
-                #[cfg(not(target_os = "windows"))]
-                PathBuf::from(String::from_utf8_lossy(&path[0..event.file_path_length]).as_ref())
-            });
-
-            let bytes = if event.file_buf_length > 0 {
-                Some(unsafe {
-                    Vec::from_raw_parts(
-                        event.file_buf,
-                        event.file_buf_length,
-                        event.file_buf_length,
-                    )
-                })
-            } else {
-                None
-            };
-
-            event_call!(data, file_dropped_event, path, bytes);
+        sapp::sapp_event_type_SAPP_EVENTTYPE_FILES_DROPPED => {
+            event_call!(data, files_dropped_event);
         }
         _ => {}
     }

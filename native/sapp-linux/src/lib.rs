@@ -23,12 +23,14 @@ pub mod clipboard;
 pub use gl::*;
 pub use rand::*;
 
+use std::path::PathBuf;
+
 use crate::x::*;
 
 pub type sapp_event_type = libc::c_uint;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
 pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 23;
-pub const sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED: sapp_event_type = 22;
+pub const sapp_event_type_SAPP_EVENTTYPE_FILES_DROPPED: sapp_event_type = 22;
 pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
 pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
 pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
@@ -255,11 +257,13 @@ pub struct sapp_event {
     pub window_height: libc::c_int,
     pub framebuffer_width: libc::c_int,
     pub framebuffer_height: libc::c_int,
-    pub file_path: Option<[u8; 4096]>,
-    pub file_path_length: usize,
-    pub file_buf: *mut u8,
-    pub file_buf_length: usize,
 }
+
+#[derive(Clone)]
+pub struct sapp_drop {
+    pub file_paths: Vec<PathBuf>,
+}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct sapp_desc {
@@ -294,8 +298,7 @@ pub struct sapp_desc {
     pub ios_keyboard_resizes_canvas: bool,
     pub gl_force_gles2: bool,
 }
-#[derive(Copy, Clone)]
-#[repr(C)]
+#[derive(Clone)]
 pub struct _sapp_state {
     pub valid: bool,
     pub window_width: libc::c_int,
@@ -324,6 +327,7 @@ pub struct _sapp_state {
     pub desc: sapp_desc,
     pub keycodes: [sapp_keycode; 512],
     pub xdnd: sapp_xdnd,
+    pub drop: sapp_drop,
 }
 
 /// opcode from XQueryExtension("XInputExtension")
@@ -2824,15 +2828,15 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
                     &mut buf) as usize;
                 let data = std::slice::from_raw_parts(buf as _, len);
                 let decoded = sapp_x11_percent_decode(&data);
-                for path in decoded.split("\r\n")
-                    .filter(|path| !path.is_empty())
-                    .map(|path| path.trim_start_matches("file://")) {
-                    let mut path_bytes = [0; 4096];
-                    path_bytes[0..path.len()].copy_from_slice(path.as_bytes());
 
-                    _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED);
-                    _sapp.event.file_path = Some(path_bytes);
-                    _sapp.event.file_path_length = path.len();
+                _sapp.drop.file_paths = decoded.split("\r\n")
+                    .filter(|path| !path.is_empty())
+                    .map(|path| path.trim_start_matches("file://").to_string())
+                    .map(PathBuf::from)
+                    .collect();
+
+                if !_sapp.drop.file_paths.is_empty() {
+                    _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_FILES_DROPPED);
                     _sapp_call_event(&mut _sapp.event);
                 }
             }
@@ -3257,10 +3261,6 @@ pub static mut _sapp: _sapp_state = _sapp_state {
         window_height: 0,
         framebuffer_width: 0,
         framebuffer_height: 0,
-        file_path: None,
-        file_path_length: 0,
-        file_buf: std::ptr::null_mut(),
-        file_buf_length: 0,
     },
     desc: sapp_desc {
         init_cb: None,
@@ -3309,6 +3309,9 @@ pub static mut _sapp: _sapp_state = _sapp_state {
             type_list: 0,
             text_uri_list: 0
         }
+    },
+    drop: sapp_drop {
+        file_paths: vec![]
     }
 };
 #[no_mangle]
@@ -3339,4 +3342,20 @@ fn sapp_x11_percent_decode(bytes: &[u8]) -> String {
     }
 
     String::from_utf8_lossy(&decoded).into_owned()
+}
+
+pub fn dropped_file_count() -> usize {
+    unsafe {
+        _sapp.drop.file_paths.len()
+    }
+}
+
+pub fn dropped_file_bytes(index: usize) -> Option<Vec<u8>> {
+    None
+}
+
+pub fn dropped_file_path(index: usize) -> Option<PathBuf> {
+    unsafe {
+        _sapp.drop.file_paths.get(index).cloned()
+    }
 }

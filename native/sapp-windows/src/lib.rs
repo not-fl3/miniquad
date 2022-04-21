@@ -4,6 +4,9 @@ pub mod clipboard;
 pub mod gl;
 mod rand;
 
+use std::ffi::OsString;
+use std::os::windows::ffi::OsStringExt;
+use std::path::PathBuf;
 pub use gl::*;
 pub use rand::*;
 
@@ -61,7 +64,7 @@ use winapi::{
 pub type sapp_event_type = u32;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
 pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 23;
-pub const sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED: sapp_event_type = 22;
+pub const sapp_event_type_SAPP_EVENTTYPE_FILES_DROPPED: sapp_event_type = 22;
 pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
 pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
 pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
@@ -261,10 +264,6 @@ pub struct sapp_event {
     pub window_height: i32,
     pub framebuffer_width: i32,
     pub framebuffer_height: i32,
-    pub file_path: Option<[u16; MAX_PATH]>,
-    pub file_path_length: usize,
-    pub file_buf: *mut u8,
-    pub file_buf_length: usize
 }
 
 #[derive(Clone)]
@@ -272,6 +271,11 @@ pub struct sapp_icon {
     pub small: Vec<u8>,
     pub medium: Vec<u8>,
     pub big: Vec<u8>,
+}
+
+#[derive(Clone)]
+pub struct sapp_drop {
+    pub file_paths: Vec<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -335,6 +339,7 @@ pub struct _sapp_state {
     pub event: sapp_event,
     pub desc: sapp_desc,
     pub keycodes: [sapp_keycode; 512],
+    pub drop: sapp_drop,
 }
 
 static mut _sapp_win32_window_scale: f32 = 1.;
@@ -426,10 +431,6 @@ static mut _sapp: _sapp_state = _sapp_state {
         window_height: 0,
         framebuffer_width: 0,
         framebuffer_height: 0,
-        file_path: None,
-        file_path_length: 0,
-        file_buf: std::ptr::null_mut(),
-        file_buf_length: 0,
     },
     desc: sapp_desc {
         init_cb: None,
@@ -463,6 +464,9 @@ static mut _sapp: _sapp_state = _sapp_state {
         icon: None,
     },
     keycodes: [sapp_keycode_SAPP_KEYCODE_INVALID; 512],
+    drop: sapp_drop {
+        file_paths: Vec::new(),
+    }
 };
 
 #[no_mangle]
@@ -940,15 +944,21 @@ unsafe extern "system" fn win32_wndproc(
                 let mut path: [u16; MAX_PATH] = std::mem::zeroed();
                 let num_drops = DragQueryFileW(hdrop, 0xFFFFFFFF, std::ptr::null_mut(), 0);
 
+                let mut paths = Vec::with_capacity(num_drops as _);
+
                 for i in 0..num_drops {
                     let path_len =
                         DragQueryFileW(hdrop, i, path.as_mut_ptr(), MAX_PATH as u32) as usize;
                     if path_len > 0 {
-                        _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED);
-                        _sapp.event.file_path = Some(path);
-                        _sapp.event.file_path_length = path_len;
-                        _sapp_call_event(&_sapp.event);
+                        paths.push(PathBuf::from(OsString::from_wide(&path)));
                     }
+                }
+
+                _sapp.drop.file_paths = paths;
+
+                if !_sapp.drop.file_paths.is_empty() {
+                    _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_FILES_DROPPED);
+                    _sapp_call_event(&_sapp.event);
                 }
 
                 DragFinish(hdrop);
@@ -1879,4 +1889,20 @@ pub unsafe fn sapp_run(desc: *const sapp_desc) -> i32 {
 
 pub unsafe fn sapp_is_elapsed_timer_supported() -> bool {
     return true;
+}
+
+pub fn dropped_file_count() -> usize {
+    unsafe {
+        _sapp.drop.file_paths.len()
+    }
+}
+
+pub fn dropped_file_bytes(_index: usize) -> Option<Vec<u8>> {
+    None
+}
+
+pub fn dropped_file_path(index: usize) -> Option<PathBuf> {
+    unsafe {
+        _sapp.drop.file_paths.get(index).cloned()
+    }
 }
