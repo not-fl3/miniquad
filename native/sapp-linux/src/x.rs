@@ -10,7 +10,7 @@ pub use X_h::{
     FocusChangeMask, GrabModeAsync, InputOutput, IsViewable, KeyCode, KeyPressMask, KeyReleaseMask,
     KeySym, KeymapStateMask, LeaveWindowMask, Mod1Mask, Mod4Mask, Pixmap, PointerMotionHintMask,
     PointerMotionMask, PropModeReplace, PropertyChangeMask, PropertyNewValue, ShiftMask,
-    StaticGravity, StructureNotifyMask, Success, VisibilityChangeMask, Window, XID,
+    StaticGravity, StructureNotifyMask, Success, VisibilityChangeMask, Window, XID, Time
 };
 pub use Xlib_h::{
     ClientMessageData, Display, Screen, Visual, XChangeProperty, XClientMessageEvent,
@@ -991,5 +991,21 @@ extern "C" {
         _: libc::c_int,
         _: libc::c_long,
         _: *mut XEvent,
+    ) -> libc::c_int;
+
+    pub fn XConvertSelection(
+        _: *mut Display,
+        _: Atom,
+        _: Atom,
+        _: Atom,
+        _: Window,
+        _: Time,
+    ) -> libc::c_int;
+
+    pub fn XSetSelectionOwner(
+        _: *mut Display,
+        _: Atom,
+        _: Window,
+        _: Time
     ) -> libc::c_int;
 }

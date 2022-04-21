@@ -471,5 +471,6 @@ pub trait EventHandlerFree {
     /// If the event is ignored, the application will quit as usual.
     fn quit_requested_event(&mut self) {}
 
+    /// A file has been dropped over the application.
     fn file_dropped_event(&mut self, _path: Option<PathBuf>, _bytes: Option<Vec<u8>>) {}
 }
