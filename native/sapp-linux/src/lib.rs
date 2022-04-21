@@ -27,7 +27,8 @@ use crate::x::*;
 
 pub type sapp_event_type = libc::c_uint;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
-pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 22;
+pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 23;
+pub const sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED: sapp_event_type = 22;
 pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
 pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
 pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
@@ -210,6 +211,30 @@ pub const SAPP_CURSOR_NUM: usize = 12; // number of cursors
 
 #[derive(Copy, Clone)]
 #[repr(C)]
+pub struct sapp_xdnd_atoms {
+    aware: Atom,
+    enter: Atom,
+    position: Atom,
+    status: Atom,
+    action_copy: Atom,
+    drop: Atom,
+    finished: Atom,
+    selection: Atom,
+    type_list: Atom,
+    text_uri_list: Atom,
+}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct sapp_xdnd {
+    version: Atom,
+    format: Atom,
+    source: Window,
+    atoms: sapp_xdnd_atoms,
+}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
 pub struct sapp_event {
     pub frame_count: u64,
     pub type_: sapp_event_type,
@@ -230,6 +255,10 @@ pub struct sapp_event {
     pub window_height: libc::c_int,
     pub framebuffer_width: libc::c_int,
     pub framebuffer_height: libc::c_int,
+    pub file_path: Option<[u8; 4096]>,
+    pub file_path_length: usize,
+    pub file_buf: *mut u8,
+    pub file_buf_length: usize,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -294,6 +323,7 @@ pub struct _sapp_state {
     pub event: sapp_event,
     pub desc: sapp_desc,
     pub keycodes: [sapp_keycode; 512],
+    pub xdnd: sapp_xdnd,
 }
 
 /// opcode from XQueryExtension("XInputExtension")
@@ -487,6 +517,16 @@ pub unsafe extern "C" fn _sapp_x11_create_window(mut visual: *mut Visual, mut de
     XFree(hints as *mut libc::c_void);
     _sapp_x11_update_window_title();
     _sapp_x11_query_window_size();
+
+    XChangeProperty(
+        _sapp_x11_display,
+        _sapp_x11_window,
+        _sapp.xdnd.atoms.aware,
+        _sapp_x11_XA_ATOM,
+        32,
+        PropModeReplace,
+        &_sapp_x11_XDND_VERSION as *const _ as *const libc::c_uchar,
+        1);
 }
 
 pub unsafe extern "C" fn _sapp_strcpy(
@@ -628,7 +668,58 @@ pub unsafe extern "C" fn _sapp_x11_init_extensions() {
         b"_NET_WM_ICON_NAME\x00" as *const u8 as *const libc::c_char,
         false as _,
     );
+    _sapp.xdnd.atoms.aware = XInternAtom(
+        _sapp_x11_display,
+        b"XdndAware\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    _sapp.xdnd.atoms.enter = XInternAtom(
+        _sapp_x11_display,
+        b"XdndEnter\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    _sapp.xdnd.atoms.position = XInternAtom(
+        _sapp_x11_display,
+        b"XdndPosition\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    _sapp.xdnd.atoms.status = XInternAtom(
+        _sapp_x11_display,
+        b"XdndStatus\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    _sapp.xdnd.atoms.action_copy = XInternAtom(
+        _sapp_x11_display,
+        b"XdndActionCopy\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    _sapp.xdnd.atoms.drop = XInternAtom(
+        _sapp_x11_display,
+        b"XdndDrop\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    _sapp.xdnd.atoms.finished = XInternAtom(
+        _sapp_x11_display,
+        b"XdndFinished\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    _sapp.xdnd.atoms.selection = XInternAtom(
+        _sapp_x11_display,
+        b"XdndSelection\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    _sapp.xdnd.atoms.type_list = XInternAtom(
+        _sapp_x11_display,
+        b"XdndTypeList\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
+    _sapp.xdnd.atoms.text_uri_list = XInternAtom(
+        _sapp_x11_display,
+        b"text/uri-list\x00" as *const u8 as *const libc::c_char,
+        false as _,
+    );
 }
+
 pub static mut _sapp_glx_CreateNewContext: PFNGLXCREATENEWCONTEXTPROC = None;
 pub static mut _sapp_glx_QueryExtension: PFNGLXQUERYEXTENSIONPROC = None;
 pub static mut _sapp_glx_errorbase: libc::c_int = 0;
@@ -814,6 +905,9 @@ pub static mut _sapp_x11_root: Window = 0;
 pub static mut _sapp_x11_NET_WM_NAME: Atom = 0;
 pub static mut _sapp_x11_NET_WM_ICON_NAME: Atom = 0;
 pub static mut _sapp_x11_UTF8_STRING: Atom = 0;
+pub static mut _sapp_x11_XA_ATOM: Atom = 4;
+pub static mut _sapp_x11_XDND_VERSION: Atom = 5;
+
 pub unsafe extern "C" fn _sapp_x11_update_window_title() {
     Xutf8SetWMProperties(
         _sapp_x11_display,
@@ -2421,6 +2515,7 @@ pub unsafe extern "C" fn _sapp_x11_mod(mut x11_mods: libc::c_int) -> u32 {
 }
 pub static mut _sapp_x11_window_state: libc::c_int = 0;
 pub unsafe extern "C" fn _sapp_x11_get_window_property(
+    window: Window,
     mut property: Atom,
     mut type_: Atom,
     mut value: *mut *mut libc::c_uchar,
@@ -2431,7 +2526,7 @@ pub unsafe extern "C" fn _sapp_x11_get_window_property(
     let mut bytesAfter: libc::c_ulong = 0;
     XGetWindowProperty(
         _sapp_x11_display,
-        _sapp_x11_window,
+        window,
         property,
         0,
         libc::c_long::max_value(),
@@ -2450,6 +2545,7 @@ pub unsafe extern "C" fn _sapp_x11_get_window_state() -> libc::c_int {
     let mut result = WithdrawnState;
     let mut state: *mut C2RustUnnamed_1 = std::ptr::null_mut();
     if _sapp_x11_get_window_property(
+        _sapp_x11_window,
         _sapp_x11_WM_STATE,
         _sapp_x11_WM_STATE,
         &mut state as *mut *mut C2RustUnnamed_1 as *mut *mut libc::c_uchar,
@@ -2584,10 +2680,127 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
             }
         }
         33 => {
-            if (*event).xclient.message_type == _sapp_x11_WM_PROTOCOLS {
+            let message_type = (*event).xclient.message_type;
+            if message_type == _sapp_x11_WM_PROTOCOLS {
                 let protocol = (*event).xclient.data.l[0 as libc::c_int as usize] as Atom;
                 if protocol == _sapp_x11_WM_DELETE_WINDOW {
                     _sapp.quit_requested = true
+                }
+            } else if message_type == _sapp.xdnd.atoms.enter {
+                let is_list = (*event).xclient.data.l[1] & 1 == 1;
+                _sapp.xdnd.source = (*event).xclient.data.l[0] as Window;
+                _sapp.xdnd.version = (*event).xclient.data.l[1] as Atom >> 24;
+                _sapp.xdnd.format = 0;
+
+                if _sapp.xdnd.version > _sapp_x11_XDND_VERSION {
+                    return;
+                }
+
+                let mut count = 0;
+                let mut formats: *mut Atom = std::ptr::null_mut();
+
+                if is_list {
+                    count = _sapp_x11_get_window_property(
+                        _sapp.xdnd.source,
+                        _sapp.xdnd.atoms.type_list,
+                        _sapp_x11_XA_ATOM,
+                        &mut formats as *mut _ as _);
+                } else {
+                    count = 3;
+                    formats = (*event).xclient.data.l.as_mut_ptr().offset(2) as *mut Atom;
+                }
+
+                let formats = std::slice::from_raw_parts_mut(formats, count as _);
+
+                for i in 0..count as usize {
+                    if formats[i] == _sapp.xdnd.atoms.text_uri_list {
+                        _sapp.xdnd.format = _sapp.xdnd.atoms.text_uri_list;
+                        break;
+                    }
+                }
+
+                if is_list && !formats.is_empty() {
+                    XFree(formats.as_mut_ptr() as *mut libc::c_void);
+                }
+            } else if message_type == _sapp.xdnd.atoms.position {
+                if _sapp.xdnd.version > _sapp_x11_XDND_VERSION {
+                    return;
+                }
+
+                let mut data = [0isize; 5];
+                data[0] = _sapp_x11_window as _;
+                if _sapp.xdnd.format > 0 {
+                    data[1] = 1;
+                    if _sapp.xdnd.version >= 2 {
+                        data[4] = _sapp.xdnd.atoms.action_copy as _;
+                    }
+                }
+
+                let mut ev = XClientMessageEvent {
+                    type_0: 33,
+                    serial: 0,
+                    send_event: true as _,
+                    message_type: _sapp.xdnd.atoms.status,
+                    window: _sapp.xdnd.source,
+                    display: _sapp_x11_display,
+                    format: 32,
+                    data: ClientMessageData {
+                        l: std::mem::transmute(data),
+                    },
+                };
+                XSendEvent(
+                    _sapp_x11_display,
+                    (*event).xclient.data.l[0] as Window,
+                    false as _,
+                    0,
+                    &mut ev as *mut XClientMessageEvent as *mut XEvent,
+                );
+                XFlush(_sapp_x11_display);
+            } else if message_type == _sapp.xdnd.atoms.drop {
+                if _sapp.xdnd.version > _sapp_x11_XDND_VERSION {
+                    return;
+                }
+
+                let mut time = 0;
+                if _sapp.xdnd.format > 0 {
+                    if _sapp.xdnd.version >= 1 {
+                        time = (*event).xclient.data.l[2] as Time;
+                    }
+
+                    XConvertSelection(
+                        _sapp_x11_display,
+                        _sapp.xdnd.atoms.selection,
+                        _sapp_x11_UTF8_STRING,
+                        _sapp.xdnd.atoms.selection,
+                        _sapp_x11_window,
+                        time
+                    );
+                } else if _sapp.xdnd.version >= 2 {
+                    let mut data = [0isize; 5];
+                    data[0] = _sapp_x11_window as _;
+                    data[1] = 0;
+                    data[2] = 0;
+
+                    let mut ev = XClientMessageEvent {
+                        type_0: 33,
+                        serial: 0,
+                        send_event: true as _,
+                        message_type: _sapp.xdnd.atoms.finished,
+                        window: _sapp.xdnd.source,
+                        display: _sapp_x11_display,
+                        format: 32,
+                        data: ClientMessageData {
+                            l: std::mem::transmute(data),
+                        },
+                    };
+                    XSendEvent(
+                        _sapp_x11_display,
+                        _sapp.xdnd.source,
+                        false as _,
+                        0,
+                        &mut ev as *mut XClientMessageEvent as *mut XEvent,
+                    );
+                    XFlush(_sapp_x11_display);
                 }
             }
         }
@@ -2597,6 +2810,32 @@ pub unsafe extern "C" fn _sapp_x11_process_event(mut event: *mut XEvent) {
             // need to make appropriate XSelectionEvent - response for this request
             // only UTF8_STRING request is actually supported
             crate::clipboard::respond_to_clipboard_request(event);
+        }
+        // SelectionNotify
+        31 => {
+            let xsel = &mut *(event as *mut XSelectionEvent);
+
+            if xsel.property == _sapp.xdnd.atoms.selection as _ {
+                let mut buf : *mut libc::c_uchar = std::ptr::null_mut();
+                let len = _sapp_x11_get_window_property(
+                    xsel.requestor,
+                    xsel.property,
+                    xsel.target,
+                    &mut buf) as usize;
+                let data = std::slice::from_raw_parts(buf as _, len);
+                let decoded = sapp_x11_percent_decode(&data);
+                for path in decoded.split("\r\n")
+                    .filter(|path| !path.is_empty())
+                    .map(|path| path.trim_start_matches("file://")) {
+                    let mut path_bytes = [0; 4096];
+                    path_bytes[0..path.len()].copy_from_slice(path.as_bytes());
+
+                    _sapp_init_event(sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED);
+                    _sapp.event.file_path = Some(path_bytes);
+                    _sapp.event.file_path_length = path.len();
+                    _sapp_call_event(&mut _sapp.event);
+                }
+            }
         }
         // SelectionClear
         29 => {}
@@ -3018,6 +3257,10 @@ pub static mut _sapp: _sapp_state = _sapp_state {
         window_height: 0,
         framebuffer_width: 0,
         framebuffer_height: 0,
+        file_path: None,
+        file_path_length: 0,
+        file_buf: std::ptr::null_mut(),
+        file_buf_length: 0,
     },
     desc: sapp_desc {
         init_cb: None,
@@ -3050,6 +3293,23 @@ pub static mut _sapp: _sapp_state = _sapp_state {
         gl_force_gles2: false,
     },
     keycodes: [sapp_keycode_SAPP_KEYCODE_INVALID; 512],
+    xdnd: sapp_xdnd {
+        version: 0,
+        format: 0,
+        source: 0,
+        atoms: sapp_xdnd_atoms {
+            aware: 0,
+            enter: 0,
+            position: 0,
+            status: 0,
+            action_copy: 0,
+            drop: 0,
+            finished: 0,
+            selection: 0,
+            type_list: 0,
+            text_uri_list: 0
+        }
+    }
 };
 #[no_mangle]
 pub unsafe extern "C" fn sapp_isvalid() -> bool {
@@ -3058,4 +3318,25 @@ pub unsafe extern "C" fn sapp_isvalid() -> bool {
 #[no_mangle]
 pub unsafe fn sapp_is_elapsed_timer_supported() -> bool {
     return true;
+}
+
+fn sapp_x11_percent_decode(bytes: &[u8]) -> String {
+    let mut decoded = Vec::new();
+
+    let mut i = 0;
+    while i < bytes.len() {
+        let byte = bytes[i];
+        i += 1;
+
+        decoded.push(if byte == b'%' && i < bytes.len() - 1 {
+            let hi = char::from(bytes[i]).to_digit(16).unwrap();
+            let lo = char::from(bytes[i + 1]).to_digit(16).unwrap();
+            i += 2;
+            ((hi as u8) << 4) | (lo as u8)
+        } else {
+            byte
+        });
+    }
+
+    String::from_utf8_lossy(&decoded).into_owned()
 }

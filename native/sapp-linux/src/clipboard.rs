@@ -13,19 +13,6 @@ const AnyPropertyType: libc::c_long = 0 as libc::c_long;
 
 type Time = libc::c_ulong;
 
-extern "C" {
-    pub fn XConvertSelection(
-        _: *mut Display,
-        _: Atom,
-        _: Atom,
-        _: Atom,
-        _: Window,
-        _: Time,
-    ) -> libc::c_int;
-
-    pub fn XSetSelectionOwner(_: *mut Display, _: Atom, _: Window, _: Time) -> libc::c_int;
-}
-
 pub unsafe fn get_clipboard(
     mut bufname: *const libc::c_char,
     mut fmtname: *const libc::c_char,

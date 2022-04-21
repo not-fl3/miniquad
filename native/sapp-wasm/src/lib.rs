@@ -243,7 +243,7 @@ pub struct sapp_event {
     pub window_height: ::std::os::raw::c_int,
     pub framebuffer_width: ::std::os::raw::c_int,
     pub framebuffer_height: ::std::os::raw::c_int,
-    pub file_path: Option<[u16; 4096]>,
+    pub file_path: Option<[u8; 4096]>,
     pub file_path_length: usize,
     pub file_buf: *mut u8,
     pub file_buf_length: usize,
@@ -582,13 +582,13 @@ pub extern "C" fn touch(event_type: u32, id: u32, x: f32, y: f32) {
 
 #[no_mangle]
 pub extern "C" fn on_file_dropped(name: *mut u8, name_len: usize, bytes: *mut u8, bytes_len: usize) {
-    let name_utf16 = unsafe {
-        String::from_raw_parts(name, name_len, name_len).encode_utf16().collect::<Vec<_>>()
+    let name = unsafe {
+        String::from_raw_parts(name, name_len, name_len)
     };
 
     let mut name_array = [0; 4096];
-    let actual_len = name_array.len().min(name_utf16.len());
-    name_array[0..actual_len].copy_from_slice(&name_utf16[0..actual_len]);
+    let actual_len = name_array.len().min(name.len());
+    name_array[0..actual_len].copy_from_slice((&name[0..actual_len]).as_bytes());
 
     let mut event: sapp_event = unsafe { std::mem::zeroed() };
 

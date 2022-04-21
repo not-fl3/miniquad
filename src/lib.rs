@@ -402,6 +402,7 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
         sapp::sapp_event_type_SAPP_EVENTTYPE_SUSPENDED => {
             event_call!(data, window_minimized_event);
         }
+        #[cfg(any(target_os = "windows", target_os = "linux", target_arch = "wasm32"))]
         sapp::sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED => {
             let path = event.file_path.map(|path| {
                 #[cfg(target_os = "windows")]
@@ -411,7 +412,7 @@ extern "C" fn event(event: *const sapp::sapp_event, user_data: *mut ::std::os::r
                 }
 
                 #[cfg(not(target_os = "windows"))]
-                PathBuf::from(String::from_utf16_lossy(&path[0..event.file_path_length]))
+                PathBuf::from(String::from_utf8_lossy(&path[0..event.file_path_length]).as_ref())
             });
 
             let bytes = if event.file_buf_length > 0 {
