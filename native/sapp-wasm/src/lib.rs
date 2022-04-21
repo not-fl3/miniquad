@@ -4,12 +4,20 @@ pub mod fs;
 pub mod gl;
 mod rand;
 
+use std::path::{Path, PathBuf};
 pub use gl::*;
 pub use rand::*;
+
+#[derive(Default)]
+struct DroppedFiles {
+    paths: Vec<PathBuf>,
+    bytes: Vec<Vec<u8>>,
+}
 
 struct SappContext {
     desc: sapp_desc,
     clipboard: Option<String>,
+    dropped_files: DroppedFiles,
 }
 
 impl SappContext {
@@ -18,6 +26,10 @@ impl SappContext {
         SAPP_CONTEXT = Some(SappContext {
             desc,
             clipboard: None,
+            dropped_files: DroppedFiles {
+                paths: vec![],
+                bytes: vec![]
+            }
         });
         SAPP_CONTEXT
             .as_mut()
@@ -72,7 +84,7 @@ pub const sapp_event_type_SAPP_EVENTTYPE_RESUMED: sapp_event_type = 18;
 pub const sapp_event_type_SAPP_EVENTTYPE_UPDATE_CURSOR: sapp_event_type = 19;
 pub const sapp_event_type_SAPP_EVENTTYPE_QUIT_REQUESTED: sapp_event_type = 20;
 pub const sapp_event_type_SAPP_EVENTTYPE_RAW_DEVICE: sapp_event_type = 21;
-pub const sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED: sapp_event_type = 22;
+pub const sapp_event_type_SAPP_EVENTTYPE_FILES_DROPPED: sapp_event_type = 22;
 pub const sapp_event_type__SAPP_EVENTTYPE_NUM: sapp_event_type = 23;
 pub const sapp_event_type__SAPP_EVENTTYPE_FORCE_U32: sapp_event_type = 2147483647;
 
@@ -243,10 +255,6 @@ pub struct sapp_event {
     pub window_height: ::std::os::raw::c_int,
     pub framebuffer_width: ::std::os::raw::c_int,
     pub framebuffer_height: ::std::os::raw::c_int,
-    pub file_path: Option<[u8; 4096]>,
-    pub file_path_length: usize,
-    pub file_buf: *mut u8,
-    pub file_buf_length: usize,
 }
 
 #[repr(C)]
@@ -445,6 +453,24 @@ pub fn clipboard_set(data: &str) {
     unsafe { sapp_set_clipboard(data.as_ptr(), len) };
 }
 
+pub fn dropped_file_count() -> usize {
+    unsafe {
+        sapp_context().dropped_files.bytes.len()
+    }
+}
+
+pub fn dropped_file_bytes(index: usize) -> Option<Vec<u8>> {
+    unsafe {
+        sapp_context().dropped_files.bytes.get(index).cloned()
+    }
+}
+
+pub fn dropped_file_path(index: usize) -> Option<PathBuf> {
+    unsafe {
+        sapp_context().dropped_files.paths.get(index).cloned()
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn frame() {
     unsafe {
@@ -581,24 +607,30 @@ pub extern "C" fn touch(event_type: u32, id: u32, x: f32, y: f32) {
 }
 
 #[no_mangle]
-pub extern "C" fn on_file_dropped(name: *mut u8, name_len: usize, bytes: *mut u8, bytes_len: usize) {
-    let name = unsafe {
-        String::from_raw_parts(name, name_len, name_len)
-    };
+pub extern "C" fn on_files_dropped_start() {
+    unsafe {
+        sapp_context().dropped_files = Default::default();
+    }
+}
 
-    let mut name_array = [0; 4096];
-    let actual_len = name_array.len().min(name.len());
-    name_array[0..actual_len].copy_from_slice((&name[0..actual_len]).as_bytes());
-
+#[no_mangle]
+pub extern "C" fn on_files_dropped_finish() {
     let mut event: sapp_event = unsafe { std::mem::zeroed() };
 
-    event.type_ = sapp_event_type_SAPP_EVENTTYPE_FILE_DROPPED as u32;
-    event.file_path = Some(name_array);
-    event.file_path_length = actual_len;
-    event.file_buf = bytes;
-    event.file_buf_length = bytes_len;
+    event.type_ = sapp_event_type_SAPP_EVENTTYPE_FILES_DROPPED as u32;
 
     unsafe {
         sapp_context().event(event);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn on_file_dropped(path: *mut u8, path_len: usize, bytes: *mut u8, bytes_len: usize) {
+    unsafe {
+        let path = PathBuf::from(String::from_raw_parts(path, path_len, path_len));
+        let bytes = Vec::from_raw_parts(bytes, bytes_len, bytes_len);
+
+        sapp_context().dropped_files.paths.push(path);
+        sapp_context().dropped_files.bytes.push(bytes);
     }
 }

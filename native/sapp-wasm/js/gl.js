@@ -1233,6 +1233,8 @@ var importObject = {
             window.ondrop = async function(e) {
                 e.preventDefault();
 
+                wasm_exports.on_files_dropped_start();
+
                 for (let file of e.dataTransfer.files) {
                     const nameLen = file.name.length;
                     const nameVec = wasm_exports.allocate_vec_u8(nameLen);
@@ -1247,6 +1249,8 @@ var importObject = {
 
                     wasm_exports.on_file_dropped(nameVec, nameLen, fileVec, fileLen);
                 }
+
+                wasm_exports.on_files_dropped_finish();
             };
 
             window.requestAnimationFrame(animation);

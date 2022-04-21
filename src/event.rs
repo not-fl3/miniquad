@@ -1,5 +1,4 @@
 use crate::Context;
-use std::path::PathBuf;
 
 use crate::sapp::{self, sapp_keycode, sapp_mousebutton};
 
@@ -412,13 +411,11 @@ pub trait EventHandler {
     fn quit_requested_event(&mut self, _ctx: &mut Context) {}
 
     /// A file has been dropped over the application.
-    fn file_dropped_event(
-        &mut self,
-        _ctx: &mut Context,
-        _path: Option<PathBuf>,
-        _bytes: Option<Vec<u8>>,
-    ) {
-    }
+    /// Applications can request the number of dropped files with
+    /// miniquad::dnd::dropped_file_count, path of an individual file with
+    /// miniquad::dnd::dropped_file_path, and for wasm targets the file bytes
+    /// can be requested with miniquad::dnd::dropped_file_bytes.
+    fn files_dropped_event(&mut self, _ctx: &mut Context) {}
 }
 
 /// A trait defining event callbacks.
@@ -472,5 +469,9 @@ pub trait EventHandlerFree {
     fn quit_requested_event(&mut self) {}
 
     /// A file has been dropped over the application.
-    fn file_dropped_event(&mut self, _path: Option<PathBuf>, _bytes: Option<Vec<u8>>) {}
+    /// Applications can request the number of dropped files with
+    /// miniquad::dnd::dropped_file_count, path of an individual file with
+    /// miniquad::dnd::dropped_file_path, and for wasm targets the file bytes
+    /// can be requested with miniquad::dnd::dropped_file_bytes.
+    fn files_dropped_event(&mut self) {}
 }
