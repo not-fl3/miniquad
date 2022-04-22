@@ -950,7 +950,7 @@ unsafe extern "system" fn win32_wndproc(
                     let path_len =
                         DragQueryFileW(hdrop, i, path.as_mut_ptr(), MAX_PATH as u32) as usize;
                     if path_len > 0 {
-                        paths.push(PathBuf::from(OsString::from_wide(&path)));
+                        paths.push(PathBuf::from(OsString::from_wide(&path[..path_len])));
                     }
                 }
 
