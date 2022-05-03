@@ -49,7 +49,7 @@ Worth to mention [zemeroth port](https://not-fl3.github.io/miniquad-samples/zeme
 
 ```bash
 # ubuntu system dependencies
-apt install libx11-dev libxi-dev libgl1-mesa-dev
+apt install libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev
 
 cargo run --example quad
 ```
