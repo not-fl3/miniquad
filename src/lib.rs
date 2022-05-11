@@ -208,9 +208,9 @@ where
                 }
             }
             conf::LinuxBackend::WaylandWithX11Fallback => {
-                if native::linux_x11::run(&conf, f).is_none() {
+                if native::linux_wayland::run(&conf, f).is_none() {
                     println!("Failed to initialize through wayland! Trying X11 instead");
-                    native::linux_wayland::run(&conf, f);
+                    native::linux_x11::run(&conf, f);
                 }
             }
         }
