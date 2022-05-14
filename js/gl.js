@@ -1269,7 +1269,10 @@ var importObject = {
 
                     FS.loaded_files[file_id] = uInt8Array;
                     wasm_exports.file_loaded(file_id);
-                }
+                } else {
+		    FS.loaded_files[file_id] = null;
+		    wasm_exports.file_loaded(file_id);
+		}
             }
             xhr.onerror = function (e) {
                 FS.loaded_files[file_id] = null;
