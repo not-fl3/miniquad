@@ -1,6 +1,6 @@
 use crate::{native::gl::*, native::*, Context};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash)]
 pub struct Texture {
     pub(crate) texture: GLuint,
     pub width: u32,
@@ -48,7 +48,7 @@ impl Texture {
 /// List of all the possible formats of input data when uploading to texture.
 /// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
 #[repr(u8)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum TextureFormat {
     RGB8,
     RGBA8,
@@ -107,7 +107,7 @@ pub enum TextureWrap {
     Clamp = GL_CLAMP_TO_EDGE as isize,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash)]
 pub enum FilterMode {
     Linear = GL_LINEAR as isize,
     Nearest = GL_NEAREST as isize,
