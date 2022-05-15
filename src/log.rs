@@ -193,14 +193,15 @@ pub fn __private_api_log_lit(
     level: Level,
     &(_target, _module_path, _file, _line): &(&str, &'static str, &'static str, u32),
 ) {
+    use crate::native::wasm;
     use std::ffi::CString;
 
     let log_fn = match level {
-        Level::Debug => sapp_wasm::console_debug,
-        Level::Warn => sapp_wasm::console_warn,
-        Level::Info => sapp_wasm::console_info,
-        Level::Trace => sapp_wasm::console_debug,
-        Level::Error => sapp_wasm::console_error,
+        Level::Debug => wasm::console_debug,
+        Level::Warn => wasm::console_warn,
+        Level::Info => wasm::console_info,
+        Level::Trace => wasm::console_debug,
+        Level::Error => wasm::console_error,
     };
     let msg = CString::new(message).unwrap_or_else(|_| panic!());
 
