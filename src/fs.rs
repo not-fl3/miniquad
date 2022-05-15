@@ -3,6 +3,7 @@ pub enum Error {
     IOError(std::io::Error),
     DownloadFailed,
     AndroidAssetLoadingError,
+    WebAssetLoadingError(u16),
 }
 
 impl std::fmt::Display for Error {
@@ -80,14 +81,17 @@ mod wasm {
             let callback = files
                 .remove(&file_id)
                 .unwrap_or_else(|| panic!("Unknown file loaded!"));
-            let file_len = unsafe { fs::fs_get_buffer_size(file_id) };
-            if file_len == -1 {
-                callback(Err(Error::DownloadFailed));
-            } else {
-                let mut buffer = vec![0; file_len as usize];
-                unsafe { fs::fs_take_buffer(file_id, buffer.as_mut_ptr(), file_len as u32) };
-
-                callback(Ok(buffer));
+            let status = unsafe { fs::fs_take_status(file_id) } as u16;
+            match status {
+                200 => {
+                    let file_len = unsafe { fs::fs_get_buffer_size(file_id) };
+                    let mut buffer = vec![0; file_len as usize];
+                    unsafe { fs::fs_take_buffer(file_id, buffer.as_mut_ptr(), file_len as u32) };
+    
+                    callback(Ok(buffer));
+                }
+                404 => callback(Err(Error::DownloadFailed)),
+                _ => callback(Err(Error::WebAssetLoadingError(status))),
             }
         })
     }
