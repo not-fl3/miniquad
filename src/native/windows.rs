@@ -230,7 +230,7 @@ unsafe extern "system" fn win32_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let display_ptr = GetWindowLongA(hwnd, GWLP_USERDATA);
+    let display_ptr = GetWindowLongPtrA(hwnd, GWLP_USERDATA);
     if display_ptr == 0 {
         return DefWindowProcW(hwnd, umsg, wparam, lparam);
     }
