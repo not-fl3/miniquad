@@ -18,6 +18,8 @@ pub type EGLNativeWindowType = ::std::os::raw::c_ulong;
 
 pub use core::ptr::null_mut;
 
+pub const EGL_SUCCESS: u32 = 12288;
+
 pub const EGL_WINDOW_BIT: u32 = 4;
 
 pub const EGL_ALPHA_SIZE: u32 = 12321;

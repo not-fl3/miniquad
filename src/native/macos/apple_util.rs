@@ -463,7 +463,6 @@ pub fn load_mouse_cursor(cursor: CursorIcon) -> ObjcId {
     }
 }
 
-#[macro_export]
 macro_rules!objc_block {
     (move | $ ( $ arg_ident: ident: $ arg_ty: ty), * | $ (: $ return_ty: ty) ? $ body: block) => {
         {
@@ -530,7 +529,6 @@ macro_rules!objc_block {
     }
 }
 
-#[macro_export]
 macro_rules!objc_block_invoke {
     ( $ inp: expr, invoke ( $ ( ($ arg_ident: expr): $ arg_ty: ty), *) $ ( -> $ return_ty: ty) ?) => {
         {

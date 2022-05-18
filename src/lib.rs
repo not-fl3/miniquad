@@ -217,7 +217,7 @@ where
     }
 
     #[cfg(target_os = "android")]
-    {
+    unsafe {
         native::android::run(conf, f);
     }
 

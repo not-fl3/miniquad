@@ -42,7 +42,7 @@ fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
 
         let mut data: native::android_asset = unsafe { std::mem::zeroed() };
 
-        unsafe { native::sapp_load_asset(filename.as_ptr(), &mut data as _) };
+        unsafe { native::android::load_asset(filename.as_ptr(), &mut data as _) };
 
         if data.content.is_null() == false {
             let slice =

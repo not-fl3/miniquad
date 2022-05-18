@@ -158,6 +158,13 @@ pub enum TouchPhase {
 
 /// A trait defining event callbacks.
 pub trait EventHandler {
+    /// On most platforms update() and draw() are called each frame, sequentially,
+    /// draw right after update.
+    /// But on Android (and maybe some other platforms in the future) update might
+    /// be called without draw.
+    /// When the app is in background, Android destroys the rendering surface,
+    /// while app is still alive and can do some usefull calculations.
+    /// Note that in this case drawing from update may lead to crashes.
     fn update(&mut self, _ctx: &mut Context);
     fn draw(&mut self, _ctx: &mut Context);
     fn resize_event(&mut self, _ctx: &mut Context, _width: f32, _height: f32) {}
