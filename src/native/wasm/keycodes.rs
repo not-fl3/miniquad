@@ -6,9 +6,9 @@ use crate::event::{KeyCode, KeyMods, MouseButton, TouchPhase};
 
 pub fn translate_mouse_button(button: i32) -> MouseButton {
     match button {
-        1 => return MouseButton::Left,
+        0 => return MouseButton::Left,
+        1 => return MouseButton::Right,
         2 => return MouseButton::Middle,
-        3 => return MouseButton::Right,
         _ => return MouseButton::Unknown,
     };
 }
