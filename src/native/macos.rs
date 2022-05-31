@@ -354,7 +354,7 @@ pub fn define_cocoa_view_class() -> *const Class {
         fire_mouse_event(this, event, true, MouseButton::Left);
     }
     extern "C" fn mouse_up(this: &Object, _sel: Sel, event: ObjcId) {
-        fire_mouse_event(this, event, false, MouseButton::Right);
+        fire_mouse_event(this, event, false, MouseButton::Left);
     }
     extern "C" fn right_mouse_down(this: &Object, _sel: Sel, event: ObjcId) {
         fire_mouse_event(this, event, true, MouseButton::Right);
@@ -366,7 +366,7 @@ pub fn define_cocoa_view_class() -> *const Class {
         fire_mouse_event(this, event, true, MouseButton::Middle);
     }
     extern "C" fn other_mouse_up(this: &Object, _sel: Sel, event: ObjcId) {
-        fire_mouse_event(this, event, false, MouseButton::Right);
+        fire_mouse_event(this, event, false, MouseButton::Middle);
     }
     extern "C" fn scroll_wheel(this: &Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
