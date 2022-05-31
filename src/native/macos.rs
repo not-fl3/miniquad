@@ -443,6 +443,18 @@ pub fn define_cocoa_view_class() -> *const Class {
             mouse_moved as extern "C" fn(&Object, Sel, ObjcId),
         );
         decl.add_method(
+            sel!(mouseDragged:),
+            mouse_moved as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(rightMouseDragged:),
+            mouse_moved as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(otherMouseDragged:),
+            mouse_moved as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
             sel!(mouseDown:),
             mouse_down as extern "C" fn(&Object, Sel, ObjcId),
         );
