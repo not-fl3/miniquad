@@ -371,14 +371,15 @@ pub fn define_cocoa_view_class() -> *const Class {
     extern "C" fn scroll_wheel(this: &Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
         unsafe {
-            let mut dx: f32 = msg_send![event, scrollingDeltaX];
-            let mut dy: f32 = msg_send![event, scrollingDeltaY];
-            if msg_send![event, hasPreciseScrollingDeltas] {
-                dx *= 0.1;
-                dy *= 0.1;
+            let mut dx: f64 = msg_send![event, scrollingDeltaX];
+            let mut dy: f64 = msg_send![event, scrollingDeltaY];
+
+            if !msg_send![event, hasPreciseScrollingDeltas] {
+                dx *= 10.0;
+                dy *= 10.0;
             }
             if let (mut context, Some(event_handler)) = payload.context() {
-                event_handler.mouse_wheel_event(&mut context, dx, dy);
+                event_handler.mouse_wheel_event(&mut context, dx as f32, dy as f32);
             }
         }
     }
@@ -618,10 +619,6 @@ where
     let title = str_to_nsstring(&conf.window_title);
     //let () = msg_send![window, setReleasedWhenClosed: NO];
     let () = msg_send![window, setTitle: title];
-    let () = msg_send![
-        window,
-        setTitleVisibility: NSWindowTitleVisibility::NSWindowTitleHidden
-    ];
     let () = msg_send![window, center];
     let () = msg_send![window, setAcceptsMouseMovedEvents: YES];
 
