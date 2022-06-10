@@ -135,25 +135,16 @@ pub struct WindowPayload {
     f: Option<Box<dyn 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>>>,
 }
 impl WindowPayload {
-    pub fn context(&mut self) -> (Context<'_, '_>, &mut Option<Box<dyn EventHandler>>) {
-        (
-            Context {
-                a: self.context.as_mut().unwrap(),
-                b: &mut self.display,
-            },
-            &mut self.event_handler,
-        )
-    }
-
-    pub fn try_context(&mut self) -> Option<(Context<'_, '_>, &mut Option<Box<dyn EventHandler>>)> {
+    pub fn context(&mut self) -> Option<(Context<'_, '_>, &mut dyn EventHandler)> {
         let a = self.context.as_mut()?;
+        let event_handler = self.event_handler.as_deref_mut()?;
 
         Some((
             Context {
                 a,
                 b: &mut self.display,
             },
-            &mut self.event_handler,
+            event_handler,
         ))
     }
 }
@@ -179,7 +170,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
             // if window should be closed and event handling is enabled, give user code
             // a chance to intervene via sapp_cancel_quit()
             payload.display.data.quit_requested = true;
-            if let (mut context, Some(event_handler)) = payload.context() {
+            if let Some((mut context, event_handler)) = payload.context() {
                 event_handler.quit_requested_event(&mut context);
             }
 
@@ -198,7 +189,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
     extern "C" fn window_did_resize(this: &Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
         if let Some((w, h)) = unsafe { payload.display.update_dimensions() } {
-            if let Some((mut context, Some(event_handler))) = payload.try_context() {
+            if let Some((mut context, event_handler)) = payload.context() {
                 event_handler.resize_event(&mut context, w as _, h as _);
             }
         }
@@ -207,7 +198,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
     extern "C" fn window_did_change_screen(this: &Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
         if let Some((w, h)) = unsafe { payload.display.update_dimensions() } {
-            if let (mut context, Some(event_handler)) = payload.context() {
+            if let Some((mut context, event_handler)) = payload.context() {
                 event_handler.resize_event(&mut context, w as _, h as _);
             }
         }
@@ -264,7 +255,7 @@ pub fn define_cocoa_view_class() -> *const Class {
             let () = msg_send![super(this, superclass), reshape];
 
             if let Some((w, h)) = payload.display.update_dimensions() {
-                if let (mut context, Some(event_handler)) = payload.context() {
+                if let Some((mut context, event_handler)) = payload.context() {
                     event_handler.resize_event(&mut context, w as _, h as _);
                 }
             }
@@ -292,7 +283,7 @@ pub fn define_cocoa_view_class() -> *const Class {
 
     extern "C" fn draw_rect(this: &Object, _sel: Sel, _rect: NSRect) {
         let payload = get_window_payload(this);
-        if let (mut context, Some(event_handler)) = payload.context() {
+        if let Some((mut context, event_handler)) = payload.context() {
             event_handler.update(&mut context);
             event_handler.draw(&mut context);
         }
@@ -341,7 +332,7 @@ pub fn define_cocoa_view_class() -> *const Class {
         unsafe {
             let point: NSPoint = msg_send!(event, locationInWindow);
             let point = payload.display.transform_mouse_point(&point);
-            if let (mut context, Some(event_handler)) = payload.context() {
+            if let Some((mut context, event_handler)) = payload.context() {
                 event_handler.mouse_motion_event(&mut context, point.0, point.1);
             }
         }
@@ -353,7 +344,7 @@ pub fn define_cocoa_view_class() -> *const Class {
         unsafe {
             let point: NSPoint = msg_send!(event, locationInWindow);
             let point = payload.display.transform_mouse_point(&point);
-            if let (mut context, Some(event_handler)) = payload.context() {
+            if let Some((mut context, event_handler)) = payload.context() {
                 if down {
                     event_handler.mouse_button_down_event(&mut context, btn, point.0, point.1);
                 } else {
@@ -390,7 +381,7 @@ pub fn define_cocoa_view_class() -> *const Class {
                 dx *= 10.0;
                 dy *= 10.0;
             }
-            if let (mut context, Some(event_handler)) = payload.context() {
+            if let Some((mut context, event_handler)) = payload.context() {
                 event_handler.mouse_wheel_event(&mut context, dx as f32, dy as f32);
             }
         }
@@ -400,13 +391,13 @@ pub fn define_cocoa_view_class() -> *const Class {
         let mods = get_event_key_modifier(event);
         let repeat: bool = unsafe { msg_send!(event, isARepeat) };
         if let Some(key) = get_event_keycode(event) {
-            if let (mut context, Some(event_handler)) = payload.context() {
+            if let Some((mut context, event_handler)) = payload.context() {
                 event_handler.key_down_event(&mut context, key, mods, repeat);
             }
         }
 
         if let Some(character) = get_event_char(event) {
-            if let (mut context, Some(event_handler)) = payload.context() {
+            if let Some((mut context, event_handler)) = payload.context() {
                 event_handler.char_event(&mut context, character, mods, repeat);
             }
         }
@@ -415,7 +406,7 @@ pub fn define_cocoa_view_class() -> *const Class {
         let payload = get_window_payload(this);
         let mods = get_event_key_modifier(event);
         if let Some(key) = get_event_keycode(event) {
-            if let (mut context, Some(event_handler)) = payload.context() {
+            if let Some((mut context, event_handler)) = payload.context() {
                 event_handler.key_up_event(&mut context, key, mods);
             }
         }
