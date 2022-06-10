@@ -588,6 +588,7 @@ where
         setActivationPolicy: NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular
             as i64
     ];
+    let () = msg_send![ns_app, activateIgnoringOtherApps: YES];
 
     let window_masks = NSWindowStyleMask::NSTitledWindowMask as u64
         | NSWindowStyleMask::NSClosableWindowMask as u64
