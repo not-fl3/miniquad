@@ -144,6 +144,18 @@ impl WindowPayload {
             &mut self.event_handler,
         )
     }
+
+    pub fn try_context(&mut self) -> Option<(Context<'_, '_>, &mut Option<Box<dyn EventHandler>>)> {
+        let a = self.context.as_mut()?;
+
+        Some((
+            Context {
+                a,
+                b: &mut self.display,
+            },
+            &mut self.event_handler,
+        ))
+    }
 }
 pub fn define_app_delegate() -> *const Class {
     let superclass = class!(NSObject);
@@ -186,7 +198,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
     extern "C" fn window_did_resize(this: &Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
         if let Some((w, h)) = unsafe { payload.display.update_dimensions() } {
-            if let (mut context, Some(event_handler)) = payload.context() {
+            if let Some((mut context, Some(event_handler))) = payload.try_context() {
                 event_handler.resize_event(&mut context, w as _, h as _);
             }
         }
