@@ -2,7 +2,7 @@ use crate::{
     event::{EventHandler, TouchPhase},
     native::egl::{self, LibEgl},
     native::NativeDisplay,
-    Context, GraphicsContext,
+    GraphicsContext,
 };
 
 use std::{cell::RefCell, sync::mpsc, thread};
@@ -225,7 +225,7 @@ impl MainThreadState {
                 self.display.screen_width = width as _;
                 self.display.screen_height = height as _;
                 self.event_handler.resize_event(
-                    &mut Context::new(&mut self.context, &mut self.display),
+                    self.context.as_mut(&mut self.display),
                     width as _,
                     height as _,
                 );
@@ -237,7 +237,7 @@ impl MainThreadState {
                 y,
             } => {
                 self.event_handler.touch_event(
-                    &mut Context::new(&mut self.context, &mut self.display),
+                    self.context.as_mut(&mut self.display),
                     phase,
                     touch_id,
                     x,
@@ -246,10 +246,10 @@ impl MainThreadState {
             }
             Message::Pause => self
                 .event_handler
-                .window_minimized_event(&mut Context::new(&mut self.context, &mut self.display)),
+                .window_minimized_event(self.context.as_mut(&mut self.display)),
             Message::Resume => self
                 .event_handler
-                .window_restored_event(&mut Context::new(&mut self.context, &mut self.display)),
+                .window_restored_event(self.context.as_mut(&mut self.display)),
             Message::Destroy => {
                 self.quit = true;
             }
@@ -258,11 +258,11 @@ impl MainThreadState {
 
     fn frame(&mut self) {
         self.event_handler
-            .update(&mut Context::new(&mut self.context, &mut self.display));
+            .update(self.context.as_mut(&mut self.display));
 
         if self.surface.is_null() == false {
             self.event_handler
-                .draw(&mut Context::new(&mut self.context, &mut self.display));
+                .draw(self.context.as_mut(&mut self.display));
 
             unsafe {
                 (self.libegl.eglSwapBuffers.unwrap())(self.egl_display, self.surface);
@@ -381,7 +381,7 @@ where
             screen_width,
             screen_height,
         };
-        let event_handler = f.0(&mut Context::new(&mut context, &mut display));
+        let event_handler = f.0(context.as_mut(&mut display));
         let mut s = MainThreadState {
             libegl,
             egl_display,

@@ -151,13 +151,13 @@ impl Texture {
 
         let (internal_format, format, pixel_type) = params.format.into();
 
-        ctx.a.cache.store_texture_binding(0);
+        ctx.cache.store_texture_binding(0);
 
         let mut texture: GLuint = 0;
 
         unsafe {
             glGenTextures(1, &mut texture as *mut _);
-            ctx.a.cache.bind_texture(0, texture);
+            ctx.cache.bind_texture(0, texture);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
 
             if cfg!(not(target_arch = "wasm32")) {
@@ -192,7 +192,7 @@ impl Texture {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, params.filter as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, params.filter as i32);
         }
-        ctx.a.cache.restore_texture_binding(0);
+        ctx.cache.restore_texture_binding(0);
 
         Texture {
             texture,
@@ -225,17 +225,17 @@ impl Texture {
     }
 
     pub fn set_filter(&self, ctx: &mut Context, filter: FilterMode) {
-        ctx.a.cache.store_texture_binding(0);
-        ctx.a.cache.bind_texture(0, self.texture);
+        ctx.cache.store_texture_binding(0);
+        ctx.cache.bind_texture(0, self.texture);
         unsafe {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter as i32);
         }
-        ctx.a.cache.restore_texture_binding(0);
+        ctx.cache.restore_texture_binding(0);
     }
 
     pub fn resize(&mut self, ctx: &mut Context, width: u32, height: u32, bytes: Option<&[u8]>) {
-        ctx.a.cache.store_texture_binding(0);
+        ctx.cache.store_texture_binding(0);
 
         let (internal_format, format, pixel_type) = self.format.into();
 
@@ -259,7 +259,7 @@ impl Texture {
             );
         }
 
-        ctx.a.cache.restore_texture_binding(0);
+        ctx.cache.restore_texture_binding(0);
     }
 
     /// Update whole texture content
@@ -290,8 +290,8 @@ impl Texture {
         assert!(x_offset + width <= self.width as _);
         assert!(y_offset + height <= self.height as _);
 
-        ctx.a.cache.store_texture_binding(0);
-        ctx.a.cache.bind_texture(0, self.texture);
+        ctx.cache.store_texture_binding(0);
+        ctx.cache.bind_texture(0, self.texture);
 
         let (_, format, pixel_type) = self.format.into();
 
@@ -323,7 +323,7 @@ impl Texture {
             );
         }
 
-        ctx.a.cache.restore_texture_binding(0);
+        ctx.cache.restore_texture_binding(0);
     }
 
     /// Read texture data into CPU memory

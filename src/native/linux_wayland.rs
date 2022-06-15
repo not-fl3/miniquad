@@ -84,12 +84,9 @@ struct WaylandPayload {
 }
 
 impl WaylandPayload {
-    pub fn context(&mut self) -> (Context<'_, '_>, &mut Option<Box<dyn EventHandler>>) {
+    pub fn context(&mut self) -> (&mut Context, &mut Option<Box<dyn EventHandler>>) {
         (
-            Context {
-                a: self.context.as_mut().unwrap(),
-                b: &mut self.display,
-            },
+            self.context.as_mut().unwrap().as_mut(&mut self.display),
             &mut self.event_handler,
         )
     }

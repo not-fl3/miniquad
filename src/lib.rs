@@ -16,6 +16,8 @@ mod default_icon;
 
 pub use native::{gl, NativeDisplay};
 
+pub use graphics::GraphicsContext as Context;
+
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn now() -> f64 {
@@ -35,25 +37,38 @@ pub mod date {
     }
 }
 
-/// Main miniquad struct, the only struct exposed to the event handler.
-/// All the drawing and window manipulation are done through the Context.
-///
-/// (impl details) a and b fields are here due to unresolved problem
-/// of relationship between GraphicsContext and NativeDisplay
-/// Should we expose both of them to the user? Should one of them be
-/// consumed by another (technically very complicated, they have a bit different lifetimes)? Or, maybe, just expose both to each EventHandler's functions?
-/// From implementation perspective "fn update(&mut self, context: &mut GraphicsContext, &mut dyn NativeDisplay)" feels really nice
-/// But looks a bit heavy in the trait declaration and is a bit too much of a breaking change
-/// Conclusion for now - leave it with a/b, think during 0.4 and make a final decision in 0.5
-pub struct Context<'a, 'b> {
-    pub(crate) a: &'a mut GraphicsContext,
-    pub(crate) b: &'b mut dyn NativeDisplay,
-}
-
-impl<'a, 'b> Context<'a, 'b> {
-    pub(crate) fn new(a: &'a mut GraphicsContext, b: &'b mut dyn NativeDisplay) -> Context<'a, 'b> {
-        Context { a, b }
+impl Context {
+    pub(crate) fn as_mut(&mut self, display: &mut dyn NativeDisplay) -> &mut Context {
+        self.display = Some(display);
+        self
     }
+
+    pub fn display(&self) -> &dyn NativeDisplay {
+        unsafe { &*self.display.unwrap() }
+    }
+
+    pub fn display_mut(&self) -> &mut dyn NativeDisplay {
+        unsafe { &mut *self.display.unwrap() }
+    }
+
+    /// The current framebuffer size in pixels
+    /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
+    pub fn screen_size(&self) -> (f32, f32) {
+        self.display().screen_size()
+    }
+
+    /// The dpi scaling factor (window pixels to framebuffer pixels)
+    /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
+    pub fn dpi_scale(&self) -> f32 {
+        self.display().dpi_scale()
+    }
+
+    /// True when high_dpi was requested and actually running in a high-dpi scenario
+    /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
+    pub fn high_dpi(&self) -> bool {
+        self.display().high_dpi()
+    }
+
     /// This function simply quits the application without
     /// giving the user a chance to intervene. Usually this might
     /// be called when the user clicks the 'Ok' button in a 'Really Quit?'
@@ -62,7 +77,7 @@ impl<'a, 'b> Context<'a, 'b> {
     /// happen in the order_quit implmentation) and execution might continue for some time after
     /// But the window is going to be inevitably closed at some point.
     pub fn order_quit(&mut self) {
-        self.b.order_quit();
+        self.display_mut().order_quit();
     }
 
     /// Calling request_quit() will trigger "quit_requested_event" event , giving
@@ -71,7 +86,7 @@ impl<'a, 'b> Context<'a, 'b> {
     /// If the event handler callback does nothing, the application will be quit as usual.
     /// To prevent this, call the function "cancel_quit()"" from inside the event handler.
     pub fn request_quit(&mut self) {
-        self.b.request_quit();
+        self.display_mut().request_quit();
     }
 
     /// Cancels a pending quit request, either initiated
@@ -80,7 +95,7 @@ impl<'a, 'b> Context<'a, 'b> {
     /// function makes sense is from inside the event handler callback when
     /// the "quit_requested_event" event has been received
     pub fn cancel_quit(&mut self) {
-        self.b.cancel_quit();
+        self.display_mut().cancel_quit();
     }
 
     /// Capture mouse cursor to the current window
@@ -90,50 +105,50 @@ impl<'a, 'b> Context<'a, 'b> {
     ///         so set_cursor_grab(false) on window's focus lost is recommended.
     /// TODO: implement window focus events
     pub fn set_cursor_grab(&mut self, grab: bool) {
-        self.b.set_cursor_grab(grab);
+        self.display_mut().set_cursor_grab(grab);
     }
 
     /// Show or hide the mouse cursor
     pub fn show_mouse(&mut self, shown: bool) {
-        self.b.show_mouse(shown);
+        self.display_mut().show_mouse(shown);
     }
 
     /// Set the mouse cursor icon.
     pub fn set_mouse_cursor(&mut self, cursor_icon: CursorIcon) {
-        self.b.set_mouse_cursor(cursor_icon);
+        self.display_mut().set_mouse_cursor(cursor_icon);
     }
 
     /// Set the application's window size.
     pub fn set_window_size(&mut self, new_width: u32, new_height: u32) {
-        self.b.set_window_size(new_width, new_height);
+        self.display_mut().set_window_size(new_width, new_height);
     }
 
     pub fn set_fullscreen(&mut self, fullscreen: bool) {
-        self.b.set_fullscreen(fullscreen);
+        self.display_mut().set_fullscreen(fullscreen);
     }
 
     /// Get current OS clipboard value
     pub fn clipboard_get(&mut self) -> Option<String> {
-        self.b.clipboard_get()
+        self.display_mut().clipboard_get()
     }
 
     /// Save value to OS clipboard
     pub fn clipboard_set(&mut self, data: &str) {
-        self.b.clipboard_set(data);
+        self.display_mut().clipboard_set(data);
     }
     pub fn dropped_file_count(&mut self) -> usize {
-        self.b.dropped_file_count()
+        self.display_mut().dropped_file_count()
     }
     pub fn dropped_file_bytes(&mut self, index: usize) -> Option<Vec<u8>> {
-        self.b.dropped_file_bytes(index)
+        self.display_mut().dropped_file_bytes(index)
     }
     pub fn dropped_file_path(&mut self, index: usize) -> Option<std::path::PathBuf> {
-        self.b.dropped_file_path(index)
+        self.display_mut().dropped_file_path(index)
     }
 
     /// Shortcut for `order_quit`. Will add a legacy attribute at some point.
     pub fn quit(&mut self) {
-        self.b.order_quit()
+        self.display_mut().order_quit()
     }
 }
 
