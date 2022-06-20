@@ -486,7 +486,7 @@ impl X11Display {
             3 => {
                 let keycode = (*event).xkey.keycode;
                 let key = self.translate_key(keycode as _);
-                self.repeated_keycodes[(keycode & 0xffe) as usize] = false;
+                self.repeated_keycodes[(keycode & 0xff) as usize] = false;
                 if key != crate::event::KeyCode::Unknown {
                     let mods = self.translate_mod((*event).xkey.state as libc::c_int);
                     event_handler.key_up_event(context.as_mut(&mut *self), key, mods);
