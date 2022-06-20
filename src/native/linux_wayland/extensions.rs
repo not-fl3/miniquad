@@ -58,7 +58,7 @@ macro_rules! wayland_interface {
             }),*];
 
             pub static mut $name: wl_interface = wl_interface {
-                name: concat!(stringify!($struct_name), '\0').as_ptr() as *const i8,
+                name: concat!(stringify!($struct_name), '\0').as_ptr() as *const u8,
                 version: $version,
                 method_count: crate::count!($($method_name)*) as i32,
                 methods: unsafe { requests.as_ptr() },
