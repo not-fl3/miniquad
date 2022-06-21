@@ -152,7 +152,7 @@ extern "C" fn seat_handle_name(
 extern "C" fn seat_handle_name(
     _data: *mut std::ffi::c_void,
     _seat: *mut wl_seat,
-    _name: *const u8,
+    _name: *const i8,
 ) {
 }
 
