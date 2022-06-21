@@ -11,6 +11,8 @@ jobs:
       matrix:
         config:
           - { os: ubuntu-latest, target: 'x86_64-unknown-linux-gnu' }
+          - { os: ubuntu-latest, target: 'aarch64-unknown-linux-gnu' }
+          - { os: ubuntu-latest, target: 'armv7-unknown-linux-gnueabihf' }    
           - { os: ubuntu-latest, target: 'x86_64-pc-windows-gnu' }
           - { os: ubuntu-latest, target: 'wasm32-unknown-unknown' }
           - { os: macos-latest, target: 'x86_64-apple-darwin' }
