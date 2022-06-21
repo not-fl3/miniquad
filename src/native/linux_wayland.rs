@@ -143,7 +143,7 @@ unsafe extern "C" fn seat_handle_capabilities(
 extern "C" fn seat_handle_name(
     _data: *mut std::ffi::c_void,
     _seat: *mut wl_seat,
-    _name: *const i8,
+    _name: *const ::std::os::raw::c_char,
 ) {
 }
 
@@ -151,7 +151,7 @@ unsafe extern "C" fn registry_add_object(
     data: *mut std::ffi::c_void,
     registry: *mut wl_registry,
     name: u32,
-    interface: *const i8,
+    interface: *const ::std::os::raw::c_char,
     version: u32,
 ) {
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
