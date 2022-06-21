@@ -140,18 +140,108 @@ unsafe extern "C" fn seat_handle_capabilities(
 ) {
 }
 
+#[cfg(not(all(any(target_arch = "x86", target_arch = "x86_64"), target_os = "linux")))]
 extern "C" fn seat_handle_name(
     _data: *mut std::ffi::c_void,
     _seat: *mut wl_seat,
-    _name: *const _,
+    _name: *const u8,
 ) {
 }
 
+#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), target_os = "linux"))]
+extern "C" fn seat_handle_name(
+    _data: *mut std::ffi::c_void,
+    _seat: *mut wl_seat,
+    _name: *const u8,
+) {
+}
+
+#[cfg(not(all(any(target_arch = "x86", target_arch = "x86_64"), target_os = "linux")))]
 unsafe extern "C" fn registry_add_object(
     data: *mut std::ffi::c_void,
     registry: *mut wl_registry,
     name: u32,
-    interface: *const _,
+    interface: *const u8,
+    version: u32,
+) {
+    let payload: &mut WaylandPayload = &mut *(data as *mut _);
+    let display = &mut payload.display;
+
+    let interface = std::ffi::CStr::from_ptr(interface).to_str().unwrap();
+    println!("{:?}", interface);
+    match interface {
+        "wl_compositor" => {
+            display.compositor = display.client.wl_registry_bind(
+                registry,
+                name,
+                display.client.wl_compositor_interface,
+                1,
+            ) as _;
+        }
+        "wl_subcompositor" => {
+            display.subcompositor = display.client.wl_registry_bind(
+                registry,
+                name,
+                display.client.wl_subcompositor_interface,
+                1,
+            ) as _;
+        }
+        "xdg_wm_base" => {
+            display.xdg_wm_base = display.client.wl_registry_bind(
+                registry,
+                name,
+                &extensions::xdg_shell::xdg_wm_base_interface,
+                1,
+            ) as _;
+        }
+        "zxdg_decoration_manager" => {
+            display.decoration_manager = display.client.wl_registry_bind(
+                registry,
+                name,
+                &extensions::xdg_decoration::zxdg_decoration_manager_v1_interface,
+                1,
+            ) as _;
+        }
+        "wp_viewporter" => {
+            display.viewporter = display.client.wl_registry_bind(
+                registry,
+                name,
+                &extensions::viewporter::wp_viewporter_interface,
+                1,
+            ) as _;
+        }
+        "wl_shm" => {
+            display.shm =
+                display
+                    .client
+                    .wl_registry_bind(registry, name, display.client.wl_shm_interface, 1)
+                    as _;
+        }
+        "wl_seat" => {
+            let seat_version = 4.min(version);
+            display.seat = display.client.wl_registry_bind(
+                registry,
+                name,
+                display.client.wl_seat_interface,
+                seat_version,
+            ) as _;
+            (display.client.wl_proxy_add_listener)(
+                display.seat as _,
+                &SEAT_LISTENER as *const _ as _,
+                data,
+            );
+        }
+
+        _ => {}
+    }
+}
+
+#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), target_os = "linux"))]
+unsafe extern "C" fn registry_add_object(
+    data: *mut std::ffi::c_void,
+    registry: *mut wl_registry,
+    name: u32,
+    interface: *const i8,
     version: u32,
 ) {
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
