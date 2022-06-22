@@ -12,17 +12,17 @@ Miniquad aims to provide a graphics abstraction that works the same way on any p
 
 ## Supported platforms
 
-* Windows, OpenGl 3
-* Linux, OpenGl 3
+* Windows, OpenGL 3
+* Linux, OpenGL 3
 * macOS, OpenGL 3
 * iOS, GLES 3
-* WASM, WebGl1 - tested on ios safari, ff, chrome
+* WASM, WebGl1 - tested on iOS safari, ff, chrome
 * Android, GLES3
 
 ## Not supported, but desirable platforms
 
 * Android, GLES2 - work in progress.
-* Metal. For both MacOs and IOS metal rendering backend next to opengl one is highly desirable. But I just dont have any MacOs capable hardware to start working on it :/
+* Metal. For both MacOs and iOS metal rendering backend next to opengl one is highly desirable. But I just dont have any MacOs capable hardware to start working on it :/
 
 ## Examples
 
@@ -103,7 +103,7 @@ cargo install basic-http-server
 basic-http-server .
 ```
 
-## android
+## Android
 
 Recommended way to build for android is using Docker.<br/>
 miniquad use slightly modifed version of `cargo-apk`
@@ -141,7 +141,7 @@ cargo run --example quad --target x86_64-pc-windows-gnu
 
 * Hackability. Working on your own game, highly probable some hardware incompability will be found. Working around that kind of bugs should be easy, implementation details should not be hidden under layers of abstraction.
 
-* Forkability. Each platform implementation is, usually, just one pure rust file. And this file is very copy-paste friendly - it doesnt use any miniquad specific abstractions. It is very easy to just copy some part of miniquad's platform implementation and use it standalone.
+* Forkability. Each platform implementation is, usually, just one pure Rust file. And this file is very copy-paste friendly - it doesnt use any miniquad specific abstractions. It is very easy to just copy some part of miniquad's platform implementation and use it standalone.
 
 # Non goals
 
