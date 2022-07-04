@@ -314,9 +314,7 @@ where
             let msg = CString::new(format!("{:?}", info)).unwrap_or_else(|_| {
                 CString::new(format!("MALFORMED ERROR MESSAGE {:?}", info.location())).unwrap()
             });
-            unsafe {
-                console_error(msg.as_ptr());
-            }
+            console_error(msg.as_ptr());
         }));
     }
 

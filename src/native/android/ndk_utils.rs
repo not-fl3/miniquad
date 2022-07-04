@@ -25,7 +25,6 @@ macro_rules! new_object {
 #[macro_export]
 macro_rules! call_method {
     ($fn:tt, $env:expr, $obj:expr, $method:expr, $sig:expr $(, $args:expr)*) => {{
-        let find_class = (**$env).FindClass.unwrap();
         let get_object_class = (**$env).GetObjectClass.unwrap();
         let get_method_id = (**$env).GetMethodID.unwrap();
         let call_object_method = (**$env).$fn.unwrap();
