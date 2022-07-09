@@ -15,6 +15,7 @@ import android.view.SurfaceHolder;
 import android.view.MotionEvent;
 
 import android.content.Context;
+import android.content.Intent;
 
 import quad_native.QuadNative;
 
