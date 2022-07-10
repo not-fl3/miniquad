@@ -58,12 +58,14 @@ impl UniformType {
     }
 }
 
+#[derive(Clone)]
 pub struct UniformDesc {
     name: String,
     uniform_type: UniformType,
     array_count: usize,
 }
 
+#[derive(Clone)]
 pub struct UniformBlockLayout {
     pub uniforms: Vec<UniformDesc>,
 }
@@ -85,6 +87,7 @@ impl UniformDesc {
     }
 }
 
+#[derive(Clone)]
 pub struct ShaderMeta {
     pub uniforms: UniformBlockLayout,
     pub images: Vec<String>,
