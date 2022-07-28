@@ -586,11 +586,10 @@ impl X11Display {
         };
 
         if self.data.quit_requested && !self.data.quit_ordered {
+            event_handler.quit_requested_event(context.as_mut(&mut *self));
             if self.data.quit_requested {
                 self.data.quit_ordered = true
             }
-
-            event_handler.quit_requested_event(context.as_mut(&mut *self));
         }
     }
 
