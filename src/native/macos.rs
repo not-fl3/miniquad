@@ -140,7 +140,7 @@ impl WindowPayload {
         let a = self.context.as_mut()?;
         let event_handler = self.event_handler.as_deref_mut()?;
 
-        Some((a.as_mut(&mut self.display), event_handler))
+        Some((a.with_display(&mut self.display), event_handler))
     }
 }
 pub fn define_app_delegate() -> *const Class {
@@ -314,7 +314,7 @@ pub fn define_cocoa_view_class() -> *const Class {
             .context
             .as_mut()
             .unwrap()
-            .as_mut(&mut payload.display)));
+            .with_display(&mut payload.display)));
     }
 
     extern "C" fn timer_fired(this: &Object, _sel: Sel, _: ObjcId) {

@@ -142,7 +142,7 @@ where
             dropped_files: Default::default(),
         };
         *g.borrow_mut() = Some(WasmGlobals {
-            event_handler: f(context.as_mut(&mut display)),
+            event_handler: f(context.with_display(&mut display)),
             context,
             display,
         });
@@ -271,10 +271,10 @@ pub extern "C" fn frame() {
     with(|globals| {
         globals
             .event_handler
-            .update(globals.context.as_mut(&mut globals.display));
+            .update(globals.context.with_display(&mut globals.display));
         globals
             .event_handler
-            .draw(globals.context.as_mut(&mut globals.display));
+            .draw(globals.context.with_display(&mut globals.display));
     });
 }
 
@@ -282,7 +282,7 @@ pub extern "C" fn frame() {
 pub extern "C" fn mouse_move(x: i32, y: i32) {
     with(|globals| {
         globals.event_handler.mouse_motion_event(
-            globals.context.as_mut(&mut globals.display),
+            globals.context.with_display(&mut globals.display),
             x as _,
             y as _,
         );
@@ -293,7 +293,7 @@ pub extern "C" fn mouse_move(x: i32, y: i32) {
 pub extern "C" fn raw_mouse_move(dx: i32, dy: i32) {
     with(|globals| {
         globals.event_handler.raw_mouse_motion(
-            globals.context.as_mut(&mut globals.display),
+            globals.context.with_display(&mut globals.display),
             dx as _,
             dy as _,
         );
@@ -306,7 +306,7 @@ pub extern "C" fn mouse_down(x: i32, y: i32, btn: i32) {
 
     with(|globals| {
         globals.event_handler.mouse_button_down_event(
-            globals.context.as_mut(&mut globals.display),
+            globals.context.with_display(&mut globals.display),
             btn,
             x as _,
             y as _,
@@ -320,7 +320,7 @@ pub extern "C" fn mouse_up(x: i32, y: i32, btn: i32) {
 
     with(|globals| {
         globals.event_handler.mouse_button_up_event(
-            globals.context.as_mut(&mut globals.display),
+            globals.context.with_display(&mut globals.display),
             btn,
             x as _,
             y as _,
@@ -332,7 +332,7 @@ pub extern "C" fn mouse_up(x: i32, y: i32, btn: i32) {
 pub extern "C" fn mouse_wheel(dx: i32, dy: i32) {
     with(|globals| {
         globals.event_handler.mouse_wheel_event(
-            globals.context.as_mut(&mut globals.display),
+            globals.context.with_display(&mut globals.display),
             dx as _,
             dy as _,
         );
@@ -346,7 +346,7 @@ pub extern "C" fn key_down(key: u32, modifiers: u32, repeat: bool) {
 
     with(|globals| {
         globals.event_handler.key_down_event(
-            globals.context.as_mut(&mut globals.display),
+            globals.context.with_display(&mut globals.display),
             key,
             mods,
             repeat,
@@ -359,7 +359,7 @@ pub extern "C" fn key_press(key: u32) {
     if let Some(key) = char::from_u32(key) {
         with(|globals| {
             globals.event_handler.char_event(
-                globals.context.as_mut(&mut globals.display),
+                globals.context.with_display(&mut globals.display),
                 key,
                 crate::KeyMods::default(),
                 false,
@@ -374,9 +374,11 @@ pub extern "C" fn key_up(key: u32, modifiers: u32) {
     let mods = keycodes::translate_mod(modifiers as _);
 
     with(|globals| {
-        globals
-            .event_handler
-            .key_up_event(globals.context.as_mut(&mut globals.display), key, mods);
+        globals.event_handler.key_up_event(
+            globals.context.with_display(&mut globals.display),
+            key,
+            mods,
+        );
     });
 }
 
@@ -387,7 +389,7 @@ pub extern "C" fn resize(width: i32, height: i32) {
         globals.display.screen_height = height as _;
 
         globals.event_handler.resize_event(
-            globals.context.as_mut(&mut globals.display),
+            globals.context.with_display(&mut globals.display),
             width as _,
             height as _,
         );
@@ -399,7 +401,7 @@ pub extern "C" fn touch(phase: u32, id: u32, x: f32, y: f32) {
     let phase = keycodes::translate_touch_phase(phase as _);
     with(|globals| {
         globals.event_handler.touch_event(
-            globals.context.as_mut(&mut globals.display),
+            globals.context.with_display(&mut globals.display),
             phase,
             id as _,
             x as _,
@@ -420,7 +422,7 @@ pub extern "C" fn on_files_dropped_finish() {
     with(|globals| {
         globals
             .event_handler
-            .files_dropped_event(globals.context.as_mut(&mut globals.display))
+            .files_dropped_event(globals.context.with_display(&mut globals.display))
     });
 }
 
