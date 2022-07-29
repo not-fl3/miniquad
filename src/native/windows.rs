@@ -272,7 +272,7 @@ unsafe extern "system" fn win32_wndproc(
                 // if window should be closed and event handling is enabled, give user code
                 // a change to intervene via sapp_cancel_quit()
                 display.display_data.quit_requested = true;
-                event_handler.quit_requested_event(context.as_mut(display));
+                event_handler.quit_requested_event(context.with_display(display));
                 // if user code hasn't intervened, quit the app
                 if display.display_data.quit_requested {
                     display.display_data.quit_ordered = true;
@@ -310,9 +310,9 @@ unsafe extern "system" fn win32_wndproc(
             if iconified != display.iconified {
                 display.iconified = iconified;
                 if iconified {
-                    event_handler.window_minimized_event(context.as_mut(display));
+                    event_handler.window_minimized_event(context.with_display(display));
                 } else {
-                    event_handler.window_restored_event(context.as_mut(display));
+                    event_handler.window_restored_event(context.with_display(display));
                 }
             }
         }
@@ -329,7 +329,7 @@ unsafe extern "system" fn win32_wndproc(
             let mouse_x = display.mouse_x;
             let mouse_y = display.mouse_y;
             event_handler.mouse_button_down_event(
-                context.as_mut(display),
+                context.with_display(display),
                 MouseButton::Left,
                 mouse_x,
                 mouse_y,
@@ -339,7 +339,7 @@ unsafe extern "system" fn win32_wndproc(
             let mouse_x = display.mouse_x;
             let mouse_y = display.mouse_y;
             event_handler.mouse_button_down_event(
-                context.as_mut(display),
+                context.with_display(display),
                 MouseButton::Right,
                 mouse_x,
                 mouse_y,
@@ -349,7 +349,7 @@ unsafe extern "system" fn win32_wndproc(
             let mouse_x = display.mouse_x;
             let mouse_y = display.mouse_y;
             event_handler.mouse_button_down_event(
-                context.as_mut(display),
+                context.with_display(display),
                 MouseButton::Middle,
                 mouse_x,
                 mouse_y,
@@ -359,7 +359,7 @@ unsafe extern "system" fn win32_wndproc(
             let mouse_x = display.mouse_x;
             let mouse_y = display.mouse_y;
             event_handler.mouse_button_up_event(
-                context.as_mut(display),
+                context.with_display(display),
                 MouseButton::Left,
                 mouse_x,
                 mouse_y,
@@ -369,7 +369,7 @@ unsafe extern "system" fn win32_wndproc(
             let mouse_x = display.mouse_x;
             let mouse_y = display.mouse_y;
             event_handler.mouse_button_up_event(
-                context.as_mut(display),
+                context.with_display(display),
                 MouseButton::Right,
                 mouse_x,
                 mouse_y,
@@ -379,7 +379,7 @@ unsafe extern "system" fn win32_wndproc(
             let mouse_x = display.mouse_x;
             let mouse_y = display.mouse_y;
             event_handler.mouse_button_up_event(
-                context.as_mut(display),
+                context.with_display(display),
                 MouseButton::Middle,
                 mouse_x,
                 mouse_y,
@@ -409,7 +409,7 @@ unsafe extern "system" fn win32_wndproc(
             let mouse_x = display.mouse_x;
             let mouse_y = display.mouse_y;
 
-            event_handler.mouse_motion_event(context.as_mut(display), mouse_x, mouse_y);
+            event_handler.mouse_motion_event(context.with_display(display), mouse_x, mouse_y);
         }
 
         WM_MOVE if display.cursor_grabbed => {
@@ -436,7 +436,7 @@ unsafe extern "system" fn win32_wndproc(
 
             let dx = data.data.mouse().lLastX as f32 * display.mouse_scale;
             let dy = data.data.mouse().lLastY as f32 * display.mouse_scale;
-            event_handler.raw_mouse_motion(context.as_mut(display), dx as f32, dy as f32);
+            event_handler.raw_mouse_motion(context.with_display(display), dx as f32, dy as f32);
 
             update_clip_rect(hwnd);
         }
@@ -451,7 +451,7 @@ unsafe extern "system" fn win32_wndproc(
         }
         WM_MOUSEWHEEL => {
             event_handler.mouse_wheel_event(
-                context.as_mut(display),
+                context.with_display(display),
                 0.0,
                 (HIWORD(wparam as _) as i16) as f32,
             );
@@ -459,7 +459,7 @@ unsafe extern "system" fn win32_wndproc(
 
         WM_MOUSEHWHEEL => {
             event_handler.mouse_wheel_event(
-                context.as_mut(display),
+                context.with_display(display),
                 (HIWORD(wparam as _) as i16) as f32,
                 0.0,
             );
@@ -470,7 +470,7 @@ unsafe extern "system" fn win32_wndproc(
             let mods = key_mods();
             if chr > 0 {
                 if let Some(chr) = std::char::from_u32(chr as u32) {
-                    event_handler.char_event(context.as_mut(display), chr, mods, repeat);
+                    event_handler.char_event(context.with_display(display), chr, mods, repeat);
                 }
             }
         }
@@ -479,13 +479,13 @@ unsafe extern "system" fn win32_wndproc(
             let keycode = keycodes::translate_keycode(keycode);
             let mods = key_mods();
             let repeat = !!(lparam & 0x40000000) != 0;
-            event_handler.key_down_event(context.as_mut(display), keycode, mods, repeat);
+            event_handler.key_down_event(context.with_display(display), keycode, mods, repeat);
         }
         WM_KEYUP | WM_SYSKEYUP => {
             let keycode = HIWORD(lparam as _) as u32 & 0x1FF;
             let keycode = keycodes::translate_keycode(keycode);
             let mods = key_mods();
-            event_handler.key_up_event(context.as_mut(display), keycode, mods);
+            event_handler.key_up_event(context.with_display(display), keycode, mods);
         }
 
         _ => {}
@@ -874,7 +874,7 @@ where
 
         let mut context = GraphicsContext::new();
 
-        let event_handler = f(context.as_mut(&mut display));
+        let event_handler = f(context.with_display(&mut display));
 
         let mut p = WindowPayload {
             display,
@@ -897,15 +897,16 @@ where
                     DispatchMessageW(&mut msg as *mut _ as _);
                 }
             }
-            p.event_handler.update(p.context.as_mut(&mut p.display));
-            p.event_handler.draw(p.context.as_mut(&mut p.display));
+            p.event_handler
+                .update(p.context.with_display(&mut p.display));
+            p.event_handler.draw(p.context.with_display(&mut p.display));
             SwapBuffers(p.display.dc);
 
             if p.display.update_dimensions(wnd) {
                 let width = p.display.display_data.screen_width as _;
                 let height = p.display.display_data.screen_height as _;
                 p.event_handler
-                    .resize_event(p.context.as_mut(&mut p.display), width, height);
+                    .resize_event(p.context.with_display(&mut p.display), width, height);
             }
             if p.display.display_data.quit_requested {
                 PostMessageW(p.display.wnd, WM_CLOSE, 0, 0);

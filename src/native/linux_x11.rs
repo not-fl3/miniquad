@@ -466,7 +466,12 @@ impl X11Display {
                 self.repeated_keycodes[(keycode & 0xff) as usize] = true;
                 let mods = self.translate_mod((*event).xkey.state as libc::c_int);
                 if key != crate::event::KeyCode::Unknown {
-                    event_handler.key_down_event(context.as_mut(&mut *self), key, mods, repeat);
+                    event_handler.key_down_event(
+                        context.with_display(&mut *self),
+                        key,
+                        mods,
+                        repeat,
+                    );
                 }
                 let mut keysym: KeySym = 0;
                 (self.libx11.XLookupString)(
@@ -479,7 +484,12 @@ impl X11Display {
                 let chr = self.keysym_to_unicode(keysym);
                 if chr > 0 {
                     if let Some(chr) = std::char::from_u32(chr as u32) {
-                        event_handler.char_event(context.as_mut(&mut *self), chr, mods, repeat);
+                        event_handler.char_event(
+                            context.with_display(&mut *self),
+                            chr,
+                            mods,
+                            repeat,
+                        );
                     }
                 }
             }
@@ -489,7 +499,7 @@ impl X11Display {
                 self.repeated_keycodes[(keycode & 0xff) as usize] = false;
                 if key != crate::event::KeyCode::Unknown {
                     let mods = self.translate_mod((*event).xkey.state as libc::c_int);
-                    event_handler.key_up_event(context.as_mut(&mut *self), key, mods);
+                    event_handler.key_up_event(context.with_display(&mut *self), key, mods);
                 }
             }
             4 => {
@@ -498,20 +508,41 @@ impl X11Display {
                 let y = (*event).xmotion.y as libc::c_float;
 
                 if btn != crate::event::MouseButton::Unknown {
-                    event_handler.mouse_button_down_event(context.as_mut(&mut *self), btn, x, y);
+                    event_handler.mouse_button_down_event(
+                        context.with_display(&mut *self),
+                        btn,
+                        x,
+                        y,
+                    );
                 } else {
                     match (*event).xbutton.button {
                         4 => {
-                            event_handler.mouse_wheel_event(context.as_mut(&mut *self), 0.0, 1.0);
+                            event_handler.mouse_wheel_event(
+                                context.with_display(&mut *self),
+                                0.0,
+                                1.0,
+                            );
                         }
                         5 => {
-                            event_handler.mouse_wheel_event(context.as_mut(&mut *self), 0.0, -1.0);
+                            event_handler.mouse_wheel_event(
+                                context.with_display(&mut *self),
+                                0.0,
+                                -1.0,
+                            );
                         }
                         6 => {
-                            event_handler.mouse_wheel_event(context.as_mut(&mut *self), 1.0, 0.0);
+                            event_handler.mouse_wheel_event(
+                                context.with_display(&mut *self),
+                                1.0,
+                                0.0,
+                            );
                         }
                         7 => {
-                            event_handler.mouse_wheel_event(context.as_mut(&mut *self), -1.0, 0.0);
+                            event_handler.mouse_wheel_event(
+                                context.with_display(&mut *self),
+                                -1.0,
+                                0.0,
+                            );
                         }
                         _ => {}
                     }
@@ -523,7 +554,12 @@ impl X11Display {
                 let y = (*event).xmotion.y as libc::c_float;
 
                 if btn != crate::event::MouseButton::Unknown {
-                    event_handler.mouse_button_up_event(context.as_mut(&mut *self), btn, x, y);
+                    event_handler.mouse_button_up_event(
+                        context.with_display(&mut *self),
+                        btn,
+                        x,
+                        y,
+                    );
                 }
             }
             7 => {
@@ -535,7 +571,7 @@ impl X11Display {
             6 => {
                 let x = (*event).xmotion.x as libc::c_float;
                 let y = (*event).xmotion.y as libc::c_float;
-                event_handler.mouse_motion_event(context.as_mut(&mut *self), x, y);
+                event_handler.mouse_motion_event(context.with_display(&mut *self), x, y);
             }
             22 => {
                 if (*event).xconfigure.width != self.data.screen_width
@@ -546,7 +582,7 @@ impl X11Display {
                     self.data.screen_width = width;
                     self.data.screen_height = height;
                     event_handler.resize_event(
-                        context.as_mut(&mut *self),
+                        context.with_display(&mut *self),
                         width as f32,
                         height as f32,
                     );
@@ -576,7 +612,7 @@ impl X11Display {
                 if (*event).xcookie.evtype == xi_input::XI_RawMotion {
                     let (dx, dy) = self.libxi.read_cookie(&mut (*event).xcookie, self.display);
                     event_handler.raw_mouse_motion(
-                        context.as_mut(&mut *self),
+                        context.with_display(&mut *self),
                         dx as f32,
                         dy as f32,
                     );
@@ -586,7 +622,7 @@ impl X11Display {
         };
 
         if self.data.quit_requested && !self.data.quit_ordered {
-            event_handler.quit_requested_event(context.as_mut(&mut *self));
+            event_handler.quit_requested_event(context.with_display(&mut *self));
             if self.data.quit_requested {
                 self.data.quit_ordered = true
             }
@@ -667,7 +703,6 @@ where
         glx_context,
         conf.platform.swap_interval.unwrap_or(1),
     );
-
     super::gl::load_gl_funcs(|proc| glx.libgl.get_procaddr(proc));
 
     display.show_window(window);
@@ -685,7 +720,7 @@ where
 
     let mut context = GraphicsContext::new();
 
-    let mut data = (f.take().unwrap())(context.as_mut(&mut display));
+    let mut data = (f.take().unwrap())(context.with_display(&mut display));
 
     while !display.data.quit_ordered {
         {
@@ -700,8 +735,8 @@ where
             }
         }
 
-        data.update(context.as_mut(&mut display));
-        data.draw(context.as_mut(&mut display));
+        data.update(context.with_display(&mut display));
+        data.draw(context.with_display(&mut display));
 
         glx.swap_buffers(&mut display, glx_window);
 
@@ -775,7 +810,7 @@ where
     display.data.screen_width = w;
     display.data.screen_height = h;
 
-    let mut data = (f.take().unwrap())(context.as_mut(&mut display));
+    let mut data = (f.take().unwrap())(context.with_display(&mut display));
 
     while !display.data.quit_ordered {
         let count = (display.libx11.XPending)(display.display);
@@ -786,8 +821,8 @@ where
             display.process_event(&mut context, &mut *data, &mut event);
         }
 
-        data.update(context.as_mut(&mut display));
-        data.draw(context.as_mut(&mut display));
+        data.update(context.with_display(&mut display));
+        data.draw(context.with_display(&mut display));
 
         (egl_lib.eglSwapBuffers.unwrap())(egl_display, egl_surface);
         (display.libx11.XFlush)(display.display);

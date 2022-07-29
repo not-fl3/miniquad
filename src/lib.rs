@@ -38,7 +38,9 @@ pub mod date {
 }
 
 impl Context {
-    pub(crate) fn as_mut(&mut self, display: &mut dyn NativeDisplay) -> &mut Context {
+    // Updates the display pointer inside the Context
+    // Context should always be passed to event handlers through "with_display"
+    pub(crate) fn with_display(&mut self, display: &mut dyn NativeDisplay) -> &mut Context {
         self.display = Some(display);
         self
     }
