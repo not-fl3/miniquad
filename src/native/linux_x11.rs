@@ -9,6 +9,7 @@ mod x_cursor;
 mod xi_input;
 
 use crate::{
+    gl,
     event::EventHandler,
     graphics::GraphicsContext,
     native::{egl, NativeDisplayData},
@@ -703,7 +704,7 @@ where
         glx_context,
         conf.platform.swap_interval.unwrap_or(1),
     );
-    super::gl::load_gl_funcs(|proc| glx.libgl.get_procaddr(proc));
+    gl::load_gl_funcs(|proc| glx.libgl.get_procaddr(proc));
 
     display.show_window(window);
 
@@ -719,6 +720,8 @@ where
     display.data.screen_height = h;
 
     let mut context = GraphicsContext::new();
+
+    context.features.instancing = !gl::is_gl2();
 
     let mut data = (f.take().unwrap())(context.with_display(&mut display));
 
@@ -805,6 +808,8 @@ where
     (display.libx11.XFlush)(display.display);
 
     let mut context = GraphicsContext::new();
+
+    context.features.instancing = !gl::is_gl2();
 
     let (w, h) = display.query_window_size(window);
     display.data.screen_width = w;

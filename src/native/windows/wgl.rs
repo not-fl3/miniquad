@@ -396,12 +396,10 @@ impl Wgl {
         }
         let attrs = [
             WGL_CONTEXT_MAJOR_VERSION_ARB,
-            3,
+            2,
             WGL_CONTEXT_MINOR_VERSION_ARB,
-            3,
+            1,
             WGL_CONTEXT_FLAGS_ARB,
-            WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
-            WGL_CONTEXT_PROFILE_MASK_ARB,
             WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
             0,
             0,
