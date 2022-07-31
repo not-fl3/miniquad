@@ -873,6 +873,7 @@ where
         super::gl::load_gl_funcs(|proc| display.get_proc_address(proc));
 
         let mut context = GraphicsContext::new();
+        context.features.instancing = !crate::gl::is_gl2();
 
         let event_handler = f(context.with_display(&mut display));
 

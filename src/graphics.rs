@@ -632,6 +632,16 @@ impl RenderPass {
 pub const MAX_VERTEX_ATTRIBUTES: usize = 16;
 pub const MAX_SHADERSTAGE_IMAGES: usize = 12;
 
+pub struct Features {
+    pub instancing: bool,
+}
+
+impl Default for Features {
+    fn default() -> Features {
+        Features { instancing: true }
+    }
+}
+
 pub struct GraphicsContext {
     shaders: Vec<ShaderInternal>,
     pipelines: Vec<PipelineInternal>,
@@ -639,6 +649,7 @@ pub struct GraphicsContext {
     default_framebuffer: GLuint,
     cache: GlCache,
 
+    pub(crate) features: Features,
     pub(crate) display: Option<*mut dyn crate::NativeDisplay>,
 }
 
@@ -659,6 +670,7 @@ impl GraphicsContext {
                 shaders: vec![],
                 pipelines: vec![],
                 passes: vec![],
+                features: Default::default(),
                 cache: GlCache {
                     stored_index_buffer: 0,
                     stored_index_type: None,
@@ -679,6 +691,10 @@ impl GraphicsContext {
                 display: None,
             }
         }
+    }
+
+    pub fn features(&self) -> &Features {
+        &self.features
     }
 }
 
@@ -915,7 +931,9 @@ impl Context {
                             attribute.stride,
                             attribute.offset as *mut _,
                         );
-                        glVertexAttribDivisor(attr_index as GLuint, attribute.divisor as u32);
+                        if self.features.instancing {
+                            glVertexAttribDivisor(attr_index as GLuint, attribute.divisor as u32);
+                        }
                         glEnableVertexAttribArray(attr_index as GLuint);
                     };
 
@@ -1097,6 +1115,12 @@ impl Context {
             self.cache.cur_pipeline.is_some(),
             "Drawing without any binded pipeline"
         );
+
+        if !self.features.instancing && num_instances != 1 {
+            println!("Instanced rendering is not supported by the GPU");
+            println!("Ignoring this draw call");
+            return;
+        }
 
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let primitive_type = pip.params.primitive_type.into();

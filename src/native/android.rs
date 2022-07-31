@@ -375,6 +375,8 @@ where
         }
 
         let mut context = GraphicsContext::new();
+        context.features.instancing = !gl::is_gl2();
+
         let mut display = AndroidDisplay {
             screen_width,
             screen_height,

@@ -318,11 +318,14 @@ impl Glx {
         }
 
         // _sapp_x11_grab_error_handler(libx11);
-        let attribs: [libc::c_int; 5] = [
+        let attribs: [libc::c_int; 8] = [
             GLX_CONTEXT_MAJOR_VERSION_ARB,
             2,
             GLX_CONTEXT_MINOR_VERSION_ARB,
             1,
+            GLX_CONTEXT_FLAGS_ARB,
+            GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
+            0,
             0,
         ];
         let glx_ctx = self.extensions.glxCreateContextAttribsARB.unwrap()(
