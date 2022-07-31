@@ -248,20 +248,27 @@ impl LibEgl {
     }
 }
 
+#[derive(Debug)]
+pub enum EglError {
+    NoDisplay,
+    InitializeFailed,
+    CreateContextFailed,
+}
+
 pub struct Egl {}
 
 pub unsafe fn create_egl_context(
     egl: &mut LibEgl,
     display: *mut std::ffi::c_void,
     alpha: bool,
-) -> Option<(EGLContext, EGLConfig, EGLDisplay)> {
+) -> Result<(EGLContext, EGLConfig, EGLDisplay), EglError> {
     let display = (egl.eglGetDisplay.unwrap())(display as _);
     if display == /* EGL_NO_DISPLAY */ null_mut() {
-        return None;
+        return Err(EglError::NoDisplay);
     }
 
     if (egl.eglInitialize.unwrap())(display, null_mut(), null_mut()) == 0 {
-        return None;
+        return Err(EglError::InitializeFailed);
     }
 
     let alpha_size = if alpha { 8 } else { 0 };
@@ -325,8 +332,8 @@ pub unsafe fn create_egl_context(
         ctx_attributes.as_ptr() as _,
     );
     if context.is_null() {
-        return None;
+        return Err(EglError::CreateContextFailed);
     }
 
-    return Some((context, config, display));
+    return Ok((context, config, display));
 }
