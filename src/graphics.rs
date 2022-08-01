@@ -1110,6 +1110,9 @@ impl Context {
     /// + `base_element` specifies starting offset in `index_buffer`.
     /// + `num_elements` specifies length of the slice of `index_buffer` to draw.
     /// + `num_instances` specifies how many instances should be rendered.
+    ///
+    /// NOTE: num_instances > 1 might be not supported by the GPU (gl2.1 and gles2).
+    /// `features.instancing` check is required.
     pub fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32) {
         assert!(
             self.cache.cur_pipeline.is_some(),
