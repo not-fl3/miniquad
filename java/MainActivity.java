@@ -178,5 +178,22 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         //% MAIN_ACTIVITY_ON_ACTIVITY_RESULT
     }
+
+    public void setFullScreen(final boolean fullscreen) {
+        runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    View decorView = getWindow().getDecorView();
+
+                    if (fullscreen) {
+                        int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+                        decorView.setSystemUiVisibility(uiOptions);
+                    }
+                    else {
+                        decorView.setSystemUiVisibility(0);
+                    }
+                }
+            });
+    }
 }
 

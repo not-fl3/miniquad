@@ -2,11 +2,10 @@ package quad_native;
 
 import android.view.Surface;
 
-// Java force the MainActivity class belongs to a specially named package
+// Java force the MainActivity class to belong to a specially named package
 // this package name is forced to be different for each app
 // and Java do not have any way to specify a native symbol lookup name..
-// To workaround this - native callbacks can't be defined in dynamically named
-// MainActivity package
+// To workaround this - all native callbakcks lives in QuadNative class
 public class QuadNative {
     // belongs to MainActivity class
     public native static void activityOnCreate(Object activity);

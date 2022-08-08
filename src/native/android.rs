@@ -77,6 +77,7 @@ static mut VM: *mut ndk_sys::JavaVM = std::ptr::null_mut();
 struct AndroidDisplay {
     screen_width: f32,
     screen_height: f32,
+    fullscreen: bool,
 }
 
 impl NativeDisplay for AndroidDisplay {
@@ -89,29 +90,25 @@ impl NativeDisplay for AndroidDisplay {
     fn high_dpi(&self) -> bool {
         true
     }
-    fn order_quit(&mut self) {
-        // there is no escape from wasm
-    }
-    fn request_quit(&mut self) {
-        // there is no escape from wasm
-    }
-    fn cancel_quit(&mut self) {
-        // there is no escape from wasm
-    }
+    fn order_quit(&mut self) {}
+    fn request_quit(&mut self) {}
+    fn cancel_quit(&mut self) {}
     fn set_cursor_grab(&mut self, _grab: bool) {}
     fn show_mouse(&mut self, _shown: bool) {}
     fn set_mouse_cursor(&mut self, _cursor: crate::CursorIcon) {}
     fn set_window_size(&mut self, _new_width: u32, _new_height: u32) {}
-    fn set_fullscreen(&mut self, _fullscreen: bool) {
-        // TODO: just setting self.fullscreen is not enough,
-        // auto_hide_navbar should be called as well
-        // and auto_unhide(?)_navbar, which is not yet implemented
-        //self.fullscreen = fullscreen;
+    fn set_fullscreen(&mut self, fullscreen: bool) {
+        unsafe {
+            let env = attach_jni_env();
+            set_full_screen(env, fullscreen);
+        }
+        self.fullscreen = fullscreen;
     }
     fn clipboard_get(&mut self) -> Option<String> {
         None
     }
     fn clipboard_set(&mut self, _data: &str) {}
+    fn show_keyboard(&mut self, _show: bool) {}
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
     }
@@ -168,7 +165,6 @@ struct MainThreadState {
     window: *mut ndk_sys::ANativeWindow,
     event_handler: Box<dyn EventHandler>,
     quit: bool,
-    fullscreen: bool,
 }
 
 impl MainThreadState {
@@ -254,10 +250,10 @@ impl MainThreadState {
                 .event_handler
                 .window_minimized_event(self.context.with_display(&mut self.display)),
             Message::Resume => {
-                if self.fullscreen {
+                if self.display.fullscreen {
                     unsafe {
                         let env = attach_jni_env();
-                        auto_hide_nav_bar(env);
+                        set_full_screen(env, true);
                     }
                 }
 
@@ -334,7 +330,7 @@ where
 
     if conf.fullscreen {
         let env = attach_jni_env();
-        auto_hide_nav_bar(env);
+        set_full_screen(env, true);
     }
 
     // yeah, just adding Send to outer F will do it, but it will brake the API
@@ -400,6 +396,7 @@ where
         let mut display = AndroidDisplay {
             screen_width,
             screen_height,
+            fullscreen: conf.fullscreen,
         };
         let event_handler = f.0(context.with_display(&mut display));
         let mut s = MainThreadState {
@@ -413,7 +410,6 @@ where
             window,
             event_handler,
             quit: false,
-            fullscreen: conf.fullscreen,
         };
 
         while !s.quit {
@@ -547,80 +543,8 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnTouch(
     });
 }
 
-unsafe fn auto_hide_nav_bar(env: *mut ndk_sys::JNIEnv) {
-    console_info(b"auto_hide_nav_bar: Start\0".as_ptr() as _);
-
-    let find_class = (**env).FindClass.unwrap();
-    let get_method_id = (**env).GetMethodID.unwrap();
-    let call_object_method = (**env).CallObjectMethod.unwrap();
-    let get_static_field_id = (**env).GetStaticFieldID.unwrap();
-    let get_static_int_field = (**env).GetStaticIntField.unwrap();
-    let call_void_method = (**env).CallVoidMethod.unwrap();
-
-    let activity_class = find_class(env, b"android/app/NativeActivity\0".as_ptr() as _);
-
-    console_info(b"auto_hide_nav_bar: Got activity class\0".as_ptr() as _);
-
-    let get_window = get_method_id(
-        env,
-        activity_class,
-        b"getWindow\0".as_ptr() as _,
-        b"()Landroid/view/Window;\0".as_ptr() as _,
-    );
-
-    let window_class = find_class(env, b"android/view/Window\0".as_ptr() as _);
-    let get_decor_view = get_method_id(
-        env,
-        window_class,
-        b"getDecorView\0".as_ptr() as _,
-        b"()Landroid/view/View;\0".as_ptr() as _,
-    );
-
-    let view_class = find_class(env, b"android/view/View\0".as_ptr() as _);
-    let set_system_ui_visibility = get_method_id(
-        env,
-        view_class,
-        b"setSystemUiVisibility\0".as_ptr() as _,
-        b"(I)V\0".as_ptr() as _,
-    );
-
-    console_info(b"auto_hide_nav_bar: Got set_system_ui_visibility\0".as_ptr() as _);
-
-    let window = call_object_method(env, ACTIVITY, get_window);
-    let decor_view = call_object_method(env, window, get_decor_view);
-
-    let flag_fullscreen_id = get_static_field_id(
-        env,
-        view_class,
-        b"SYSTEM_UI_FLAG_FULLSCREEN\0".as_ptr() as _,
-        b"I\0".as_ptr() as _,
-    );
-    let flag_hide_navigation_id = get_static_field_id(
-        env,
-        view_class,
-        b"SYSTEM_UI_FLAG_HIDE_NAVIGATION\0".as_ptr() as _,
-        b"I\0".as_ptr() as _,
-    );
-    let flag_immersive_sticky_id = get_static_field_id(
-        env,
-        view_class,
-        b"SYSTEM_UI_FLAG_IMMERSIVE_STICKY\0".as_ptr() as _,
-        b"I\0".as_ptr() as _,
-    );
-
-    console_info(b"auto_hide_nav_bar: Got flags\0".as_ptr() as _);
-
-    let flag_fullscreen = get_static_int_field(env, view_class, flag_fullscreen_id);
-    let flag_hide_navigation = get_static_int_field(env, view_class, flag_hide_navigation_id);
-    let flag_immersive_sticky = get_static_int_field(env, view_class, flag_immersive_sticky_id);
-
-    let flag = flag_fullscreen | flag_hide_navigation | flag_immersive_sticky;
-
-    call_void_method(env, decor_view, set_system_ui_visibility, flag);
-
-    // detach_current_thread(java_vm);
-
-    console_info(b"auto_hide_nav_bar: Nav bar should be hidden!\0".as_ptr() as _);
+unsafe fn set_full_screen(env: *mut ndk_sys::JNIEnv, fullscreen: bool) {
+    ndk_utils::call_void_method!(env, ACTIVITY, "setFullScreen", "(Z)V", fullscreen as i32);
 }
 
 #[repr(C)]

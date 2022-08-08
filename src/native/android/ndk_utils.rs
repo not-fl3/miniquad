@@ -36,7 +36,7 @@ macro_rules! call_method {
         assert!(!class.is_null());
 
         let method = get_method_id($env, class, method.as_ptr() as _, sig.as_ptr() as _);
-        assert!(!class.is_null());
+        assert!(!method.is_null());
 
         call_object_method($env, $obj, method, $($args,)*)
     }};
