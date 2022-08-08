@@ -102,7 +102,12 @@ impl NativeDisplay for AndroidDisplay {
     fn show_mouse(&mut self, _shown: bool) {}
     fn set_mouse_cursor(&mut self, _cursor: crate::CursorIcon) {}
     fn set_window_size(&mut self, _new_width: u32, _new_height: u32) {}
-    fn set_fullscreen(&mut self, _fullscreen: bool) {}
+    fn set_fullscreen(&mut self, _fullscreen: bool) {
+        // TODO: just setting self.fullscreen is not enough,
+        // auto_hide_navbar should be called as well
+        // and auto_unhide(?)_navbar, which is not yet implemented
+        //self.fullscreen = fullscreen;
+    }
     fn clipboard_get(&mut self) -> Option<String> {
         None
     }
@@ -163,6 +168,7 @@ struct MainThreadState {
     window: *mut ndk_sys::ANativeWindow,
     event_handler: Box<dyn EventHandler>,
     quit: bool,
+    fullscreen: bool,
 }
 
 impl MainThreadState {
@@ -247,9 +253,17 @@ impl MainThreadState {
             Message::Pause => self
                 .event_handler
                 .window_minimized_event(self.context.with_display(&mut self.display)),
-            Message::Resume => self
-                .event_handler
-                .window_restored_event(self.context.with_display(&mut self.display)),
+            Message::Resume => {
+                if self.fullscreen {
+                    unsafe {
+                        let env = attach_jni_env();
+                        auto_hide_nav_bar(env);
+                    }
+                }
+
+                self.event_handler
+                    .window_restored_event(self.context.with_display(&mut self.display))
+            }
             Message::Destroy => {
                 self.quit = true;
             }
@@ -318,7 +332,13 @@ where
         }));
     }
 
-    // yeah, just adding Send to outer F will do it
+    if conf.fullscreen {
+        let env = attach_jni_env();
+        auto_hide_nav_bar(env);
+    }
+
+    // yeah, just adding Send to outer F will do it, but it will brake the API
+    // in other backends
     struct SendHack<F>(F);
     unsafe impl<F> Send for SendHack<F> {}
 
@@ -393,6 +413,7 @@ where
             window,
             event_handler,
             quit: false,
+            fullscreen: conf.fullscreen,
         };
 
         while !s.quit {
@@ -438,11 +459,7 @@ pub unsafe extern "C" fn Java_quad_1native_QuadNative_activityOnCreate(
     activity: ndk_sys::jobject,
 ) {
     let env = attach_jni_env();
-
     ACTIVITY = (**env).NewGlobalRef.unwrap()(env, activity);
-
-    auto_hide_nav_bar(env);
-
     quad_main();
 }
 
@@ -451,10 +468,6 @@ unsafe extern "C" fn Java_quad_1native_QuadNative_activityOnResume(
     _: *mut ndk_sys::JNIEnv,
     _: ndk_sys::jobject,
 ) {
-    let env = attach_jni_env();
-
-    auto_hide_nav_bar(env);
-
     send_message(Message::Resume);
 }
 
