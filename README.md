@@ -41,6 +41,9 @@ Miniquad aims to provide a graphics abstraction that works the same way on any p
 cargo run --example quad
 ```
 
+On NixOS Linux you can use [`shell.nix`](shell.nix) to start a development
+environment where Miniquad can be built and run.
+
 ## windows
 
 ```bash
