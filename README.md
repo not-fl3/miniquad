@@ -10,19 +10,19 @@ Miniquad is a manifestation of a dream in a world where we do not need a deep de
 
 Miniquad aims to provide a graphics abstraction that works the same way on any platform with a GPU, being as light weight as possible while covering as many machines as possible. 
 
-## Supported platforms
+## Supported Platforms
 
-* Windows, OpenGL 3
-* Linux, OpenGL 3
-* macOS, OpenGL 3
-* iOS, GLES 3
-* WASM, WebGl1 - tested on iOS safari, ff, chrome
-* Android, GLES3
+* Windows, OpenGL 3;
+* Linux, OpenGL 3;
+* macOS, OpenGL 3;
+* iOS, GLES 3;
+* WASM, WebGL 1 - tested on iOS Safari, Firefox, Chrome;
+* Android, GLES 3.
 
-## Not supported, but desirable platforms
+## Not Supported, but Desirable Platforms
 
-* Android, GLES2 - work in progress.
-* Metal. For both MacOs and iOS metal rendering backend next to opengl one is highly desirable. But I just dont have any MacOs capable hardware to start working on it :/
+* Android, GLES 2 - work in progress.
+* Metal. For both macOS and iOS metal rendering backend next to opengl one is highly desirable. But I just dont have any macOS capable hardware to start working on it :/
 
 ## Examples
 
@@ -35,7 +35,7 @@ Miniquad aims to provide a graphics abstraction that works the same way on any p
 
 # Building examples
 
-## linux
+## Linux
 
 ```bash
 cargo run --example quad
@@ -44,7 +44,7 @@ cargo run --example quad
 On NixOS Linux you can use [`shell.nix`](shell.nix) to start a development
 environment where Miniquad can be built and run.
 
-## windows
+## Windows
 
 ```bash
 # both MSVC and GNU target is supported:
@@ -55,7 +55,7 @@ rustup target add x86_64-pc-windows-gnu
 cargo run --example quad
 ```
 
-## wasm
+## WASM
 
 ```bash
 rustup target add wasm32-unknown-unknown
@@ -124,7 +124,7 @@ No code modifications for Android required, everything should just works.
 
 See miniquad iOS [sample project](https://github.com/Gordon-F/miniquad_ios_example).
 
-## cross compilation
+## Cross Compilation
 
 ```bash
 
@@ -146,11 +146,11 @@ cargo run --example quad --target x86_64-pc-windows-gnu
 
 * Forkability. Each platform implementation is, usually, just one pure Rust file. And this file is very copy-paste friendly - it doesnt use any miniquad specific abstractions. It is very easy to just copy some part of miniquad's platform implementation and use it standalone.
 
-# Non goals
+# Non-goals
 
 * Ultimate type safety. Library should be entirely safe in Rust's definition of safe - no UB or memory unsafety. But correct GPU state is not type guaranteed. Feel free to provide safety abstraction in the user code then!
 
-* High end API, like Vulkan/DirectX 12. Take a look on [gfx-rs](https://github.com/gfx-rs/gfx) or [vulkano](https://github.com/vulkano-rs/vulkano) instead!
+* High-end API, like Vulkan/DirectX 12. Take a look on [gfx-rs](https://github.com/gfx-rs/gfx) or [vulkano](https://github.com/vulkano-rs/vulkano) instead!
 
 # Platinum sponsors
 
