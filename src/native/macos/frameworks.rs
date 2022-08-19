@@ -11,20 +11,13 @@
 
 pub use {
     objc::{
-        runtime::{Class, Object, Protocol, Sel, BOOL, YES, NO},
+        class,
         declare::ClassDecl,
         msg_send,
-        sel,
-        class,
-        sel_impl,
-        Encode,
-        Encoding
+        runtime::{Class, Object, Protocol, Sel, BOOL, NO, YES},
+        sel, sel_impl, Encode, Encoding,
     },
-    std::{
-        ffi::c_void,
-        os::raw::c_ulong,
-        ptr::NonNull,
-    },
+    std::{ffi::c_void, os::raw::c_ulong, ptr::NonNull},
 };
 
 //use bitflags::bitflags;
@@ -36,20 +29,20 @@ pub struct RcObjcId(NonNull<Object>);
 
 impl RcObjcId {
     pub fn from_owned(id: NonNull<Object>) -> Self {
-        Self (id)
+        Self(id)
     }
-    
+
     pub fn from_unowned(id: NonNull<Object>) -> Self {
         unsafe {
             let _: () = msg_send![id.as_ptr(), retain];
         }
         Self::from_owned(id)
     }
-    
+
     pub fn as_id(&self) -> ObjcId {
         self.0.as_ptr()
     }
-    
+
     pub fn forget(self) -> NonNull<Object> {
         unsafe {
             let _: () = msg_send![self.0.as_ptr(), retain];
@@ -73,20 +66,20 @@ impl Drop for RcObjcId {
 }
 
 #[link(name = "system")]
-extern {
+extern "C" {
     pub static _NSConcreteStackBlock: [*const c_void; 32];
     pub static _NSConcreteBogusBlock: [*const c_void; 32];
 }
 
 #[link(name = "Foundation", kind = "framework")]
-extern {
+extern "C" {
     pub static NSRunLoopCommonModes: ObjcId;
     pub static NSDefaultRunLoopMode: ObjcId;
     pub static NSProcessInfo: ObjcId;
-    pub fn NSStringFromClass(class:ObjcId)->ObjcId;
-    
+    pub fn NSStringFromClass(class: ObjcId) -> ObjcId;
+
     pub fn __CFStringMakeConstantString(cStr: *const ::std::os::raw::c_char) -> CFStringRef;
-    
+
     pub fn CFStringGetLength(theString: CFStringRef) -> u64;
     pub fn CFStringGetBytes(
         theString: CFStringRef,
@@ -102,15 +95,20 @@ extern {
 }
 
 #[link(name = "ImageIO", kind = "framework")]
-extern{
-    pub static kUTTypePNG:ObjcId;
-    pub fn CGImageDestinationCreateWithURL(url:ObjcId, ty:ObjcId, count:u64, options:ObjcId)->ObjcId;    
-    pub fn CGImageDestinationAddImage(dest:ObjcId, img:ObjcId, props:ObjcId);    
-    pub fn CGImageDestinationFinalize(dest:ObjcId)->bool;    
+extern "C" {
+    pub static kUTTypePNG: ObjcId;
+    pub fn CGImageDestinationCreateWithURL(
+        url: ObjcId,
+        ty: ObjcId,
+        count: u64,
+        options: ObjcId,
+    ) -> ObjcId;
+    pub fn CGImageDestinationAddImage(dest: ObjcId, img: ObjcId, props: ObjcId);
+    pub fn CGImageDestinationFinalize(dest: ObjcId) -> bool;
 }
 
 #[link(name = "AppKit", kind = "framework")]
-extern {
+extern "C" {
     pub static NSPasteboardURLReadingFileURLsOnlyKey: ObjcId;
     pub static NSTrackingArea: ObjcId;
     pub static NSStringPboardType: ObjcId;
@@ -118,27 +116,43 @@ extern {
 }
 
 #[link(name = "Vision", kind = "framework")]
-extern {
+extern "C" {
     pub static VNImageRequestHandler: ObjcId;
     pub static VNRecognizeTextRequest: ObjcId;
 }
 
-
-pub const kCGEventLeftMouseDown:u32 = 1;
-pub const kCGEventLeftMouseUp:u32 = 2;
+pub const kCGEventLeftMouseDown: u32 = 1;
+pub const kCGEventLeftMouseUp: u32 = 2;
 pub const kCGMouseEventClickState: u32 = 1;
 //pub const kCGEventSourceStateHIDSystemState: u32 = 1;
 
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
-    pub fn CGEventSourceCreate(state_id:u32)->ObjcId;
-    pub fn CGEventSetIntegerValueField(event:ObjcId, field: u32, value:u64);
-    pub fn CGEventCreateMouseEvent(source:ObjcId, mouse_type: u32, pos:NSPoint, button:u32)->ObjcId;
-    pub fn CGEventCreateScrollWheelEvent(source:ObjcId, is_line:u32, wheel_count: u32, wheel1: i32, wheel2: i32, wheel3: i32)->ObjcId;
-    pub fn CGEventPostToPid(pid:u32, event:ObjcId);
-    pub fn CGEventPost(tap:u32, event:ObjcId);
-    
-    pub fn CGWindowListCreateImage(rect:NSRect, options:u32, window_id:u32, imageoptions:u32 )->ObjcId;
+    pub fn CGEventSourceCreate(state_id: u32) -> ObjcId;
+    pub fn CGEventSetIntegerValueField(event: ObjcId, field: u32, value: u64);
+    pub fn CGEventCreateMouseEvent(
+        source: ObjcId,
+        mouse_type: u32,
+        pos: NSPoint,
+        button: u32,
+    ) -> ObjcId;
+    pub fn CGEventCreateScrollWheelEvent(
+        source: ObjcId,
+        is_line: u32,
+        wheel_count: u32,
+        wheel1: i32,
+        wheel2: i32,
+        wheel3: i32,
+    ) -> ObjcId;
+    pub fn CGEventPostToPid(pid: u32, event: ObjcId);
+    pub fn CGEventPost(tap: u32, event: ObjcId);
+
+    pub fn CGWindowListCreateImage(
+        rect: NSRect,
+        options: u32,
+        window_id: u32,
+        imageoptions: u32,
+    ) -> ObjcId;
     pub fn CGMainDisplayID() -> u32;
     pub fn CGDisplayPixelsHigh(display: u32) -> u64;
     pub fn CGColorCreateGenericRGB(red: f64, green: f64, blue: f64, alpha: f64) -> ObjcId;
@@ -152,15 +166,12 @@ extern "C" {
 }
 
 #[link(name = "AVFoundation", kind = "framework")]
-extern {
+extern "C" {
     pub static AVAudioUnitComponentManager: ObjcId;
     pub static AVAudioUnit: ObjcId;
 }
 
-
 // Foundation
-
-
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -170,8 +181,8 @@ pub struct CFRange {
 }
 
 pub const kCFStringEncodingUTF8: u32 = 134217984;
-pub const kCGWindowListOptionIncludingWindow: u32 = 1<<3;
-pub const kCGWindowImageBoundsIgnoreFraming: u32 = 1<<0;
+pub const kCGWindowListOptionIncludingWindow: u32 = 1 << 3;
+pub const kCGWindowImageBoundsIgnoreFraming: u32 = 1 << 0;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -182,8 +193,12 @@ pub struct NSPoint {
 
 unsafe impl Encode for NSPoint {
     fn encode() -> Encoding {
-        let encoding = format!("{{CGPoint={}{}}}", f64::encode().as_str(), f64::encode().as_str());
-        unsafe {Encoding::from_str(&encoding)}
+        let encoding = format!(
+            "{{CGPoint={}{}}}",
+            f64::encode().as_str(),
+            f64::encode().as_str()
+        );
+        unsafe { Encoding::from_str(&encoding) }
     }
 }
 
@@ -196,11 +211,14 @@ pub struct NSSize {
 
 unsafe impl Encode for NSSize {
     fn encode() -> Encoding {
-        let encoding = format!("{{CGSize={}{}}}", f64::encode().as_str(), f64::encode().as_str());
-        unsafe {Encoding::from_str(&encoding)}
+        let encoding = format!(
+            "{{CGSize={}{}}}",
+            f64::encode().as_str(),
+            f64::encode().as_str()
+        );
+        unsafe { Encoding::from_str(&encoding) }
     }
 }
-
 
 #[repr(C)]
 #[derive(Copy, Debug, Clone)]
@@ -211,8 +229,12 @@ pub struct NSRect {
 
 unsafe impl Encode for NSRect {
     fn encode() -> Encoding {
-        let encoding = format!("{{CGRect={}{}}}", NSPoint::encode().as_str(), NSSize::encode().as_str());
-        unsafe {Encoding::from_str(&encoding)}
+        let encoding = format!(
+            "{{CGRect={}{}}}",
+            NSPoint::encode().as_str(),
+            NSSize::encode().as_str()
+        );
+        unsafe { Encoding::from_str(&encoding) }
     }
 }
 
@@ -226,7 +248,7 @@ pub enum NSEventModifierFlags {
     NSNumericPadKeyMask = 1 << 21,
     NSHelpKeyMask = 1 << 22,
     NSFunctionKeyMask = 1 << 23,
-    NSDeviceIndependentModifierFlagsMask = 0xffff0000
+    NSDeviceIndependentModifierFlagsMask = 0xffff0000,
 }
 
 pub const NSTrackignActiveAlways: u64 = 0x80;
@@ -241,7 +263,7 @@ pub const UTF8_ENCODING: usize = 4;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NSWindowTitleVisibility {
     NSWindowTitleVisible = 0,
-    NSWindowTitleHidden = 1
+    NSWindowTitleHidden = 1,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -310,7 +332,7 @@ pub enum NSEventMask {
     NSEventMaskBeginGesture = 1 << NSEventType::NSEventTypeBeginGesture as u64,
     NSEventMaskEndGesture = 1 << NSEventType::NSEventTypeEndGesture as u64,
     NSEventMaskPressure = 1 << NSEventType::NSEventTypePressure as u64,
-    NSAnyEventMask = 0xffffffffffffffff
+    NSAnyEventMask = 0xffffffffffffffff,
 }
 
 #[repr(u64)] // NSUInteger
@@ -320,13 +342,13 @@ pub enum NSWindowStyleMask {
     NSClosableWindowMask = 1 << 1,
     NSMiniaturizableWindowMask = 1 << 2,
     NSResizableWindowMask = 1 << 3,
-    
+
     NSTexturedBackgroundWindowMask = 1 << 8,
-    
+
     NSUnifiedTitleAndToolbarWindowMask = 1 << 12,
-    
+
     NSFullScreenWindowMask = 1 << 14,
-    
+
     NSFullSizeContentViewWindowMask = 1 << 15,
 }
 
@@ -334,7 +356,7 @@ pub enum NSWindowStyleMask {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NSApplicationActivationOptions {
     NSApplicationActivateAllWindows = 1 << 0,
-    NSApplicationActivateIgnoringOtherApps = 1 << 1
+    NSApplicationActivateIgnoringOtherApps = 1 << 1,
 }
 
 #[repr(i64)]
@@ -343,7 +365,7 @@ pub enum NSApplicationActivationPolicy {
     NSApplicationActivationPolicyRegular = 0,
     NSApplicationActivationPolicyAccessory = 1,
     NSApplicationActivationPolicyProhibited = 2,
-    NSApplicationActivationPolicyERROR = -1
+    NSApplicationActivationPolicyERROR = -1,
 }
 
 #[repr(u64)]
@@ -351,7 +373,7 @@ pub enum NSApplicationActivationPolicy {
 pub enum NSBackingStoreType {
     NSBackingStoreRetained = 0,
     NSBackingStoreNonretained = 1,
-    NSBackingStoreBuffered = 2
+    NSBackingStoreBuffered = 2,
 }
 
 #[repr(C)]
@@ -375,7 +397,7 @@ unsafe impl Encode for NSRange {
             u64::encode().as_str(),
             u64::encode().as_str(),
         );
-        unsafe {Encoding::from_str(&encoding)}
+        unsafe { Encoding::from_str(&encoding) }
     }
 }
 
@@ -383,12 +405,12 @@ pub trait NSMutableAttributedString: Sized {
     unsafe fn alloc(_: Self) -> ObjcId {
         msg_send![class!(NSMutableAttributedString), alloc]
     }
-    
+
     unsafe fn init(self) -> ObjcId;
     // *mut NSMutableAttributedString
     unsafe fn init_with_string(self, string: ObjcId) -> ObjcId;
     unsafe fn init_with_attributed_string(self, string: ObjcId) -> ObjcId;
-    
+
     unsafe fn string(self) -> ObjcId;
     // *mut NSString
     unsafe fn mutable_string(self) -> ObjcId;
@@ -400,34 +422,29 @@ impl NSMutableAttributedString for ObjcId {
     unsafe fn init(self) -> ObjcId {
         msg_send![self, init]
     }
-    
+
     unsafe fn init_with_string(self, string: ObjcId) -> ObjcId {
         msg_send![self, initWithString: string]
     }
-    
+
     unsafe fn init_with_attributed_string(self, string: ObjcId) -> ObjcId {
         msg_send![self, initWithAttributedString: string]
     }
-    
+
     unsafe fn string(self) -> ObjcId {
         msg_send![self, string]
     }
-    
+
     unsafe fn mutable_string(self) -> ObjcId {
         msg_send![self, mutableString]
     }
-    
+
     unsafe fn length(self) -> u64 {
         msg_send![self, length]
     }
 }
 
-
-
 // Metal API
-
-
-
 
 #[repr(u64)]
 #[derive(Clone, Debug)]
@@ -626,16 +643,24 @@ pub const MTLResourceHazardTrackingModeMask: u64 = 0x3 << MTLResourceHazardTrack
 #[allow(non_upper_case_globals)]
 pub struct MTLResourceOptions;
 impl MTLResourceOptions {
-    pub const CPUCacheModeDefaultCache: u64 = (MTLCPUCacheMode::DefaultCache as u64) << MTLResourceCPUCacheModeShift;
-    pub const CPUCacheModeWriteCombined: u64 = (MTLCPUCacheMode::WriteCombined as u64) << MTLResourceCPUCacheModeShift;
-    
-    pub const HazardTrackingModeUntracked: u64 = (MTLHazardTrackingMode::Untracked as u64) << MTLResourceHazardTrackingModeShift;
-    pub const HazardTrackingModeTracked: u64 = (MTLHazardTrackingMode::Tracked as u64) << MTLResourceHazardTrackingModeShift;
-    
-    pub const StorageModeShared: u64 = (MTLStorageMode::Shared as u64) << MTLResourceStorageModeShift;
-    pub const StorageModeManaged: u64 = (MTLStorageMode::Managed as u64) << MTLResourceStorageModeShift;
-    pub const StorageModePrivate: u64 = (MTLStorageMode::Private as u64) << MTLResourceStorageModeShift;
-    pub const StorageModeMemoryless: u64 = (MTLStorageMode::Memoryless as u64) << MTLResourceStorageModeShift;
+    pub const CPUCacheModeDefaultCache: u64 =
+        (MTLCPUCacheMode::DefaultCache as u64) << MTLResourceCPUCacheModeShift;
+    pub const CPUCacheModeWriteCombined: u64 =
+        (MTLCPUCacheMode::WriteCombined as u64) << MTLResourceCPUCacheModeShift;
+
+    pub const HazardTrackingModeUntracked: u64 =
+        (MTLHazardTrackingMode::Untracked as u64) << MTLResourceHazardTrackingModeShift;
+    pub const HazardTrackingModeTracked: u64 =
+        (MTLHazardTrackingMode::Tracked as u64) << MTLResourceHazardTrackingModeShift;
+
+    pub const StorageModeShared: u64 =
+        (MTLStorageMode::Shared as u64) << MTLResourceStorageModeShift;
+    pub const StorageModeManaged: u64 =
+        (MTLStorageMode::Managed as u64) << MTLResourceStorageModeShift;
+    pub const StorageModePrivate: u64 =
+        (MTLStorageMode::Private as u64) << MTLResourceStorageModeShift;
+    pub const StorageModeMemoryless: u64 =
+        (MTLStorageMode::Memoryless as u64) << MTLResourceStorageModeShift;
 }
 
 #[repr(u64)]
@@ -649,21 +674,20 @@ pub enum NSDragOperation {
 unsafe impl Encode for NSDragOperation {
     fn encode() -> Encoding {
         let encoding = format!("Q");
-        unsafe {Encoding::from_str(&encoding)}
+        unsafe { Encoding::from_str(&encoding) }
     }
 }
 
-
-
 // CORE AUDIO
-
 
 pub const kAudioUnitManufacturer_Apple: u32 = 1634758764;
 
-#[repr(C)] pub struct OpaqueAudioComponent([u8; 0]);
+#[repr(C)]
+pub struct OpaqueAudioComponent([u8; 0]);
 pub type CAudioComponent = *mut OpaqueAudioComponent;
 
-#[repr(C)] pub struct ComponentInstanceRecord([u8; 0]);
+#[repr(C)]
+pub struct ComponentInstanceRecord([u8; 0]);
 pub type CAudioComponentInstance = *mut ComponentInstanceRecord;
 pub type CAudioUnit = CAudioComponentInstance;
 
@@ -732,7 +756,6 @@ impl F60958AC3Flags {
     const IS_NON_INTERLEAVED: u32 = 32;
     const IS_NON_MIXABLE: u32 = 64;
 }
-
 
 pub struct LinearPcmFlags;
 impl LinearPcmFlags {
@@ -830,7 +853,7 @@ pub struct _AudioBuffer {
     pub mData: *mut ::std::os::raw::c_void,
 }
 
-pub const MAX_AUDIO_BUFFERS:usize = 8;
+pub const MAX_AUDIO_BUFFERS: usize = 8;
 #[repr(C)]
 pub struct CAudioBufferList {
     pub mNumberBuffers: u32,
@@ -867,7 +890,7 @@ pub enum CAudioUnitType {
 #[repr(u32)]
 pub enum CAudioUnitSubType {
     Undefined = 0,
-    
+
     PeakLimiter = 1819112562,
     DynamicsProcessor = 1684237680,
     LowPassFilter = 1819304307,
@@ -887,7 +910,7 @@ pub enum CAudioUnitSubType {
     NetSend = 1853058660,
     RogerBeep = 1919903602,
     NBandEQ = 1851942257,
-    
+
     //pub enum FormatConverterType
     AUConverter = 1668247158,
     NewTimePitch = 1853191280,
@@ -897,21 +920,21 @@ pub enum CAudioUnitSubType {
     Merger = 1835364967,
     Varispeed = 1986097769,
     AUiPodTimeOther = 1768977519,
-    
+
     //pub enum MixerType
     MultiChannelMixer = 1835232632,
     StereoMixer = 1936554098,
     Mixer3D = 862219640,
     MatrixMixer = 1836608888,
-    
+
     //pub enum GeneratorType {
     ScheduledSoundPlayer = 1936945260,
     AudioFilePlayer = 1634103404,
-    
+
     //pub enum MusicDeviceType {
     DLSSynth = 1684828960,
     Sampler = 1935764848,
-    
+
     //pub enum IOType {
     GenericOutput = 1734700658,
     HalOutput = 1634230636,
@@ -924,19 +947,18 @@ pub enum CAudioUnitSubType {
 #[derive(Debug)]
 #[repr(i32)]
 pub enum OSError {
-    
     Unimplemented = -4,
     FileNotFound = -43,
     FilePermission = -54,
     TooManyFilesOpen = -42,
-    
+
     Unspecified = -1500,
     SystemSoundClientMessageTimeout = -1501,
-    
+
     BadFilePath = 561017960,
     Param = -50,
     MemFull = -108,
-    
+
     FormatUnspecified = 2003329396,
     UnknownProperty = 2003332927,
     BadPropertySize = 561211770,
@@ -944,9 +966,9 @@ pub enum OSError {
     UnsupportedFormat = 560226676,
     State = 561214580,
     NotEnoughBufferSpace = 560100710,
-    
+
     UnsupportedDataFormat = 1718449215,
-    
+
     InvalidProperty = -10879,
     InvalidParameter = -10878,
     InvalidElement = -10877,
@@ -964,9 +986,9 @@ pub enum OSError {
     Initialized = -10849,
     InvalidOfflineRender = -10848,
     Unauthorized = -10847,
-    
+
     NoMatchingDefaultAudioUnitFound,
-    
+
     Unknown,
 }
 
@@ -981,14 +1003,16 @@ impl OSError {
             x if x == Self::FileNotFound as i32 => Self::FileNotFound,
             x if x == Self::FilePermission as i32 => Self::FilePermission,
             x if x == Self::TooManyFilesOpen as i32 => Self::TooManyFilesOpen,
-            
+
             x if x == Self::Unspecified as i32 => Self::Unspecified,
-            x if x == Self::SystemSoundClientMessageTimeout as i32 => Self::SystemSoundClientMessageTimeout,
-            
+            x if x == Self::SystemSoundClientMessageTimeout as i32 => {
+                Self::SystemSoundClientMessageTimeout
+            }
+
             x if x == Self::BadFilePath as i32 => Self::BadFilePath,
             x if x == Self::Param as i32 => Self::Param,
             x if x == Self::MemFull as i32 => Self::MemFull,
-            
+
             x if x == Self::FormatUnspecified as i32 => Self::FormatUnspecified,
             x if x == Self::UnknownProperty as i32 => Self::UnknownProperty,
             x if x == Self::BadPropertySize as i32 => Self::BadPropertySize,
@@ -996,9 +1020,9 @@ impl OSError {
             x if x == Self::UnsupportedFormat as i32 => Self::UnsupportedFormat,
             x if x == Self::State as i32 => Self::State,
             x if x == Self::NotEnoughBufferSpace as i32 => Self::NotEnoughBufferSpace,
-            
+
             x if x == Self::UnsupportedDataFormat as i32 => Self::UnsupportedDataFormat,
-            
+
             x if x == Self::InvalidProperty as i32 => Self::InvalidProperty,
             x if x == Self::InvalidParameter as i32 => Self::InvalidParameter,
             x if x == Self::InvalidElement as i32 => Self::InvalidElement,
@@ -1016,16 +1040,15 @@ impl OSError {
             x if x == Self::Initialized as i32 => Self::Initialized,
             x if x == Self::InvalidOfflineRender as i32 => Self::InvalidOfflineRender,
             x if x == Self::Unauthorized as i32 => Self::Unauthorized,
-            _ => Self::Unknown
+            _ => Self::Unknown,
         })
     }
-    
+
     pub fn from_nserror(ns_error: ObjcId) -> Result<(), Self> {
         if ns_error != nil {
-            let code: i32 = unsafe {msg_send![ns_error, code]};
+            let code: i32 = unsafe { msg_send![ns_error, code] };
             Self::from(code)
-        }
-        else {
+        } else {
             Ok(())
         }
     }
@@ -1033,7 +1056,9 @@ impl OSError {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct __CFString {_unused: [u8; 0]}
+pub struct __CFString {
+    _unused: [u8; 0],
+}
 pub type CFStringRef = *const __CFString;
 pub type ItemCount = u64;
 pub type MIDIObjectRef = u32;
@@ -1076,16 +1101,16 @@ extern "C" {
 
     pub fn MIDIGetNumberOfSources() -> ItemCount;
     pub fn MIDIGetSource(sourceIndex0: ItemCount) -> MIDIEndpointRef;
-    
+
     pub fn MIDIGetNumberOfDestinations() -> ItemCount;
     pub fn MIDIGetDestination(sourceIndex0: ItemCount) -> MIDIEndpointRef;
-    
+
     pub fn MIDIClientCreateWithBlock(
         name: CFStringRef,
         outClient: *mut MIDIClientRef,
         notifyBlock: ObjcId,
     ) -> OSStatus;
-    
+
     pub fn MIDIInputPortCreateWithProtocol(
         client: MIDIClientRef,
         portName: CFStringRef,
@@ -1093,25 +1118,25 @@ extern "C" {
         outPort: *mut MIDIPortRef,
         receiveBlock: ObjcId,
     ) -> OSStatus;
-    
+
     pub fn MIDIOutputPortCreate(
         client: MIDIClientRef,
         portName: CFStringRef,
         outPort: *mut MIDIPortRef,
     ) -> OSStatus;
-    
+
     pub fn MIDIObjectGetStringProperty(
         obj: MIDIObjectRef,
         propertyID: CFStringRef,
         str_: *mut CFStringRef,
     ) -> OSStatus;
-    
+
     pub fn MIDIObjectGetIntegerProperty(
         obj: MIDIObjectRef,
         propertyID: CFStringRef,
         outValue: *mut i32,
     ) -> OSStatus;
-    
+
     pub fn MIDIPortConnectSource(
         port: MIDIPortRef,
         source: MIDIEndpointRef,
@@ -1124,45 +1149,45 @@ pub const NSOpenGLContextParameterSwapInterval: i32 = 222;
 #[repr(u64)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NSOpenGLPixelFormatAttribute {
-    NSOpenGLPFAAllRenderers             = 1,
-    NSOpenGLPFATripleBuffer             = 3,
-    NSOpenGLPFADoubleBuffer             = 5,
-    NSOpenGLPFAStereo                   = 6,
-    NSOpenGLPFAAuxBuffers               = 7,
-    NSOpenGLPFAColorSize                = 8,
-    NSOpenGLPFAAlphaSize                = 11,
-    NSOpenGLPFADepthSize                = 12,
-    NSOpenGLPFAStencilSize              = 13,
-    NSOpenGLPFAAccumSize                = 14,
-    NSOpenGLPFAMinimumPolicy            = 51,
-    NSOpenGLPFAMaximumPolicy            = 52,
-    NSOpenGLPFAOffScreen                = 53,
-    NSOpenGLPFAFullScreen               = 54,
-    NSOpenGLPFASampleBuffers            = 55,
-    NSOpenGLPFASamples                  = 56,
-    NSOpenGLPFAAuxDepthStencil          = 57,
-    NSOpenGLPFAColorFloat               = 58,
-    NSOpenGLPFAMultisample              = 59,
-    NSOpenGLPFASupersample              = 60,
-    NSOpenGLPFASampleAlpha              = 61,
-    NSOpenGLPFARendererID               = 70,
-    NSOpenGLPFASingleRenderer           = 71,
-    NSOpenGLPFANoRecovery               = 72,
-    NSOpenGLPFAAccelerated              = 73,
-    NSOpenGLPFAClosestPolicy            = 74,
-    NSOpenGLPFARobust                   = 75,
-    NSOpenGLPFABackingStore             = 76,
-    NSOpenGLPFAMPSafe                   = 78,
-    NSOpenGLPFAWindow                   = 80,
-    NSOpenGLPFAMultiScreen              = 81,
-    NSOpenGLPFACompliant                = 83,
-    NSOpenGLPFAScreenMask               = 84,
-    NSOpenGLPFAPixelBuffer              = 90,
-    NSOpenGLPFARemotePixelBuffer        = 91,
-    NSOpenGLPFAAllowOfflineRenderers    = 96,
-    NSOpenGLPFAAcceleratedCompute       = 97,
-    NSOpenGLPFAOpenGLProfile            = 99,
-    NSOpenGLPFAVirtualScreenCount       = 128,
+    NSOpenGLPFAAllRenderers = 1,
+    NSOpenGLPFATripleBuffer = 3,
+    NSOpenGLPFADoubleBuffer = 5,
+    NSOpenGLPFAStereo = 6,
+    NSOpenGLPFAAuxBuffers = 7,
+    NSOpenGLPFAColorSize = 8,
+    NSOpenGLPFAAlphaSize = 11,
+    NSOpenGLPFADepthSize = 12,
+    NSOpenGLPFAStencilSize = 13,
+    NSOpenGLPFAAccumSize = 14,
+    NSOpenGLPFAMinimumPolicy = 51,
+    NSOpenGLPFAMaximumPolicy = 52,
+    NSOpenGLPFAOffScreen = 53,
+    NSOpenGLPFAFullScreen = 54,
+    NSOpenGLPFASampleBuffers = 55,
+    NSOpenGLPFASamples = 56,
+    NSOpenGLPFAAuxDepthStencil = 57,
+    NSOpenGLPFAColorFloat = 58,
+    NSOpenGLPFAMultisample = 59,
+    NSOpenGLPFASupersample = 60,
+    NSOpenGLPFASampleAlpha = 61,
+    NSOpenGLPFARendererID = 70,
+    NSOpenGLPFASingleRenderer = 71,
+    NSOpenGLPFANoRecovery = 72,
+    NSOpenGLPFAAccelerated = 73,
+    NSOpenGLPFAClosestPolicy = 74,
+    NSOpenGLPFARobust = 75,
+    NSOpenGLPFABackingStore = 76,
+    NSOpenGLPFAMPSafe = 78,
+    NSOpenGLPFAWindow = 80,
+    NSOpenGLPFAMultiScreen = 81,
+    NSOpenGLPFACompliant = 83,
+    NSOpenGLPFAScreenMask = 84,
+    NSOpenGLPFAPixelBuffer = 90,
+    NSOpenGLPFARemotePixelBuffer = 91,
+    NSOpenGLPFAAllowOfflineRenderers = 96,
+    NSOpenGLPFAAcceleratedCompute = 97,
+    NSOpenGLPFAOpenGLProfile = 99,
+    NSOpenGLPFAVirtualScreenCount = 128,
 }
 
 #[repr(u64)]

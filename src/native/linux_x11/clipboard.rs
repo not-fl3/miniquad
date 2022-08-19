@@ -119,7 +119,12 @@ pub unsafe fn claim_clipboard_ownership(
         0 as libc::c_int,
     );
 
-    (display.libx11.XSetSelectionOwner)(display.display, selection, display.window, 0 as libc::c_int as Time);
+    (display.libx11.XSetSelectionOwner)(
+        display.display,
+        selection,
+        display.window,
+        0 as libc::c_int as Time,
+    );
 
     MESSAGE = Some(message);
 }

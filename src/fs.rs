@@ -37,7 +37,7 @@ pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
 fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
     fn load_file_sync(path: &str) -> Response {
         use crate::native;
-        
+
         let filename = std::ffi::CString::new(path).unwrap();
 
         let mut data: native::android_asset = unsafe { std::mem::zeroed() };

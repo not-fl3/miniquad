@@ -9,8 +9,8 @@ mod x_cursor;
 mod xi_input;
 
 use crate::{
-    gl,
     event::EventHandler,
+    gl,
     graphics::GraphicsContext,
     native::{egl, NativeDisplayData},
     Context, CursorIcon,

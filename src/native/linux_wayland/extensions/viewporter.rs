@@ -1,7 +1,7 @@
 // viewporter.xml
 
-use crate::wayland_interface;
 use super::super::libwayland_client::{wl_interface, wl_message};
+use crate::wayland_interface;
 
 wayland_interface!(
     wp_viewporter_interface,
