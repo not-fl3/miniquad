@@ -144,10 +144,14 @@ pub struct Conf {
     pub platform: Platform,
 }
 
+/// Icon image in three levels of detail.
 #[derive(Clone)]
 pub struct Icon {
+    /// 16 * 16 image of RGBA pixels (each 4 * u8) in row-major order.
     pub small: [u8; 16 * 16 * 4],
+    /// 32 x 32 image of RGBA pixels (each 4 * u8) in row-major order.
     pub medium: [u8; 32 * 32 * 4],
+    /// 64 x 64 image of RGBA pixels (each 4 * u8) in row-major order.
     pub big: [u8; 64 * 64 * 4],
 }
 
