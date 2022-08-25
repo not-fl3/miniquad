@@ -171,38 +171,6 @@ pub enum CursorIcon {
 }
 
 /// Start miniquad.
-/// Initialization callback will be called when miniquad's Context is ready.
-/// User can take ownership on Context and store it in user Code. Or return it back
-/// to miniquad and give miniquad ownership on Context.
-///
-/// Variant wth EventHandler:
-/// ```no_run
-/// # use miniquad::*;
-/// struct Stage;
-///
-/// impl EventHandler for Stage {
-///     fn update(&mut self, _ctx: &mut Context) {}
-///     fn draw(&mut self, _ctx: &mut Context) {}
-/// }
-/// fn main() {
-///     miniquad::start(conf::Conf::default(), |ctx| UserData::owning(Stage, ctx));
-/// }
-/// ```
-///
-/// Variant wth EventHandlerFree:
-/// ```no_run
-/// # use miniquad::*;
-/// struct Stage {
-///     ctx: Context,
-/// }
-/// impl EventHandlerFree for Stage {
-///     fn update(&mut self) {}
-///     fn draw(&mut self) {}
-/// }
-/// fn main() {
-///     miniquad::start(conf::Conf::default(), |ctx| UserData::free(Stage { ctx }));
-/// }
-/// ```
 pub fn start<F>(conf: conf::Conf, f: F)
 where
     F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler>,
