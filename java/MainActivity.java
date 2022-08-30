@@ -94,6 +94,7 @@ class QuadSurface
             x = event.getX(0);
             y = event.getY(0);
             QuadNative.surfaceOnTouch(id, 2, x, y);
+            break;
         case MotionEvent.ACTION_CANCEL:
             for (i = 0; i < pointerCount; i++) {
                 id = event.getPointerId(i);
