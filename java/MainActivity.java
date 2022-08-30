@@ -95,6 +95,22 @@ class QuadSurface
             y = event.getY(0);
             QuadNative.surfaceOnTouch(id, 2, x, y);
             break;
+        case MotionEvent.ACTION_POINTER_UP: {
+            final int pointerIndex = event.getActionIndex();
+            id = event.getPointerId(pointerIndex);
+            x = event.getX(pointerIndex);
+            y = event.getY(pointerIndex);
+            QuadNative.surfaceOnTouch(id, 1, x, y);
+            break;
+        }
+        case MotionEvent.ACTION_POINTER_DOWN: {
+            final int pointerIndex = event.getActionIndex();
+            id = event.getPointerId(pointerIndex);
+            x = event.getX(pointerIndex);
+            y = event.getY(pointerIndex);
+            QuadNative.surfaceOnTouch(id, 2, x, y);
+            break;
+        }
         case MotionEvent.ACTION_CANCEL:
             for (i = 0; i < pointerCount; i++) {
                 id = event.getPointerId(i);
