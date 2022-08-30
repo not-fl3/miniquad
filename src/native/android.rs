@@ -108,7 +108,7 @@ impl NativeDisplay for AndroidDisplay {
         None
     }
     fn clipboard_set(&mut self, _data: &str) {}
-    fn show_keyboard(&mut self, _show: bool) {}
+    // fn show_keyboard(&mut self, _show: bool) {}
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
     }
