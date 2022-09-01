@@ -214,33 +214,8 @@ fn main() {
 mod display_shader {
     use miniquad::*;
 
-    pub const VERTEX: &str = r#"#version 100
-    attribute vec4 pos;
-    attribute vec4 color0;
-    attribute vec2 uv0;
-
-    varying lowp vec4 color;
-    varying lowp vec2 uv;
-
-    uniform mat4 mvp;
-
-    void main() {
-        gl_Position = mvp * pos;
-        color = color0;
-        uv = uv0;
-    }
-    "#;
-
-    pub const FRAGMENT: &str = r#"#version 100
-    varying lowp vec4 color;
-    varying lowp vec2 uv;
-
-    uniform sampler2D tex;
-
-    void main() {
-        gl_FragColor = color * texture2D(tex, uv);
-    }
-    "#;
+    pub const VERTEX: &str = include_str!("shaders/offscreen-vertex.glsl");
+    pub const FRAGMENT: &str = include_str!("shaders/offscreen-fragment.glsl");
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {

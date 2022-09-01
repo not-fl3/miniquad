@@ -207,8 +207,8 @@ impl EventHandler for Stage {
         );
         let view_proj = proj * view;
 
-        self.rx += 0.01;
-        self.ry += 0.03;
+        self.rx += 0.002;
+        self.ry += 0.005;
         let model = Mat4::from_rotation_ypr(self.rx, self.ry, 0.);
 
         let (w, h) = ctx.screen_size();
@@ -249,42 +249,8 @@ fn main() {
 mod post_processing_shader {
     use miniquad::*;
 
-    pub const VERTEX: &str = r#"#version 100
-    attribute vec2 pos;
-    attribute vec2 uv;
-
-    varying lowp vec2 texcoord;
-
-    void main() {
-        gl_Position = vec4(pos, 0, 1);
-        texcoord = uv;
-    }
-    "#;
-
-    pub const FRAGMENT: &str = r#"#version 100
-    precision lowp float;
-
-    varying vec2 texcoord;
-
-    uniform sampler2D tex;
-    uniform vec2 resolution;
-
-
-
-    // Source: https://github.com/Jam3/glsl-fast-gaussian-blur/blob/master/5.glsl
-    vec4 blur5(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
-        vec4 color = vec4(0.0);
-        vec2 off1 = vec2(1.3333333333333333) * direction;
-        color += texture2D(image, uv) * 0.29411764705882354;
-        color += texture2D(image, uv + (off1 / resolution)) * 0.35294117647058826;
-        color += texture2D(image, uv - (off1 / resolution)) * 0.35294117647058826;
-        return color;
-    }
-
-    void main() {
-        gl_FragColor = blur5(tex, texcoord, resolution, vec2(3.0));
-    }
-    "#;
+    pub const VERTEX: &str = include_str!("shaders/post_processing-vertex.glsl");
+    pub const FRAGMENT: &str = include_str!("shaders/post_processing-fragment.glsl");
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {
@@ -304,28 +270,8 @@ mod post_processing_shader {
 mod offscreen_shader {
     use miniquad::*;
 
-    pub const VERTEX: &str = r#"#version 100
-    attribute vec4 pos;
-    attribute vec4 color0;
-
-    varying lowp vec4 color;
-
-    uniform mat4 mvp;
-
-    void main() {
-        gl_Position = mvp * pos;
-        color = color0;
-    }
-    "#;
-
-    pub const FRAGMENT: &str = r#"#version 100
-
-    varying lowp vec4 color;
-
-    void main() {
-        gl_FragColor = color;
-    }
-    "#;
+    pub const VERTEX: &str = include_str!("shaders/post_processing-offscreenvertex.glsl");
+    pub const FRAGMENT: &str = include_str!("shaders/fragment-color.glsl");
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {

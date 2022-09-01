@@ -150,29 +150,8 @@ fn main() {
 mod shader {
     use miniquad::*;
 
-    pub const VERTEX: &str = r#"#version 100
-    attribute vec3 pos;
-    attribute vec4 color0;
-    attribute vec3 inst_pos;
-
-    varying lowp vec4 color;
-
-    uniform mat4 mvp;
-
-    void main() {
-        vec4 pos = vec4(pos + inst_pos, 1.0);
-        gl_Position = mvp * pos;
-        color = color0;
-    }
-    "#;
-
-    pub const FRAGMENT: &str = r#"#version 100
-    varying lowp vec4 color;
-
-    void main() {
-        gl_FragColor = color;
-    }
-    "#;
+    pub const VERTEX: &str = include_str!("shaders/instancing-vertex.glsl");
+    pub const FRAGMENT: &str = include_str!("shaders/fragment-color.glsl");
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {
