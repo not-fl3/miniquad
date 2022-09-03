@@ -1012,7 +1012,7 @@ const KEYSYMTAB: [CodePair; 829] = [
     CodePair::new(0xffb9 /*XKB_KEY_KP_9*/, 0x0039),
     CodePair::new(0xffbd /*XKB_KEY_KP_Equal*/, '=' as u16),
 
-   CodePair::new(0xffea /*Right Alt*/, 18 as u16)，
+   CodePair::new(0xffea /*Right Alt*/, 18 as u16),
 ];
 
 impl X11Display {
