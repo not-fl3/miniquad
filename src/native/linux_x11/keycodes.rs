@@ -1022,10 +1022,10 @@ impl X11Display {
             .wrapping_div(::std::mem::size_of::<CodePair>() as libc::c_ulong)
             .wrapping_sub(1 as libc::c_int as libc::c_ulong) as libc::c_int;
         let mut mid;
-        if keysym >= 0x20 as libc::c_int as libc::c_ulong
-            && keysym <= 0x7e as libc::c_int as libc::c_ulong
-            || keysym >= 0xa0 as libc::c_int as libc::c_ulong
-                && keysym <= 0xff as libc::c_int as libc::c_ulong
+        if (keysym >= 0x20 as libc::c_int as libc::c_ulong
+            && keysym <= 0x7e as libc::c_int as libc::c_ulong)
+            || (keysym >= 0xa0 as libc::c_int as libc::c_ulong
+                && keysym <= 0xff as libc::c_int as libc::c_ulong)
         {
             return keysym as i32;
         }
