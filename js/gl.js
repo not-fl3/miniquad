@@ -8,7 +8,7 @@
 
 "use strict";
 
-const version = "0.1.26";
+const version = "0.3.12";
 
 const canvas = document.querySelector("#glcanvas");
 const gl = canvas.getContext("webgl");
@@ -1417,7 +1417,7 @@ function load(wasm_path) {
                     if (version != crate_version) {
                         console.error(
                             "Version mismatch: gl.js version is: " + version +
-                                ", rust sapp-wasm crate version is: " + crate_version);
+                                ", miniquad crate version is: " + crate_version);
                     }
                     init_plugins(plugins);
                     obj.exports.main();
