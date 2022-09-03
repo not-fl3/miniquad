@@ -182,7 +182,7 @@ impl CodePair {
     }
 }
 
-const KEYSYMTAB: [CodePair; 828] = [
+const KEYSYMTAB: [CodePair; 829] = [
     CodePair::new(0x01a1, 0x0104),
     CodePair::new(0x01a2, 0x02d8),
     CodePair::new(0x01a3, 0x0141),
@@ -1011,12 +1011,14 @@ const KEYSYMTAB: [CodePair; 828] = [
     CodePair::new(0xffb8 /*XKB_KEY_KP_8*/, 0x0038),
     CodePair::new(0xffb9 /*XKB_KEY_KP_9*/, 0x0039),
     CodePair::new(0xffbd /*XKB_KEY_KP_Equal*/, '=' as u16),
+
+   CodePair::new(0xffea /*Right Alt*/, 18 as u16)，
 ];
 
 impl X11Display {
     pub unsafe extern "C" fn keysym_to_unicode(&self, keysym: super::libx11::KeySym) -> i32 {
         let mut min = 0 as libc::c_int;
-        let mut max = (::std::mem::size_of::<[CodePair; 828]>() as libc::c_ulong)
+        let mut max = (::std::mem::size_of::<[CodePair; 829]>() as libc::c_ulong)
             .wrapping_div(::std::mem::size_of::<CodePair>() as libc::c_ulong)
             .wrapping_sub(1 as libc::c_int as libc::c_ulong) as libc::c_int;
         let mut mid;
