@@ -10,6 +10,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.Surface;
 import android.view.Window;
+import android.view.WindowManager.LayoutParams;
 import android.view.SurfaceView;
 import android.view.SurfaceHolder;
 import android.view.MotionEvent;
@@ -203,6 +204,8 @@ public class MainActivity extends Activity {
                     View decorView = getWindow().getDecorView();
 
                     if (fullscreen) {
+                        getWindow().setFlags(LayoutParams.FLAG_LAYOUT_NO_LIMITS, LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+                        getWindow().getAttributes().layoutInDisplayCutoutMode = LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
                         int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
                         decorView.setSystemUiVisibility(uiOptions);
                     }
