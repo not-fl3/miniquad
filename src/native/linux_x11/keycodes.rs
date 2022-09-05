@@ -175,7 +175,7 @@ impl X11Display {
 pub struct CodePair {
     pub keysym: u16,
     pub ucs: u16,
-f
+}
 impl CodePair {
     const fn new(keysym: u16, ucs: u16) -> CodePair {
         CodePair { keysym, ucs }
