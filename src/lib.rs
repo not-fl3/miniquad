@@ -152,6 +152,12 @@ impl Context {
     pub fn quit(&mut self) {
         self.display_mut().order_quit()
     }
+
+    /// Show/hide onscreen keyboard.
+    /// Only works on Android right now.
+    pub fn show_keyboard(&mut self, show: bool) {
+        self.display_mut().show_keyboard(show)
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]

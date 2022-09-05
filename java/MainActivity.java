@@ -14,9 +14,12 @@ import android.view.WindowManager.LayoutParams;
 import android.view.SurfaceView;
 import android.view.SurfaceHolder;
 import android.view.MotionEvent;
+import android.view.KeyEvent;
+import android.view.inputmethod.InputMethodManager;
 
 import android.content.Context;
 import android.content.Intent;
+
 
 import quad_native.QuadNative;
 
@@ -31,6 +34,7 @@ class QuadSurface
         SurfaceView
     implements
         View.OnTouchListener,
+        View.OnKeyListener,
         SurfaceHolder.Callback {
 
     public QuadSurface(Context context){
@@ -41,6 +45,7 @@ class QuadSurface
         setFocusableInTouchMode(true);
         requestFocus();
         setOnTouchListener(this);
+        setOnKeyListener(this);
     }
 
     @Override
@@ -122,6 +127,37 @@ class QuadSurface
             break;
         default:
             break;
+        }
+
+        return true;
+    }
+
+    // docs says getCharacters are deprecated
+    // but somehow on non-latyn input all keyCode and all the relevant fields in the KeyEvent are zeros
+    // and only getCharacters has some usefull data
+    @SuppressWarnings("deprecation")
+    @Override
+    public boolean onKey(View v, int keyCode, KeyEvent event) {
+        if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode != 0) {
+            QuadNative.surfaceOnKeyDown(keyCode);
+        }
+
+        if (event.getAction() == KeyEvent.ACTION_UP && keyCode != 0) {
+            QuadNative.surfaceOnKeyUp(keyCode);
+        }
+        
+        if (event.getAction() == KeyEvent.ACTION_UP || event.getAction() == KeyEvent.ACTION_MULTIPLE) {
+            int character = event.getUnicodeChar();
+            if (character == 0) {
+                String characters = event.getCharacters();
+                if (characters != null && characters.length() >= 0) {
+                    character = characters.charAt(0);
+                }
+            }
+
+            if (character != 0) {
+                QuadNative.surfaceOnCharacter(character);
+            }
         }
 
         return true;
@@ -211,6 +247,21 @@ public class MainActivity extends Activity {
                     }
                     else {
                         decorView.setSystemUiVisibility(0);
+                    }
+                }
+            });
+    }
+
+    public void showKeyboard(final boolean show) {
+        runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (show) {
+                        InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                        imm.toggleSoftInput(InputMethodManager.SHOW_FORCED,0);
+                    } else {
+                        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                        imm.hideSoftInputFromWindow(view.getWindowToken(),0); 
                     }
                 }
             });

@@ -54,6 +54,9 @@ enum Message {
         x: f32,
         y: f32,
     },
+    Character {
+        character: u32,
+    },
     Pause,
     Resume,
     Destroy,
@@ -108,7 +111,12 @@ impl NativeDisplay for AndroidDisplay {
         None
     }
     fn clipboard_set(&mut self, _data: &str) {}
-    // fn show_keyboard(&mut self, _show: bool) {}
+    fn show_keyboard(&mut self, show: bool) {
+        unsafe {
+            let env = attach_jni_env();
+            ndk_utils::call_void_method!(env, ACTIVITY, "showKeyboard", "(Z)V", show as i32);
+        }
+    }
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
     }
@@ -245,6 +253,16 @@ impl MainThreadState {
                     x,
                     y,
                 );
+            }
+            Message::Character { character } => {
+                if let Some(character) = char::from_u32(character) {
+                    self.event_handler.char_event(
+                        self.context.with_display(&mut self.display),
+                        character,
+                        Default::default(),
+                        false,
+                    );
+                }
             }
             Message::Pause => self
                 .event_handler
@@ -540,6 +558,32 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnTouch(
         touch_id: touch_id as _,
         x: x as f32,
         y: y as f32,
+    });
+}
+
+#[no_mangle]
+extern "C" fn Java_quad_1native_QuadNative_surfaceOnKeyDown(
+    _: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+    keycode: ndk_sys::jint,
+) {
+}
+#[no_mangle]
+extern "C" fn Java_quad_1native_QuadNative_surfaceOnKeyUp(
+    _: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+    _keycode: ndk_sys::jint,
+) {
+}
+
+#[no_mangle]
+extern "C" fn Java_quad_1native_QuadNative_surfaceOnCharacter(
+    _: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+    character: ndk_sys::jint,
+) {
+    send_message(Message::Character {
+        character: character as u32,
     });
 }
 

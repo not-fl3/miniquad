@@ -48,6 +48,7 @@ pub trait NativeDisplay: std::any::Any {
     fn dropped_file_path(&mut self, _index: usize) -> Option<std::path::PathBuf> {
         None
     }
+    fn show_keyboard(&mut self, _show: bool) {}
 
     fn as_any(&mut self) -> &mut dyn std::any::Any;
 }
