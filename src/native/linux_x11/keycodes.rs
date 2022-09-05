@@ -175,7 +175,7 @@ impl X11Display {
 pub struct CodePair {
     pub keysym: u16,
     pub ucs: u16,
-}
+f
 impl CodePair {
     const fn new(keysym: u16, ucs: u16) -> CodePair {
         CodePair { keysym, ucs }
@@ -942,7 +942,7 @@ const KEYSYMTAB: [CodePair; 884] = [
     CodePair::new(0x13be, 0x0178),
     CodePair::new(0x20ac, 0x20ac),
 
-    CodePair::new(0xfe03 /*	RightAlt	*/,0xff00+0x0040),
+    CodePair::new(0xfe03 /*	RightAlt	*/,0xe000+0x0040),
 
     CodePair::new(0xfe50, '`' as u16),
     CodePair::new(0xfe51, 0x00b4),
@@ -1004,7 +1004,7 @@ const KEYSYMTAB: [CodePair; 884] = [
     CodePair::new(0xff61 /*PrintScree */,0xf000|70u16),
     CodePair::new(0xff63 /*Insert     */,0xf000|73u16),
     CodePair::new(0xff67 /*Menu       */,0xf000|101u16),
-    CodePair::new(0xff7e /*RightAlt   */,0xff00|0x0040),
+    CodePair::new(0xff7e /*RightAlt   */,0xe000|0x0040),
     CodePair::new(0xff7f /*NumLock    */,0xf000|83u16),
 
     CodePair::new(0xff80 /*XKB_KEY_KP_Space*/, ' ' as u16),
@@ -1066,15 +1066,15 @@ const KEYSYMTAB: [CodePair; 884] = [
     CodePair::new(0xffd3 /*	F22	*/,0xf000+113u16),
     CodePair::new(0xffd4 /*	F23	*/,0xf000+114u16),
     CodePair::new(0xffd5 /*	F24	*/,0xf000+115u16),
-    CodePair::new(0xffe1 /*	LeftShift   */,0xff00+2u16),
-    CodePair::new(0xffe2 /*	RightShift  */,0xff00+0x0020),
-    CodePair::new(0xffe3 /*	LeftControl */,0xff00+1u16),
-    CodePair::new(0xffe4 /*	RightControl*/,0xff00+0x0010),
+    CodePair::new(0xffe1 /*	LeftShift   */,0xe000+2u16),
+    CodePair::new(0xffe2 /*	RightShift  */,0xe000+0x0020),
+    CodePair::new(0xffe3 /*	LeftControl */,0xe000+1u16),
+    CodePair::new(0xffe4 /*	RightControl*/,0xe000+0x0010),
     CodePair::new(0xffe5 /*	CapsLock    */,0xf000+57u16),
-    CodePair::new(0xffe7 /*	LeftAlt	    */,0xff00+0x0004),
-    CodePair::new(0xffe8 /*	RightAlt    */,0xff00+0x0040),
-    CodePair::new(0xffe9 /*	LeftAlt	    */,0xff00+0x0004),
-    CodePair::new(0xffea /*	RightAlt    */,0xff00+0x0040),
+    CodePair::new(0xffe7 /*	LeftAlt	    */,0xe000+0x0004),
+    CodePair::new(0xffe8 /*	RightAlt    */,0xe000+0x0040),
+    CodePair::new(0xffe9 /*	LeftAlt	    */,0xe000+0x0004),
+    CodePair::new(0xffea /*	RightAlt    */,0xe000+0x0040),
     CodePair::new(0xffff /*	Delete	    */,0xf000+76u16),
 ];
 
