@@ -182,7 +182,7 @@ impl CodePair {
     }
 }
 
-const KEYSYMTAB: [CodePair; 828] = [
+const KEYSYMTAB: [CodePair; 884] = [
     CodePair::new(0x01a1, 0x0104),
     CodePair::new(0x01a2, 0x02d8),
     CodePair::new(0x01a3, 0x0141),
@@ -941,6 +941,9 @@ const KEYSYMTAB: [CodePair; 828] = [
     CodePair::new(0x13bd, 0x0153),
     CodePair::new(0x13be, 0x0178),
     CodePair::new(0x20ac, 0x20ac),
+
+    CodePair::new(0xfe03 /*	RightAlt	*/,0xe000+0x0040),
+
     CodePair::new(0xfe50, '`' as u16),
     CodePair::new(0xfe51, 0x00b4),
     CodePair::new(0xfe52, '^' as u16),
@@ -983,7 +986,31 @@ const KEYSYMTAB: [CodePair; 828] = [
     CodePair::new(0xfe90, '_' as u16),
     CodePair::new(0xfe91, 0x02c8),
     CodePair::new(0xfe92, 0x02cc),
+
+    CodePair::new(0xff08 /*Backspace  */,0xf000|42u16),
+    CodePair::new(0xff09 /*Tab        */,0xf000|43u16),
+    CodePair::new(0xff0d /*Enter      */,0xf000|40u16),
+    CodePair::new(0xff13 /*Pause      */,0xf000|72u16),
+    CodePair::new(0xff14 /*ScrollLock */,0xf000|71u16),
+    CodePair::new(0xff1b /*Escape     */,0xf000|41u16),
+    CodePair::new(0xff50 /*Home       */,0xf000|74u16),
+    CodePair::new(0xff51 /*Left       */,0xf000|80u16),
+    CodePair::new(0xff52 /*Up         */,0xf000|82u16),
+    CodePair::new(0xff53 /*Right      */,0xf000|79u16),
+    CodePair::new(0xff54 /*Down       */,0xf000|81u16),
+    CodePair::new(0xff55 /*PageUp     */,0xf000|75u16),
+    CodePair::new(0xff56 /*PageDown   */,0xf000|78u16),
+    CodePair::new(0xff57 /*End        */,0xf000|77u16),
+    CodePair::new(0xff61 /*PrintScree */,0xf000|70u16),
+    CodePair::new(0xff63 /*Insert     */,0xf000|73u16),
+    CodePair::new(0xff67 /*Menu       */,0xf000|101u16),
+    CodePair::new(0xff7e /*RightAlt   */,0xe000|0x0040),
+    CodePair::new(0xff7f /*NumLock    */,0xf000|83u16),
+
     CodePair::new(0xff80 /*XKB_KEY_KP_Space*/, ' ' as u16),
+
+    CodePair::new(0xff8d /* KpEnter    */,	0xf000|88u16),
+
     CodePair::new(0xff95 /*XKB_KEY_KP_7*/, 0x0037),
     CodePair::new(0xff96 /*XKB_KEY_KP_4*/, 0x0034),
     CodePair::new(0xff97 /*XKB_KEY_KP_8*/, 0x0038),
@@ -994,6 +1021,9 @@ const KEYSYMTAB: [CodePair; 828] = [
     CodePair::new(0xff9c /*XKB_KEY_KP_1*/, 0x0031),
     CodePair::new(0xff9d /*XKB_KEY_KP_5*/, 0x0035),
     CodePair::new(0xff9e /*XKB_KEY_KP_0*/, 0x0030),
+
+    CodePair::new(0xff9f /*KpDecimal*/,	0xf000+99u16),
+
     CodePair::new(0xffaa /*XKB_KEY_KP_Multiply*/, '*' as u16),
     CodePair::new(0xffab /*XKB_KEY_KP_Add*/, '+' as u16),
     CodePair::new(0xffac /*XKB_KEY_KP_Separator*/, ',' as u16),
@@ -1011,19 +1041,54 @@ const KEYSYMTAB: [CodePair; 828] = [
     CodePair::new(0xffb8 /*XKB_KEY_KP_8*/, 0x0038),
     CodePair::new(0xffb9 /*XKB_KEY_KP_9*/, 0x0039),
     CodePair::new(0xffbd /*XKB_KEY_KP_Equal*/, '=' as u16),
+
+    CodePair::new(0xffbe /*	F1	*/,0xf000+58u16),
+    CodePair::new(0xffbf /*	F2	*/,0xf000+59u16),
+    CodePair::new(0xffc0 /*	F3	*/,0xf000+60u16),
+    CodePair::new(0xffc1 /*	F4	*/,0xf000+61u16),
+    CodePair::new(0xffc2 /*	F5	*/,0xf000+62u16),
+    CodePair::new(0xffc3 /*	F6	*/,0xf000+63u16),
+    CodePair::new(0xffc4 /*	F7	*/,0xf000+64u16),
+    CodePair::new(0xffc5 /*	F8	*/,0xf000+65u16),
+    CodePair::new(0xffc6 /*	F9	*/,0xf000+66u16),
+    CodePair::new(0xffc7 /*	F10	*/,0xf000+67u16),
+    CodePair::new(0xffc8 /*	F11	*/,0xf000+68u16),
+    CodePair::new(0xffc9 /*	F12	*/,0xf000+69u16),
+    CodePair::new(0xffca /*	F13	*/,0xf000+104u16),
+    CodePair::new(0xffcb /*	F14	*/,0xf000+105u16),
+    CodePair::new(0xffcc /*	F15	*/,0xf000+106u16),
+    CodePair::new(0xffcd /*	F16	*/,0xf000+107u16),
+    CodePair::new(0xffce /*	F17	*/,0xf000+108u16),
+    CodePair::new(0xffcf /*	F18	*/,0xf000+109u16),
+    CodePair::new(0xffd0 /*	F19	*/,0xf000+110u16),
+    CodePair::new(0xffd1 /*	F20	*/,0xf000+111u16),
+    CodePair::new(0xffd2 /*	F21	*/,0xf000+112u16),
+    CodePair::new(0xffd3 /*	F22	*/,0xf000+113u16),
+    CodePair::new(0xffd4 /*	F23	*/,0xf000+114u16),
+    CodePair::new(0xffd5 /*	F24	*/,0xf000+115u16),
+    CodePair::new(0xffe1 /*	LeftShift   */,0xe000+2u16),
+    CodePair::new(0xffe2 /*	RightShift  */,0xe000+0x0020),
+    CodePair::new(0xffe3 /*	LeftControl */,0xe000+1u16),
+    CodePair::new(0xffe4 /*	RightControl*/,0xe000+0x0010),
+    CodePair::new(0xffe5 /*	CapsLock    */,0xf000+57u16),
+    CodePair::new(0xffe7 /*	LeftAlt	    */,0xe000+0x0004),
+    CodePair::new(0xffe8 /*	RightAlt    */,0xe000+0x0040),
+    CodePair::new(0xffe9 /*	LeftAlt	    */,0xe000+0x0004),
+    CodePair::new(0xffea /*	RightAlt    */,0xe000+0x0040),
+    CodePair::new(0xffff /*	Delete	    */,0xf000+76u16),
 ];
 
 impl X11Display {
     pub unsafe extern "C" fn keysym_to_unicode(&self, keysym: super::libx11::KeySym) -> i32 {
         let mut min = 0 as libc::c_int;
-        let mut max = (::std::mem::size_of::<[CodePair; 828]>() as libc::c_ulong)
+        let mut max = (::std::mem::size_of::<[CodePair; 884]>() as libc::c_ulong)
             .wrapping_div(::std::mem::size_of::<CodePair>() as libc::c_ulong)
             .wrapping_sub(1 as libc::c_int as libc::c_ulong) as libc::c_int;
         let mut mid;
-        if keysym >= 0x20 as libc::c_int as libc::c_ulong
-            && keysym <= 0x7e as libc::c_int as libc::c_ulong
-            || keysym >= 0xa0 as libc::c_int as libc::c_ulong
-                && keysym <= 0xff as libc::c_int as libc::c_ulong
+        if (keysym >= 0x20 as libc::c_int as libc::c_ulong
+            && keysym <= 0x7e as libc::c_int as libc::c_ulong)
+            || (keysym >= 0xa0 as libc::c_int as libc::c_ulong
+                && keysym <= 0xff as libc::c_int as libc::c_ulong)
         {
             return keysym as i32;
         }
