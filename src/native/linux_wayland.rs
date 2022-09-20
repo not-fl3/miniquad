@@ -491,15 +491,15 @@ where
         payload.display.data.screen_width = conf.window_width;
         payload.display.data.screen_height = conf.window_height;
 
-        let event_handler = (f.take().unwrap())(&mut payload.context().0);
+        let event_handler = (f.take().unwrap())(payload.context().0);
         payload.event_handler = Some(event_handler);
 
         while payload.display.closed == false {
             (payload.display.client.wl_display_dispatch_pending)(wdisplay);
 
-            let (mut context, event_handler) = payload.context();
-            event_handler.as_mut().unwrap().update(&mut context);
-            event_handler.as_mut().unwrap().draw(&mut context);
+            let (context, event_handler) = payload.context();
+            event_handler.as_mut().unwrap().update(context);
+            event_handler.as_mut().unwrap().draw(context);
 
             (libegl.eglSwapBuffers.unwrap())(egl_display, egl_surface);
         }
