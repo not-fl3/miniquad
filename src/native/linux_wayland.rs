@@ -302,7 +302,7 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
             }
         }
         if let (mut context, Some(event_handler)) = payload.context() {
-            event_handler.resize_event(&mut context, width as _, height as _);
+            event_handler.resize_event(context, width as _, height as _);
         }
     }
 }
