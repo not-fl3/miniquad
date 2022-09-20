@@ -275,30 +275,32 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
     _states: *mut wl_array,
 ) -> () {
     assert!(!data.is_null());
-    let payload: &mut WaylandPayload = &mut *(data as *mut _);
-    let display = &mut payload.display;
 
     if width != 0 && height != 0 {
-        let (egl_w, egl_h) = if display.decorations.is_some() {
-            // Otherwise window will resize iteself on sway
-            // I have no idea why
-            (
-                width - decorations::Decorations::WIDTH * 2,
-                height - decorations::Decorations::BAR_HEIGHT - decorations::Decorations::WIDTH,
-            )
-        } else {
-            (width, height)
-        };
-        (display.egl.wl_egl_window_resize)(display.egl_window, egl_w, egl_h, 0, 0);
+        let payload: &mut WaylandPayload = &mut *(data as *mut _);
 
-        display.data.screen_width = width;
-        display.data.screen_height = height;
+        {
+            let display = &mut payload.display;
 
-        if let Some(ref decorations) = display.decorations {
-            decorations.resize(&mut display.client, width, height);
+            let (egl_w, egl_h) = if display.decorations.is_some() {
+                // Otherwise window will resize iteself on sway
+                // I have no idea why
+                (
+                    width - decorations::Decorations::WIDTH * 2,
+                    height - decorations::Decorations::BAR_HEIGHT - decorations::Decorations::WIDTH,
+                )
+            } else {
+                (width, height)
+            };
+            (display.egl.wl_egl_window_resize)(display.egl_window, egl_w, egl_h, 0, 0);
+
+            display.data.screen_width = width;
+            display.data.screen_height = height;
+
+            if let Some(ref decorations) = display.decorations {
+                decorations.resize(&mut display.client, width, height);
+            }
         }
-
-        drop(display);
         if let (mut context, Some(event_handler)) = payload.context() {
             event_handler.resize_event(&mut context, width as _, height as _);
         }
