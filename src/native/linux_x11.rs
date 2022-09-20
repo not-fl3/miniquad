@@ -167,7 +167,7 @@ impl X11Display {
             if !db.is_null() {
                 let mut value = XrmValue {
                     size: 0,
-                    addr: 0 as *mut libc::c_char,
+                    addr: std::ptr::null_mut::<libc::c_char>(),
                 };
                 let mut type_ = std::ptr::null_mut();
                 if (self.libx11.XrmGetResource)(
