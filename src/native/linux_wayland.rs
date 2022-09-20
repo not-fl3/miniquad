@@ -273,7 +273,7 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
     width: i32,
     height: i32,
     _states: *mut wl_array,
-) -> () {
+) {
     assert!(!data.is_null());
 
     if width != 0 && height != 0 {
