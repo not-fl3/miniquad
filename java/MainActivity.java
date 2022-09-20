@@ -77,54 +77,56 @@ class QuadSurface
     public boolean onTouch(View v, MotionEvent event) {
         int pointerCount = event.getPointerCount();
         int action = event.getActionMasked();
-        int i, id;
-        float x, y;
 
         switch(action) {
-        case MotionEvent.ACTION_MOVE:
-            for (i = 0; i < pointerCount; i++) {
-                id = event.getPointerId(i);
-                x = event.getX(i);
-                y = event.getY(i);
+        case MotionEvent.ACTION_MOVE: {
+            for (int i = 0; i < pointerCount; i++) {
+                final int id = event.getPointerId(i);
+                final float x = event.getX(i);
+                final float y = event.getY(i);
                 QuadNative.surfaceOnTouch(id, 0, x, y);
             }
             break;
-        case MotionEvent.ACTION_UP:
-            id = event.getPointerId(0);
-            x = event.getX(0);
-            y = event.getY(0);
+        }
+        case MotionEvent.ACTION_UP: {
+            final int id = event.getPointerId(0);
+            final float x = event.getX(0);
+            final float y = event.getY(0);
             QuadNative.surfaceOnTouch(id, 1, x, y);
             break;
-        case MotionEvent.ACTION_DOWN:
-            id = event.getPointerId(0);
-            x = event.getX(0);
-            y = event.getY(0);
+        }
+        case MotionEvent.ACTION_DOWN: {
+            final int id = event.getPointerId(0);
+            final float x = event.getX(0);
+            final float y = event.getY(0);
             QuadNative.surfaceOnTouch(id, 2, x, y);
             break;
+        }
         case MotionEvent.ACTION_POINTER_UP: {
             final int pointerIndex = event.getActionIndex();
-            id = event.getPointerId(pointerIndex);
-            x = event.getX(pointerIndex);
-            y = event.getY(pointerIndex);
+            final int id = event.getPointerId(pointerIndex);
+            final float x = event.getX(pointerIndex);
+            final float y = event.getY(pointerIndex);
             QuadNative.surfaceOnTouch(id, 1, x, y);
             break;
         }
         case MotionEvent.ACTION_POINTER_DOWN: {
             final int pointerIndex = event.getActionIndex();
-            id = event.getPointerId(pointerIndex);
-            x = event.getX(pointerIndex);
-            y = event.getY(pointerIndex);
+            final int id = event.getPointerId(pointerIndex);
+            final float x = event.getX(pointerIndex);
+            final float y = event.getY(pointerIndex);
             QuadNative.surfaceOnTouch(id, 2, x, y);
             break;
         }
-        case MotionEvent.ACTION_CANCEL:
-            for (i = 0; i < pointerCount; i++) {
-                id = event.getPointerId(i);
-                x = event.getX(i);
-                y = event.getY(i);
+        case MotionEvent.ACTION_CANCEL: {
+            for (int i = 0; i < pointerCount; i++) {
+                final int id = event.getPointerId(i);
+                final float x = event.getX(i);
+                final float y = event.getY(i);
                 QuadNative.surfaceOnTouch(id, 3, x, y);
             }
             break;
+        }
         default:
             break;
         }
