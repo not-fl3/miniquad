@@ -49,7 +49,7 @@ impl Context {
         unsafe { &*self.display.unwrap() }
     }
 
-    pub fn display_mut(&self) -> &mut dyn NativeDisplay {
+    pub fn display_mut(&mut self) -> &mut dyn NativeDisplay {
         unsafe { &mut *self.display.unwrap() }
     }
 
