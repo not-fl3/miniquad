@@ -1,5 +1,5 @@
 use crate::{
-    event::{EventHandler, TouchPhase},
+    event::{EventHandler, KeyCode, TouchPhase},
     native::egl::{self, LibEgl},
     native::NativeDisplay,
     GraphicsContext,
@@ -8,6 +8,8 @@ use crate::{
 use std::{cell::RefCell, sync::mpsc, thread};
 
 pub use crate::gl::{self, *};
+
+mod keycodes;
 
 pub use ndk_sys;
 
@@ -56,6 +58,12 @@ enum Message {
     },
     Character {
         character: u32,
+    },
+    KeyDown {
+        keycode: KeyCode,
+    },
+    KeyUp {
+        keycode: KeyCode,
     },
     Pause,
     Resume,
@@ -263,6 +271,21 @@ impl MainThreadState {
                         false,
                     );
                 }
+            }
+            Message::KeyDown { keycode } => {
+                self.event_handler.key_down_event(
+                    self.context.with_display(&mut self.display),
+                    keycode,
+                    Default::default(),
+                    false,
+                );
+            }
+            Message::KeyUp { keycode } => {
+                self.event_handler.key_up_event(
+                    self.context.with_display(&mut self.display),
+                    keycode,
+                    Default::default(),
+                );
             }
             Message::Pause => self
                 .event_handler
@@ -567,13 +590,20 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnKeyDown(
     _: ndk_sys::jobject,
     keycode: ndk_sys::jint,
 ) {
+    let keycode = keycodes::translate_keycode(keycode as _);
+
+    send_message(Message::KeyDown { keycode });
 }
+
 #[no_mangle]
 extern "C" fn Java_quad_1native_QuadNative_surfaceOnKeyUp(
     _: *mut ndk_sys::JNIEnv,
     _: ndk_sys::jobject,
-    _keycode: ndk_sys::jint,
+    keycode: ndk_sys::jint,
 ) {
+    let keycode = keycodes::translate_keycode(keycode as _);
+
+    send_message(Message::KeyUp { keycode });
 }
 
 #[no_mangle]
