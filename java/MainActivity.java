@@ -244,11 +244,19 @@ public class MainActivity extends Activity {
                     if (fullscreen) {
                         getWindow().setFlags(LayoutParams.FLAG_LAYOUT_NO_LIMITS, LayoutParams.FLAG_LAYOUT_NO_LIMITS);
                         getWindow().getAttributes().layoutInDisplayCutoutMode = LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-                        int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-                        decorView.setSystemUiVisibility(uiOptions);
+                        // Android deprecate dsetSystemUiVisibility, but it is not clear
+                        // from the deprecation notes what exaclty we should do instead
+                        // hope this works! but just in case, left the old code in a comment below
+                        //int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+                        //decorView.setSystemUiVisibility(uiOptions);
+                        getWindow().setDecorFitsSystemWindows(false);
                     }
                     else {
-                        decorView.setSystemUiVisibility(0);
+                       // there might be a bug hidden here: setSystemUiVisibility was dealing with the bars
+                        // and setDecorFitsSystemWindows might not, needs some testing
+                        //decorView.setSystemUiVisibility(0);
+                        getWindow().setDecorFitsSystemWindows(true);
+
                     }
                 }
             });
@@ -260,7 +268,7 @@ public class MainActivity extends Activity {
                 public void run() {
                     if (show) {
                         InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                        imm.toggleSoftInput(InputMethodManager.SHOW_FORCED,0);
+                        imm.showSoftInput(view, 0);
                     } else {
                         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                         imm.hideSoftInputFromWindow(view.getWindowToken(),0); 
