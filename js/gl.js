@@ -171,6 +171,7 @@ function stringToUTF8(str, heap, outIdx, maxBytesToWrite) {
 }
 var FS = {
     loaded_files: [],
+    statuses: [],
     unique_id: 0
 };
 
@@ -1264,15 +1265,13 @@ var importObject = {
             xhr.open('GET', url, true);
             xhr.responseType = 'arraybuffer';
             xhr.onload = function (e) {
-                if (this.status == 200) {
-                    var uInt8Array = new Uint8Array(this.response);
-
-                    FS.loaded_files[file_id] = uInt8Array;
-                    wasm_exports.file_loaded(file_id);
-                }
+                var uInt8Array = new Uint8Array(this.response);
+                FS.loaded_files[file_id] = uInt8Array;
+                FS.statuses[file_id] = this.status;
+                wasm_exports.file_loaded(file_id);
             }
             xhr.onerror = function (e) {
-                FS.loaded_files[file_id] = null;
+                FS.statuses[file_id] = 404;
                 wasm_exports.file_loaded(file_id);
             };
 
@@ -1280,13 +1279,13 @@ var importObject = {
 
             return file_id;
         },
-
         fs_get_buffer_size: function (file_id) {
-            if (FS.loaded_files[file_id] == null) {
-                return -1;
-            } else {
-                return FS.loaded_files[file_id].length;
-            }
+            return FS.loaded_files[file_id].length;
+        },
+        fs_take_status: function (file_id) {
+            var status = FS.statuses[file_id];
+            delete FS.statuses[file_id];
+            return status;
         },
         fs_take_buffer: function (file_id, ptr, max_length) {
             var file = FS.loaded_files[file_id];
