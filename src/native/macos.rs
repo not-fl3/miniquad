@@ -77,7 +77,16 @@ impl crate::native::NativeDisplay for MacosDisplay {
             }
         }
     }
-    fn set_window_size(&mut self, _new_width: u32, _new_height: u32) {}
+    fn set_window_size(&mut self, new_width: u32, new_height: u32) {
+        let mut frame: NSRect = unsafe { msg_send![self.window, frame] };
+        frame.origin.y += frame.size.height;
+        frame.origin.y -= new_height as f64;
+        frame.size = NSSize {
+            width: new_width as f64,
+            height: new_height as f64,
+        };
+        let () = unsafe { msg_send![self.window, setFrame:frame display:true animate:true] };
+    }
     fn set_fullscreen(&mut self, fullscreen: bool) {
         if self.fullscreen != fullscreen {
             self.fullscreen = fullscreen;
