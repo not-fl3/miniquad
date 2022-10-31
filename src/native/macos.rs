@@ -89,7 +89,15 @@ impl crate::native::NativeDisplay for MacosDisplay {
     fn clipboard_get(&mut self) -> Option<String> {
         None
     }
-    fn clipboard_set(&mut self, _data: &str) {}
+    fn clipboard_set(&mut self, data: &str) {
+        let str: ObjcId = str_to_nsstring(data);
+        unsafe {
+            let pasteboard: ObjcId = msg_send![class!(NSPasteboard), generalPasteboard];
+            let () = msg_send![pasteboard, clearContents];
+            let arr: ObjcId = msg_send![class!(NSArray), arrayWithObject: str];
+            let () = msg_send![pasteboard, writeObjects: arr];
+        }
+    }
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
     }
