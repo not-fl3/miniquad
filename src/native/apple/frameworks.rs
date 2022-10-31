@@ -91,7 +91,7 @@ extern "C" {
         maxBufLen: u64,
         usedBufLen: *mut u64,
     ) -> u64;
-
+    pub fn NSLog(fmt: ObjcId, ...);
 }
 
 #[link(name = "ImageIO", kind = "framework")]
@@ -107,12 +107,41 @@ extern "C" {
     pub fn CGImageDestinationFinalize(dest: ObjcId) -> bool;
 }
 
+#[cfg(target_os = "macos")]
 #[link(name = "AppKit", kind = "framework")]
 extern "C" {
     pub static NSPasteboardURLReadingFileURLsOnlyKey: ObjcId;
     pub static NSTrackingArea: ObjcId;
     pub static NSStringPboardType: ObjcId;
     pub static NSPasteboardTypeFileURL: ObjcId;
+}
+
+#[cfg(target_os = "ios")]
+#[link(name = "GLKit", kind = "framework")]
+extern "C" {}
+
+pub const GLKViewDrawableColorFormatRGBA8888: i32 = 0;
+
+#[repr(i32)]
+pub enum GLKViewDrawableDepthFormat {
+    FormatNone = 0,
+    Format16,
+    Format24,
+}
+#[repr(i32)]
+pub enum GLKViewDrawableStencilFormat {
+    FormatNone = 0,
+    Format8,
+}
+#[cfg(target_os = "ios")]
+#[link(name = "UIKit", kind = "framework")]
+extern "C" {
+    pub fn UIApplicationMain(
+        argc: i32,
+        argv: *mut *mut i8,
+        principal_class_name: ObjcId,
+        delegate_class_name: ObjcId,
+    );
 }
 
 #[link(name = "Vision", kind = "framework")]

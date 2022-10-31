@@ -13,15 +13,14 @@ Miniquad aims to provide a graphics abstraction that works the same way on any p
 ## Supported Platforms
 
 * Windows, OpenGL 3;
-* Linux, OpenGL 3;
+* Linux, OpenGL 3, GLES 2, GLES 3;
 * macOS, OpenGL 3;
-* iOS, GLES 3;
+* iOS, GLES 2, GLES 3;
 * WASM, WebGL 1 - tested on iOS Safari, Firefox, Chrome;
-* Android, GLES 3.
+* Android, GLES 2, GLES 3.
 
 ## Not Supported, but Desirable Platforms
 
-* Android, GLES 2 - work in progress.
 * Metal. For both macOS and iOS metal rendering backend next to opengl one is highly desirable. But I just dont have any macOS capable hardware to start working on it :/
 
 ## Examples
@@ -122,7 +121,32 @@ No code modifications for Android required, everything should just works.
 
 ## iOS
 
-See miniquad iOS [sample project](https://github.com/Gordon-F/miniquad_ios_example).
+```
+mkdir MyGame.app
+cargo build --target x86_64-apple-ios --release
+cp target/release/mygame MyGame.app
+cat > MyGame.app/Info.plist << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+<key>CFBundleExecutable</key>
+<string>mygame</string>
+<key>CFBundleIdentifier</key>
+<string>com.my.game</string>
+<key>CFBundleName</key>
+<string>mygame</string>
+<key>CFBundleVersion</key>
+<string>1</string>
+<key>CFBundleShortVersionString</key>
+<string>1.0</string>
+</dict>
+</plist>
+EOF
+
+xcrun simctl install booted MyGame.app/
+xcrun simctl launch booted com.my.game
+```
 
 ## Cross Compilation
 
