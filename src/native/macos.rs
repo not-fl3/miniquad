@@ -91,7 +91,10 @@ impl crate::native::NativeDisplay for MacosDisplay {
             let pasteboard: ObjcId = msg_send![class!(NSPasteboard), generalPasteboard];
             let content: ObjcId = msg_send![pasteboard, stringForType: NSStringPboardType];
             let string = nsstring_to_string(content);
-            (!string.is_empty()).then(|| string)
+            if string.is_empty() {
+                return None;
+            }
+            Some(string)
         }
     }
     fn clipboard_set(&mut self, data: &str) {
