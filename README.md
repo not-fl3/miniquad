@@ -121,10 +121,14 @@ No code modifications for Android required, everything should just works.
 
 ## iOS
 
+To run on the simulator:
+
 ```
 mkdir MyGame.app
 cargo build --target x86_64-apple-ios --release
 cp target/release/mygame MyGame.app
+# only if the game have any assets
+cp -r assets MyGame.app
 cat > MyGame.app/Info.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -133,7 +137,7 @@ cat > MyGame.app/Info.plist << EOF
 <key>CFBundleExecutable</key>
 <string>mygame</string>
 <key>CFBundleIdentifier</key>
-<string>com.my.game</string>
+<string>com.mygame</string>
 <key>CFBundleName</key>
 <string>mygame</string>
 <key>CFBundleVersion</key>
@@ -145,8 +149,10 @@ cat > MyGame.app/Info.plist << EOF
 EOF
 
 xcrun simctl install booted MyGame.app/
-xcrun simctl launch booted com.my.game
+xcrun simctl launch booted com.mygame
 ```
+
+For details and instructions on provisioning for real iphone, check [https://macroquad.rs/articles/ios/](https://macroquad.rs/articles/ios/)
 
 ## Cross Compilation
 
