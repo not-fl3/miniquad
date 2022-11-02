@@ -226,4 +226,9 @@ where
     unsafe {
         native::macos::run(conf, f);
     }
+
+    #[cfg(target_os = "ios")]
+    unsafe {
+        native::ios::run(conf, f);
+    }
 }

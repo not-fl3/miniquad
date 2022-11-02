@@ -2,22 +2,17 @@
 //! sokol_app's objective C code and Makepad's (https://github.com/makepad/makepad/blob/live/platform/src/platform/apple)
 //! platform implementation
 //!
-//! The only third party dependency is ""
 use {
     crate::{
         event::{EventHandler, MouseButton},
         native::{
-            macos::{apple_util::*, frameworks::*},
+            apple::{apple_util::*, frameworks::*},
             NativeDisplayData,
         },
         Context, CursorIcon, GraphicsContext,
     },
     std::{collections::HashMap, os::raw::c_void},
 };
-
-mod apple_util;
-mod frameworks;
-pub mod gl;
 
 pub struct MacosDisplay {
     window: ObjcId,
@@ -154,7 +149,7 @@ impl MacosDisplay {
         }
     }
 }
-pub struct WindowPayload {
+struct WindowPayload {
     display: MacosDisplay,
     context: Option<GraphicsContext>,
     event_handler: Option<Box<dyn EventHandler>>,
@@ -519,7 +514,7 @@ pub fn define_cocoa_view_class() -> *const Class {
     return decl.register();
 }
 
-pub fn get_window_payload(this: &Object) -> &mut WindowPayload {
+fn get_window_payload(this: &Object) -> &mut WindowPayload {
     unsafe {
         let ptr: *mut c_void = *this.get_ivar("display_ptr");
         &mut *(ptr as *mut WindowPayload)

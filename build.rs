@@ -6,4 +6,8 @@ fn main() {
     if target.contains("darwin") {
         println!("cargo:rustc-link-lib=framework=OpenGL");
     }
+
+    if target.contains("ios") {
+        println!("cargo:rustc-link-lib=framework=OpenGLES");
+    }
 }

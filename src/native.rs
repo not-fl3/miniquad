@@ -73,21 +73,27 @@ pub use android::*;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub mod apple;
+
 #[cfg(target_os = "macos")]
 pub mod macos;
+
+#[cfg(target_os = "ios")]
+pub mod ios;
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub mod egl;
 
 // there is no glGetProcAddr on webgl, so its impossible to make "gl" module work
 // on macos.. well, there is, but way easier to just statically link to gl
-#[cfg(not(any(target_arch = "wasm32", target_os = "macos")))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "macos", target_os = "ios")))]
 pub mod gl;
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm::webgl as gl;
 
-#[cfg(target_os = "macos")]
-pub use macos::gl;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub use apple::gl;
 
 pub mod query_stab;

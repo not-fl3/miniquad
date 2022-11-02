@@ -1943,10 +1943,11 @@ impl ElapsedQuery {
     ///
     /// Use [`ElapsedQuery::is_supported()`] to check if functionality is available and the method can be called.
     pub fn get_result(&self) -> u64 {
-        let mut time: GLuint64 = 0;
-        assert!(self.gl_query != 0);
-        unsafe { glGetQueryObjectui64v(self.gl_query, GL_QUERY_RESULT, &mut time) };
-        time
+        // let mut time: GLuint64 = 0;
+        // assert!(self.gl_query != 0);
+        // unsafe { glGetQueryObjectui64v(self.gl_query, GL_QUERY_RESULT, &mut time) };
+        // time
+        0
     }
 
     /// Reports whenever elapsed timer is supported and other methods can be invoked.
@@ -1963,15 +1964,17 @@ impl ElapsedQuery {
     ///
     /// Use [`ElapsedQuery::is_supported()`] to check if functionality is available and the method can be called.
     pub fn is_available(&self) -> bool {
-        let mut available: GLint = 0;
+        // let mut available: GLint = 0;
 
-        // begin_query was not called yet
-        if self.gl_query == 0 {
-            return false;
-        }
+        // // begin_query was not called yet
+        // if self.gl_query == 0 {
+        //     return false;
+        // }
 
-        unsafe { glGetQueryObjectiv(self.gl_query, GL_QUERY_RESULT_AVAILABLE, &mut available) };
-        available != 0
+        //unsafe { glGetQueryObjectiv(self.gl_query, GL_QUERY_RESULT_AVAILABLE, &mut available) };
+        //available != 0
+
+        false
     }
 
     /// Delete query.
