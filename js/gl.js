@@ -434,7 +434,7 @@ function into_sapp_mousebutton(btn) {
 function into_sapp_keycode(key_code) {
     switch (key_code) {
         case "Space": return 32;
-        case "Quote": return 39;
+        case "Quote": return 222;
         case "Comma": return 44;
         case "Minus": return 45;
         case "Period": return 46;
