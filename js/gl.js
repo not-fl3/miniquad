@@ -1264,9 +1264,11 @@ var importObject = {
             xhr.open('GET', url, true);
             xhr.responseType = 'arraybuffer'; 
 
-            xhr.onreadystatechange=function() {
-                if (this.readyState === 4){
-                    if(this.status === 200){  
+            xhr.onreadystatechange = function() {
+	        // looks like readyState === 4 will be fired on either successful or unsuccessful load:
+		// https://stackoverflow.com/a/19247992
+                if (this.readyState === 4) {
+                    if(this.status === 200) {  
                         var uInt8Array = new Uint8Array(this.response);
     
                         FS.loaded_files[file_id] = uInt8Array;
