@@ -438,7 +438,7 @@ function into_sapp_keycode(key_code) {
         case "Comma": return 44;
         case "Minus": return 45;
         case "Period": return 46;
-        case "Slash": return 47;
+        case "Slash": return 189;
         case "Digit0": return 48;
         case "Digit1": return 49;
         case "Digit2": return 50;
