@@ -7,6 +7,7 @@ use crate::{
 
 use winapi::{
     shared::{
+        hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_PAGE_GENERIC},
         minwindef::{DWORD, HINSTANCE, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
         ntdef::{HRESULT, NULL},
         windef::{HCURSOR, HDC, HICON, HMONITOR, HWND, POINT, RECT},
@@ -37,6 +38,7 @@ pub(crate) struct Display {
     content_scale: f32,
     window_scale: f32,
     mouse_scale: f32,
+    show_cursor: bool,
     user_cursor: bool,
     mouse_x: f32,
     mouse_y: f32,
@@ -71,8 +73,22 @@ impl crate::native::NativeDisplay for Display {
         self.display_data.quit_requested = false;
     }
 
-    fn set_cursor_grab(&mut self, _grab: bool) {}
-    fn show_mouse(&mut self, _shown: bool) {}
+    fn set_cursor_grab(&mut self, grab: bool) {
+        self.cursor_grabbed = grab;
+        unsafe {
+            if grab {
+                update_clip_rect(self.wnd);
+            } else {
+                ClipCursor(NULL as _);
+            }
+        }
+    }
+    fn show_mouse(&mut self, shown: bool) {
+        if self.show_cursor != shown {
+            self.show_cursor = shown;
+            unsafe { ShowCursor(shown.into()) };
+        }
+    }
     fn set_mouse_cursor(&mut self, cursor_icon: CursorIcon) {
         let cursor_name = match cursor_icon {
             CursorIcon::Default => IDC_ARROW,
@@ -437,8 +453,6 @@ unsafe extern "system" fn win32_wndproc(
             let dx = data.data.mouse().lLastX as f32 * display.mouse_scale;
             let dy = data.data.mouse().lLastY as f32 * display.mouse_scale;
             event_handler.raw_mouse_motion(context.with_display(display), dx as f32, dy as f32);
-
-            update_clip_rect(hwnd);
         }
 
         WM_MOUSELEAVE => {
@@ -650,6 +664,21 @@ unsafe fn create_window(
         NULL as _,                   // lparam
     );
     assert!(hwnd.is_null() == false);
+
+    let mut rawinputdevice: RAWINPUTDEVICE = std::mem::zeroed();
+    rawinputdevice.usUsagePage = HID_USAGE_PAGE_GENERIC;
+    rawinputdevice.usUsage = HID_USAGE_GENERIC_MOUSE;
+    rawinputdevice.hwndTarget = NULL as _;
+    let register_succeed = RegisterRawInputDevices(
+        &rawinputdevice as *const _,
+        1,
+        std::mem::size_of::<RAWINPUTDEVICE>() as _,
+    );
+    assert!(
+        register_succeed == 1,
+        "Win32: failed to register for raw mouse input!"
+    );
+
     ShowWindow(hwnd, SW_SHOW);
     let dc = GetDC(hwnd);
     assert!(dc.is_null() == false);
@@ -850,6 +879,7 @@ where
             window_scale: 1.,
             mouse_x: 0.,
             mouse_y: 0.,
+            show_cursor: true,
             user_cursor: false,
             cursor: std::ptr::null_mut(),
             display_data: Default::default(),
