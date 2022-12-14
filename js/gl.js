@@ -630,7 +630,7 @@ var importObject = {
             gl.clearColor(r, g, b, a);
         },
         glClearStencil: function (s) {
-            gl.clearColorStencil(s);
+            gl.clearStencil(s);
         },
         glColorMask: function (red, green, blue, alpha) {
             gl.colorMask(red, green, blue, alpha);
