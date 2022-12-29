@@ -61,7 +61,7 @@ impl NativeDisplay for WasmDisplay {
         }
     }
     fn clipboard_get(&mut self) -> Option<String> {
-        clipboard_get()
+        self.clipboard.clone()
     }
     fn clipboard_set(&mut self, data: &str) {
         clipboard_set(data)
