@@ -54,6 +54,7 @@ pub enum TextureFormat {
     RGBA8,
     Depth,
     Alpha,
+    LuminanceAlpha,
 }
 
 /// Converts from TextureFormat to (internal_format, format, pixel_type)
@@ -67,6 +68,12 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
             TextureFormat::Alpha => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
             #[cfg(not(target_arch = "wasm32"))]
             TextureFormat::Alpha => (GL_R8, GL_RED, GL_UNSIGNED_BYTE), // texture updates will swizzle Red -> Alpha to match WASM
+            #[cfg(target_arch = "wasm32")]
+            TextureFormat::LuminanceAlpha => {
+                (GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE)
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            TextureFormat::LuminanceAlpha => (GL_RG, GL_RG, GL_UNSIGNED_BYTE), // texture updates will swizzle Green -> Alpha to match WASM
         }
     }
 }
@@ -80,6 +87,7 @@ impl TextureFormat {
             TextureFormat::RGBA8 => 4 * square,
             TextureFormat::Depth => 2 * square,
             TextureFormat::Alpha => 1 * square,
+            TextureFormat::LuminanceAlpha => 2 * square,
         }
     }
 }
@@ -160,17 +168,7 @@ impl Texture {
             ctx.cache.bind_texture(0, texture);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
 
-            if cfg!(not(target_arch = "wasm32")) {
-                // if not WASM
-                if params.format == TextureFormat::Alpha {
-                    // if alpha miniquad texture, the value on non-WASM is stored in red channel
-                    // swizzle red -> alpha
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
-                } else {
-                    // keep alpha -> alpha
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
-                }
-            }
+            Self::apply_swizzle_parameter(params.format);
 
             glTexImage2D(
                 GL_TEXTURE_2D,
@@ -308,17 +306,7 @@ impl Texture {
         unsafe {
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
 
-            if cfg!(not(target_arch = "wasm32")) {
-                // if not WASM
-                if self.format == TextureFormat::Alpha {
-                    // if alpha miniquad texture, the value on non-WASM is stored in red channel
-                    // swizzle red -> alpha
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
-                } else {
-                    // keep alpha -> alpha
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
-                }
-            }
+            Self::apply_swizzle_parameter(self.format);
 
             glTexSubImage2D(
                 GL_TEXTURE_2D,
@@ -372,5 +360,25 @@ impl Texture {
     #[inline]
     fn size(&self, width: u32, height: u32) -> usize {
         self.format.size(width, height) as usize
+    }
+
+    #[inline]
+    unsafe fn apply_swizzle_parameter(format: TextureFormat) {
+        if cfg!(not(target_arch = "wasm32")) {
+            // if not WASM
+            match format {
+                // on non-WASM alpha value is stored in red channel
+                // swizzle red -> alpha
+                TextureFormat::Alpha => {
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _)
+                }
+                // on non-WASM luminance is stored in red channel, alpha is stored in green channel
+                // keep red, swizzle green -> alpha
+                TextureFormat::LuminanceAlpha => {
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_GREEN as _)
+                }
+                _ => {}
+            }
+        }
     }
 }
