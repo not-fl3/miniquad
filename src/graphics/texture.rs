@@ -57,28 +57,34 @@ pub enum TextureFormat {
     LuminanceAlpha,
 }
 
-/// Converts from TextureFormat to (internal_format, format, pixel_type)
-impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
-    fn from(format: TextureFormat) -> Self {
-        match format {
+impl TextureFormat {
+    /// Converts from TextureFormat to (internal_format, format, pixel_type)
+    fn into_gl_params(self, alpha_texture: bool) -> (GLenum, GLenum, GLenum) {
+        match self {
             TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
             TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
             TextureFormat::Depth => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT),
+
             #[cfg(target_arch = "wasm32")]
             TextureFormat::Alpha => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
             #[cfg(not(target_arch = "wasm32"))]
+            TextureFormat::Alpha if alpha_texture => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
+            #[cfg(not(target_arch = "wasm32"))]
             TextureFormat::Alpha => (GL_R8, GL_RED, GL_UNSIGNED_BYTE), // texture updates will swizzle Red -> Alpha to match WASM
+
             #[cfg(target_arch = "wasm32")]
             TextureFormat::LuminanceAlpha => {
+                (GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE)
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            TextureFormat::LuminanceAlpha if alpha_texture => {
                 (GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE)
             }
             #[cfg(not(target_arch = "wasm32"))]
             TextureFormat::LuminanceAlpha => (GL_RG, GL_RG, GL_UNSIGNED_BYTE), // texture updates will swizzle Green -> Alpha to match WASM
         }
     }
-}
 
-impl TextureFormat {
     /// Returns the size in bytes of texture with `dimensions`.
     pub fn size(self, width: u32, height: u32) -> u32 {
         let square = width * height;
@@ -157,7 +163,8 @@ impl Texture {
             );
         }
 
-        let (internal_format, format, pixel_type) = params.format.into();
+        let (internal_format, format, pixel_type) =
+            params.format.into_gl_params(ctx.features().alpha_texture);
 
         ctx.cache.store_texture_binding(0);
 
@@ -245,7 +252,8 @@ impl Texture {
     pub fn resize(&mut self, ctx: &mut Context, width: u32, height: u32, bytes: Option<&[u8]>) {
         ctx.cache.store_texture_binding(0);
 
-        let (internal_format, format, pixel_type) = self.format.into();
+        let (internal_format, format, pixel_type) =
+            self.format.into_gl_params(ctx.features().alpha_texture);
 
         self.width = width;
         self.height = height;
@@ -301,7 +309,7 @@ impl Texture {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
 
-        let (_, format, pixel_type) = self.format.into();
+        let (_, format, pixel_type) = self.format.into_gl_params(ctx.features().alpha_texture);
 
         unsafe {
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
@@ -326,7 +334,10 @@ impl Texture {
 
     /// Read texture data into CPU memory
     pub fn read_pixels(&self, bytes: &mut [u8]) {
-        let (_, format, pixel_type) = self.format.into();
+        if self.format == TextureFormat::Alpha || self.format == TextureFormat::LuminanceAlpha {
+            unimplemented!("read_pixels is not implement for Alpha and LuminanceAlpha textures");
+        }
+        let (_, format, pixel_type) = self.format.into_gl_params(false);
 
         let mut fbo = 0;
         unsafe {
