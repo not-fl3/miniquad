@@ -418,6 +418,8 @@ impl Wgl {
         );
 
         if gl_ctx.is_null() {
+            println!("WGL: failed to create 3.2 context, trying 2.1");
+
             let attrs = [
                 WGL_CONTEXT_MAJOR_VERSION_ARB,
                 2,

@@ -1134,13 +1134,22 @@ impl GraphicsContext {
         let index_type = self.cache.index_type.expect("Unset index buffer type");
 
         unsafe {
-            glDrawElementsInstanced(
-                primitive_type,
-                num_elements,
-                index_type.into(),
-                (index_type.size() as i32 * base_element) as *mut _,
-                num_instances,
-            );
+            if self.features.instancing {
+                glDrawElementsInstanced(
+                    primitive_type,
+                    num_elements,
+                    index_type.into(),
+                    (index_type.size() as i32 * base_element) as *mut _,
+                    num_instances,
+                );
+            } else {
+                glDrawElements(
+                    primitive_type,
+                    num_elements,
+                    index_type.into(),
+                    (index_type.size() as i32 * base_element) as *mut _,
+                );
+            }
         }
     }
 }
