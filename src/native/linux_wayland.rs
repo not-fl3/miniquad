@@ -484,8 +484,7 @@ where
             ));
         }
 
-        let context = crate::GraphicsContext::new();
-        payload.context = Some(context);
+        payload.context = Some(crate::GraphicsContext::new(false));
         payload.display.data.screen_width = conf.window_width;
         payload.display.data.screen_height = conf.window_height;
 

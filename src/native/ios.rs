@@ -153,9 +153,7 @@ pub fn define_glk_view_dlg() -> *const Class {
         let payload = get_window_payload(this);
         if payload.event_handler.is_none() {
             let f = payload.f.take().unwrap();
-            let mut context = GraphicsContext::new();
-            context.features = Features::from_gles2(payload.gles2);
-            payload.context = Some(context);
+            payload.context = Some(GraphicsContext::new(payload.gles2));
             payload.event_handler = Some(f(payload
                 .context
                 .as_mut()

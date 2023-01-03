@@ -431,8 +431,7 @@ where
             panic!();
         }
 
-        let mut context = GraphicsContext::new();
-        context.features = Feature::from_gles2(gl::is_gl2());
+        let mut context = GraphicsContext::new(gl::is_gl2());
 
         let mut display = AndroidDisplay {
             screen_width,
