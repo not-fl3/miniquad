@@ -634,11 +634,24 @@ pub const MAX_SHADERSTAGE_IMAGES: usize = 12;
 
 pub struct Features {
     pub instancing: bool,
+    pub alpha_texture: bool,
 }
 
 impl Default for Features {
     fn default() -> Features {
-        Features { instancing: true }
+        Features {
+            instancing: true,
+            alpha_texture: false,
+        }
+    }
+}
+
+impl Features {
+    pub fn from_gles2(is_gles2: bool) -> Self {
+        Features {
+            instancing: !is_gles2,
+            alpha_texture: is_gles2,
+        }
     }
 }
 
