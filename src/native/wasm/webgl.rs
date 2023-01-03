@@ -1242,15 +1242,6 @@ extern "C" {
     pub fn glClearBufferiv(buffer: GLenum, drawbuffer: GLint, value: *const GLint);
 }
 extern "C" {
-    pub fn glClearBufferuiv(buffer: GLenum, drawbuffer: GLint, value: *const GLuint);
-}
-extern "C" {
-    pub fn glClearBufferfv(buffer: GLenum, drawbuffer: GLint, value: *const GLfloat);
-}
-extern "C" {
-    pub fn glClearBufferfi(buffer: GLenum, drawbuffer: GLint, depth: GLfloat, stencil: GLint);
-}
-extern "C" {
     pub fn glCopyBufferSubData(
         readTarget: GLenum,
         writeTarget: GLenum,

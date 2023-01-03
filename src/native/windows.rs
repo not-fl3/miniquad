@@ -729,11 +729,10 @@ impl Display {
         if proc_ptr.is_null() {
             proc_ptr = GetProcAddress(self.libopengl32.module.0, proc.as_ptr());
         }
-        assert!(
-            proc_ptr.is_null() == false,
-            "Load GL func {:?} failed.",
-            proc
-        );
+        if proc_ptr.is_null() {
+            println!("Load GL func {:?} failed.", proc);
+            return None;
+        }
         Some(std::mem::transmute(proc_ptr))
     }
 
