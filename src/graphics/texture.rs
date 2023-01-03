@@ -259,6 +259,12 @@ impl Texture {
         self.height = height;
 
         unsafe {
+            ctx.cache.bind_texture(0, self.texture);
+
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
+
+            Self::apply_swizzle_parameter(self.format);
+
             glTexImage2D(
                 GL_TEXTURE_2D,
                 0,
