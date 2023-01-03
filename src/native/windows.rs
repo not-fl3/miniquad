@@ -732,7 +732,7 @@ impl Display {
         assert!(
             proc_ptr.is_null() == false,
             "Load GL func {:?} failed.",
-            stringify!($fn)
+            proc
         );
         Some(std::mem::transmute(proc_ptr))
     }
