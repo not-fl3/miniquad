@@ -154,7 +154,7 @@ pub fn define_glk_view_dlg() -> *const Class {
         if payload.event_handler.is_none() {
             let f = payload.f.take().unwrap();
             let mut context = GraphicsContext::new();
-            context.features.instancing = !payload.gles2;
+            context.features = Features::from_gles2(payload.gles2);
             payload.context = Some(context);
             payload.event_handler = Some(f(payload
                 .context
