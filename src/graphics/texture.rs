@@ -198,14 +198,16 @@ impl Texture {
             #[cfg(not(target_arch = "wasm32"))]
             match params.format {
                 // on non-WASM alpha value is stored in red channel
-                // swizzle red -> alpha
+                // swizzle red -> alpha, zero red
                 TextureFormat::Alpha if !ctx.features().alpha_texture => {
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_ZERO as _);
                 }
                 // on non-WASM luminance is stored in red channel, alpha is stored in green channel
-                // keep red, swizzle green -> alpha
+                // keep red, swizzle green -> alpha, zero green
                 TextureFormat::LuminanceAlpha if !ctx.features().alpha_texture => {
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_GREEN as _);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_ZERO as _);
                 }
                 _ => {}
             }
