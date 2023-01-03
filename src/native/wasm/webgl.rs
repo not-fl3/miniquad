@@ -1251,9 +1251,6 @@ extern "C" {
     pub fn glClearBufferfi(buffer: GLenum, drawbuffer: GLint, depth: GLfloat, stencil: GLint);
 }
 extern "C" {
-    pub fn glGetStringi(name: GLenum, index: GLuint) -> *const GLubyte;
-}
-extern "C" {
     pub fn glCopyBufferSubData(
         readTarget: GLenum,
         writeTarget: GLenum,

@@ -327,7 +327,6 @@ macro_rules! gl_loader {
 }
 
 gl_loader!(
-    fn glGetStringi(name: GLenum, index: GLuint) -> *const GLubyte,
     fn glGetString(name: GLenum) -> *const GLubyte,
     fn glFramebufferTextureLayer(
         target: GLenum,

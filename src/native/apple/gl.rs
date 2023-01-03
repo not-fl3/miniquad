@@ -3085,9 +3085,6 @@ extern "C" {
 extern "C" {
     pub fn glClearBufferfi(buffer: GLenum, drawbuffer: GLint, depth: GLfloat, stencil: GLint);
 }
-extern "C" {
-    pub fn glGetStringi(name: GLenum, index: GLuint) -> *const GLubyte;
-}
 pub type PFNGLCOLORMASKIPROC = ::std::option::Option<
     unsafe extern "C" fn(index: GLuint, r: GLboolean, g: GLboolean, b: GLboolean, a: GLboolean),
 >;
