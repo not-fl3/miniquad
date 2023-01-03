@@ -637,15 +637,6 @@ pub struct Features {
     pub alpha_texture: bool,
 }
 
-impl Default for Features {
-    fn default() -> Features {
-        Features {
-            instancing: true,
-            alpha_texture: false,
-        }
-    }
-}
-
 impl Features {
     pub fn from_gles2(is_gles2: bool) -> Self {
         Features {
@@ -667,7 +658,7 @@ pub struct GraphicsContext {
 }
 
 impl GraphicsContext {
-    pub fn new() -> GraphicsContext {
+    pub fn new(is_gles2: bool) -> GraphicsContext {
         unsafe {
             let mut default_framebuffer: GLuint = 0;
             glGetIntegerv(
@@ -683,7 +674,7 @@ impl GraphicsContext {
                 shaders: vec![],
                 pipelines: vec![],
                 passes: vec![],
-                features: Default::default(),
+                features: Features::from_gles2(is_gles2),
                 cache: GlCache {
                     stored_index_buffer: 0,
                     stored_index_type: None,
@@ -711,7 +702,7 @@ impl GraphicsContext {
     }
 }
 
-impl Context {
+impl GraphicsContext {
     pub fn apply_pipeline(&mut self, pipeline: &Pipeline) {
         self.cache.cur_pipeline = Some(*pipeline);
 

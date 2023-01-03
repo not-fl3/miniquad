@@ -132,7 +132,7 @@ where
     }
 
     // run user intialisation code
-    let mut context = crate::GraphicsContext::new();
+    let mut context = crate::GraphicsContext::new(false);
 
     GLOBALS.with(|g| {
         let mut display = WasmDisplay {

@@ -327,7 +327,7 @@ pub fn define_cocoa_view_class() -> *const Class {
             let () = msg_send![ctx, makeCurrentContext];
         }
 
-        payload.context = Some(GraphicsContext::new());
+        payload.context = Some(GraphicsContext::new(false));
 
         let f = payload.f.take().unwrap();
         payload.event_handler = Some(f(payload
