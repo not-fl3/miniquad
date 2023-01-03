@@ -394,21 +394,46 @@ impl Wgl {
         if !self.arb_create_context_profile {
             panic!("WGL: ARB_create_context_profile required!");
         }
+
+        // CreateContextAttribsARB is supposed to create the context with
+        // the highest version version possible
+        // but, somehow, sometimes, it creates 2.1 context when 3.2 is in fact available
+        // so this is a workaround: try to create 3.2, and if it fails, go for 2.1
         let attrs = [
             WGL_CONTEXT_MAJOR_VERSION_ARB,
+            3,
             2,
             WGL_CONTEXT_MINOR_VERSION_ARB,
+            3,
             1,
             WGL_CONTEXT_FLAGS_ARB,
+            WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+            WGL_CONTEXT_PROFILE_MASK_ARB,
             WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-            0,
-            0,
         ];
-        let gl_ctx = self.CreateContextAttribsARB.unwrap()(
+        let mut gl_ctx = self.CreateContextAttribsARB.unwrap()(
             display.dc,
             std::ptr::null_mut(),
             attrs.as_ptr() as *const _,
         );
+
+        if gl_ctx.is_null() {
+            let attrs = [
+                WGL_CONTEXT_MAJOR_VERSION_ARB,
+                2,
+                WGL_CONTEXT_MINOR_VERSION_ARB,
+                1,
+                WGL_CONTEXT_FLAGS_ARB,
+                WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+                0,
+                0,
+            ];
+            gl_ctx = self.CreateContextAttribsARB.unwrap()(
+                display.dc,
+                std::ptr::null_mut(),
+                attrs.as_ptr() as *const _,
+            );
+        }
         if gl_ctx.is_null() {
             let err = GetLastError();
             if err == (0xc0070000 | ERROR_INVALID_VERSION_ARB) {
