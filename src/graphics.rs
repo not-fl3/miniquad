@@ -1407,14 +1407,18 @@ impl From<CompareFunc> for GLenum {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum PrimitiveType {
     Triangles,
+    TriangleStrip,
     Lines,
+    LineStrip,
 }
 
 impl From<PrimitiveType> for GLenum {
     fn from(primitive_type: PrimitiveType) -> Self {
         match primitive_type {
             PrimitiveType::Triangles => GL_TRIANGLES,
+            PrimitiveType::TriangleStrip => GL_TRIANGLE_STRIP,
             PrimitiveType::Lines => GL_LINES,
+            PrimitiveType::LineStrip => GL_LINE_STRIP,
         }
     }
 }
