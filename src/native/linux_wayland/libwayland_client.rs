@@ -440,8 +440,9 @@ pub type wl_display_roundtrip =
 pub type wl_display_dispatch_pending =
     unsafe extern "C" fn(display: *mut wl_display) -> ::std::os::raw::c_int;
 
+#[derive(Clone)]
 pub struct LibWaylandClient {
-    _module: crate::native::module::Module,
+    _module: std::rc::Rc<crate::native::module::Module>,
     pub wl_display_connect: wl_display_connect,
     pub wl_proxy_destroy: wl_proxy_destroy,
     pub wl_proxy_marshal: wl_proxy_marshal,
@@ -494,7 +495,7 @@ impl LibWaylandClient {
                 wl_shm_interface: module.get_symbol("wl_shm_interface").unwrap(),
                 wl_shm_pool_interface: module.get_symbol("wl_shm_pool_interface").unwrap(),
 
-                _module: module,
+                _module: std::rc::Rc::new(module),
             })
             .ok()
     }

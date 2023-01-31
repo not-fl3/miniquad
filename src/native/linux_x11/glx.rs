@@ -1,6 +1,6 @@
 #![allow(dead_code, non_snake_case)]
 
-use super::{libx11::*, X11Display};
+use super::{libx11::*};
 
 use crate::native::module;
 
@@ -212,14 +212,13 @@ pub struct Glx {
 }
 
 impl Glx {
-    pub unsafe fn init(display: &mut X11Display) -> Option<Glx> {
+    pub unsafe fn init(libx11: &mut LibX11, display: *mut Display, screen: i32) -> Option<Glx> {
         let mut libgl = LibGlx::try_load()?;
 
         let mut errorbase = 0;
         let mut eventbase = 0;
 
-        if (libgl.glxQueryExtension.unwrap())(display.display, &mut errorbase, &mut eventbase) == 0
-        {
+        if (libgl.glxQueryExtension.unwrap())(display, &mut errorbase, &mut eventbase) == 0 {
             println!("GLX: GLX extension not found");
             return None;
         }
@@ -227,7 +226,7 @@ impl Glx {
         let mut glx_major = 0;
         let mut glx_minor = 0;
 
-        if (libgl.glxQueryVersion.unwrap())(display.display, &mut glx_major, &mut glx_minor) == 0 {
+        if (libgl.glxQueryVersion.unwrap())(display, &mut glx_major, &mut glx_minor) == 0 {
             println!("GLX: Failed to query GLX version");
             return None;
         }
@@ -236,7 +235,7 @@ impl Glx {
             return None;
         }
 
-        let exts = (libgl.glxQueryExtensionsString.unwrap())(display.display, display.screen);
+        let exts = (libgl.glxQueryExtensionsString.unwrap())(display, screen);
         let extensions = std::ffi::CStr::from_ptr(exts).to_str().unwrap().to_owned();
 
         let multisample = extensions.contains("GLX_ARB_multisample");
@@ -252,19 +251,13 @@ impl Glx {
         // _sapp_glx_ARB_create_context_profile =
         //     _sapp_glx_extsupported(b"GLX_ARB_create_context_profile\x00", exts);
 
-        let fbconfig = choose_fbconfig(
-            &mut libgl,
-            &mut display.libx11,
-            display.display,
-            display.screen,
-            multisample,
-        );
+        let fbconfig = choose_fbconfig(&mut libgl, libx11, display, screen, multisample);
         assert!(
             !fbconfig.is_null(),
             "GLX: Failed to find a suitable GLXFBConfig"
         );
 
-        let result = libgl.glxGetVisualFromFBConfig.unwrap()(display.display, fbconfig);
+        let result = libgl.glxGetVisualFromFBConfig.unwrap()(display, fbconfig);
         assert!(
             !result.is_null(),
             "GLX: Failed to retrieve Visual for GLXFBConfig"
@@ -273,7 +266,7 @@ impl Glx {
         let visual = (*result).visual;
         let depth = (*result).depth;
 
-        (display.libx11.XFree)(result as *mut libc::c_void);
+        (libx11.XFree)(result as *mut libc::c_void);
 
         let extensions_string = extensions;
         let mut extensions = GlxExtensions {
@@ -310,7 +303,7 @@ impl Glx {
 
     pub unsafe fn create_context(
         &mut self,
-        display: &mut X11Display,
+        display: *mut Display,
         window: Window,
     ) -> (GLXContext, GLXWindow) {
         if self.extensions.glxCreateContextAttribsARB.is_none() {
@@ -329,7 +322,7 @@ impl Glx {
             0,
         ];
         let glx_ctx = self.extensions.glxCreateContextAttribsARB.unwrap()(
-            display.display,
+            display,
             self.fbconfig,
             std::ptr::null_mut(),
             true as _,
@@ -338,12 +331,8 @@ impl Glx {
         assert!(!glx_ctx.is_null(), "GLX: failed to create GL context");
         // _sapp_x11_release_error_handler(libx11);
 
-        let glx_window = self.libgl.glxCreateWindow.unwrap()(
-            display.display,
-            self.fbconfig,
-            window,
-            std::ptr::null(),
-        );
+        let glx_window =
+            self.libgl.glxCreateWindow.unwrap()(display, self.fbconfig, window, std::ptr::null());
         assert!(glx_window != 0, "GLX: failed to create window");
 
         (glx_ctx, glx_window)
@@ -351,42 +340,42 @@ impl Glx {
 
     pub unsafe fn destroy_context(
         &mut self,
-        display: &mut X11Display,
+        display: *mut Display,
         window: GLXWindow,
         ctx: GLXContext,
     ) {
         if window != 0 {
-            self.libgl.glxDestroyWindow.unwrap()(display.display, window);
+            self.libgl.glxDestroyWindow.unwrap()(display, window);
         }
         if !ctx.is_null() {
-            self.libgl.glxDestroyContext.unwrap()(display.display, ctx);
+            self.libgl.glxDestroyContext.unwrap()(display, ctx);
         };
     }
 
     pub unsafe fn make_current(
         &mut self,
-        display: &mut X11Display,
+        display: *mut Display,
         window: GLXWindow,
         ctx: GLXContext,
     ) {
-        self.libgl.glxMakeCurrent.unwrap()(display.display, window, ctx);
+        self.libgl.glxMakeCurrent.unwrap()(display, window, ctx);
     }
 
-    pub unsafe fn swap_buffers(&mut self, display: &mut X11Display, window: GLXWindow) {
-        self.libgl.glxSwapBuffers.unwrap()(display.display, window);
+    pub unsafe fn swap_buffers(&mut self, display: *mut Display, window: GLXWindow) {
+        self.libgl.glxSwapBuffers.unwrap()(display, window);
     }
 
     pub unsafe fn swap_interval(
         &mut self,
-        display: &mut X11Display,
+        display: *mut Display,
         window: GLXWindow,
         ctx: GLXContext,
         interval: i32,
     ) {
-        self.libgl.glxMakeCurrent.unwrap()(display.display, window, ctx);
+        self.libgl.glxMakeCurrent.unwrap()(display, window, ctx);
 
         if self.extensions.glxSwapIntervalExt.is_some() {
-            self.extensions.glxSwapIntervalExt.unwrap()(display.display, window, interval);
+            self.extensions.glxSwapIntervalExt.unwrap()(display, window, interval);
         } else if self.extensions.glxSwapIntervalMesa.is_some() {
             self.extensions.glxSwapIntervalMesa.unwrap()(interval);
         };

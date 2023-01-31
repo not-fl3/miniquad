@@ -6,6 +6,8 @@ const MAX_PARTICLES: usize = 512 * 1024;
 const NUM_PARTICLES_EMITTED_PER_FRAME: usize = 10;
 
 struct Stage {
+    ctx: Box<dyn RenderingBackend>,
+
     pipeline: Pipeline,
     bindings: Bindings,
 
@@ -15,7 +17,9 @@ struct Stage {
 }
 
 impl Stage {
-    pub fn new(ctx: &mut Context) -> Stage {
+    pub fn new() -> Stage {
+        let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
+
         let r = 0.05;
         #[rustfmt::skip]
         let vertices: &[f32] = &[
@@ -28,18 +32,18 @@ impl Stage {
              0.0,   r, 0.0,       1.0, 0.0, 1.0, 1.0
         ];
         // vertex buffer for static geometry
-        let geometry_vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
+        let geometry_vertex_buffer =
+            ctx.new_buffer_immutable(BufferType::VertexBuffer, Arg::slice(&vertices));
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
             0, 1, 2,    0, 2, 3,    0, 3, 4,    0, 4, 1,
             5, 1, 2,    5, 2, 3,    5, 3, 4,    5, 4, 1
         ];
-        let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
+        let index_buffer = ctx.new_buffer_immutable(BufferType::IndexBuffer, Arg::slice(&indices));
 
         // empty, dynamic instance-data vertex buffer
-        let positions_vertex_buffer = Buffer::stream(
-            ctx,
+        let positions_vertex_buffer = ctx.new_buffer_stream(
             BufferType::VertexBuffer,
             MAX_PARTICLES * std::mem::size_of::<Vec3>(),
         );
@@ -50,10 +54,18 @@ impl Stage {
             images: vec![],
         };
 
-        let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::meta()).unwrap();
+        let shader = ctx
+            .new_shader(
+                ShaderSource {
+                    glsl_vertex: Some(shader::GL_VERTEX),
+                    glsl_fragment: Some(shader::GL_FRAGMENT),
+                    metal_shader: Some(shader::METAL),
+                },
+                shader::meta(),
+            )
+            .unwrap();
 
-        let pipeline = Pipeline::new(
-            ctx,
+        let pipeline = ctx.new_pipeline(
             &[
                 BufferLayout::default(),
                 BufferLayout {
@@ -62,14 +74,15 @@ impl Stage {
                 },
             ],
             &[
-                VertexAttribute::with_buffer("pos", VertexFormat::Float3, 0),
-                VertexAttribute::with_buffer("color0", VertexFormat::Float4, 0),
-                VertexAttribute::with_buffer("inst_pos", VertexFormat::Float3, 1),
+                VertexAttribute::with_buffer("in_pos", VertexFormat::Float3, 0),
+                VertexAttribute::with_buffer("in_color", VertexFormat::Float4, 0),
+                VertexAttribute::with_buffer("in_inst_pos", VertexFormat::Float3, 1),
             ],
             shader,
         );
 
         Stage {
+            ctx,
             pipeline,
             bindings,
             pos: Vec::with_capacity(MAX_PARTICLES),
@@ -80,7 +93,7 @@ impl Stage {
 }
 
 impl EventHandler for Stage {
-    fn update(&mut self, _: &mut Context) {
+    fn update(&mut self) {
         let frame_time = 1. / 60.;
 
         // emit new particles
@@ -109,14 +122,15 @@ impl EventHandler for Stage {
         }
     }
 
-    fn draw(&mut self, ctx: &mut Context) {
+    fn draw(&mut self) {
         // by default glam-rs can vec3 as u128 or #[reprc(C)](f32, f32, f32). need to ensure that the second option was used
         assert_eq!(std::mem::size_of::<Vec3>(), 12);
 
-        self.bindings.vertex_buffers[1].update(ctx, &self.pos[..]);
+        self.ctx
+            .buffer_update(self.bindings.vertex_buffers[1], Arg::slice(&self.pos[..]));
 
         // model-view-projection matrix
-        let (width, height) = ctx.screen_size();
+        let (width, height) = window::screen_size();
 
         let proj = Mat4::perspective_rh_gl(60.0f32.to_radians(), width / height, 0.01, 50.0);
         let view = Mat4::look_at_rh(
@@ -129,50 +143,94 @@ impl EventHandler for Stage {
         self.ry += 0.01;
         let mvp = view_proj * Mat4::from_rotation_y(self.ry);
 
-        ctx.begin_default_pass(Default::default());
+        self.ctx.begin_default_pass(Default::default());
 
-        ctx.apply_pipeline(&self.pipeline);
-        ctx.apply_bindings(&self.bindings);
-        ctx.apply_uniforms(&shader::Uniforms { mvp });
-        ctx.draw(0, 24, self.pos.len() as i32);
-        ctx.end_render_pass();
+        self.ctx.apply_pipeline(&self.pipeline);
+        self.ctx.apply_bindings(&self.bindings);
+        self.ctx.apply_uniforms(Arg::val(&shader::Uniforms { mvp }));
+        self.ctx.draw(0, 24, self.pos.len() as i32);
+        self.ctx.end_render_pass();
 
-        ctx.commit_frame();
+        self.ctx.commit_frame();
     }
 }
 
 fn main() {
-    miniquad::start(conf::Conf::default(), |mut ctx| {
-        Box::new(Stage::new(&mut ctx))
-    });
+    let mut conf = conf::Conf::default();
+    let metal = std::env::args().nth(1).as_deref() == Some("metal");
+    conf.platform.apple_gfx_api = if metal {
+        conf::AppleGfxApi::Metal
+    } else {
+        conf::AppleGfxApi::OpenGl
+    };
+
+    miniquad::start(conf, move || Box::new(Stage::new()));
 }
 
 mod shader {
     use miniquad::*;
 
-    pub const VERTEX: &str = r#"#version 100
-    attribute vec3 pos;
-    attribute vec4 color0;
-    attribute vec3 inst_pos;
+    pub const GL_VERTEX: &str = r#"#version 100
+    attribute vec3 in_pos;
+    attribute vec4 in_color;
+    attribute vec3 in_inst_pos;
 
     varying lowp vec4 color;
 
     uniform mat4 mvp;
 
     void main() {
-        vec4 pos = vec4(pos + inst_pos, 1.0);
+        vec4 pos = vec4(in_pos + in_inst_pos, 1.0);
         gl_Position = mvp * pos;
-        color = color0;
+        color = in_color;
     }
     "#;
 
-    pub const FRAGMENT: &str = r#"#version 100
+    pub const GL_FRAGMENT: &str = r#"#version 100
     varying lowp vec4 color;
 
     void main() {
         gl_FragColor = color;
     }
     "#;
+
+    pub const METAL: &str = r#"
+    #include <metal_stdlib>
+
+    using namespace metal;
+
+    struct Uniforms
+    {
+        float4x4 mvp;
+    };
+
+    struct Vertex
+    {
+        float3 in_pos      [[attribute(0)]];
+        float4 in_color    [[attribute(1)]];
+        float3 in_inst_pos [[attribute(2)]];
+    };
+
+    struct RasterizerData
+    {
+        float4 position [[position]];
+        float4 color [[user(locn0)]];
+    };
+
+    vertex RasterizerData vertexShader(Vertex v [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
+    {
+        RasterizerData out;
+
+        out.position = uniforms.mvp * float4(v.in_pos + v.in_inst_pos, 1.0);
+        out.color = v.in_color;
+
+        return out;
+    }
+
+    fragment float4 fragmentShader(RasterizerData in [[stage_in]])
+    {
+        return in.color;
+    }"#;
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {

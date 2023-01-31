@@ -4,7 +4,7 @@
 //!
 use {
     crate::{
-        conf::Conf,
+        conf::{self, AppleGfxApi, Conf},
         event::{EventHandler, MouseButton},
         fs,
         native::{
@@ -14,13 +14,14 @@ use {
             },
             NativeDisplayData,
         },
-        Context, GraphicsContext,
     },
     std::os::raw::c_void,
 };
 
 struct IosDisplay {
     data: NativeDisplayData,
+    view: ObjcId,
+    gfx_api: conf::AppleGfxApi,
 }
 
 impl crate::native::NativeDisplay for IosDisplay {
@@ -52,25 +53,55 @@ impl crate::native::NativeDisplay for IosDisplay {
         None
     }
     fn clipboard_set(&mut self, _data: &str) {}
+    #[cfg(target_vendor = "apple")]
+    fn apple_gfx_api(&self) -> crate::conf::AppleGfxApi {
+        self.gfx_api
+    }
+    #[cfg(target_vendor = "apple")]
+    fn apple_view(&mut self) -> Option<crate::native::apple::frameworks::ObjcId> {
+        Some(self.view)
+    }
+
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
     }
 }
+mod tl_display {
+    use super::*;
+    use crate::NATIVE_DISPLAY;
+
+    use std::cell::RefCell;
+
+    thread_local! {
+        static DISPLAY: RefCell<Option<IosDisplay>> = RefCell::new(None);
+    }
+
+    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let mut d = d.as_mut().unwrap();
+            f(&mut *d);
+        })
+    }
+
+    pub(super) fn with<T>(mut f: impl FnMut(&mut IosDisplay) -> T) -> T {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let mut d = d.as_mut().unwrap();
+            f(&mut *d)
+        })
+    }
+
+    pub(super) fn set_display(display: IosDisplay) {
+        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
+        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
+    }
+}
 
 struct WindowPayload {
-    display: IosDisplay,
-    context: Option<GraphicsContext>,
     event_handler: Option<Box<dyn EventHandler>>,
     gles2: bool,
-    f: Option<Box<dyn 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>>>,
-}
-impl WindowPayload {
-    pub fn context(&mut self) -> Option<(&mut Context, &mut dyn EventHandler)> {
-        let a = self.context.as_mut()?;
-        let event_handler = self.event_handler.as_deref_mut()?;
-
-        Some((a.with_display(&mut self.display), event_handler))
-    }
+    f: Option<Box<dyn 'static + FnOnce() -> Box<dyn EventHandler>>>,
 }
 
 fn get_window_payload(this: &Object) -> &mut WindowPayload {
@@ -80,8 +111,7 @@ fn get_window_payload(this: &Object) -> &mut WindowPayload {
     }
 }
 
-pub fn define_glk_view() -> *const Class {
-    let superclass = class!(GLKView);
+pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
     let mut decl = ClassDecl::new("QuadView", superclass).unwrap();
 
     extern "C" fn touches_began(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
@@ -99,13 +129,14 @@ pub fn define_glk_view() -> *const Class {
             } {
                 let mut ios_pos: NSPoint = msg_send![ios_touch, locationInView: this];
 
-                if payload.display.data.high_dpi {
-                    ios_pos.x *= 2.;
-                    ios_pos.y *= 2.;
-                }
-                if let Some((context, event_handler)) = payload.context() {
+                tl_display::with(|d| {
+                    if d.data.high_dpi {
+                        ios_pos.x *= 2.;
+                        ios_pos.y *= 2.;
+                    }
+                });
+                if let Some(ref mut event_handler) = payload.event_handler {
                     event_handler.mouse_button_down_event(
-                        context,
                         MouseButton::Left,
                         ios_pos.x as _,
                         ios_pos.y as _,
@@ -145,25 +176,58 @@ pub fn define_glk_view() -> *const Class {
     return decl.register();
 }
 
-pub fn define_glk_view_dlg() -> *const Class {
-    let superclass = class!(NSObject);
+unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
+    mod libc {
+        use std::ffi::{c_char, c_int, c_void};
+
+        pub const RTLD_LAZY: c_int = 1;
+        extern "C" {
+            pub fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
+            pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+        }
+    }
+    static mut opengl: *mut std::ffi::c_void = std::ptr::null_mut();
+
+    if opengl.is_null() {
+        opengl = libc::dlopen(
+            b"/System/Library/Frameworks/OpenGLES.framework/OpenGLES\0".as_ptr() as _,
+            libc::RTLD_LAZY,
+        );
+    }
+
+    assert!(!opengl.is_null());
+
+    let symbol = libc::dlsym(opengl, name as _);
+    if symbol.is_null() {
+        return None;
+    }
+    Some(unsafe { std::mem::transmute_copy(&symbol) })
+}
+
+pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
     let mut decl = ClassDecl::new("QuadViewDlg", superclass).unwrap();
 
     extern "C" fn draw_in_rect(this: &Object, _: Sel, _: ObjcId, _: ObjcId) {
         let payload = get_window_payload(this);
         if payload.event_handler.is_none() {
             let f = payload.f.take().unwrap();
-            payload.context = Some(GraphicsContext::new(payload.gles2));
-            payload.event_handler = Some(f(payload
-                .context
-                .as_mut()
-                .unwrap()
-                .with_display(&mut payload.display)));
+
+            if tl_display::with(|d| d.gfx_api == AppleGfxApi::OpenGl) {
+                crate::native::gl::load_gl_funcs(|proc| {
+                    let name = std::ffi::CString::new(proc).unwrap();
+
+                    unsafe { get_proc_address(name.as_ptr() as _) }
+                });
+            }
+
+            payload.event_handler = Some(f());
         }
 
         let main_screen: ObjcId = unsafe { msg_send![class!(UIScreen), mainScreen] };
         let screen_rect: NSRect = unsafe { msg_send![main_screen, bounds] };
-        let (screen_width, screen_height) = if payload.display.data.high_dpi {
+        let high_dpi = tl_display::with(|d| d.data.high_dpi);
+
+        let (screen_width, screen_height) = if high_dpi {
             (
                 screen_rect.size.width as i32 * 2,
                 screen_rect.size.height as i32 * 2,
@@ -175,20 +239,26 @@ pub fn define_glk_view_dlg() -> *const Class {
             )
         };
 
-        if payload.display.data.screen_width != screen_width
-            || payload.display.data.screen_height != screen_height
+        if tl_display::with(|d| d.data.screen_width != screen_width)
+            || tl_display::with(|d| d.data.screen_height != screen_height)
         {
-            payload.display.data.screen_width = screen_width;
-            payload.display.data.screen_height = screen_height;
-            if let Some((context, event_handler)) = payload.context() {
-                event_handler.resize_event(context, screen_width as _, screen_height as _);
+            tl_display::with(|d| {
+                d.data.screen_width = screen_width;
+                d.data.screen_height = screen_height;
+            });
+            if let Some(ref mut event_handler) = payload.event_handler {
+                event_handler.resize_event(screen_width as _, screen_height as _);
             }
         }
 
-        if let Some((context, event_handler)) = payload.context() {
-            event_handler.update(context);
-            event_handler.draw(context);
+        if let Some(ref mut event_handler) = payload.event_handler {
+            event_handler.update();
+            event_handler.draw();
         }
+    }
+    // wrapper to make sel! macros happy
+    extern "C" fn draw_in_rect2(this: &Object, s: Sel, o: ObjcId) {
+        draw_in_rect(this, s, o, nil);
     }
 
     unsafe {
@@ -196,9 +266,104 @@ pub fn define_glk_view_dlg() -> *const Class {
             sel!(glkView: drawInRect:),
             draw_in_rect as extern "C" fn(&Object, Sel, ObjcId, ObjcId),
         );
+
+        decl.add_method(
+            sel!(drawInMTKView:),
+            draw_in_rect2 as extern "C" fn(&Object, Sel, ObjcId),
+        );
     }
+
     decl.add_ivar::<*mut c_void>("display_ptr");
     return decl.register();
+}
+
+// metal or opengl view and the objects required to collect all the window events
+struct View {
+    view: ObjcId,
+    view_dlg: ObjcId,
+    view_ctrl: ObjcId,
+    // this view failed to create gles3 context, but succeeded with gles2
+    gles2: bool,
+}
+
+unsafe fn create_opengl_view(screen_rect: NSRect, sample_count: i32, high_dpi: bool) -> View {
+    let glk_view_obj: ObjcId = msg_send![define_glk_or_mtk_view(class!(GLKView)), alloc];
+    let glk_view_obj: ObjcId = msg_send![glk_view_obj, initWithFrame: screen_rect];
+
+    let glk_view_dlg_obj: ObjcId = msg_send![define_glk_or_mtk_view_dlg(class!(NSObject)), alloc];
+    let glk_view_dlg_obj: ObjcId = msg_send![glk_view_dlg_obj, init];
+
+    let eagl_context_obj: ObjcId = msg_send![class!(EAGLContext), alloc];
+    let mut eagl_context_obj: ObjcId = msg_send![eagl_context_obj, initWithAPI: 3];
+    let mut gles2 = false;
+    if eagl_context_obj.is_null() {
+        eagl_context_obj = msg_send![eagl_context_obj, initWithAPI: 2];
+        gles2 = true;
+    }
+
+    msg_send_![
+        glk_view_obj,
+        setDrawableColorFormat: frameworks::GLKViewDrawableColorFormatRGBA8888
+    ];
+    msg_send_![
+        glk_view_obj,
+        setDrawableDepthFormat: frameworks::GLKViewDrawableDepthFormat::Format24 as i32
+    ];
+    msg_send_![
+        glk_view_obj,
+        setDrawableStencilFormat: frameworks::GLKViewDrawableStencilFormat::FormatNone as i32
+    ];
+    msg_send_![glk_view_obj, setContext: eagl_context_obj];
+
+    msg_send_![glk_view_obj, setDelegate: glk_view_dlg_obj];
+    msg_send_![glk_view_obj, setEnableSetNeedsDisplay: NO];
+    msg_send_![glk_view_obj, setUserInteractionEnabled: YES];
+    msg_send_![glk_view_obj, setMultipleTouchEnabled: YES];
+    if high_dpi {
+        msg_send_![glk_view_obj, setContentScaleFactor: 2.0];
+    } else {
+        msg_send_![glk_view_obj, setContentScaleFactor: 1.0];
+    }
+
+    let view_ctrl_obj: ObjcId = msg_send![class!(GLKViewController), alloc];
+    let view_ctrl_obj: ObjcId = msg_send![view_ctrl_obj, init];
+
+    msg_send_![view_ctrl_obj, setView: glk_view_obj];
+    msg_send_![view_ctrl_obj, setPreferredFramesPerSecond:60];
+
+    View {
+        view: glk_view_obj,
+        view_dlg: glk_view_dlg_obj,
+        view_ctrl: view_ctrl_obj,
+        gles2,
+    }
+}
+
+unsafe fn create_metal_view(screen_rect: NSRect, sample_count: i32, high_dpi: bool) -> View {
+    let mtk_view_obj: ObjcId = msg_send![define_glk_or_mtk_view(class!(MTKView)), alloc];
+    let mtk_view_obj: ObjcId = msg_send![mtk_view_obj, initWithFrame: screen_rect];
+
+    let mtk_view_dlg_obj: ObjcId = msg_send![define_glk_or_mtk_view_dlg(class!(NSObject)), alloc];
+    let mtk_view_dlg_obj: ObjcId = msg_send![mtk_view_dlg_obj, init];
+
+    let view_ctrl_obj: ObjcId = msg_send![class!(UIViewController), alloc];
+    let view_ctrl_obj: ObjcId = msg_send![view_ctrl_obj, init];
+
+    msg_send_![view_ctrl_obj, setView: mtk_view_obj];
+
+    msg_send_![mtk_view_obj, setPreferredFramesPerSecond:60];
+    msg_send_![mtk_view_obj, setDelegate: mtk_view_dlg_obj];
+    let device = MTLCreateSystemDefaultDevice();
+    msg_send_![mtk_view_obj, setDevice: device];
+    msg_send_![mtk_view_obj, setUserInteractionEnabled: YES];
+
+    View {
+        view: mtk_view_obj,
+        view_dlg: mtk_view_dlg_obj,
+        view_ctrl: view_ctrl_obj,
+
+        gles2: false,
+    }
 }
 
 pub fn define_app_delegate() -> *const Class {
@@ -232,73 +397,40 @@ pub fn define_app_delegate() -> *const Class {
             let window_obj: ObjcId = msg_send![class!(UIWindow), alloc];
             let window_obj: ObjcId = msg_send![window_obj, initWithFrame: screen_rect];
 
-            let eagl_context_obj: ObjcId = msg_send![class!(EAGLContext), alloc];
-            let mut eagl_context_obj: ObjcId = msg_send![eagl_context_obj, initWithAPI: 3];
-            let mut gles2 = false;
-            if eagl_context_obj.is_null() {
-                eagl_context_obj = msg_send![eagl_context_obj, initWithAPI: 2];
-                gles2 = true;
-            }
+            let view = match conf.platform.apple_gfx_api {
+                AppleGfxApi::OpenGl => {
+                    create_opengl_view(screen_rect, conf.sample_count, conf.high_dpi)
+                }
+                AppleGfxApi::Metal => {
+                    create_metal_view(screen_rect, conf.sample_count, conf.high_dpi)
+                }
+            };
 
-            let payload = Box::new(WindowPayload {
-                display: IosDisplay {
-                    data: NativeDisplayData {
-                        screen_width,
-                        screen_height,
-                        high_dpi: conf.high_dpi,
-                        ..Default::default()
-                    },
+            tl_display::set_display(IosDisplay {
+                data: NativeDisplayData {
+                    screen_width,
+                    screen_height,
+                    high_dpi: conf.high_dpi,
+                    ..Default::default()
                 },
+                view: view.view,
+                gfx_api: conf.platform.apple_gfx_api,
+            });
+            let payload = Box::new(WindowPayload {
                 f: Some(Box::new(f)),
                 event_handler: None,
-                context: None,
-                gles2,
+                gles2: view.gles2,
             });
             let payload_ptr = Box::into_raw(payload) as *mut std::ffi::c_void;
 
-            let glk_view_dlg_obj: ObjcId = msg_send![define_glk_view_dlg(), alloc];
-            let glk_view_dlg_obj: ObjcId = msg_send![glk_view_dlg_obj, init];
+            (*view.view).set_ivar("display_ptr", payload_ptr);
+            (*view.view_dlg).set_ivar("display_ptr", payload_ptr);
 
-            (*glk_view_dlg_obj).set_ivar("display_ptr", payload_ptr);
+            msg_send_![window_obj, addSubview: view.view];
 
-            let glk_view_obj: ObjcId = msg_send![define_glk_view(), alloc];
-            let glk_view_obj: ObjcId = msg_send![glk_view_obj, initWithFrame: screen_rect];
+            msg_send_![window_obj, setRootViewController: view.view_ctrl];
 
-            (*glk_view_obj).set_ivar("display_ptr", payload_ptr);
-
-            let _: () = msg_send![
-                glk_view_obj,
-                setDrawableColorFormat: frameworks::GLKViewDrawableColorFormatRGBA8888
-            ];
-            let _: () = msg_send![
-                glk_view_obj,
-                setDrawableDepthFormat: frameworks::GLKViewDrawableDepthFormat::Format24 as i32
-            ];
-            let _: () = msg_send![
-                glk_view_obj,
-                setDrawableStencilFormat: frameworks::GLKViewDrawableStencilFormat::FormatNone
-                    as i32
-            ];
-            let _: () = msg_send![glk_view_obj, setContext: eagl_context_obj];
-            let _: () = msg_send![glk_view_obj, setDelegate: glk_view_dlg_obj];
-            let _: () = msg_send![glk_view_obj, setEnableSetNeedsDisplay: NO];
-            let _: () = msg_send![glk_view_obj, setUserInteractionEnabled: YES];
-            let _: () = msg_send![glk_view_obj, setMultipleTouchEnabled: YES];
-            if conf.high_dpi {
-                let _: () = msg_send![glk_view_obj, setContentScaleFactor: 2.0];
-            } else {
-                let _: () = msg_send![glk_view_obj, setContentScaleFactor: 1.0];
-            }
-            let _: () = msg_send![window_obj, addSubview: glk_view_obj];
-
-            let view_ctrl_obj: ObjcId = msg_send![class!(GLKViewController), alloc];
-            let view_ctrl_obj: ObjcId = msg_send![view_ctrl_obj, init];
-
-            let _: () = msg_send![view_ctrl_obj, setView: glk_view_obj];
-            let _: () = msg_send![view_ctrl_obj, setPreferredFramesPerSecond:60];
-            let _: () = msg_send![window_obj, setRootViewController: view_ctrl_obj];
-
-            let _: () = msg_send![window_obj, makeKeyAndVisible];
+            msg_send_![window_obj, makeKeyAndVisible];
         }
         YES
     }
@@ -358,14 +490,11 @@ pub fn load_file<F: Fn(crate::fs::Response) + 'static>(path: &str, on_loaded: F)
 
 // this is the way to pass argument to UiApplicationMain
 // this static will be used exactly once, to .take() the "run" arguments
-static mut RUN_ARGS: Option<(
-    Box<dyn FnOnce(&mut crate::Context) -> Box<dyn EventHandler>>,
-    Conf,
-)> = None;
+static mut RUN_ARGS: Option<(Box<dyn FnOnce() -> Box<dyn EventHandler>>, Conf)> = None;
 
 pub unsafe fn run<F>(conf: Conf, f: F)
 where
-    F: 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     RUN_ARGS = Some((Box::new(f), conf));
 

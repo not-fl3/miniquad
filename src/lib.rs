@@ -16,8 +16,6 @@ mod default_icon;
 
 pub use native::{gl, NativeDisplay};
 
-pub use graphics::GraphicsContext as Context;
-
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn now() -> f64 {
@@ -37,38 +35,49 @@ pub mod date {
     }
 }
 
-impl Context {
-    // Updates the display pointer inside the Context
-    // Context should always be passed to event handlers through "with_display"
-    pub(crate) fn with_display(&mut self, display: &mut dyn NativeDisplay) -> &mut Context {
-        self.display = Some(display);
-        self
-    }
+use std::cell::RefCell;
+thread_local! {
+    static NATIVE_DISPLAY: RefCell<Option<fn (&mut dyn FnMut(&mut dyn crate::NativeDisplay))>> = RefCell::new(None);
+}
+pub(crate) fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+    NATIVE_DISPLAY.with(|d| (d.borrow().as_ref().unwrap())(f))
+}
 
-    pub fn display(&self) -> &dyn NativeDisplay {
-        unsafe { &*self.display.unwrap() }
-    }
+// I wish "with_native_display" could be generic over return value, but function
+// pointer to a generic function requires way too much unsafe :(
+macro_rules! with_native_display {
+    ($target:ident, $f:expr) => {{
+        let mut res = Default::default();
 
-    pub fn display_mut(&mut self) -> &mut dyn NativeDisplay {
-        unsafe { &mut *self.display.unwrap() }
-    }
+        with_native_display(&mut |$target| {
+            res = $f;
+        });
+
+        res
+    }};
+}
+
+/// Window and associated to window rendering context related functions.
+/// in macroquad <= 0.3, it was ctx.screen_size(). Now it is window::screen_size()
+pub mod window {
+    use super::*;
 
     /// The current framebuffer size in pixels
     /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
-    pub fn screen_size(&self) -> (f32, f32) {
-        self.display().screen_size()
+    pub fn screen_size() -> (f32, f32) {
+        with_native_display!(d, d.screen_size())
     }
 
     /// The dpi scaling factor (window pixels to framebuffer pixels)
     /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
-    pub fn dpi_scale(&self) -> f32 {
-        self.display().dpi_scale()
+    pub fn dpi_scale() -> f32 {
+        with_native_display!(d, d.dpi_scale())
     }
 
     /// True when high_dpi was requested and actually running in a high-dpi scenario
     /// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
-    pub fn high_dpi(&self) -> bool {
-        self.display().high_dpi()
+    pub fn high_dpi() -> bool {
+        with_native_display!(d, d.high_dpi())
     }
 
     /// This function simply quits the application without
@@ -78,8 +87,8 @@ impl Context {
     /// Window might not be actually closed right away (exit(0) might not
     /// happen in the order_quit implmentation) and execution might continue for some time after
     /// But the window is going to be inevitably closed at some point.
-    pub fn order_quit(&mut self) {
-        self.display_mut().order_quit();
+    pub fn order_quit() {
+        with_native_display!(d, d.order_quit())
     }
 
     /// Calling request_quit() will trigger "quit_requested_event" event , giving
@@ -87,8 +96,8 @@ impl Context {
     /// (for instance to show a 'Really Quit?' dialog box).
     /// If the event handler callback does nothing, the application will be quit as usual.
     /// To prevent this, call the function "cancel_quit()"" from inside the event handler.
-    pub fn request_quit(&mut self) {
-        self.display_mut().request_quit();
+    pub fn request_quit() {
+        with_native_display!(d, d.request_quit())
     }
 
     /// Cancels a pending quit request, either initiated
@@ -96,8 +105,8 @@ impl Context {
     /// by calling "request_quit()". The only place where calling this
     /// function makes sense is from inside the event handler callback when
     /// the "quit_requested_event" event has been received
-    pub fn cancel_quit(&mut self) {
-        self.display_mut().cancel_quit();
+    pub fn cancel_quit() {
+        with_native_display!(d, d.cancel_quit())
     }
 
     /// Capture mouse cursor to the current window
@@ -106,57 +115,76 @@ impl Context {
     /// NOTICE: on desktop cursor will not be automatically released after window lost focus
     ///         so set_cursor_grab(false) on window's focus lost is recommended.
     /// TODO: implement window focus events
-    pub fn set_cursor_grab(&mut self, grab: bool) {
-        self.display_mut().set_cursor_grab(grab);
+    pub fn set_cursor_grab(grab: bool) {
+        with_native_display!(d, d.set_cursor_grab(grab))
     }
 
     /// Show or hide the mouse cursor
-    pub fn show_mouse(&mut self, shown: bool) {
-        self.display_mut().show_mouse(shown);
+    pub fn show_mouse(shown: bool) {
+        with_native_display!(d, d.show_mouse(shown))
     }
 
     /// Set the mouse cursor icon.
-    pub fn set_mouse_cursor(&mut self, cursor_icon: CursorIcon) {
-        self.display_mut().set_mouse_cursor(cursor_icon);
+    pub fn set_mouse_cursor(cursor_icon: CursorIcon) {
+        with_native_display!(d, d.set_mouse_cursor(cursor_icon))
     }
 
     /// Set the application's window size.
-    pub fn set_window_size(&mut self, new_width: u32, new_height: u32) {
-        self.display_mut().set_window_size(new_width, new_height);
+    pub fn set_window_size(new_width: u32, new_height: u32) {
+        with_native_display!(d, d.set_window_size(new_width, new_height))
     }
 
-    pub fn set_fullscreen(&mut self, fullscreen: bool) {
-        self.display_mut().set_fullscreen(fullscreen);
+    pub fn set_fullscreen(fullscreen: bool) {
+        with_native_display!(d, d.set_fullscreen(fullscreen))
     }
 
     /// Get current OS clipboard value
-    pub fn clipboard_get(&mut self) -> Option<String> {
-        self.display_mut().clipboard_get()
+    pub fn clipboard_get() -> Option<String> {
+        with_native_display!(d, d.clipboard_get())
     }
 
     /// Save value to OS clipboard
-    pub fn clipboard_set(&mut self, data: &str) {
-        self.display_mut().clipboard_set(data);
+    pub fn clipboard_set(data: &str) {
+        with_native_display!(d, d.clipboard_set(data))
     }
-    pub fn dropped_file_count(&mut self) -> usize {
-        self.display_mut().dropped_file_count()
+    pub fn dropped_file_count() -> usize {
+        with_native_display!(d, d.dropped_file_count())
     }
-    pub fn dropped_file_bytes(&mut self, index: usize) -> Option<Vec<u8>> {
-        self.display_mut().dropped_file_bytes(index)
+    pub fn dropped_file_bytes(index: usize) -> Option<Vec<u8>> {
+        with_native_display!(d, d.dropped_file_bytes(index))
     }
-    pub fn dropped_file_path(&mut self, index: usize) -> Option<std::path::PathBuf> {
-        self.display_mut().dropped_file_path(index)
+    pub fn dropped_file_path(index: usize) -> Option<std::path::PathBuf> {
+        with_native_display!(d, d.dropped_file_path(index))
     }
 
     /// Shortcut for `order_quit`. Will add a legacy attribute at some point.
-    pub fn quit(&mut self) {
-        self.display_mut().order_quit()
+    pub fn quit() {
+        with_native_display!(d, d.order_quit())
     }
 
     /// Show/hide onscreen keyboard.
     /// Only works on Android right now.
-    pub fn show_keyboard(&mut self, show: bool) {
-        self.display_mut().show_keyboard(show)
+    pub fn show_keyboard(show: bool) {
+        with_native_display!(d, d.show_keyboard(show))
+    }
+
+    ///
+    pub fn new_rendering_backend() -> Box<dyn RenderingBackend> {
+        #[cfg(target_vendor = "apple")]
+        {
+            if with_native_display!(d, d.apple_gfx_api() == conf::AppleGfxApi::Metal) {
+                Box::new(MetalContext::new())
+            } else {
+                Box::new(GlContext::new())
+            }
+        }
+        #[cfg(not(target_vendor = "apple"))]
+        Box::new(GlContext::new())
+    }
+
+    #[cfg(target_vendor = "apple")]
+    pub(crate) fn apple_view() -> Option<crate::native::apple::frameworks::ObjcId> {
+        with_native_display!(d, d.apple_view())
     }
 }
 
@@ -179,7 +207,7 @@ pub enum CursorIcon {
 /// Start miniquad.
 pub fn start<F>(conf: conf::Conf, f: F)
 where
-    F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     #[cfg(target_os = "linux")]
     {

@@ -1,23 +1,14 @@
-use std::{ffi::CString, mem};
+//mod texture;
 
-mod texture;
-
-use crate::{native::gl::*, Context};
+use crate::native::gl::*;
 
 use std::{error::Error, fmt::Display};
 
-pub use texture::{FilterMode, Texture, TextureAccess, TextureFormat, TextureParams, TextureWrap};
+//pub use texture::{FilterMode, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 
-fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
-    let cname = CString::new(name).unwrap_or_else(|e| panic!("{}", e));
-    let location = unsafe { glGetUniformLocation(program, cname.as_ptr()) };
+mod gl;
 
-    if location == -1 {
-        return None;
-    }
-
-    Some(location)
-}
+pub use gl::GlContext;
 
 #[derive(Clone, Copy, Debug)]
 pub enum UniformType {
@@ -132,7 +123,10 @@ pub enum VertexFormat {
 }
 
 impl VertexFormat {
-    pub fn size(&self) -> i32 {
+    /// Number of components in this VertexFormat
+    /// it is called size in OpenGl, but do not confuse this with bytes size
+    /// basically, its an N from FloatN/IntN
+    pub fn components(&self) -> i32 {
         match self {
             VertexFormat::Float1 => 1,
             VertexFormat::Float2 => 2,
@@ -154,7 +148,8 @@ impl VertexFormat {
         }
     }
 
-    pub fn byte_len(&self) -> i32 {
+    /// Size in bytes
+    pub fn size_bytes(&self) -> i32 {
         match self {
             VertexFormat::Float1 => 1 * 4,
             VertexFormat::Float2 => 2 * 4,
@@ -294,43 +289,79 @@ impl Error for ShaderError {
     }
 }
 
-#[derive(Clone, Debug, Copy)]
-pub struct Shader(usize);
-
-impl Shader {
-    pub fn new(
-        ctx: &mut Context,
-        vertex_shader: &str,
-        fragment_shader: &str,
-        meta: ShaderMeta,
-    ) -> Result<Shader, ShaderError> {
-        let shader = load_shader_internal(vertex_shader, fragment_shader, meta)?;
-        ctx.shaders.push(shader);
-        Ok(Shader(ctx.shaders.len() - 1))
+/// List of all the possible formats of input data when uploading to texture.
+/// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
+#[repr(u8)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum TextureFormat {
+    RGB8,
+    RGBA8,
+    Depth,
+    Alpha,
+}
+impl TextureFormat {
+    /// Returns the size in bytes of texture with `dimensions`.
+    pub fn size(self, width: u32, height: u32) -> u32 {
+        let square = width * height;
+        match self {
+            TextureFormat::RGB8 => 3 * square,
+            TextureFormat::RGBA8 => 4 * square,
+            TextureFormat::Depth => 2 * square,
+            TextureFormat::Alpha => 1 * square,
+        }
     }
 }
 
-type UniformLocation = Option<GLint>;
-
-pub struct ShaderImage {
-    gl_loc: UniformLocation,
+/// Sets the wrap parameter for texture.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum TextureWrap {
+    /// Samples at coord x + 1 map to coord x.
+    Repeat = GL_REPEAT as isize,
+    /// Samples at coord x + 1 map to coord 1 - x.
+    Mirror = GL_MIRRORED_REPEAT as isize,
+    /// Samples at coord x + 1 map to coord 1.
+    Clamp = GL_CLAMP_TO_EDGE as isize,
 }
 
-#[allow(dead_code)]
-#[derive(Debug)]
-pub struct ShaderUniform {
-    gl_loc: UniformLocation,
-    _offset: usize,
-    _size: usize,
-    uniform_type: UniformType,
-    array_count: i32,
+#[derive(Clone, Copy, Debug, PartialEq, Hash)]
+pub enum FilterMode {
+    Linear,
+    Nearest,
 }
 
-struct ShaderInternal {
-    program: GLuint,
-    images: Vec<ShaderImage>,
-    uniforms: Vec<ShaderUniform>,
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum TextureAccess {
+    /// Used as read-only from GPU
+    Static,
+    /// Can be written to from GPU
+    RenderTarget,
 }
+
+#[derive(Debug, Copy, Clone)]
+pub struct TextureParams {
+    pub format: TextureFormat,
+    pub wrap: TextureWrap,
+    pub filter: FilterMode,
+    pub width: u32,
+    pub height: u32,
+}
+impl Default for TextureParams {
+    fn default() -> Self {
+        TextureParams {
+            format: TextureFormat::RGBA8,
+            wrap: TextureWrap::Clamp,
+            filter: FilterMode::Linear,
+            width: 0,
+            height: 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Copy, PartialEq)]
+pub struct ShaderId(usize);
+
+#[derive(Clone, Debug, Copy, PartialEq)]
+pub struct TextureId(pub usize);
 
 /// Pixel arithmetic description for blending operations.
 /// Will be used in an equation:
@@ -428,109 +459,6 @@ pub enum CompareFunc {
 
 type ColorMask = (bool, bool, bool, bool);
 
-#[derive(Default, Copy, Clone)]
-struct CachedAttribute {
-    attribute: VertexAttributeInternal,
-    gl_vbuf: GLuint,
-}
-
-struct GlCache {
-    stored_index_buffer: GLuint,
-    stored_index_type: Option<IndexType>,
-    stored_vertex_buffer: GLuint,
-    stored_texture: GLuint,
-    index_buffer: GLuint,
-    index_type: Option<IndexType>,
-    vertex_buffer: GLuint,
-    textures: [GLuint; MAX_SHADERSTAGE_IMAGES],
-    cur_pipeline: Option<Pipeline>,
-    color_blend: Option<BlendState>,
-    alpha_blend: Option<BlendState>,
-    stencil: Option<StencilState>,
-    color_write: ColorMask,
-    cull_face: CullFace,
-    attributes: [Option<CachedAttribute>; MAX_VERTEX_ATTRIBUTES],
-}
-
-impl GlCache {
-    fn bind_buffer(&mut self, target: GLenum, buffer: GLuint, index_type: Option<IndexType>) {
-        if target == GL_ARRAY_BUFFER {
-            if self.vertex_buffer != buffer {
-                self.vertex_buffer = buffer;
-                unsafe {
-                    glBindBuffer(target, buffer);
-                }
-            }
-        } else {
-            if self.index_buffer != buffer {
-                self.index_buffer = buffer;
-                unsafe {
-                    glBindBuffer(target, buffer);
-                }
-            }
-            self.index_type = index_type;
-        }
-    }
-
-    fn store_buffer_binding(&mut self, target: GLenum) {
-        if target == GL_ARRAY_BUFFER {
-            self.stored_vertex_buffer = self.vertex_buffer;
-        } else {
-            self.stored_index_buffer = self.index_buffer;
-            self.stored_index_type = self.index_type;
-        }
-    }
-
-    fn restore_buffer_binding(&mut self, target: GLenum) {
-        if target == GL_ARRAY_BUFFER {
-            if self.stored_vertex_buffer != 0 {
-                self.bind_buffer(target, self.stored_vertex_buffer, None);
-                self.stored_vertex_buffer = 0;
-            }
-        } else {
-            if self.stored_index_buffer != 0 {
-                self.bind_buffer(target, self.stored_index_buffer, self.stored_index_type);
-                self.stored_index_buffer = 0;
-            }
-        }
-    }
-
-    fn bind_texture(&mut self, slot_index: usize, texture: GLuint) {
-        unsafe {
-            glActiveTexture(GL_TEXTURE0 + slot_index as GLuint);
-            if self.textures[slot_index] != texture {
-                glBindTexture(GL_TEXTURE_2D, texture);
-                self.textures[slot_index] = texture;
-            }
-        }
-    }
-
-    fn store_texture_binding(&mut self, slot_index: usize) {
-        self.stored_texture = self.textures[slot_index];
-    }
-
-    fn restore_texture_binding(&mut self, slot_index: usize) {
-        self.bind_texture(slot_index, self.stored_texture);
-    }
-
-    fn clear_buffer_bindings(&mut self) {
-        self.bind_buffer(GL_ARRAY_BUFFER, 0, None);
-        self.vertex_buffer = 0;
-
-        self.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0, None);
-        self.index_buffer = 0;
-    }
-
-    fn clear_texture_bindings(&mut self) {
-        for ix in 0..MAX_SHADERSTAGE_IMAGES {
-            if self.textures[ix] != 0 {
-                self.bind_texture(ix, 0);
-                self.textures[ix] = 0;
-            }
-        }
-    }
-}
-
 pub enum PassAction {
     Nothing,
     Clear {
@@ -563,70 +491,12 @@ impl Default for PassAction {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderPass(usize);
 
-struct RenderPassInternal {
-    gl_fb: GLuint,
-    texture: Texture,
-    depth_texture: Option<Texture>,
-}
-
 impl RenderPass {
-    pub fn new(
-        ctx: &mut Context,
-        color_img: Texture,
-        depth_img: impl Into<Option<Texture>>,
-    ) -> RenderPass {
-        let mut gl_fb = 0;
+    // pub fn texture(&self, ctx: &mut Gl) -> Texture {
+    //     let render_pass = &mut ctx.passes[self.0];
 
-        let depth_img = depth_img.into();
-
-        unsafe {
-            glGenFramebuffers(1, &mut gl_fb as *mut _);
-            glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
-            glFramebufferTexture2D(
-                GL_FRAMEBUFFER,
-                GL_COLOR_ATTACHMENT0,
-                GL_TEXTURE_2D,
-                color_img.texture,
-                0,
-            );
-            if let Some(depth_img) = depth_img {
-                glFramebufferTexture2D(
-                    GL_FRAMEBUFFER,
-                    GL_DEPTH_ATTACHMENT,
-                    GL_TEXTURE_2D,
-                    depth_img.texture,
-                    0,
-                );
-            }
-            glBindFramebuffer(GL_FRAMEBUFFER, ctx.default_framebuffer);
-        }
-        let pass = RenderPassInternal {
-            gl_fb,
-            texture: color_img,
-            depth_texture: depth_img,
-        };
-
-        ctx.passes.push(pass);
-
-        RenderPass(ctx.passes.len() - 1)
-    }
-
-    pub fn texture(&self, ctx: &mut Context) -> Texture {
-        let render_pass = &mut ctx.passes[self.0];
-
-        render_pass.texture
-    }
-
-    pub fn delete(&self, ctx: &mut Context) {
-        let render_pass = &mut ctx.passes[self.0];
-
-        unsafe { glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _) }
-
-        render_pass.texture.delete();
-        if let Some(depth_texture) = render_pass.depth_texture {
-            depth_texture.delete();
-        }
-    }
+    //     render_pass.texture
+    // }
 }
 
 pub const MAX_VERTEX_ATTRIBUTES: usize = 16;
@@ -634,632 +504,11 @@ pub const MAX_SHADERSTAGE_IMAGES: usize = 12;
 
 pub struct Features {
     pub instancing: bool,
-    pub alpha_texture: bool,
 }
 
-impl Features {
-    pub fn from_gles2(is_gles2: bool) -> Self {
-        Features {
-            instancing: !is_gles2,
-            alpha_texture: is_gles2,
-        }
-    }
-}
-
-pub struct GraphicsContext {
-    shaders: Vec<ShaderInternal>,
-    pipelines: Vec<PipelineInternal>,
-    passes: Vec<RenderPassInternal>,
-    default_framebuffer: GLuint,
-    cache: GlCache,
-
-    pub(crate) features: Features,
-    pub(crate) display: Option<*mut dyn crate::NativeDisplay>,
-}
-
-impl GraphicsContext {
-    pub fn new(is_gles2: bool) -> GraphicsContext {
-        unsafe {
-            let mut default_framebuffer: GLuint = 0;
-            glGetIntegerv(
-                GL_FRAMEBUFFER_BINDING,
-                &mut default_framebuffer as *mut _ as *mut _,
-            );
-            let mut vao = 0;
-
-            glGenVertexArrays(1, &mut vao as *mut _);
-            glBindVertexArray(vao);
-            GraphicsContext {
-                default_framebuffer,
-                shaders: vec![],
-                pipelines: vec![],
-                passes: vec![],
-                features: Features::from_gles2(is_gles2),
-                cache: GlCache {
-                    stored_index_buffer: 0,
-                    stored_index_type: None,
-                    stored_vertex_buffer: 0,
-                    index_buffer: 0,
-                    index_type: None,
-                    vertex_buffer: 0,
-                    cur_pipeline: None,
-                    color_blend: None,
-                    alpha_blend: None,
-                    stencil: None,
-                    color_write: (true, true, true, true),
-                    cull_face: CullFace::Nothing,
-                    stored_texture: 0,
-                    textures: [0; MAX_SHADERSTAGE_IMAGES],
-                    attributes: [None; MAX_VERTEX_ATTRIBUTES],
-                },
-                display: None,
-            }
-        }
-    }
-
-    pub fn features(&self) -> &Features {
-        &self.features
-    }
-}
-
-impl GraphicsContext {
-    pub fn apply_pipeline(&mut self, pipeline: &Pipeline) {
-        self.cache.cur_pipeline = Some(*pipeline);
-
-        {
-            let pipeline = &self.pipelines[pipeline.0];
-            let shader = &mut self.shaders[pipeline.shader.0];
-            unsafe {
-                glUseProgram(shader.program);
-            }
-
-            unsafe {
-                glEnable(GL_SCISSOR_TEST);
-            }
-
-            if pipeline.params.depth_write {
-                unsafe {
-                    glEnable(GL_DEPTH_TEST);
-                    glDepthFunc(pipeline.params.depth_test.into())
-                }
-            } else {
-                unsafe {
-                    glDisable(GL_DEPTH_TEST);
-                }
-            }
-
-            match pipeline.params.front_face_order {
-                FrontFaceOrder::Clockwise => unsafe {
-                    glFrontFace(GL_CW);
-                },
-                FrontFaceOrder::CounterClockwise => unsafe {
-                    glFrontFace(GL_CCW);
-                },
-            }
-        }
-
-        self.set_cull_face(self.pipelines[pipeline.0].params.cull_face);
-        self.set_blend(
-            self.pipelines[pipeline.0].params.color_blend,
-            self.pipelines[pipeline.0].params.alpha_blend,
-        );
-
-        self.set_stencil(self.pipelines[pipeline.0].params.stencil_test);
-        self.set_color_write(self.pipelines[pipeline.0].params.color_write);
-    }
-
-    pub fn set_cull_face(&mut self, cull_face: CullFace) {
-        if self.cache.cull_face == cull_face {
-            return;
-        }
-
-        match cull_face {
-            CullFace::Nothing => unsafe {
-                glDisable(GL_CULL_FACE);
-            },
-            CullFace::Front => unsafe {
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_FRONT);
-            },
-            CullFace::Back => unsafe {
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
-            },
-        }
-        self.cache.cull_face = cull_face;
-    }
-
-    pub fn set_color_write(&mut self, color_write: ColorMask) {
-        if self.cache.color_write == color_write {
-            return;
-        }
-        let (r, g, b, a) = color_write;
-        unsafe { glColorMask(r as _, g as _, b as _, a as _) }
-        self.cache.color_write = color_write;
-    }
-
-    pub fn set_blend(&mut self, color_blend: Option<BlendState>, alpha_blend: Option<BlendState>) {
-        if color_blend.is_none() && alpha_blend.is_some() {
-            panic!("AlphaBlend without ColorBlend");
-        }
-        if self.cache.color_blend == color_blend && self.cache.alpha_blend == alpha_blend {
-            return;
-        }
-
-        unsafe {
-            if let Some(color_blend) = color_blend {
-                if self.cache.color_blend.is_none() {
-                    glEnable(GL_BLEND);
-                }
-
-                let BlendState {
-                    equation: eq_rgb,
-                    sfactor: src_rgb,
-                    dfactor: dst_rgb,
-                } = color_blend;
-
-                if let Some(BlendState {
-                    equation: eq_alpha,
-                    sfactor: src_alpha,
-                    dfactor: dst_alpha,
-                }) = alpha_blend
-                {
-                    glBlendFuncSeparate(
-                        src_rgb.into(),
-                        dst_rgb.into(),
-                        src_alpha.into(),
-                        dst_alpha.into(),
-                    );
-                    glBlendEquationSeparate(eq_rgb.into(), eq_alpha.into());
-                } else {
-                    glBlendFunc(src_rgb.into(), dst_rgb.into());
-                    glBlendEquationSeparate(eq_rgb.into(), eq_rgb.into());
-                }
-            } else if self.cache.color_blend.is_some() {
-                glDisable(GL_BLEND);
-            }
-        }
-
-        self.cache.color_blend = color_blend;
-        self.cache.alpha_blend = alpha_blend;
-    }
-
-    pub fn set_stencil(&mut self, stencil_test: Option<StencilState>) {
-        if self.cache.stencil == stencil_test {
-            return;
-        }
-        unsafe {
-            if let Some(stencil) = stencil_test {
-                if self.cache.stencil.is_none() {
-                    glEnable(GL_STENCIL_TEST);
-                }
-
-                let front = &stencil.front;
-                glStencilOpSeparate(
-                    GL_FRONT,
-                    front.fail_op.into(),
-                    front.depth_fail_op.into(),
-                    front.pass_op.into(),
-                );
-                glStencilFuncSeparate(
-                    GL_FRONT,
-                    front.test_func.into(),
-                    front.test_ref,
-                    front.test_mask,
-                );
-                glStencilMaskSeparate(GL_FRONT, front.write_mask);
-
-                let back = &stencil.back;
-                glStencilOpSeparate(
-                    GL_BACK,
-                    back.fail_op.into(),
-                    back.depth_fail_op.into(),
-                    back.pass_op.into(),
-                );
-                glStencilFuncSeparate(
-                    GL_BACK,
-                    back.test_func.into(),
-                    back.test_ref.into(),
-                    back.test_mask,
-                );
-                glStencilMaskSeparate(GL_BACK, back.write_mask);
-            } else if self.cache.stencil.is_some() {
-                glDisable(GL_STENCIL_TEST);
-            }
-        }
-
-        self.cache.stencil = stencil_test;
-    }
-
-    /// Set a new viewport rectangle.
-    /// Should be applied after begin_pass.
-    pub fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) {
-        unsafe {
-            glViewport(x, y, w, h);
-        }
-    }
-
-    /// Set a new scissor rectangle.
-    /// Should be applied after begin_pass.
-    pub fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
-        unsafe {
-            glScissor(x, y, w, h);
-        }
-    }
-
-    pub fn apply_bindings(&mut self, bindings: &Bindings) {
-        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
-        let shader = &self.shaders[pip.shader.0];
-
-        for (n, shader_image) in shader.images.iter().enumerate() {
-            let bindings_image = bindings
-                .images
-                .get(n)
-                .unwrap_or_else(|| panic!("Image count in bindings and shader did not match!"));
-            if let Some(gl_loc) = shader_image.gl_loc {
-                unsafe {
-                    self.cache.bind_texture(n, bindings_image.texture);
-                    glUniform1i(gl_loc, n as i32);
-                }
-            }
-        }
-
-        self.cache.bind_buffer(
-            GL_ELEMENT_ARRAY_BUFFER,
-            bindings.index_buffer.gl_buf,
-            bindings.index_buffer.index_type,
-        );
-
-        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
-
-        for attr_index in 0..MAX_VERTEX_ATTRIBUTES {
-            let cached_attr = &mut self.cache.attributes[attr_index];
-
-            let pip_attribute = pip.layout.get(attr_index).copied();
-
-            if let Some(Some(attribute)) = pip_attribute {
-                let vb = bindings.vertex_buffers[attribute.buffer_index];
-
-                if cached_attr.map_or(true, |cached_attr| {
-                    attribute != cached_attr.attribute || cached_attr.gl_vbuf != vb.gl_buf
-                }) {
-                    self.cache
-                        .bind_buffer(GL_ARRAY_BUFFER, vb.gl_buf, vb.index_type);
-
-                    unsafe {
-                        glVertexAttribPointer(
-                            attr_index as GLuint,
-                            attribute.size,
-                            attribute.type_,
-                            GL_FALSE as u8,
-                            attribute.stride,
-                            attribute.offset as *mut _,
-                        );
-                        if self.features.instancing {
-                            glVertexAttribDivisor(attr_index as GLuint, attribute.divisor as u32);
-                        }
-                        glEnableVertexAttribArray(attr_index as GLuint);
-                    };
-
-                    let cached_attr = &mut self.cache.attributes[attr_index];
-                    *cached_attr = Some(CachedAttribute {
-                        attribute,
-                        gl_vbuf: vb.gl_buf,
-                    });
-                }
-            } else {
-                if cached_attr.is_some() {
-                    unsafe {
-                        glDisableVertexAttribArray(attr_index as GLuint);
-                    }
-                    *cached_attr = None;
-                }
-            }
-        }
-    }
-
-    pub fn apply_uniforms<U>(&mut self, uniforms: &U) {
-        self.apply_uniforms_from_bytes(uniforms as *const _ as *const u8, std::mem::size_of::<U>())
-    }
-
-    #[doc(hidden)]
-    /// Apply uniforms data from array of bytes with very special layout.
-    /// Hidden because `apply_uniforms` is the recommended and safer way to work with uniforms.
-    pub fn apply_uniforms_from_bytes(&mut self, uniform_ptr: *const u8, size: usize) {
-        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
-        let shader = &self.shaders[pip.shader.0];
-
-        let mut offset = 0;
-
-        for (_, uniform) in shader.uniforms.iter().enumerate() {
-            use UniformType::*;
-
-            assert!(
-                offset <= size - uniform.uniform_type.size() / 4,
-                "Uniforms struct does not match shader uniforms layout"
-            );
-
-            unsafe {
-                let data = (uniform_ptr as *const f32).offset(offset as isize);
-                let data_int = (uniform_ptr as *const i32).offset(offset as isize);
-
-                if let Some(gl_loc) = uniform.gl_loc {
-                    match uniform.uniform_type {
-                        Float1 => {
-                            glUniform1fv(gl_loc, uniform.array_count, data);
-                        }
-                        Float2 => {
-                            glUniform2fv(gl_loc, uniform.array_count, data);
-                        }
-                        Float3 => {
-                            glUniform3fv(gl_loc, uniform.array_count, data);
-                        }
-                        Float4 => {
-                            glUniform4fv(gl_loc, uniform.array_count, data);
-                        }
-                        Int1 => {
-                            glUniform1iv(gl_loc, uniform.array_count, data_int);
-                        }
-                        Int2 => {
-                            glUniform2iv(gl_loc, uniform.array_count, data_int);
-                        }
-                        Int3 => {
-                            glUniform3iv(gl_loc, uniform.array_count, data_int);
-                        }
-                        Int4 => {
-                            glUniform4iv(gl_loc, uniform.array_count, data_int);
-                        }
-                        Mat4 => {
-                            glUniformMatrix4fv(gl_loc, uniform.array_count, 0, data);
-                        }
-                    }
-                }
-            }
-            offset += uniform.uniform_type.size() / 4 * uniform.array_count as usize;
-        }
-    }
-
-    pub fn clear(
-        &self,
-        color: Option<(f32, f32, f32, f32)>,
-        depth: Option<f32>,
-        stencil: Option<i32>,
-    ) {
-        let mut bits = 0;
-        if let Some((r, g, b, a)) = color {
-            bits |= GL_COLOR_BUFFER_BIT;
-            unsafe {
-                glClearColor(r, g, b, a);
-            }
-        }
-
-        if let Some(v) = depth {
-            bits |= GL_DEPTH_BUFFER_BIT;
-            unsafe {
-                glClearDepthf(v);
-            }
-        }
-
-        if let Some(v) = stencil {
-            bits |= GL_STENCIL_BUFFER_BIT;
-            unsafe {
-                glClearStencil(v);
-            }
-        }
-
-        if bits != 0 {
-            unsafe {
-                glClear(bits);
-            }
-        }
-    }
-
-    /// start rendering to the default frame buffer
-    pub fn begin_default_pass(&mut self, action: PassAction) {
-        self.begin_pass(None, action);
-    }
-
-    /// start rendering to an offscreen framebuffer
-    pub fn begin_pass(&mut self, pass: impl Into<Option<RenderPass>>, action: PassAction) {
-        let (framebuffer, w, h) = match pass.into() {
-            None => {
-                let (screen_width, screen_height) = self.screen_size();
-                (
-                    self.default_framebuffer,
-                    screen_width as i32,
-                    screen_height as i32,
-                )
-            }
-            Some(pass) => {
-                let pass = &self.passes[pass.0];
-                (
-                    pass.gl_fb,
-                    pass.texture.width as i32,
-                    pass.texture.height as i32,
-                )
-            }
-        };
-        unsafe {
-            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-            glViewport(0, 0, w, h);
-            glScissor(0, 0, w, h);
-        }
-        match action {
-            PassAction::Nothing => {}
-            PassAction::Clear {
-                color,
-                depth,
-                stencil,
-            } => {
-                self.clear(color, depth, stencil);
-            }
-        }
-    }
-
-    pub fn end_render_pass(&mut self) {
-        unsafe {
-            glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
-            self.cache.bind_buffer(GL_ARRAY_BUFFER, 0, None);
-            self.cache.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0, None);
-        }
-    }
-
-    pub fn commit_frame(&mut self) {
-        self.cache.clear_buffer_bindings();
-        self.cache.clear_texture_bindings();
-    }
-
-    /// Draw elements using currently applied bindings and pipeline.
-    ///
-    /// + `base_element` specifies starting offset in `index_buffer`.
-    /// + `num_elements` specifies length of the slice of `index_buffer` to draw.
-    /// + `num_instances` specifies how many instances should be rendered.
-    ///
-    /// NOTE: num_instances > 1 might be not supported by the GPU (gl2.1 and gles2).
-    /// `features.instancing` check is required.
-    pub fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32) {
-        assert!(
-            self.cache.cur_pipeline.is_some(),
-            "Drawing without any binded pipeline"
-        );
-
-        if !self.features.instancing && num_instances != 1 {
-            println!("Instanced rendering is not supported by the GPU");
-            println!("Ignoring this draw call");
-            return;
-        }
-
-        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
-        let primitive_type = pip.params.primitive_type.into();
-        let index_type = self.cache.index_type.expect("Unset index buffer type");
-
-        unsafe {
-            if self.features.instancing {
-                glDrawElementsInstanced(
-                    primitive_type,
-                    num_elements,
-                    index_type.into(),
-                    (index_type.size() as i32 * base_element) as *mut _,
-                    num_instances,
-                );
-            } else {
-                glDrawElements(
-                    primitive_type,
-                    num_elements,
-                    index_type.into(),
-                    (index_type.size() as i32 * base_element) as *mut _,
-                );
-            }
-        }
-    }
-}
-
-fn load_shader_internal(
-    vertex_shader: &str,
-    fragment_shader: &str,
-    meta: ShaderMeta,
-) -> Result<ShaderInternal, ShaderError> {
-    unsafe {
-        let vertex_shader = load_shader(GL_VERTEX_SHADER, vertex_shader)?;
-        let fragment_shader = load_shader(GL_FRAGMENT_SHADER, fragment_shader)?;
-
-        let program = glCreateProgram();
-        glAttachShader(program, vertex_shader);
-        glAttachShader(program, fragment_shader);
-        glLinkProgram(program);
-
-        let mut link_status = 0;
-        glGetProgramiv(program, GL_LINK_STATUS, &mut link_status as *mut _);
-        if link_status == 0 {
-            let mut max_length: i32 = 0;
-            glGetProgramiv(program, GL_INFO_LOG_LENGTH, &mut max_length as *mut _);
-
-            let mut error_message = vec![0u8; max_length as usize + 1];
-            glGetProgramInfoLog(
-                program,
-                max_length,
-                &mut max_length as *mut _,
-                error_message.as_mut_ptr() as *mut _,
-            );
-            assert!(max_length >= 1);
-            let error_message =
-                std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1]);
-            return Err(ShaderError::LinkError(error_message.to_string()));
-        }
-
-        glUseProgram(program);
-
-        #[rustfmt::skip]
-        let images = meta.images.iter().map(|name| ShaderImage {
-            gl_loc: get_uniform_location(program, name),
-        }).collect();
-
-        #[rustfmt::skip]
-        let uniforms = meta.uniforms.uniforms.iter().scan(0, |offset, uniform| {
-            let res = ShaderUniform {
-                gl_loc: get_uniform_location(program, &uniform.name),
-                _offset: *offset,
-                _size: uniform.uniform_type.size(),
-                uniform_type: uniform.uniform_type,
-                array_count: uniform.array_count as _,
-            };
-            *offset += uniform.uniform_type.size() * uniform.array_count;
-            Some(res)
-        }).collect();
-
-        Ok(ShaderInternal {
-            program,
-            images,
-            uniforms,
-        })
-    }
-}
-
-pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderError> {
-    unsafe {
-        let shader = glCreateShader(shader_type);
-        assert!(shader != 0);
-
-        let cstring = CString::new(source)?;
-        let csource = [cstring];
-        glShaderSource(shader, 1, csource.as_ptr() as *const _, std::ptr::null());
-        glCompileShader(shader);
-
-        let mut is_compiled = 0;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &mut is_compiled as *mut _);
-        if is_compiled == 0 {
-            let mut max_length: i32 = 0;
-            glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &mut max_length as *mut _);
-
-            let mut error_message = vec![0u8; max_length as usize + 1];
-            glGetShaderInfoLog(
-                shader,
-                max_length,
-                &mut max_length as *mut _,
-                error_message.as_mut_ptr() as *mut _,
-            );
-
-            assert!(max_length >= 1);
-            let mut error_message =
-                std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1])
-                    .into_owned();
-
-            // On Wasm + Chrome, for unknown reason, string with zero-terminator is returned. On Firefox there is no zero-terminators in JavaScript string.
-            if error_message.ends_with('\0') {
-                error_message.pop();
-            }
-
-            return Err(ShaderError::CompilationError {
-                shader_type: match shader_type {
-                    GL_VERTEX_SHADER => ShaderType::Vertex,
-                    GL_FRAGMENT_SHADER => ShaderType::Fragment,
-                    _ => unreachable!(),
-                },
-                error_message,
-            });
-        }
-
-        Ok(shader)
+impl Default for Features {
+    fn default() -> Features {
+        Features { instancing: true }
     }
 }
 
@@ -1407,18 +656,14 @@ impl From<CompareFunc> for GLenum {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum PrimitiveType {
     Triangles,
-    TriangleStrip,
     Lines,
-    LineStrip,
 }
 
 impl From<PrimitiveType> for GLenum {
     fn from(primitive_type: PrimitiveType) -> Self {
         match primitive_type {
             PrimitiveType::Triangles => GL_TRIANGLES,
-            PrimitiveType::TriangleStrip => GL_TRIANGLE_STRIP,
             PrimitiveType::Lines => GL_LINES,
-            PrimitiveType::LineStrip => GL_LINE_STRIP,
         }
     }
 }
@@ -1441,8 +686,8 @@ impl From<IndexType> for GLenum {
 }
 
 impl IndexType {
-    pub fn for_type<T>() -> IndexType {
-        match std::mem::size_of::<T>() {
+    pub fn for_type_size(size: usize) -> IndexType {
+        match size {
             1 => IndexType::Byte,
             2 => IndexType::Short,
             4 => IndexType::Int,
@@ -1527,150 +772,6 @@ impl Default for PipelineParams {
     }
 }
 
-impl Pipeline {
-    pub fn new(
-        ctx: &mut Context,
-        buffer_layout: &[BufferLayout],
-        attributes: &[VertexAttribute],
-        shader: Shader,
-    ) -> Pipeline {
-        Self::with_params(ctx, buffer_layout, attributes, shader, Default::default())
-    }
-
-    pub fn with_params(
-        ctx: &mut Context,
-        buffer_layout: &[BufferLayout],
-        attributes: &[VertexAttribute],
-        shader: Shader,
-        params: PipelineParams,
-    ) -> Pipeline {
-        #[derive(Clone, Copy, Default)]
-        struct BufferCacheData {
-            stride: i32,
-            offset: i64,
-        }
-
-        let mut buffer_cache: Vec<BufferCacheData> =
-            vec![BufferCacheData::default(); buffer_layout.len()];
-
-        for VertexAttribute {
-            format,
-            buffer_index,
-            ..
-        } in attributes
-        {
-            let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());
-            let mut cache = buffer_cache
-                .get_mut(*buffer_index)
-                .unwrap_or_else(|| panic!());
-
-            if layout.stride == 0 {
-                cache.stride += format.byte_len();
-            } else {
-                cache.stride = layout.stride;
-            }
-            // WebGL 1 limitation
-            assert!(cache.stride <= 255);
-        }
-
-        let program = ctx.shaders[shader.0].program;
-
-        let attributes_len = attributes
-            .iter()
-            .map(|layout| match layout.format {
-                VertexFormat::Mat4 => 4,
-                _ => 1,
-            })
-            .sum();
-
-        let mut vertex_layout: Vec<Option<VertexAttributeInternal>> = vec![None; attributes_len];
-
-        for VertexAttribute {
-            name,
-            format,
-            buffer_index,
-        } in attributes
-        {
-            let mut buffer_data = &mut buffer_cache
-                .get_mut(*buffer_index)
-                .unwrap_or_else(|| panic!());
-            let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());
-
-            let cname = CString::new(*name).unwrap_or_else(|e| panic!("{}", e));
-            let attr_loc = unsafe { glGetAttribLocation(program, cname.as_ptr() as *const _) };
-            let attr_loc = if attr_loc == -1 { None } else { Some(attr_loc) };
-            let divisor = if layout.step_func == VertexStep::PerVertex {
-                0
-            } else {
-                layout.step_rate
-            };
-
-            let mut attributes_count: usize = 1;
-            let mut format = *format;
-
-            if format == VertexFormat::Mat4 {
-                format = VertexFormat::Float4;
-                attributes_count = 4;
-            }
-            for i in 0..attributes_count {
-                if let Some(attr_loc) = attr_loc {
-                    let attr_loc = attr_loc as GLuint + i as GLuint;
-
-                    let attr = VertexAttributeInternal {
-                        attr_loc,
-                        size: format.size(),
-                        type_: format.type_(),
-                        offset: buffer_data.offset,
-                        stride: buffer_data.stride,
-                        buffer_index: *buffer_index,
-                        divisor,
-                    };
-
-                    assert!(
-                        attr_loc < vertex_layout.len() as u32,
-                        "attribute: {} outside of allocated attributes array len: {}",
-                        name,
-                        vertex_layout.len()
-                    );
-                    vertex_layout[attr_loc as usize] = Some(attr);
-                }
-                buffer_data.offset += format.byte_len() as i64
-            }
-        }
-
-        let pipeline = PipelineInternal {
-            layout: vertex_layout,
-            shader,
-            params,
-        };
-
-        ctx.pipelines.push(pipeline);
-        Pipeline(ctx.pipelines.len() - 1)
-    }
-
-    pub fn set_blend(&self, ctx: &mut Context, color_blend: Option<BlendState>) {
-        let mut pipeline = &mut ctx.pipelines[self.0];
-        pipeline.params.color_blend = color_blend;
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-struct VertexAttributeInternal {
-    attr_loc: GLuint,
-    size: i32,
-    type_: GLuint,
-    offset: i64,
-    stride: i32,
-    buffer_index: usize,
-    divisor: i32,
-}
-
-struct PipelineInternal {
-    layout: Vec<Option<VertexAttributeInternal>>,
-    shader: Shader,
-    params: PipelineParams,
-}
-
 /// Geometry bindings
 #[derive(Clone, Debug)]
 pub struct Bindings {
@@ -1680,14 +781,14 @@ pub struct Bindings {
     /// Most commonly vertex buffer will contain `(x,y,z,w)` coordinates of the
     /// vertex in 3d space, as well as `(u,v)` coordinates that map the vertex
     /// to some position in the corresponding `Texture`.
-    pub vertex_buffers: Vec<Buffer>,
+    pub vertex_buffers: Vec<BufferId>,
     /// Index buffer which instructs the GPU in which order to draw vertices
     /// from a vertex buffer, with each subsequent 3 indices forming a
     /// triangle.
-    pub index_buffer: Buffer,
+    pub index_buffer: BufferId,
     /// Textures to be used with when drawing the geometry in the fragment
     /// shader.
-    pub images: Vec<Texture>,
+    pub images: Vec<TextureId>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1718,140 +819,8 @@ fn gl_usage(usage: &Usage) -> GLenum {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct Buffer {
-    gl_buf: GLuint,
-    buffer_type: BufferType,
-    size: usize,
-    index_type: Option<IndexType>,
-}
-
-impl Buffer {
-    /// Create an immutable buffer resource object.
-    /// ```ignore
-    /// #[repr(C)]
-    /// struct Vertex {
-    ///     pos: Vec2,
-    ///     uv: Vec2,
-    /// }
-    /// let vertices: [Vertex; 4] = [
-    ///     Vertex { pos : Vec2 { x: -0.5, y: -0.5 }, uv: Vec2 { x: 0., y: 0. } },
-    ///     Vertex { pos : Vec2 { x:  0.5, y: -0.5 }, uv: Vec2 { x: 1., y: 0. } },
-    ///     Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 1. } },
-    ///     Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 1. } },
-    /// ];
-    /// let buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
-    /// ```
-    pub fn immutable<T>(ctx: &mut Context, buffer_type: BufferType, data: &[T]) -> Buffer {
-        let index_type = if buffer_type == BufferType::IndexBuffer {
-            Some(IndexType::for_type::<T>())
-        } else {
-            None
-        };
-
-        let gl_target = gl_buffer_target(&buffer_type);
-        let gl_usage = gl_usage(&Usage::Immutable);
-        let size = mem::size_of_val(data);
-        let mut gl_buf: u32 = 0;
-
-        unsafe {
-            glGenBuffers(1, &mut gl_buf as *mut _);
-            ctx.cache.store_buffer_binding(gl_target);
-            ctx.cache.bind_buffer(gl_target, gl_buf, index_type);
-            glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
-            glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _);
-            ctx.cache.restore_buffer_binding(gl_target);
-        }
-
-        Buffer {
-            gl_buf,
-            buffer_type,
-            size,
-            index_type,
-        }
-    }
-
-    pub fn stream(ctx: &mut Context, buffer_type: BufferType, size: usize) -> Buffer {
-        let index_type = if buffer_type == BufferType::IndexBuffer {
-            Some(IndexType::Short)
-        } else {
-            None
-        };
-
-        let gl_target = gl_buffer_target(&buffer_type);
-        let gl_usage = gl_usage(&Usage::Stream);
-        let mut gl_buf: u32 = 0;
-
-        unsafe {
-            glGenBuffers(1, &mut gl_buf as *mut _);
-            ctx.cache.store_buffer_binding(gl_target);
-            ctx.cache.bind_buffer(gl_target, gl_buf, None);
-            glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
-            ctx.cache.restore_buffer_binding(gl_target);
-        }
-
-        Buffer {
-            gl_buf,
-            buffer_type,
-            size,
-            index_type,
-        }
-    }
-
-    pub fn index_stream(ctx: &mut Context, index_type: IndexType, size: usize) -> Buffer {
-        let gl_target = gl_buffer_target(&BufferType::IndexBuffer);
-        let gl_usage = gl_usage(&Usage::Stream);
-        let mut gl_buf: u32 = 0;
-
-        unsafe {
-            glGenBuffers(1, &mut gl_buf as *mut _);
-            ctx.cache.store_buffer_binding(gl_target);
-            ctx.cache.bind_buffer(gl_target, gl_buf, None);
-            glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
-            ctx.cache.restore_buffer_binding(gl_target);
-        }
-
-        Buffer {
-            gl_buf,
-            buffer_type: BufferType::IndexBuffer,
-            size,
-            index_type: Some(index_type),
-        }
-    }
-    pub fn update<T>(&self, ctx: &mut Context, data: &[T]) {
-        if self.buffer_type == BufferType::IndexBuffer {
-            assert!(self.index_type.is_some());
-            assert!(self.index_type.unwrap() == IndexType::for_type::<T>());
-        };
-
-        let size = mem::size_of_val(data);
-
-        assert!(size <= self.size);
-
-        let gl_target = gl_buffer_target(&self.buffer_type);
-        ctx.cache.store_buffer_binding(gl_target);
-        ctx.cache
-            .bind_buffer(gl_target, self.gl_buf, self.index_type);
-        unsafe { glBufferSubData(gl_target, 0, size as _, data.as_ptr() as *const _) };
-        ctx.cache.restore_buffer_binding(gl_target);
-    }
-
-    /// Size of buffer in bytes
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
-    /// Delete GPU buffer, leaving handle unmodified.
-    ///
-    /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
-    /// more RAII buffer object.
-    ///
-    /// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why
-    /// this function is not marked as unsafe
-    pub fn delete(&self) {
-        unsafe { glDeleteBuffers(1, &self.gl_buf as *const _) }
-    }
-}
+#[derive(Debug, Clone, Copy)]
+pub struct BufferId(usize);
 
 /// `ElapsedQuery` is used to measure duration of GPU operations.
 ///
@@ -1874,7 +843,7 @@ impl Buffer {
 /// # let mut query = ElapsedQuery::new();
 ///
 /// query.begin_query();
-/// // one or multiple calls to miniquad::Context::draw()
+/// // one or multiple calls to miniquad::GraphicsContext::draw()
 /// query.end_query();
 /// ```
 ///
@@ -2003,4 +972,193 @@ impl ElapsedQuery {
         unsafe { glDeleteQueries(1, &mut self.gl_query) }
         self.gl_query = 0;
     }
+}
+
+/// A vtable-erased generic argument.
+/// Basically, the same thing as fn f<U>(a: &U), but
+/// trait-object friendly.
+pub struct Arg<'a> {
+    ptr: *const std::ffi::c_void,
+    element_size: usize,
+    size: usize,
+    is_slice: bool,
+    _phantom: std::marker::PhantomData<&'a ()>,
+}
+impl<'a> Arg<'a> {
+    pub fn slice<T>(data: &'a [T]) -> Arg<'a> {
+        Arg {
+            ptr: data.as_ptr() as _,
+            size: std::mem::size_of_val(data),
+            element_size: std::mem::size_of::<T>(),
+            is_slice: true,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn val<T>(data: &'a T) -> Arg<'a> {
+        Arg {
+            ptr: data as *const T as _,
+            size: std::mem::size_of_val(data),
+            element_size: std::mem::size_of::<T>(),
+            is_slice: false,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct ShaderSource<'a> {
+    pub glsl_vertex: Option<&'a str>,
+    pub glsl_fragment: Option<&'a str>,
+    pub metal_shader: Option<&'a str>,
+}
+
+pub trait RenderingBackend {
+    fn new_shader(
+        &mut self,
+        shader: ShaderSource,
+        meta: ShaderMeta,
+    ) -> Result<ShaderId, ShaderError>;
+    fn new_texture(
+        &mut self,
+        access: TextureAccess,
+        bytes: Option<&[u8]>,
+        params: TextureParams,
+    ) -> TextureId;
+    fn new_render_texture(&mut self, params: TextureParams) -> TextureId {
+        self.new_texture(TextureAccess::RenderTarget, None, params)
+    }
+    fn new_texture_from_data_and_format(
+        &mut self,
+        bytes: &[u8],
+        params: TextureParams,
+    ) -> TextureId {
+        self.new_texture(TextureAccess::Static, Some(bytes), params)
+    }
+    fn new_texture_from_rgba8(&mut self, width: u16, height: u16, bytes: &[u8]) -> TextureId {
+        assert_eq!(width as usize * height as usize * 4, bytes.len());
+
+        self.new_texture_from_data_and_format(
+            bytes,
+            TextureParams {
+                width: width as _,
+                height: height as _,
+                format: TextureFormat::RGBA8,
+                wrap: TextureWrap::Clamp,
+                filter: FilterMode::Linear,
+            },
+        )
+    }
+    fn texture_size(&self, texture: TextureId) -> (u32, u32);
+    /// Update whole texture content
+    /// bytes should be width * height * 4 size - non rgba8 textures are not supported yet anyway
+    fn update_texture(&mut self, texture: TextureId, bytes: &[u8]) {
+        let (width, height) = self.texture_size(texture);
+        //TODO
+        //assert_eq!(texture.size(width, height), bytes.len());
+
+        self.update_texture_part(texture, 0 as _, 0 as _, width as _, height as _, bytes)
+    }
+
+    fn update_texture_part(
+        &mut self,
+        texture: TextureId,
+        x_offset: i32,
+        y_offset: i32,
+        width: i32,
+        height: i32,
+        bytes: &[u8],
+    );
+    fn new_render_pass(&mut self, color_img: TextureId, depth_img: Option<TextureId>)
+        -> RenderPass;
+    fn render_pass_texture(&self, render_pass: RenderPass) -> TextureId;
+    fn delete_render_pass(&mut self, render_pass: RenderPass);
+    fn new_pipeline(
+        &mut self,
+        buffer_layout: &[BufferLayout],
+        attributes: &[VertexAttribute],
+        shader: ShaderId,
+    ) -> Pipeline;
+    fn new_pipeline_with_params(
+        &mut self,
+        buffer_layout: &[BufferLayout],
+        attributes: &[VertexAttribute],
+        shader: ShaderId,
+        params: PipelineParams,
+    ) -> Pipeline;
+    fn pipeline_set_blend(&mut self, pipeline: &Pipeline, color_blend: Option<BlendState>);
+    fn apply_pipeline(&mut self, pipeline: &Pipeline);
+
+    /// Create an immutable buffer resource object.
+    /// ```ignore
+    /// #[repr(C)]
+    /// struct Vertex {
+    ///     pos: Vec2,
+    ///     uv: Vec2,
+    /// }
+    /// let vertices: [Vertex; 4] = [
+    ///     Vertex { pos : Vec2 { x: -0.5, y: -0.5 }, uv: Vec2 { x: 0., y: 0. } },
+    ///     Vertex { pos : Vec2 { x:  0.5, y: -0.5 }, uv: Vec2 { x: 1., y: 0. } },
+    ///     Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 1. } },
+    ///     Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 1. } },
+    /// ];
+    /// let buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
+    /// ```
+    fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: Arg) -> BufferId;
+    fn new_buffer_stream(&mut self, buffer_type: BufferType, size: usize) -> BufferId;
+    fn new_buffer_index_stream(&mut self, index_type: IndexType, size: usize) -> BufferId;
+    fn buffer_update(&mut self, buffer: BufferId, data: Arg);
+    /// Size of buffer in bytes
+    fn buffer_size(&mut self, buffer: BufferId) -> usize;
+
+    /// Delete GPU buffer, leaving handle unmodified.
+    ///
+    /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
+    /// more RAII buffer object.
+    ///
+    /// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why
+    /// this function is not marked as unsafe
+    fn buffer_delete(&mut self, buffer: BufferId);
+
+    fn set_cull_face(&mut self, cull_face: CullFace);
+
+    fn set_color_write(&mut self, color_write: ColorMask);
+
+    fn set_blend(&mut self, color_blend: Option<BlendState>, alpha_blend: Option<BlendState>);
+
+    fn set_stencil(&mut self, stencil_test: Option<StencilState>);
+
+    /// Set a new viewport rectangle.
+    /// Should be applied after begin_pass.
+    fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32);
+
+    /// Set a new scissor rectangle.
+    /// Should be applied after begin_pass.
+    fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32);
+
+    fn apply_bindings(&mut self, bindings: &Bindings);
+
+    fn apply_uniforms(&mut self, uniforms: Arg) {
+        self.apply_uniforms_from_bytes(uniforms.ptr as _, uniforms.size)
+    }
+    fn apply_uniforms_from_bytes(&mut self, uniform_ptr: *const u8, size: usize);
+
+    fn clear(&self, color: Option<(f32, f32, f32, f32)>, depth: Option<f32>, stencil: Option<i32>);
+    /// start rendering to the default frame buffer
+    fn begin_default_pass(&mut self, action: PassAction);
+    /// start rendering to an offscreen framebuffer
+    fn begin_pass(&mut self, pass: Option<RenderPass>, action: PassAction);
+
+    fn end_render_pass(&mut self);
+
+    fn commit_frame(&mut self);
+
+    /// Draw elements using currently applied bindings and pipeline.
+    ///
+    /// + `base_element` specifies starting offset in `index_buffer`.
+    /// + `num_elements` specifies length of the slice of `index_buffer` to draw.
+    /// + `num_instances` specifies how many instances should be rendered.
+    ///
+    /// NOTE: num_instances > 1 might be not supported by the GPU (gl2.1 and gles2).
+    /// `features.instancing` check is required.
+    fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32);
 }

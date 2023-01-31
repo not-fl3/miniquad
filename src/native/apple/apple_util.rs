@@ -546,6 +546,18 @@ pub fn load_mouse_cursor(cursor: CursorIcon) -> ObjcId {
 //     }
 // }
 
+macro_rules! msg_send_ {
+    ($obj:expr, $name:ident) => ({
+        let res: ObjcId = msg_send!($obj, $name);
+        res
+    });
+    ($obj:expr, $($name:ident : $arg:expr)+) => ({
+        let res: ObjcId = msg_send!($obj, $($name: $arg)*);
+        res
+    });
+}
+pub(crate) use msg_send_;
+
 pub extern "C" fn yes(_: &Object, _: Sel) -> BOOL {
     YES
 }

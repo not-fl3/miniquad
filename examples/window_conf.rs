@@ -1,11 +1,13 @@
 use miniquad::*;
 
-struct Stage {}
+struct Stage {
+    ctx: GlContext,
+}
 impl EventHandler for Stage {
-    fn update(&mut self, _ctx: &mut Context) {}
+    fn update(&mut self) {}
 
-    fn draw(&mut self, ctx: &mut Context) {
-        ctx.clear(Some((0., 1., 0., 1.)), None, None);
+    fn draw(&mut self) {
+        self.ctx.clear(Some((0., 1., 0., 1.)), None, None);
     }
 }
 
@@ -18,6 +20,10 @@ fn main() {
             fullscreen: true,
             ..Default::default()
         },
-        |_ctx| Box::new(Stage {}),
+        || {
+            Box::new(Stage {
+                ctx: GlContext::new(),
+            })
+        },
     );
 }

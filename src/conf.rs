@@ -62,6 +62,12 @@ pub enum LinuxBackend {
     WaylandWithX11Fallback,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum AppleGfxApi {
+    OpenGl,
+    Metal,
+}
+
 /// Platform specific settings.
 #[derive(Debug)]
 pub struct Platform {
@@ -77,6 +83,13 @@ pub struct Platform {
     ///
     /// Defaults to X11Only. Wayland implementation is way too unstable right now.
     pub linux_backend: LinuxBackend,
+
+    /// Which rendering context to create, Metal or OpenGL.
+    /// Miniquad always links with Metal.framework (assuming it is always present)
+    /// but it links with OpenGL dynamically and only if required.
+    ///
+    /// Defaults to AppleGfxApi::GL for legacy reasons.
+    pub apple_gfx_api: AppleGfxApi,
 
     /// On some platform it is possible to ask the OS for a specific swap interval.
     /// Note that this is highly platform and implementation dependent,
@@ -98,6 +111,7 @@ impl Default for Platform {
             linux_x11_gl: LinuxX11Gl::GLXWithEGLFallback,
             swap_interval: None,
             linux_backend: LinuxBackend::X11Only,
+            apple_gfx_api: AppleGfxApi::OpenGl,
             framebuffer_alpha: false,
         }
     }

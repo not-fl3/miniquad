@@ -2,7 +2,7 @@ use crate::{
     conf::{Conf, Icon},
     event::{KeyMods, MouseButton},
     native::NativeDisplayData,
-    Context, CursorIcon, EventHandler, GraphicsContext,
+    CursorIcon, EventHandler,
 };
 
 use winapi::{
@@ -28,7 +28,7 @@ mod wgl;
 
 use libopengl32::LibOpengl32;
 
-pub(crate) struct Display {
+pub(crate) struct WindowsDisplay {
     fullscreen: bool,
     dpi_aware: bool,
     window_resizable: bool,
@@ -50,7 +50,39 @@ pub(crate) struct Display {
     dc: HDC,
 }
 
-impl crate::native::NativeDisplay for Display {
+mod tl_display {
+    use super::*;
+    use crate::NATIVE_DISPLAY;
+
+    use std::cell::RefCell;
+
+    thread_local! {
+        static DISPLAY: RefCell<Option<WindowsDisplay>> = RefCell::new(None);
+    }
+
+    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let mut d = d.as_mut().unwrap();
+            f(&mut *d);
+        })
+    }
+
+    pub(super) fn with<T>(mut f: impl FnMut(&mut WindowsDisplay) -> T) -> T {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let mut d = d.as_mut().unwrap();
+            f(&mut *d)
+        })
+    }
+
+    pub(super) fn set_display(display: WindowsDisplay) {
+        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
+        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
+    }
+}
+
+impl crate::native::NativeDisplay for WindowsDisplay {
     fn screen_size(&self) -> (f32, f32) {
         (
             self.display_data.screen_width as _,
@@ -158,7 +190,10 @@ impl crate::native::NativeDisplay for Display {
         let win_style: DWORD = get_win_style(self.fullscreen, self.window_resizable);
 
         unsafe {
-            SetWindowLongPtrA(self.wnd, GWL_STYLE, win_style as _);
+            #[cfg(target = "x86_64")]
+            SetWindowLongPtrA(wnd, GWLP_USERDATA, win_style as _);
+            #[cfg(target = "i686")]
+            SetWindowLong(wnd, GWLP_USERDATA, win_style as _);
 
             if self.fullscreen {
                 SetWindowPos(
@@ -199,8 +234,6 @@ impl crate::native::NativeDisplay for Display {
 
 struct WindowPayload {
     event_handler: Box<dyn EventHandler>,
-    context: GraphicsContext,
-    display: Display,
 }
 
 fn get_win_style(is_fullscreen: bool, is_resizable: bool) -> DWORD {
@@ -271,38 +304,54 @@ unsafe extern "system" fn win32_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let display_ptr = GetWindowLongPtrA(hwnd, GWLP_USERDATA);
+    let mut display_ptr: isize = 0;
+
+    #[cfg(target = "x86_64")]
+    {
+        display_ptr = GetWindowLongPtrA(hwnd, GWLP_USERDATA)
+    }
+
+    #[cfg(target = "i686")]
+    {
+        display_ptr = GetWindowLong(hwnd, GWLP_USERDATA)
+    }
+
     if display_ptr == 0 {
         return DefWindowProcW(hwnd, umsg, wparam, lparam);
     }
     let &mut WindowPayload {
-        ref mut display,
-        ref mut context,
         ref mut event_handler,
     } = &mut *(display_ptr as *mut WindowPayload);
 
     match umsg {
         WM_CLOSE => {
-            // only give user a chance to intervene when sapp_quit() wasn't already called
-            if !display.display_data.quit_ordered {
-                // if window should be closed and event handling is enabled, give user code
-                // a change to intervene via sapp_cancel_quit()
-                display.display_data.quit_requested = true;
-                event_handler.quit_requested_event(context.with_display(display));
-                // if user code hasn't intervened, quit the app
-                if display.display_data.quit_requested {
-                    display.display_data.quit_ordered = true;
+            let mut quit_requested = false;
+
+            tl_display::with(|display| {
+                // only give user a chance to intervene when sapp_quit() wasn't already called
+                if !display.display_data.quit_ordered {
+                    // if window should be closed and event handling is enabled, give user code
+                    // a change to intervene via sapp_cancel_quit()
+                    display.display_data.quit_requested = true;
+                    quit_requested = true;
+                    // if user code hasn't intervened, quit the app
+                    if display.display_data.quit_requested {
+                        display.display_data.quit_ordered = true;
+                    }
                 }
-            }
-            if display.display_data.quit_ordered {
-                PostQuitMessage(0);
+                if display.display_data.quit_ordered {
+                    PostQuitMessage(0);
+                }
+            });
+            if quit_requested {
+                event_handler.quit_requested_event();
             }
             return 0;
         }
         WM_SYSCOMMAND => {
             match wparam & 0xFFF0 {
                 SC_SCREENSAVE | SC_MONITORPOWER => {
-                    if display.fullscreen {
+                    if tl_display::with(|d| d.fullscreen) {
                         // disable screen saver and blanking in fullscreen mode
                         return 0;
                     }
@@ -318,91 +367,68 @@ unsafe extern "system" fn win32_wndproc(
             return 1;
         }
         WM_SIZE => {
-            if display.cursor_grabbed {
+            if tl_display::with(|d| d.cursor_grabbed) {
                 update_clip_rect(hwnd);
             }
 
             let iconified = wparam == SIZE_MINIMIZED;
-            if iconified != display.iconified {
-                display.iconified = iconified;
+            if iconified != tl_display::with(|d| d.iconified) {
+                tl_display::with(|d| d.iconified = iconified);
                 if iconified {
-                    event_handler.window_minimized_event(context.with_display(display));
+                    event_handler.window_minimized_event();
                 } else {
-                    event_handler.window_restored_event(context.with_display(display));
+                    event_handler.window_restored_event();
                 }
             }
         }
         WM_SETCURSOR => {
-            if display.user_cursor && LOWORD(lparam as _) == HTCLIENT as _ {
-                SetCursor(display.cursor);
+            if tl_display::with(|d| d.user_cursor) && LOWORD(lparam as _) == HTCLIENT as _ {
+                SetCursor(tl_display::with(|d| d.cursor));
 
                 return 1;
             }
         }
         WM_LBUTTONDOWN => {
-            let mouse_x = display.mouse_x;
-            let mouse_y = display.mouse_y;
-            event_handler.mouse_button_down_event(
-                context.with_display(display),
-                MouseButton::Left,
-                mouse_x,
-                mouse_y,
-            );
+            let mouse_x = tl_display::with(|d| d.mouse_x);
+            let mouse_y = tl_display::with(|d| d.mouse_y);
+            event_handler.mouse_button_down_event(MouseButton::Left, mouse_x, mouse_y);
         }
         WM_RBUTTONDOWN => {
-            let mouse_x = display.mouse_x;
-            let mouse_y = display.mouse_y;
-            event_handler.mouse_button_down_event(
-                context.with_display(display),
-                MouseButton::Right,
-                mouse_x,
-                mouse_y,
-            );
+            let mouse_x = tl_display::with(|d| d.mouse_x);
+            let mouse_y = tl_display::with(|d| d.mouse_y);
+
+            event_handler.mouse_button_down_event(MouseButton::Right, mouse_x, mouse_y);
         }
         WM_MBUTTONDOWN => {
-            let mouse_x = display.mouse_x;
-            let mouse_y = display.mouse_y;
-            event_handler.mouse_button_down_event(
-                context.with_display(display),
-                MouseButton::Middle,
-                mouse_x,
-                mouse_y,
-            );
+            let mouse_x = tl_display::with(|d| d.mouse_x);
+            let mouse_y = tl_display::with(|d| d.mouse_y);
+
+            event_handler.mouse_button_down_event(MouseButton::Middle, mouse_x, mouse_y);
         }
         WM_LBUTTONUP => {
-            let mouse_x = display.mouse_x;
-            let mouse_y = display.mouse_y;
-            event_handler.mouse_button_up_event(
-                context.with_display(display),
-                MouseButton::Left,
-                mouse_x,
-                mouse_y,
-            );
+            let mouse_x = tl_display::with(|d| d.mouse_x);
+            let mouse_y = tl_display::with(|d| d.mouse_y);
+
+            event_handler.mouse_button_up_event(MouseButton::Left, mouse_x, mouse_y);
         }
         WM_RBUTTONUP => {
-            let mouse_x = display.mouse_x;
-            let mouse_y = display.mouse_y;
-            event_handler.mouse_button_up_event(
-                context.with_display(display),
-                MouseButton::Right,
-                mouse_x,
-                mouse_y,
-            );
+            let mouse_x = tl_display::with(|d| d.mouse_x);
+            let mouse_y = tl_display::with(|d| d.mouse_y);
+
+            event_handler.mouse_button_up_event(MouseButton::Right, mouse_x, mouse_y);
         }
         WM_MBUTTONUP => {
-            let mouse_x = display.mouse_x;
-            let mouse_y = display.mouse_y;
-            event_handler.mouse_button_up_event(
-                context.with_display(display),
-                MouseButton::Middle,
-                mouse_x,
-                mouse_y,
-            );
+            let mouse_x = tl_display::with(|d| d.mouse_x);
+            let mouse_y = tl_display::with(|d| d.mouse_y);
+
+            event_handler.mouse_button_up_event(MouseButton::Middle, mouse_x, mouse_y);
         }
 
         WM_MOUSEMOVE => {
-            display.mouse_x = GET_X_LPARAM(lparam) as f32 * display.mouse_scale;
-            display.mouse_y = GET_Y_LPARAM(lparam) as f32 * display.mouse_scale;
+            tl_display::with(|d| {
+                d.mouse_x = GET_X_LPARAM(lparam) as f32 * d.mouse_scale;
+                d.mouse_y = GET_Y_LPARAM(lparam) as f32 * d.mouse_scale;
+            });
 
             // mouse enter was not handled by miniquad anyway
             // if !_sapp.win32_mouse_tracked {
@@ -420,13 +446,13 @@ unsafe extern "system" fn win32_wndproc(
             //     );
             // }
 
-            let mouse_x = display.mouse_x;
-            let mouse_y = display.mouse_y;
+            let mouse_x = tl_display::with(|d| d.mouse_x);
+            let mouse_y = tl_display::with(|d| d.mouse_y);
 
-            event_handler.mouse_motion_event(context.with_display(display), mouse_x, mouse_y);
+            event_handler.mouse_motion_event(mouse_x, mouse_y);
         }
 
-        WM_MOVE if display.cursor_grabbed => {
+        WM_MOVE if tl_display::with(|d| d.cursor_grabbed) => {
             update_clip_rect(hwnd);
         }
 
@@ -453,7 +479,10 @@ unsafe extern "system" fn win32_wndproc(
                 dy = dy / 65535.0 * height;
             }
 
-            event_handler.raw_mouse_motion(context.with_display(display), dx as f32, dy as f32);
+            let mouse_scale = tl_display::with(|d| d.mouse_scale);
+            let dx = data.data.mouse().lLastX as f32 * mouse_scale;
+            let dy = data.data.mouse().lLastY as f32 * mouse_scale;
+            event_handler.raw_mouse_motion(dx as f32, dy as f32);
         }
 
         WM_MOUSELEAVE => {
@@ -465,19 +494,11 @@ unsafe extern "system" fn win32_wndproc(
             // );
         }
         WM_MOUSEWHEEL => {
-            event_handler.mouse_wheel_event(
-                context.with_display(display),
-                0.0,
-                (HIWORD(wparam as _) as i16) as f32,
-            );
+            event_handler.mouse_wheel_event(0.0, (HIWORD(wparam as _) as i16) as f32);
         }
 
         WM_MOUSEHWHEEL => {
-            event_handler.mouse_wheel_event(
-                context.with_display(display),
-                (HIWORD(wparam as _) as i16) as f32,
-                0.0,
-            );
+            event_handler.mouse_wheel_event((HIWORD(wparam as _) as i16) as f32, 0.0);
         }
         WM_CHAR => {
             let chr = wparam as u32;
@@ -485,7 +506,7 @@ unsafe extern "system" fn win32_wndproc(
             let mods = key_mods();
             if chr > 0 {
                 if let Some(chr) = std::char::from_u32(chr as u32) {
-                    event_handler.char_event(context.with_display(display), chr, mods, repeat);
+                    event_handler.char_event(chr, mods, repeat);
                 }
             }
         }
@@ -494,13 +515,13 @@ unsafe extern "system" fn win32_wndproc(
             let keycode = keycodes::translate_keycode(keycode);
             let mods = key_mods();
             let repeat = !!(lparam & 0x40000000) != 0;
-            event_handler.key_down_event(context.with_display(display), keycode, mods, repeat);
+            event_handler.key_down_event(keycode, mods, repeat);
         }
         WM_KEYUP | WM_SYSKEYUP => {
             let keycode = HIWORD(lparam as _) as u32 & 0x1FF;
             let keycode = keycodes::translate_keycode(keycode);
             let mods = key_mods();
-            event_handler.key_up_event(context.with_display(display), keycode, mods);
+            event_handler.key_up_event(keycode, mods);
         }
 
         _ => {}
@@ -725,7 +746,7 @@ unsafe fn create_msg_window() -> (HWND, HDC) {
     (msg_hwnd, msg_dc)
 }
 
-impl Display {
+impl WindowsDisplay {
     unsafe fn get_proc_address(&mut self, proc: &str) -> Option<unsafe extern "C" fn() -> ()> {
         let proc = std::ffi::CString::new(proc).unwrap();
         let mut proc_ptr = (self.libopengl32.wglGetProcAddress)(proc.as_ptr());
@@ -794,7 +815,7 @@ impl Display {
 
 pub fn run<F>(conf: &Conf, f: F)
 where
-    F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     unsafe {
         if conf.high_dpi {
@@ -814,7 +835,7 @@ where
         let libopengl32 = LibOpengl32::try_load().expect("Failed to load opengl32.dll.");
 
         let (msg_wnd, msg_dc) = create_msg_window();
-        let mut display = Display {
+        let mut display = WindowsDisplay {
             fullscreen: false,
             dpi_aware: false,
             window_resizable: conf.window_resizable,
@@ -848,21 +869,20 @@ where
 
         super::gl::load_gl_funcs(|proc| display.get_proc_address(proc));
 
-        let mut context = GraphicsContext::new(crate::gl::is_gl2());
+        tl_display::set_display(display);
 
-        let event_handler = f(context.with_display(&mut display));
+        let event_handler = f();
 
-        let mut p = WindowPayload {
-            display,
-            context,
-            event_handler,
-        };
+        let mut p = WindowPayload { event_handler };
         // well, technically this is UB and we are suppose to use *mut WindowPayload instead of &mut WindowPayload forever from now on...
         // so if there going to be some weird bugs someday in the future - check this out!
+        #[cfg(target = "x86_64")]
         SetWindowLongPtrA(wnd, GWLP_USERDATA, &mut p as *mut _ as isize);
+        #[cfg(target = "i686")]
+        SetWindowLong(wnd, GWLP_USERDATA, &mut p as *mut _ as isize);
 
         let mut done = false;
-        while !(done || p.display.display_data.quit_ordered) {
+        while !(done || tl_display::with(|d| d.display_data.quit_ordered)) {
             let mut msg: MSG = std::mem::zeroed();
             while PeekMessageW(&mut msg as *mut _ as _, NULL as _, 0, 0, PM_REMOVE) != 0 {
                 if WM_QUIT == msg.message {
@@ -873,22 +893,26 @@ where
                     DispatchMessageW(&mut msg as *mut _ as _);
                 }
             }
-            p.event_handler
-                .update(p.context.with_display(&mut p.display));
-            p.event_handler.draw(p.context.with_display(&mut p.display));
-            SwapBuffers(p.display.dc);
+            p.event_handler.update();
+            p.event_handler.draw();
 
-            if p.display.update_dimensions(wnd) {
-                let width = p.display.display_data.screen_width as _;
-                let height = p.display.display_data.screen_height as _;
-                p.event_handler
-                    .resize_event(p.context.with_display(&mut p.display), width, height);
+            SwapBuffers(tl_display::with(|d| d.dc));
+
+            if tl_display::with(|d| d.update_dimensions(wnd)) {
+                let width = tl_display::with(|d| d.display_data.screen_width as f32);
+                let height = tl_display::with(|d| d.display_data.screen_height as f32);
+                p.event_handler.resize_event(width, height);
             }
-            if p.display.display_data.quit_requested {
-                PostMessageW(p.display.wnd, WM_CLOSE, 0, 0);
-            }
+            tl_display::with(|d| {
+                if d.display_data.quit_requested {
+                    PostMessageW(d.wnd, WM_CLOSE, 0, 0);
+                }
+            });
         }
-        (p.display.libopengl32.wglDeleteContext)(gl_ctx);
+
+        tl_display::with(|d| {
+            (d.libopengl32.wglDeleteContext)(gl_ctx);
+        });
         DestroyWindow(wnd);
     }
 }

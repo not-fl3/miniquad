@@ -327,6 +327,7 @@ macro_rules! gl_loader {
 }
 
 gl_loader!(
+    fn glGetStringi(name: GLenum, index: GLuint) -> *const GLubyte,
     fn glGetString(name: GLenum) -> *const GLubyte,
     fn glFramebufferTextureLayer(
         target: GLenum,
@@ -338,6 +339,9 @@ gl_loader!(
     fn glGenFramebuffers(n: GLsizei, framebuffers: *mut GLuint) -> (),
     fn glBindFramebuffer(target: GLenum, framebuffer: GLuint) -> (),
     fn glBindRenderbuffer(target: GLenum, renderbuffer: GLuint) -> (),
+    fn glClearBufferfi(buffer: GLenum, drawbuffer: GLint, depth: GLfloat, stencil: GLint) -> (),
+    fn glClearBufferfv(buffer: GLenum, drawbuffer: GLint, value: *const GLfloat) -> (),
+    fn glClearBufferuiv(buffer: GLenum, drawbuffer: GLint, value: *const GLuint) -> (),
     fn glDeleteRenderbuffers(n: GLsizei, renderbuffers: *const GLuint) -> (),
     fn glUniform4fv(location: GLint, count: GLsizei, value: *const GLfloat) -> (),
     fn glUniform3fv(location: GLint, count: GLsizei, value: *const GLfloat) -> (),
@@ -635,8 +639,5 @@ pub unsafe fn is_gl2() -> bool {
         .to_str()
         .unwrap();
 
-    println!("GL_VERSION: {}", version_string);
-    version_string.is_empty()
-        || version_string.starts_with("2")
-        || version_string.starts_with("OpenGL ES 2")
+    version_string.starts_with("2") || version_string.starts_with("OpenGL ES 2")
 }

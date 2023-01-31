@@ -49,6 +49,10 @@ pub trait NativeDisplay: std::any::Any {
         None
     }
     fn show_keyboard(&mut self, _show: bool) {}
+    #[cfg(target_vendor = "apple")]
+    fn apple_gfx_api(&self) -> crate::conf::AppleGfxApi;
+    #[cfg(target_vendor = "apple")]
+    fn apple_view(&mut self) -> Option<crate::native::apple::frameworks::ObjcId>;
 
     fn as_any(&mut self) -> &mut dyn std::any::Any;
 }
@@ -87,13 +91,10 @@ pub mod egl;
 
 // there is no glGetProcAddr on webgl, so its impossible to make "gl" module work
 // on macos.. well, there is, but way easier to just statically link to gl
-#[cfg(not(any(target_arch = "wasm32", target_os = "macos", target_os = "ios")))]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod gl;
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm::webgl as gl;
-
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-pub use apple::gl;
 
 pub mod query_stab;

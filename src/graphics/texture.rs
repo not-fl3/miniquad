@@ -1,7 +1,7 @@
-use crate::{native::gl::*, native::*, Context};
+use crate::{graphics::gl::GlContext as GraphicsContext, native::gl::*, native::*};
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
-pub struct Texture {
+struct Texture {
     pub(crate) texture: GLuint,
     pub width: u32,
     pub height: u32,
@@ -54,37 +54,24 @@ pub enum TextureFormat {
     RGBA8,
     Depth,
     Alpha,
-    LuminanceAlpha,
 }
 
-impl TextureFormat {
-    /// Converts from TextureFormat to (internal_format, format, pixel_type)
-    fn into_gl_params(self, alpha_texture: bool) -> (GLenum, GLenum, GLenum) {
-        match self {
+/// Converts from TextureFormat to (internal_format, format, pixel_type)
+impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
+    fn from(format: TextureFormat) -> Self {
+        match format {
             TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
             TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
             TextureFormat::Depth => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT),
-
             #[cfg(target_arch = "wasm32")]
             TextureFormat::Alpha => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
             #[cfg(not(target_arch = "wasm32"))]
-            TextureFormat::Alpha if alpha_texture => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
-            #[cfg(not(target_arch = "wasm32"))]
             TextureFormat::Alpha => (GL_R8, GL_RED, GL_UNSIGNED_BYTE), // texture updates will swizzle Red -> Alpha to match WASM
-
-            #[cfg(target_arch = "wasm32")]
-            TextureFormat::LuminanceAlpha => {
-                (GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE)
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            TextureFormat::LuminanceAlpha if alpha_texture => {
-                (GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE)
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            TextureFormat::LuminanceAlpha => (GL_RG, GL_RG, GL_UNSIGNED_BYTE), // texture updates will swizzle Green -> Alpha to match WASM
         }
     }
+}
 
+impl TextureFormat {
     /// Returns the size in bytes of texture with `dimensions`.
     pub fn size(self, width: u32, height: u32) -> u32 {
         let square = width * height;
@@ -93,7 +80,6 @@ impl TextureFormat {
             TextureFormat::RGBA8 => 4 * square,
             TextureFormat::Depth => 2 * square,
             TextureFormat::Alpha => 1 * square,
-            TextureFormat::LuminanceAlpha => 2 * square,
         }
     }
 }
@@ -146,12 +132,12 @@ pub struct TextureParams {
 
 impl Texture {
     /// Shorthand for `new(ctx, TextureAccess::RenderTarget, params)`
-    pub fn new_render_texture(ctx: &mut Context, params: TextureParams) -> Texture {
+    pub fn new_render_texture(ctx: &mut GraphicsContext, params: TextureParams) -> Texture {
         Self::new(ctx, TextureAccess::RenderTarget, None, params)
     }
 
     pub fn new(
-        ctx: &mut Context,
+        ctx: &mut GraphicsContext,
         _access: TextureAccess,
         bytes: Option<&[u8]>,
         params: TextureParams,
@@ -163,8 +149,7 @@ impl Texture {
             );
         }
 
-        let (internal_format, format, pixel_type) =
-            params.format.into_gl_params(ctx.features().alpha_texture);
+        let (internal_format, format, pixel_type) = params.format.into();
 
         ctx.cache.store_texture_binding(0);
 
@@ -174,6 +159,18 @@ impl Texture {
             glGenTextures(1, &mut texture as *mut _);
             ctx.cache.bind_texture(0, texture);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
+
+            if cfg!(not(target_arch = "wasm32")) {
+                // if not WASM
+                if params.format == TextureFormat::Alpha {
+                    // if alpha miniquad texture, the value on non-WASM is stored in red channel
+                    // swizzle red -> alpha
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
+                } else {
+                    // keep alpha -> alpha
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
+                }
+            }
 
             glTexImage2D(
                 GL_TEXTURE_2D,
@@ -194,23 +191,6 @@ impl Texture {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, params.wrap as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, params.filter as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, params.filter as i32);
-
-            #[cfg(not(target_arch = "wasm32"))]
-            match params.format {
-                // on non-WASM alpha value is stored in red channel
-                // swizzle red -> alpha, zero red
-                TextureFormat::Alpha if !ctx.features().alpha_texture => {
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_ZERO as _);
-                }
-                // on non-WASM luminance is stored in red channel, alpha is stored in green channel
-                // keep red, swizzle green -> alpha, zero green
-                TextureFormat::LuminanceAlpha if !ctx.features().alpha_texture => {
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_GREEN as _);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_ZERO as _);
-                }
-                _ => {}
-            }
         }
         ctx.cache.restore_texture_binding(0);
 
@@ -223,12 +203,16 @@ impl Texture {
     }
 
     /// Upload texture to GPU with given TextureParams
-    pub fn from_data_and_format(ctx: &mut Context, bytes: &[u8], params: TextureParams) -> Texture {
+    pub fn from_data_and_format(
+        ctx: &mut GraphicsContext,
+        bytes: &[u8],
+        params: TextureParams,
+    ) -> Texture {
         Self::new(ctx, TextureAccess::Static, Some(bytes), params)
     }
 
     /// Upload RGBA8 texture to GPU
-    pub fn from_rgba8(ctx: &mut Context, width: u16, height: u16, bytes: &[u8]) -> Texture {
+    pub fn from_rgba8(ctx: &mut GraphicsContext, width: u16, height: u16, bytes: &[u8]) -> Texture {
         assert_eq!(width as usize * height as usize * 4, bytes.len());
 
         Self::from_data_and_format(
@@ -245,7 +229,7 @@ impl Texture {
     }
 
     /// Set the min and mag filter to `filter`
-    pub fn set_filter(&self, ctx: &mut Context, filter: FilterMode) {
+    pub fn set_filter(&self, ctx: &mut GraphicsContext, filter: FilterMode) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
         unsafe {
@@ -267,7 +251,7 @@ impl Texture {
     }
 
     /// Set x and y wrap to `wrap`
-    pub fn set_wrap(&self, ctx: &mut Context, wrap: TextureWrap) {
+    pub fn set_wrap(&self, ctx: &mut GraphicsContext, wrap: TextureWrap) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
         unsafe {
@@ -288,19 +272,21 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
     }
 
-    pub fn resize(&mut self, ctx: &mut Context, width: u32, height: u32, bytes: Option<&[u8]>) {
+    pub fn resize(
+        &mut self,
+        ctx: &mut GraphicsContext,
+        width: u32,
+        height: u32,
+        bytes: Option<&[u8]>,
+    ) {
         ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.texture);
 
-        let (internal_format, format, pixel_type) =
-            self.format.into_gl_params(ctx.features().alpha_texture);
+        let (internal_format, format, pixel_type) = self.format.into();
 
         self.width = width;
         self.height = height;
 
         unsafe {
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
-
             glTexImage2D(
                 GL_TEXTURE_2D,
                 0,
@@ -322,7 +308,7 @@ impl Texture {
 
     /// Update whole texture content
     /// bytes should be width * height * 4 size - non rgba8 textures are not supported yet anyway
-    pub fn update(&self, ctx: &mut Context, bytes: &[u8]) {
+    pub fn update(&self, ctx: &mut GraphicsContext, bytes: &[u8]) {
         assert_eq!(self.size(self.width, self.height), bytes.len());
 
         self.update_texture_part(
@@ -337,7 +323,7 @@ impl Texture {
 
     pub fn update_texture_part(
         &self,
-        ctx: &mut Context,
+        ctx: &mut GraphicsContext,
         x_offset: i32,
         y_offset: i32,
         width: i32,
@@ -351,10 +337,22 @@ impl Texture {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
 
-        let (_, format, pixel_type) = self.format.into_gl_params(ctx.features().alpha_texture);
+        let (_, format, pixel_type) = self.format.into();
 
         unsafe {
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
+
+            if cfg!(not(target_arch = "wasm32")) {
+                // if not WASM
+                if self.format == TextureFormat::Alpha {
+                    // if alpha miniquad texture, the value on non-WASM is stored in red channel
+                    // swizzle red -> alpha
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
+                } else {
+                    // keep alpha -> alpha
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
+                }
+            }
 
             glTexSubImage2D(
                 GL_TEXTURE_2D,
@@ -374,10 +372,7 @@ impl Texture {
 
     /// Read texture data into CPU memory
     pub fn read_pixels(&self, bytes: &mut [u8]) {
-        if self.format == TextureFormat::Alpha || self.format == TextureFormat::LuminanceAlpha {
-            unimplemented!("read_pixels is not implement for Alpha and LuminanceAlpha textures");
-        }
-        let (_, format, pixel_type) = self.format.into_gl_params(false);
+        let (_, format, pixel_type) = self.format.into();
 
         let mut fbo = 0;
         unsafe {
