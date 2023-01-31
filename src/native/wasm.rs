@@ -1,5 +1,3 @@
-#![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
-
 pub mod fs;
 pub mod webgl;
 
@@ -9,7 +7,7 @@ pub use webgl::*;
 
 use std::{cell::RefCell, path::PathBuf, thread_local};
 
-use crate::{event::EventHandler, native::NativeDisplay, GraphicsContext};
+use crate::{event::EventHandler, native::NativeDisplay};
 
 #[derive(Default)]
 struct DroppedFiles {
@@ -61,7 +59,7 @@ impl NativeDisplay for WasmDisplay {
         }
     }
     fn clipboard_get(&mut self) -> Option<String> {
-        self.clipboard.clone()
+        clipboard_get()
     }
     fn clipboard_set(&mut self, data: &str) {
         clipboard_set(data)
@@ -80,22 +78,47 @@ impl NativeDisplay for WasmDisplay {
     }
 }
 
-struct WasmGlobals {
-    event_handler: Box<dyn EventHandler>,
-    context: GraphicsContext,
-    display: WasmDisplay,
-}
-
 thread_local! {
-    static GLOBALS: RefCell<Option<WasmGlobals>> = RefCell::new(None);
+    static EVENT_HANDLER: RefCell<Option<Box<dyn EventHandler>>> = RefCell::new(None);
+}
+fn tl_event_handler<T, F: FnOnce(&mut dyn EventHandler) -> T>(f: F) -> T {
+    EVENT_HANDLER.with(|globals| {
+        let mut globals = globals.borrow_mut();
+        let globals: &mut Box<dyn EventHandler> = globals.as_mut().unwrap();
+        f(&mut **globals)
+    })
 }
 
-fn with<T, F: FnOnce(&mut WasmGlobals) -> T>(f: F) -> T {
-    GLOBALS.with(|globals| {
-        let mut globals = globals.borrow_mut();
-        let globals = globals.as_mut().unwrap();
-        f(globals)
-    })
+mod tl_display {
+    use super::*;
+    use crate::NATIVE_DISPLAY;
+
+    use std::cell::RefCell;
+
+    thread_local! {
+        static DISPLAY: RefCell<Option<WasmDisplay>> = RefCell::new(None);
+    }
+
+    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let mut d = d.as_mut().unwrap();
+            f(&mut *d);
+        })
+    }
+
+    pub(super) fn with<T>(mut f: impl FnOnce(&mut WasmDisplay) -> T) -> T {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let mut d = d.as_mut().unwrap();
+            f(&mut *d)
+        })
+    }
+
+    pub(super) fn set_display(display: WasmDisplay) {
+        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
+        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
+    }
 }
 
 static mut cursor_icon: crate::CursorIcon = crate::CursorIcon::Default;
@@ -112,7 +135,7 @@ pub struct sapp_touchpoint {
 
 pub fn run<F>(conf: &crate::conf::Conf, f: F)
 where
-    F: 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     {
         use std::ffi::CString;
@@ -131,21 +154,14 @@ where
         setup_canvas_size(conf.high_dpi);
     }
 
-    // run user intialisation code
-    let mut context = crate::GraphicsContext::new(false);
-
-    GLOBALS.with(|g| {
-        let mut display = WasmDisplay {
-            clipboard: None,
-            screen_width: unsafe { canvas_width() as _ },
-            screen_height: unsafe { canvas_height() as _ },
-            dropped_files: Default::default(),
-        };
-        *g.borrow_mut() = Some(WasmGlobals {
-            event_handler: f(context.with_display(&mut display)),
-            context,
-            display,
-        });
+    tl_display::set_display(WasmDisplay {
+        clipboard: None,
+        screen_width: unsafe { canvas_width() as _ },
+        screen_height: unsafe { canvas_height() as _ },
+        dropped_files: Default::default(),
+    });
+    EVENT_HANDLER.with(|g| {
+        *g.borrow_mut() = Some(f());
     });
 
     // start requestAnimationFrame loop
@@ -253,11 +269,11 @@ pub extern "C" fn allocate_vec_u8(len: usize) -> *mut u8 {
 pub extern "C" fn on_clipboard_paste(msg: *mut u8, len: usize) {
     let msg = unsafe { String::from_raw_parts(msg, len, len) };
 
-    with(move |globals| globals.display.clipboard = Some(msg));
+    tl_display::with(move |display| display.clipboard = Some(msg));
 }
 
 pub fn clipboard_get() -> Option<String> {
-    with(|globals| globals.display.clipboard.clone())
+    tl_display::with(|display| display.clipboard.clone())
 }
 
 pub fn clipboard_set(data: &str) {
@@ -268,35 +284,23 @@ pub fn clipboard_set(data: &str) {
 
 #[no_mangle]
 pub extern "C" fn frame() {
-    with(|globals| {
-        globals
-            .event_handler
-            .update(globals.context.with_display(&mut globals.display));
-        globals
-            .event_handler
-            .draw(globals.context.with_display(&mut globals.display));
+    tl_event_handler(|event_handler| {
+        event_handler.update();
+        event_handler.draw();
     });
 }
 
 #[no_mangle]
 pub extern "C" fn mouse_move(x: i32, y: i32) {
-    with(|globals| {
-        globals.event_handler.mouse_motion_event(
-            globals.context.with_display(&mut globals.display),
-            x as _,
-            y as _,
-        );
+    tl_event_handler(|event_handler| {
+        event_handler.mouse_motion_event(x as _, y as _);
     });
 }
 
 #[no_mangle]
 pub extern "C" fn raw_mouse_move(dx: i32, dy: i32) {
-    with(|globals| {
-        globals.event_handler.raw_mouse_motion(
-            globals.context.with_display(&mut globals.display),
-            dx as _,
-            dy as _,
-        );
+    tl_event_handler(|event_handler| {
+        event_handler.raw_mouse_motion(dx as _, dy as _);
     });
 }
 
@@ -304,13 +308,8 @@ pub extern "C" fn raw_mouse_move(dx: i32, dy: i32) {
 pub extern "C" fn mouse_down(x: i32, y: i32, btn: i32) {
     let btn = keycodes::translate_mouse_button(btn);
 
-    with(|globals| {
-        globals.event_handler.mouse_button_down_event(
-            globals.context.with_display(&mut globals.display),
-            btn,
-            x as _,
-            y as _,
-        );
+    tl_event_handler(|event_handler| {
+        event_handler.mouse_button_down_event(btn, x as _, y as _);
     });
 }
 
@@ -318,24 +317,15 @@ pub extern "C" fn mouse_down(x: i32, y: i32, btn: i32) {
 pub extern "C" fn mouse_up(x: i32, y: i32, btn: i32) {
     let btn = keycodes::translate_mouse_button(btn);
 
-    with(|globals| {
-        globals.event_handler.mouse_button_up_event(
-            globals.context.with_display(&mut globals.display),
-            btn,
-            x as _,
-            y as _,
-        );
+    tl_event_handler(|event_handler| {
+        event_handler.mouse_button_up_event(btn, x as _, y as _);
     });
 }
 
 #[no_mangle]
 pub extern "C" fn mouse_wheel(dx: i32, dy: i32) {
-    with(|globals| {
-        globals.event_handler.mouse_wheel_event(
-            globals.context.with_display(&mut globals.display),
-            dx as _,
-            dy as _,
-        );
+    tl_event_handler(|event_handler| {
+        event_handler.mouse_wheel_event(dx as _, dy as _);
     });
 }
 
@@ -344,26 +334,16 @@ pub extern "C" fn key_down(key: u32, modifiers: u32, repeat: bool) {
     let key = keycodes::translate_keycode(key as _);
     let mods = keycodes::translate_mod(modifiers as _);
 
-    with(|globals| {
-        globals.event_handler.key_down_event(
-            globals.context.with_display(&mut globals.display),
-            key,
-            mods,
-            repeat,
-        );
+    tl_event_handler(|event_handler| {
+        event_handler.key_down_event(key, mods, repeat);
     });
 }
 
 #[no_mangle]
 pub extern "C" fn key_press(key: u32) {
     if let Some(key) = char::from_u32(key) {
-        with(|globals| {
-            globals.event_handler.char_event(
-                globals.context.with_display(&mut globals.display),
-                key,
-                crate::KeyMods::default(),
-                false,
-            );
+        tl_event_handler(|event_handler| {
+            event_handler.char_event(key, crate::KeyMods::default(), false);
         });
     }
 }
@@ -373,57 +353,40 @@ pub extern "C" fn key_up(key: u32, modifiers: u32) {
     let key = keycodes::translate_keycode(key as _);
     let mods = keycodes::translate_mod(modifiers as _);
 
-    with(|globals| {
-        globals.event_handler.key_up_event(
-            globals.context.with_display(&mut globals.display),
-            key,
-            mods,
-        );
+    tl_event_handler(|event_handler| {
+        event_handler.key_up_event(key, mods);
     });
 }
 
 #[no_mangle]
 pub extern "C" fn resize(width: i32, height: i32) {
-    with(|globals| {
-        globals.display.screen_width = width as _;
-        globals.display.screen_height = height as _;
-
-        globals.event_handler.resize_event(
-            globals.context.with_display(&mut globals.display),
-            width as _,
-            height as _,
-        );
+    tl_display::with(|display| {
+        display.screen_width = width as _;
+        display.screen_height = height as _;
+    });
+    tl_event_handler(|event_handler| {
+        event_handler.resize_event(width as _, height as _);
     });
 }
 
 #[no_mangle]
 pub extern "C" fn touch(phase: u32, id: u32, x: f32, y: f32) {
     let phase = keycodes::translate_touch_phase(phase as _);
-    with(|globals| {
-        globals.event_handler.touch_event(
-            globals.context.with_display(&mut globals.display),
-            phase,
-            id as _,
-            x as _,
-            y as _,
-        );
+    tl_event_handler(|event_handler| {
+        event_handler.touch_event(phase, id as _, x as _, y as _);
     });
 }
 
 #[no_mangle]
 pub extern "C" fn on_files_dropped_start() {
-    with(|globals| {
-        globals.display.dropped_files = Default::default();
+    tl_display::with(|display| {
+        display.dropped_files = Default::default();
     });
 }
 
 #[no_mangle]
 pub extern "C" fn on_files_dropped_finish() {
-    with(|globals| {
-        globals
-            .event_handler
-            .files_dropped_event(globals.context.with_display(&mut globals.display))
-    });
+    tl_event_handler(|event_handler| event_handler.files_dropped_event());
 }
 
 #[no_mangle]
@@ -433,11 +396,11 @@ pub extern "C" fn on_file_dropped(
     bytes: *mut u8,
     bytes_len: usize,
 ) {
-    with(|globals| {
+    tl_display::with(|display| {
         let path = PathBuf::from(unsafe { String::from_raw_parts(path, path_len, path_len) });
         let bytes = unsafe { Vec::from_raw_parts(bytes, bytes_len, bytes_len) };
 
-        globals.display.dropped_files.paths.push(path);
-        globals.display.dropped_files.bytes.push(bytes);
+        display.dropped_files.paths.push(path);
+        display.dropped_files.bytes.push(bytes);
     });
 }

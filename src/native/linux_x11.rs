@@ -5,15 +5,15 @@ mod clipboard;
 mod glx;
 mod keycodes;
 pub mod libx11;
+mod libx11_ex;
 mod x_cursor;
 mod xi_input;
 
 use crate::{
     event::EventHandler,
     gl,
-    graphics::GraphicsContext,
     native::{egl, NativeDisplayData},
-    Context, CursorIcon,
+    CursorIcon,
 };
 
 use libx11::*;
@@ -22,66 +22,55 @@ use std::collections::HashMap;
 
 pub struct Dummy;
 
-struct X11Extensions {
-    utf8_string: Atom,
-    wm_protocols: Atom,
-    wm_delete_window: Atom,
-    _wm_state: Atom,
-    net_wm_name: Atom,
-    net_wm_icon_name: Atom,
-}
-
-impl X11Extensions {
-    pub unsafe fn new(libx11: &mut LibX11, display: *mut Display) -> X11Extensions {
-        X11Extensions {
-            utf8_string: (libx11.XInternAtom)(
-                display,
-                b"UTF8_STRING\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            wm_protocols: (libx11.XInternAtom)(
-                display,
-                b"WM_PROTOCOLS\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            wm_delete_window: (libx11.XInternAtom)(
-                display,
-                b"WM_DELETE_WINDOW\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            _wm_state: (libx11.XInternAtom)(
-                display,
-                b"WM_STATE\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            net_wm_name: (libx11.XInternAtom)(
-                display,
-                b"_NET_WM_NAME\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            net_wm_icon_name: (libx11.XInternAtom)(
-                display,
-                b"_NET_WM_ICON_NAME\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-        }
-    }
-}
-
+// part of the X11 display that lives in thread local and is accessible from miniquad::window
 pub struct X11Display {
     libx11: LibX11,
-    libxi: xi_input::LibXi,
-    screen: i32,
     display: *mut Display,
     root: Window,
     window: Window,
-    dpi_scale: f32,
-    extensions: X11Extensions,
-    xi_extension_opcode: Option<i32>,
-    repeated_keycodes: [bool; 256],
-    empty_cursor: Option<libx11::Cursor>,
-    cursor_cache: HashMap<CursorIcon, libx11::Cursor>,
     data: NativeDisplayData,
+    empty_cursor: libx11::Cursor,
+    cursor_cache: HashMap<CursorIcon, libx11::Cursor>,
+}
+
+// part of X11 display that lives on a main loop
+pub struct X11MainLoopData {
+    libx11: LibX11,
+    libxi: xi_input::LibXi,
+    display: *mut Display,
+    root: Window,
+    repeated_keycodes: [bool; 256],
+}
+
+pub mod tl_display {
+    use super::*;
+    use crate::NATIVE_DISPLAY;
+    use std::cell::RefCell;
+
+    thread_local! {
+        static DISPLAY: RefCell<Option<X11Display>> = RefCell::new(None);
+    }
+
+    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let d = d.as_mut().unwrap();
+            f(&mut *d);
+        })
+    }
+
+    pub fn with<T>(mut f: impl FnMut(&mut X11Display) -> T) -> T {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let d = d.as_mut().unwrap();
+            f(&mut *d)
+        })
+    }
+
+    pub fn set_display(display: X11Display) {
+        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
+        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
+    }
 }
 
 impl crate::native::NativeDisplay for X11Display {
@@ -108,7 +97,6 @@ impl crate::native::NativeDisplay for X11Display {
             self.set_cursor_grab(self.window, grab);
         }
     }
-
     fn show_mouse(&mut self, shown: bool) {
         unsafe {
             if shown {
@@ -141,7 +129,15 @@ impl crate::native::NativeDisplay for X11Display {
         let bufname = CString::new("CLIPBOARD").unwrap();
         let fmtname = CString::new("UTF8_STRING").unwrap();
 
-        unsafe { clipboard::get_clipboard(self, bufname.as_ptr(), fmtname.as_ptr()) }
+        unsafe {
+            clipboard::get_clipboard(
+                &mut self.libx11,
+                self.display,
+                self.window,
+                bufname.as_ptr(),
+                fmtname.as_ptr(),
+            )
+        }
     }
 
     fn clipboard_set(&mut self, data: &str) {
@@ -150,7 +146,13 @@ impl crate::native::NativeDisplay for X11Display {
         let bufname = CString::new("CLIPBOARD").unwrap();
 
         unsafe {
-            clipboard::claim_clipboard_ownership(self, bufname.as_ptr(), data.to_owned());
+            clipboard::claim_clipboard_ownership(
+                &mut self.libx11,
+                self.display,
+                self.window,
+                bufname.as_ptr(),
+                data.to_owned(),
+            );
         };
     }
 
@@ -160,193 +162,85 @@ impl crate::native::NativeDisplay for X11Display {
 }
 
 impl X11Display {
-    unsafe fn update_system_dpi(&mut self) {
-        let rms = (self.libx11.XResourceManagerString)(self.display);
-        if !rms.is_null() {
-            let db = (self.libx11.XrmGetStringDatabase)(rms);
-            if !db.is_null() {
-                let mut value = XrmValue {
-                    size: 0,
-                    addr: 0 as *mut libc::c_char,
-                };
-                let mut type_ = std::ptr::null_mut();
-                if (self.libx11.XrmGetResource)(
-                    db,
-                    b"Xft.dpi\x00".as_ptr() as _,
-                    b"Xft.Dpi\x00".as_ptr() as _,
-                    &mut type_,
-                    &mut value,
-                ) != 0
-                {
-                    if !type_.is_null() && libc::strcmp(type_, b"String\x00".as_ptr() as _) == 0 {
-                        self.dpi_scale = libc::atof(value.addr as *const _) as f32 / 96.0;
-                    }
-                }
-                (self.libx11.XrmDestroyDatabase)(db);
-            }
-        };
-    }
-
-    unsafe fn grab_error_handler(&mut self) {
-        pub unsafe extern "C" fn _sapp_x11_error_handler(
-            mut _display: *mut Display,
-            event: *mut XErrorEvent,
-        ) -> libc::c_int {
-            println!("Error: {}", (*event).error_code);
-            return 0 as libc::c_int;
-        }
-
-        (self.libx11.XSetErrorHandler)(Some(
-            _sapp_x11_error_handler
-                as unsafe extern "C" fn(_: *mut Display, _: *mut XErrorEvent) -> libc::c_int,
-        ));
-    }
-    unsafe fn release_error_handler(&mut self) {
-        (self.libx11.XSync)(self.display, false as _);
-        (self.libx11.XSetErrorHandler)(None);
-    }
-    unsafe fn create_window(
-        &mut self,
-        visual: *mut Visual,
-        depth: libc::c_int,
-        conf: &crate::conf::Conf,
-    ) -> Window {
-        let mut wa = XSetWindowAttributes {
-            background_pixmap: 0,
-            background_pixel: 0,
-            border_pixmap: 0,
-            border_pixel: 0,
-            bit_gravity: 0,
-            win_gravity: 0,
-            backing_store: 0,
-            backing_planes: 0,
-            backing_pixel: 0,
-            save_under: 0,
-            event_mask: 0,
-            do_not_propagate_mask: 0,
-            override_redirect: 0,
-            colormap: 0,
-            cursor: 0,
-        };
-        libc::memset(
-            &mut wa as *mut XSetWindowAttributes as *mut libc::c_void,
-            0 as libc::c_int,
-            ::std::mem::size_of::<XSetWindowAttributes>() as _,
-        );
-        let wamask = (CWBorderPixel | CWColormap | CWEventMask) as u32;
-
-        if !visual.is_null() {
-            let colormap =
-                (self.libx11.XCreateColormap)(self.display, self.root, visual, AllocNone);
-            wa.colormap = colormap;
-        }
-        wa.border_pixel = 0 as libc::c_int as libc::c_ulong;
-        wa.event_mask = StructureNotifyMask
-            | KeyPressMask
-            | KeyReleaseMask
-            | PointerMotionMask
-            | ButtonPressMask
-            | ButtonReleaseMask
-            | ExposureMask
-            | FocusChangeMask
-            | VisibilityChangeMask
-            | EnterWindowMask
-            | LeaveWindowMask
-            | PropertyChangeMask;
-        self.grab_error_handler();
-
-        let window = (self.libx11.XCreateWindow)(
-            self.display,
-            self.root,
-            0 as libc::c_int,
-            0 as libc::c_int,
-            conf.window_width as _,
-            conf.window_height as _,
-            0 as libc::c_int as libc::c_uint,
-            depth,
-            InputOutput as libc::c_uint,
-            visual,
-            wamask as libc::c_ulong,
-            &mut wa,
-        );
-        self.release_error_handler();
-        assert!(window != 0, "X11: Failed to create window");
-
-        self.xi_extension_opcode = self
-            .libxi
-            .query_xi_extension(&mut self.libx11, self.display);
-
-        let empty_cursor = x_cursor::create_empty_cursor(self.display, self.root, &mut self.libx11);
-        self.empty_cursor = Some(empty_cursor);
-
-        let mut protocols: [Atom; 1] = [self.extensions.wm_delete_window];
-        (self.libx11.XSetWMProtocols)(
-            self.display,
+    pub unsafe fn new(display: &mut X11MainLoopData, window: Window, w: i32, h: i32) -> X11Display {
+        X11Display {
+            libx11: display.libx11.clone(),
+            display: display.display,
+            root: display.root,
             window,
-            protocols.as_mut_ptr(),
-            1 as libc::c_int,
-        );
-        let mut hints = (self.libx11.XAllocSizeHints)();
-        (*hints).flags |= PWinGravity;
-        if conf.window_resizable == false {
-            (*hints).flags |= PMinSize | PMaxSize;
-            (*hints).min_width = conf.window_width;
-            (*hints).min_height = conf.window_height;
-            (*hints).max_width = conf.window_width;
-            (*hints).max_height = conf.window_height;
+            empty_cursor: x_cursor::create_empty_cursor(
+                display.display,
+                display.root,
+                &mut display.libx11,
+            ),
+            cursor_cache: HashMap::new(),
+            data: NativeDisplayData {
+                screen_width: w,
+                screen_height: h,
+                dpi_scale: display.libx11.update_system_dpi(display.display),
+                ..Default::default()
+            },
         }
-        (*hints).win_gravity = StaticGravity;
-        (self.libx11.XSetWMNormalHints)(self.display, window, hints);
-        (self.libx11.XFree)(hints as *mut libc::c_void);
-
-        self.update_window_title(window, &conf.window_title);
-
-        window
     }
+    pub unsafe fn set_cursor_grab(&mut self, window: Window, grab: bool) {
+        (self.libx11.XUngrabPointer)(self.display, 0);
 
-    unsafe fn show_window(&mut self, window: Window) {
-        (self.libx11.XMapWindow)(self.display, window);
-        (self.libx11.XRaiseWindow)(self.display, window);
+        if grab {
+            (self.libx11.XGrabPointer)(
+                self.display,
+                window,
+                true as _,
+                (ButtonPressMask
+                    | ButtonReleaseMask
+                    | EnterWindowMask
+                    | LeaveWindowMask
+                    | PointerMotionMask
+                    | PointerMotionHintMask
+                    | Button1MotionMask
+                    | Button2MotionMask
+                    | Button3MotionMask
+                    | Button4MotionMask
+                    | Button5MotionMask
+                    | ButtonMotionMask
+                    | KeymapStateMask) as libc::c_uint,
+                GrabModeAsync,
+                GrabModeAsync,
+                window,
+                0,
+                0, // CurrentTime
+            );
+        }
+
         (self.libx11.XFlush)(self.display);
     }
+    pub unsafe fn set_cursor(&mut self, window: Window, cursor: Option<CursorIcon>) {
+        let libx11 = &mut self.libx11;
+        let display = self.display;
 
-    unsafe fn update_window_title(&mut self, window: Window, title: &str) {
-        let c_title = std::ffi::CString::new(title).unwrap();
-
-        (self.libx11.Xutf8SetWMProperties)(
-            self.display,
-            window,
-            c_title.as_ptr(),
-            c_title.as_ptr(),
-            std::ptr::null_mut(),
-            0 as libc::c_int,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-        );
-        (self.libx11.XChangeProperty)(
-            self.display,
-            window,
-            self.extensions.net_wm_name,
-            self.extensions.utf8_string,
-            8 as libc::c_int,
-            PropModeReplace,
-            c_title.as_ptr() as *mut libc::c_uchar,
-            libc::strlen(c_title.as_ptr()) as libc::c_int,
-        );
-        (self.libx11.XChangeProperty)(
-            self.display,
-            window,
-            self.extensions.net_wm_icon_name,
-            self.extensions.utf8_string,
-            8 as libc::c_int,
-            PropModeReplace,
-            c_title.as_ptr() as *mut libc::c_uchar,
-            libc::strlen(c_title.as_ptr()) as libc::c_int,
-        );
-        (self.libx11.XFlush)(self.display);
+        let cursor = match cursor {
+            None => self.empty_cursor,
+            Some(cursor_icon) => *self.cursor_cache.entry(cursor_icon).or_insert_with(|| {
+                (libx11.XCreateFontCursor)(
+                    display,
+                    match cursor_icon {
+                        CursorIcon::Default => libx11::XC_left_ptr,
+                        CursorIcon::Help => libx11::XC_question_arrow,
+                        CursorIcon::Pointer => libx11::XC_hand2,
+                        CursorIcon::Wait => libx11::XC_watch,
+                        CursorIcon::Crosshair => libx11::XC_crosshair,
+                        CursorIcon::Text => libx11::XC_xterm,
+                        CursorIcon::Move => libx11::XC_fleur,
+                        CursorIcon::NotAllowed => libx11::XC_pirate,
+                        CursorIcon::EWResize => libx11::XC_sb_h_double_arrow,
+                        CursorIcon::NSResize => libx11::XC_sb_v_double_arrow,
+                        CursorIcon::NESWResize => libx11::XC_top_right_corner,
+                        CursorIcon::NWSEResize => libx11::XC_top_left_corner,
+                    },
+                )
+            }),
+        };
+        (libx11.XDefineCursor)(display, window, cursor);
     }
-
     // TODO: _fullscreen is not used, this function always setting window fullscreen
     // should be able to able to go back from fullscreen to windowed instead
     unsafe fn set_fullscreen(&mut self, window: Window, _fullscreen: bool) {
@@ -415,65 +309,17 @@ impl X11Display {
             );
         }
     }
+}
 
-    pub unsafe fn set_cursor_grab(&mut self, window: Window, grab: bool) {
-        (self.libx11.XUngrabPointer)(self.display, 0);
-
-        if grab {
-            (self.libx11.XGrabPointer)(
-                self.display,
-                window,
-                true as _,
-                (ButtonPressMask
-                    | ButtonReleaseMask
-                    | EnterWindowMask
-                    | LeaveWindowMask
-                    | PointerMotionMask
-                    | PointerMotionHintMask
-                    | Button1MotionMask
-                    | Button2MotionMask
-                    | Button3MotionMask
-                    | Button4MotionMask
-                    | Button5MotionMask
-                    | ButtonMotionMask
-                    | KeymapStateMask) as libc::c_uint,
-                GrabModeAsync,
-                GrabModeAsync,
-                window,
-                0,
-                0, // CurrentTime
-            );
-        }
-
-        (self.libx11.XFlush)(self.display);
-    }
-    unsafe fn query_window_size(&mut self, window: Window) -> (i32, i32) {
-        let mut attribs: XWindowAttributes = std::mem::zeroed();
-        (self.libx11.XGetWindowAttributes)(self.display, window, &mut attribs);
-        (attribs.width, attribs.height)
-    }
-
-    unsafe fn process_event(
-        &mut self,
-        context: &mut GraphicsContext,
-        event_handler: &mut dyn EventHandler,
-        event: &mut XEvent,
-    ) {
+impl X11MainLoopData {
+    unsafe fn process_event(&mut self, event: &mut XEvent, event_handler: &mut dyn EventHandler) {
         match (*event).type_0 {
             2 => {
                 let keycode = (*event).xkey.keycode as libc::c_int;
-                let key = self.translate_key(keycode);
+                let key = keycodes::translate_key(&mut self.libx11, self.display, keycode);
                 let repeat = self.repeated_keycodes[(keycode & 0xff) as usize];
                 self.repeated_keycodes[(keycode & 0xff) as usize] = true;
-                let mods = self.translate_mod((*event).xkey.state as libc::c_int);
-                if key != crate::event::KeyCode::Unknown {
-                    event_handler.key_down_event(
-                        context.with_display(&mut *self),
-                        key,
-                        mods,
-                        repeat,
-                    );
-                }
+                let mods = keycodes::translate_mod((*event).xkey.state as libc::c_int);
                 let mut keysym: KeySym = 0;
                 (self.libx11.XLookupString)(
                     &mut (*event).xkey,
@@ -482,85 +328,53 @@ impl X11Display {
                     &mut keysym,
                     std::ptr::null_mut(),
                 );
-                let chr = self.keysym_to_unicode(keysym);
+                let chr = keycodes::keysym_to_unicode(keysym);
                 if chr > 0 {
                     if let Some(chr) = std::char::from_u32(chr as u32) {
-                        event_handler.char_event(
-                            context.with_display(&mut *self),
-                            chr,
-                            mods,
-                            repeat,
-                        );
+                        event_handler.char_event(chr, mods, repeat);
                     }
                 }
+                event_handler.key_down_event(key, mods, repeat);
             }
             3 => {
                 let keycode = (*event).xkey.keycode;
-                let key = self.translate_key(keycode as _);
+                let key = keycodes::translate_key(&mut self.libx11, self.display, keycode as _);
                 self.repeated_keycodes[(keycode & 0xff) as usize] = false;
-                if key != crate::event::KeyCode::Unknown {
-                    let mods = self.translate_mod((*event).xkey.state as libc::c_int);
-                    event_handler.key_up_event(context.with_display(&mut *self), key, mods);
-                }
+                let mods = keycodes::translate_mod((*event).xkey.state as libc::c_int);
+                event_handler.key_up_event(key, mods);
             }
             4 => {
-                let btn = self.translate_mouse_button((*event).xbutton.button as _);
+                let btn = keycodes::translate_mouse_button((*event).xbutton.button as _);
                 let x = (*event).xmotion.x as libc::c_float;
                 let y = (*event).xmotion.y as libc::c_float;
 
                 if btn != crate::event::MouseButton::Unknown {
-                    event_handler.mouse_button_down_event(
-                        context.with_display(&mut *self),
-                        btn,
-                        x,
-                        y,
-                    );
+                    event_handler.mouse_button_down_event(btn, x, y);
                 } else {
                     match (*event).xbutton.button {
                         4 => {
-                            event_handler.mouse_wheel_event(
-                                context.with_display(&mut *self),
-                                0.0,
-                                1.0,
-                            );
+                            event_handler.mouse_wheel_event(0.0, 1.0);
                         }
                         5 => {
-                            event_handler.mouse_wheel_event(
-                                context.with_display(&mut *self),
-                                0.0,
-                                -1.0,
-                            );
+                            event_handler.mouse_wheel_event(0.0, -1.0);
                         }
                         6 => {
-                            event_handler.mouse_wheel_event(
-                                context.with_display(&mut *self),
-                                1.0,
-                                0.0,
-                            );
+                            event_handler.mouse_wheel_event(1.0, 0.0);
                         }
                         7 => {
-                            event_handler.mouse_wheel_event(
-                                context.with_display(&mut *self),
-                                -1.0,
-                                0.0,
-                            );
+                            event_handler.mouse_wheel_event(-1.0, 0.0);
                         }
                         _ => {}
                     }
                 }
             }
             5 => {
-                let btn = self.translate_mouse_button((*event).xbutton.button as _);
+                let btn = keycodes::translate_mouse_button((*event).xbutton.button as _);
                 let x = (*event).xmotion.x as libc::c_float;
                 let y = (*event).xmotion.y as libc::c_float;
 
                 if btn != crate::event::MouseButton::Unknown {
-                    event_handler.mouse_button_up_event(
-                        context.with_display(&mut *self),
-                        btn,
-                        x,
-                        y,
-                    );
+                    event_handler.mouse_button_up_event(btn, x, y);
                 }
             }
             7 => {
@@ -572,28 +386,26 @@ impl X11Display {
             6 => {
                 let x = (*event).xmotion.x as libc::c_float;
                 let y = (*event).xmotion.y as libc::c_float;
-                event_handler.mouse_motion_event(context.with_display(&mut *self), x, y);
+                event_handler.mouse_motion_event(x, y);
             }
             22 => {
-                if (*event).xconfigure.width != self.data.screen_width
-                    || (*event).xconfigure.height != self.data.screen_height
+                if (*event).xconfigure.width != tl_display::with(|d| d.data.screen_width)
+                    || (*event).xconfigure.height != tl_display::with(|d| d.data.screen_height)
                 {
                     let width = (*event).xconfigure.width;
                     let height = (*event).xconfigure.height;
-                    self.data.screen_width = width;
-                    self.data.screen_height = height;
-                    event_handler.resize_event(
-                        context.with_display(&mut *self),
-                        width as f32,
-                        height as f32,
-                    );
+                    tl_display::with(|d| {
+                        d.data.screen_width = width;
+                        d.data.screen_height = height;
+                    });
+                    event_handler.resize_event(width as _, height as _);
                 }
             }
             33 => {
-                if (*event).xclient.message_type == self.extensions.wm_protocols {
+                if (*event).xclient.message_type == self.libx11.extensions.wm_protocols {
                     let protocol = (*event).xclient.data.l[0 as libc::c_int as usize] as Atom;
-                    if protocol == self.extensions.wm_delete_window {
-                        self.data.quit_requested = true
+                    if protocol == self.libx11.extensions.wm_delete_window {
+                        tl_display::with(|d| d.data.quit_requested = true);
                     }
                 }
             }
@@ -602,151 +414,97 @@ impl X11Display {
                 // // some other app is waiting for clibpoard content
                 // // need to make appropriate XSelectionEvent - response for this request
                 // // only UTF8_STRING request is actually supported
-                clipboard::respond_to_clipboard_request(self, event);
+                clipboard::respond_to_clipboard_request(&mut self.libx11, self.display, event);
             }
             // SelectionClear
             29 => {}
             17 => {}
 
             // GenericEvent
-            35 if Some((*event).xcookie.extension) == self.xi_extension_opcode => {
+            35 if Some((*event).xcookie.extension)
+                == self
+                    .libxi
+                    .xi_extension_opcode(&mut self.libx11, self.display) =>
+            {
                 if (*event).xcookie.evtype == xi_input::XI_RawMotion {
                     let (dx, dy) = self.libxi.read_cookie(&mut (*event).xcookie, self.display);
-                    event_handler.raw_mouse_motion(
-                        context.with_display(&mut *self),
-                        dx as f32,
-                        dy as f32,
-                    );
+                    event_handler.raw_mouse_motion(dx as f32, dy as f32);
                 }
             }
             _ => {}
         };
 
-        if self.data.quit_requested && !self.data.quit_ordered {
-            event_handler.quit_requested_event(context.with_display(&mut *self));
-            if self.data.quit_requested {
-                self.data.quit_ordered = true
-            }
+        if tl_display::with(|d| d.data.quit_requested && !d.data.quit_ordered) {
+            event_handler.quit_requested_event();
+            tl_display::with(|d| {
+                if d.data.quit_requested {
+                    d.data.quit_ordered = true
+                }
+            });
         }
     }
-
-    pub unsafe fn set_cursor(&mut self, window: Window, cursor: Option<CursorIcon>) {
-        let libx11 = &mut self.libx11;
-        let display = self.display;
-
-        let cursor = match cursor {
-            None => {
-                // empty_cursor was created during create_window
-                self.empty_cursor.unwrap()
-            }
-            Some(cursor_icon) => *self.cursor_cache.entry(cursor_icon).or_insert_with(|| {
-                (libx11.XCreateFontCursor)(
-                    display,
-                    match cursor_icon {
-                        CursorIcon::Default => libx11::XC_left_ptr,
-                        CursorIcon::Help => libx11::XC_question_arrow,
-                        CursorIcon::Pointer => libx11::XC_hand2,
-                        CursorIcon::Wait => libx11::XC_watch,
-                        CursorIcon::Crosshair => libx11::XC_crosshair,
-                        CursorIcon::Text => libx11::XC_xterm,
-                        CursorIcon::Move => libx11::XC_fleur,
-                        CursorIcon::NotAllowed => libx11::XC_pirate,
-                        CursorIcon::EWResize => libx11::XC_sb_h_double_arrow,
-                        CursorIcon::NSResize => libx11::XC_sb_v_double_arrow,
-                        CursorIcon::NESWResize => libx11::XC_top_right_corner,
-                        CursorIcon::NWSEResize => libx11::XC_top_left_corner,
-                    },
-                )
-            }),
-        };
-        (libx11.XDefineCursor)(display, window, cursor);
-    }
-
-    // pub unsafe fn process_requests(&mut self, window: Window, event_handler: &mut super::UserData) {
-    //     let context = data.get_context();
-
-    //     if let Some(cursor) = self.data.cursor_requested.take() {
-    //         self.set_cursor(window, Some(cursor));
-    //     }
-    //     match self.data.show_mouse_requested.take() {
-    //         Some(true) => self.set_cursor(window, Some(CursorIcon::Default)),
-    //         Some(false) => self.set_cursor(window, None),
-    //         None => {}
-    //     }
-    //     if let Some(fullscreen) = self.data.fullscreen_requested.take() {
-    //         self.set_fullscreen(window, fullscreen);
-    //     }
-    //     if let Some(grab) = self.data.cursor_grab_requested.take() {
-    //         self.set_cursor_grab(window, grab);
-    //     }
 }
 
 unsafe fn glx_main_loop<F>(
-    mut display: X11Display,
+    mut display: X11MainLoopData,
     conf: &crate::conf::Conf,
     f: &mut Option<F>,
-) -> Result<(), X11Display>
+    screen: i32,
+) -> Result<(), X11MainLoopData>
 where
-    F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    let mut glx = match glx::Glx::init(&mut display) {
+    let mut glx = match glx::Glx::init(&mut display.libx11, display.display, screen) {
         Some(glx) => glx,
         _ => return Err(display),
     };
     let visual = glx.visual;
     let depth = glx.depth;
-    let window = display.create_window(visual, depth, conf);
-    display.window = window;
-    let (glx_context, glx_window) = glx.create_context(&mut display, window);
+    let window = display
+        .libx11
+        .create_window(display.root, display.display, visual, depth, conf);
+
+    let (glx_context, glx_window) = glx.create_context(display.display, window);
     glx.swap_interval(
-        &mut display,
+        display.display,
         glx_window,
         glx_context,
         conf.platform.swap_interval.unwrap_or(1),
     );
     gl::load_gl_funcs(|proc| glx.libgl.get_procaddr(proc));
 
-    display.show_window(window);
-
-    if conf.fullscreen {
-        display.set_fullscreen(window, true);
-    }
+    display.libx11.show_window(display.display, window);
 
     (display.libx11.XFlush)(display.display);
 
-    let (w, h) = display.query_window_size(window);
+    let (w, h) = display.libx11.query_window_size(display.display, window);
 
-    display.data.screen_width = w;
-    display.data.screen_height = h;
+    tl_display::set_display(X11Display::new(&mut display, window, w, h));
 
-    let mut context = GraphicsContext::new(gl::is_gl2());
-
-    let mut data = (f.take().unwrap())(context.with_display(&mut display));
-
-    while !display.data.quit_ordered {
-        {
-            glx.make_current(&mut display, glx_window, glx_context);
-
-            let count = (display.libx11.XPending)(display.display);
-            for _ in 0..count {
-                let mut event = _XEvent { type_0: 0 };
-                (display.libx11.XNextEvent)(display.display, &mut event);
-
-                display.process_event(&mut context, &mut *data, &mut event);
-            }
-        }
-
-        data.update(context.with_display(&mut display));
-        data.draw(context.with_display(&mut display));
-
-        glx.swap_buffers(&mut display, glx_window);
-
-        (display.libx11.XFlush)(display.display);
-        //display.process_requests(window, &mut data);
+    if conf.fullscreen {
+        tl_display::with(|d| d.set_fullscreen(window, true));
     }
 
-    glx.destroy_context(&mut display, glx_window, glx_context);
+    let mut event_handler = (f.take().unwrap())();
 
+    while !tl_display::with(|d| d.data.quit_ordered) {
+        glx.make_current(display.display, glx_window, glx_context);
+        let count = (display.libx11.XPending)(display.display);
+
+        for _ in 0..count {
+            let mut xevent = _XEvent { type_0: 0 };
+            (display.libx11.XNextEvent)(display.display, &mut xevent);
+            display.process_event(&mut xevent, &mut *event_handler);
+        }
+
+        event_handler.update();
+        event_handler.draw();
+
+        glx.swap_buffers(display.display, glx_window);
+        (display.libx11.XFlush)(display.display);
+    }
+
+    glx.destroy_context(display.display, glx_window, glx_context);
     (display.libx11.XUnmapWindow)(display.display, window);
     (display.libx11.XDestroyWindow)(display.display, window);
     (display.libx11.XCloseDisplay)(display.display);
@@ -755,20 +513,23 @@ where
 }
 
 unsafe fn egl_main_loop<F>(
-    mut display: X11Display,
+    mut display: X11MainLoopData,
     conf: &crate::conf::Conf,
     f: &mut Option<F>,
-) -> Result<(), X11Display>
+) -> Result<(), X11MainLoopData>
 where
-    F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     let mut egl_lib = match egl::LibEgl::try_load() {
         Some(glx) => glx,
         _ => return Err(display),
     };
 
-    let window = display.create_window(std::ptr::null_mut(), 0, conf);
-    display.window = window;
+    let window =
+        display
+            .libx11
+            .create_window(display.root, display.display, std::ptr::null_mut(), 0, conf);
+
     let (context, config, egl_display) = egl::create_egl_context(
         &mut egl_lib,
         display.display as *mut _,
@@ -797,50 +558,45 @@ where
             .expect("non-null function pointer")(name.as_ptr() as _)
     });
 
-    display.show_window(window);
+    display.libx11.show_window(display.display, window);
+    let (w, h) = display.libx11.query_window_size(display.display, window);
+
+    tl_display::set_display(X11Display::new(&mut display, window, w, h));
 
     if conf.fullscreen {
-        display.set_fullscreen(window, true);
+        tl_display::with(|d| d.set_fullscreen(window, true));
     }
 
     (display.libx11.XFlush)(display.display);
 
-    let mut context = GraphicsContext::new(gl::is_gl2());
+    let mut event_handler = (f.take().unwrap())();
 
-    let (w, h) = display.query_window_size(window);
-    display.data.screen_width = w;
-    display.data.screen_height = h;
-
-    let mut data = (f.take().unwrap())(context.with_display(&mut display));
-
-    while !display.data.quit_ordered {
+    while !tl_display::with(|d| d.data.quit_ordered) {
         let count = (display.libx11.XPending)(display.display);
-        for _ in 0..count {
-            let mut event = _XEvent { type_0: 0 };
-            (display.libx11.XNextEvent)(display.display, &mut event);
 
-            display.process_event(&mut context, &mut *data, &mut event);
+        for _ in 0..count {
+            let mut xevent = _XEvent { type_0: 0 };
+            (display.libx11.XNextEvent)(display.display, &mut xevent);
+            display.process_event(&mut xevent, &mut *event_handler);
         }
 
-        data.update(context.with_display(&mut display));
-        data.draw(context.with_display(&mut display));
+        event_handler.update();
+        event_handler.draw();
 
         (egl_lib.eglSwapBuffers.unwrap())(egl_display, egl_surface);
         (display.libx11.XFlush)(display.display);
-
-        //display.process_requests(window, &mut data);
     }
 
-    // (display.libx11.XUnmapWindow)(display.display, window);
-    // (display.libx11.XDestroyWindow)(display.display, window);
-    // (display.libx11.XCloseDisplay)(display.display);
+    (display.libx11.XUnmapWindow)(display.display, window);
+    (display.libx11.XDestroyWindow)(display.display, window);
+    (display.libx11.XCloseDisplay)(display.display);
 
     Ok(())
 }
 
 pub fn run<F>(conf: &crate::conf::Conf, f: &mut Option<F>) -> Option<()>
 where
-    F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     unsafe {
         let mut libx11 = LibX11::try_load()?;
@@ -871,39 +627,30 @@ where
         // repeating KeyPress event it generates.
         (libx11.XkbSetDetectableAutoRepeat)(x11_display, true as _, std::ptr::null_mut());
 
-        let extensions = X11Extensions::new(&mut libx11, x11_display);
-        let mut display = X11Display {
+        libx11.load_extensions(x11_display);
+        let display = X11MainLoopData {
             display: x11_display,
-            screen: x11_screen,
             root: x11_root,
-            window: 0,
             libx11,
             libxi,
-            dpi_scale: 1.0,
-            extensions,
-            xi_extension_opcode: None,
             repeated_keycodes: [false; 256],
-            empty_cursor: None,
-            cursor_cache: HashMap::new(),
-            data: Default::default(),
         };
-        display.update_system_dpi();
 
         match conf.platform.linux_x11_gl {
             crate::conf::LinuxX11Gl::GLXOnly => {
-                glx_main_loop(display, &conf, f).ok().unwrap();
+                glx_main_loop(display, &conf, f, x11_screen).ok().unwrap();
             }
             crate::conf::LinuxX11Gl::EGLOnly => {
                 egl_main_loop(display, &conf, f).ok().unwrap();
             }
             crate::conf::LinuxX11Gl::GLXWithEGLFallback => {
-                if let Err(display) = glx_main_loop(display, &conf, f) {
+                if let Err(display) = glx_main_loop(display, &conf, f, x11_screen) {
                     egl_main_loop(display, &conf, f).ok().unwrap();
                 }
             }
             crate::conf::LinuxX11Gl::EGLWithGLXFallback => {
                 if let Err(display) = egl_main_loop(display, &conf, f) {
-                    glx_main_loop(display, &conf, f).ok().unwrap();
+                    glx_main_loop(display, &conf, f, x11_screen).ok().unwrap();
                 }
             }
         }

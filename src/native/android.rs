@@ -2,7 +2,6 @@ use crate::{
     event::{EventHandler, KeyCode, TouchPhase},
     native::egl::{self, LibEgl},
     native::NativeDisplay,
-    GraphicsContext,
 };
 
 use std::{cell::RefCell, sync::mpsc, thread};
@@ -91,6 +90,38 @@ struct AndroidDisplay {
     fullscreen: bool,
 }
 
+mod tl_display {
+    use super::*;
+    use crate::NATIVE_DISPLAY;
+
+    use std::cell::RefCell;
+
+    thread_local! {
+        static DISPLAY: RefCell<Option<AndroidDisplay>> = RefCell::new(None);
+    }
+
+    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let mut d = d.as_mut().unwrap();
+            f(&mut *d);
+        })
+    }
+
+    pub(super) fn with<T>(mut f: impl FnMut(&mut AndroidDisplay) -> T) -> T {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let mut d = d.as_mut().unwrap();
+            f(&mut *d)
+        })
+    }
+
+    pub(super) fn set_display(display: AndroidDisplay) {
+        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
+        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
+    }
+}
+
 impl NativeDisplay for AndroidDisplay {
     fn screen_size(&self) -> (f32, f32) {
         (self.screen_width as _, self.screen_height as _)
@@ -172,12 +203,10 @@ pub unsafe fn console_error(msg: *const ::std::os::raw::c_char) {
 
 struct MainThreadState {
     libegl: LibEgl,
-    context: GraphicsContext,
     egl_display: egl::EGLDisplay,
     egl_config: egl::EGLConfig,
     egl_context: egl::EGLContext,
     surface: egl::EGLSurface,
-    display: AndroidDisplay,
     window: *mut ndk_sys::ANativeWindow,
     event_handler: Box<dyn EventHandler>,
     quit: bool,
@@ -240,13 +269,11 @@ impl MainThreadState {
                     self.update_surface(window);
                 }
 
-                self.display.screen_width = width as _;
-                self.display.screen_height = height as _;
-                self.event_handler.resize_event(
-                    self.context.with_display(&mut self.display),
-                    width as _,
-                    height as _,
-                );
+                tl_display::with(|d| {
+                    d.screen_width = width as _;
+                    d.screen_height = height as _;
+                });
+                self.event_handler.resize_event(width as _, height as _);
             }
             Message::Touch {
                 phase,
@@ -254,52 +281,31 @@ impl MainThreadState {
                 x,
                 y,
             } => {
-                self.event_handler.touch_event(
-                    self.context.with_display(&mut self.display),
-                    phase,
-                    touch_id,
-                    x,
-                    y,
-                );
+                self.event_handler.touch_event(phase, touch_id, x, y);
             }
             Message::Character { character } => {
                 if let Some(character) = char::from_u32(character) {
-                    self.event_handler.char_event(
-                        self.context.with_display(&mut self.display),
-                        character,
-                        Default::default(),
-                        false,
-                    );
+                    self.event_handler
+                        .char_event(character, Default::default(), false);
                 }
             }
             Message::KeyDown { keycode } => {
-                self.event_handler.key_down_event(
-                    self.context.with_display(&mut self.display),
-                    keycode,
-                    Default::default(),
-                    false,
-                );
+                self.event_handler
+                    .key_down_event(keycode, Default::default(), false);
             }
             Message::KeyUp { keycode } => {
-                self.event_handler.key_up_event(
-                    self.context.with_display(&mut self.display),
-                    keycode,
-                    Default::default(),
-                );
+                self.event_handler.key_up_event(keycode, Default::default());
             }
-            Message::Pause => self
-                .event_handler
-                .window_minimized_event(self.context.with_display(&mut self.display)),
+            Message::Pause => self.event_handler.window_minimized_event(),
             Message::Resume => {
-                if self.display.fullscreen {
+                if tl_display::with(|d| d.fullscreen) {
                     unsafe {
                         let env = attach_jni_env();
                         set_full_screen(env, true);
                     }
                 }
 
-                self.event_handler
-                    .window_restored_event(self.context.with_display(&mut self.display))
+                self.event_handler.window_restored_event()
             }
             Message::Destroy => {
                 self.quit = true;
@@ -308,12 +314,10 @@ impl MainThreadState {
     }
 
     fn frame(&mut self) {
-        self.event_handler
-            .update(self.context.with_display(&mut self.display));
+        self.event_handler.update();
 
         if self.surface.is_null() == false {
-            self.event_handler
-                .draw(self.context.with_display(&mut self.display));
+            self.event_handler.draw();
 
             unsafe {
                 (self.libegl.eglSwapBuffers.unwrap())(self.egl_display, self.surface);
@@ -355,7 +359,7 @@ pub unsafe fn attach_jni_env() -> *mut ndk_sys::JNIEnv {
 
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
 where
-    F: 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     {
         use std::ffi::CString;
@@ -431,22 +435,19 @@ where
             panic!();
         }
 
-        let mut context = GraphicsContext::new(gl::is_gl2());
-
-        let mut display = AndroidDisplay {
+        let display = AndroidDisplay {
             screen_width,
             screen_height,
             fullscreen: conf.fullscreen,
         };
-        let event_handler = f.0(context.with_display(&mut display));
+        tl_display::set_display(display);
+        let event_handler = f.0();
         let mut s = MainThreadState {
             libegl,
             egl_display,
             egl_config,
             egl_context,
             surface,
-            context,
-            display,
             window,
             event_handler,
             quit: false,

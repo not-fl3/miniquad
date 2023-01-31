@@ -7,7 +7,7 @@ use winapi::{
     um::{errhandlingapi::GetLastError, wingdi::*},
 };
 
-use super::{Display, LibOpengl32};
+use super::{LibOpengl32, WindowsDisplay};
 
 pub const WGL_NUMBER_PIXEL_FORMATS_ARB: u32 = 0x2000;
 pub const WGL_SUPPORT_OPENGL_ARB: u32 = 0x2010;
@@ -211,7 +211,7 @@ unsafe fn get_wgl_proc_address<T>(libopengl32: &mut LibOpengl32, proc: &str) -> 
 }
 
 impl Wgl {
-    pub(crate) unsafe fn new(display: &mut Display) -> Wgl {
+    pub(crate) unsafe fn new(display: &mut WindowsDisplay) -> Wgl {
         let mut pfd: PIXELFORMATDESCRIPTOR = std::mem::zeroed();
         pfd.nSize = std::mem::size_of_val(&pfd) as _;
         pfd.nVersion = 1;
@@ -294,7 +294,12 @@ impl Wgl {
         }
     }
 
-    unsafe fn wgl_attrib(&self, display: &mut Display, pixel_format: i32, attrib: i32) -> i32 {
+    unsafe fn wgl_attrib(
+        &self,
+        display: &mut WindowsDisplay,
+        pixel_format: i32,
+        attrib: i32,
+    ) -> i32 {
         let mut value = 0;
         if !(self.GetPixelFormatAttribivARB.unwrap())(
             display.dc,
@@ -309,7 +314,7 @@ impl Wgl {
         return value;
     }
 
-    unsafe fn wgl_find_pixel_format(&self, display: &mut Display, sample_count: i32) -> u32 {
+    unsafe fn wgl_find_pixel_format(&self, display: &mut WindowsDisplay, sample_count: i32) -> u32 {
         let native_count = self.wgl_attrib(display, 1, WGL_NUMBER_PIXEL_FORMATS_ARB as _);
         let mut usable_configs = vec![GlFbconfig::default(); native_count as usize];
 
@@ -367,7 +372,7 @@ impl Wgl {
 
     pub(crate) unsafe fn create_context(
         &mut self,
-        display: &mut Display,
+        display: &mut WindowsDisplay,
         sample_count: i32,
         swap_interval: i32,
     ) -> HGLRC {

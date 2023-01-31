@@ -2,6 +2,8 @@
 //! The only way to get gl functions - actually tell the linker to link with
 //! their gl.js counterparts.
 
+#![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
+
 pub type GLenum = ::std::os::raw::c_uint;
 pub type GLboolean = ::std::os::raw::c_uchar;
 pub type GLbitfield = ::std::os::raw::c_uint;
@@ -1242,6 +1244,18 @@ extern "C" {
     pub fn glClearBufferiv(buffer: GLenum, drawbuffer: GLint, value: *const GLint);
 }
 extern "C" {
+    pub fn glClearBufferuiv(buffer: GLenum, drawbuffer: GLint, value: *const GLuint);
+}
+extern "C" {
+    pub fn glClearBufferfv(buffer: GLenum, drawbuffer: GLint, value: *const GLfloat);
+}
+extern "C" {
+    pub fn glClearBufferfi(buffer: GLenum, drawbuffer: GLint, depth: GLfloat, stencil: GLint);
+}
+extern "C" {
+    pub fn glGetStringi(name: GLenum, index: GLuint) -> *const GLubyte;
+}
+extern "C" {
     pub fn glCopyBufferSubData(
         readTarget: GLenum,
         writeTarget: GLenum,
@@ -1460,4 +1474,8 @@ extern "C" {
         bufSize: GLsizei,
         params: *mut GLint,
     );
+}
+
+pub unsafe fn is_gl2() -> bool {
+    false
 }

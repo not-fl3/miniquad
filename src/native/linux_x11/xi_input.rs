@@ -62,13 +62,15 @@ type XISelectEvents =
 type XGetEventData = fn(_: *mut Display, _: *mut libx11::XGenericEventCookie) -> libc::c_int;
 type XFreeEventData = fn(_: *mut Display, _: *mut libx11::XGenericEventCookie);
 
+#[derive(Clone)]
 pub struct LibXi {
-    _module: crate::native::module::Module,
+    _module: std::rc::Rc<crate::native::module::Module>,
     _XQueryExtension: XQueryExtension,
     XIQueryVersion: XIQueryVersion,
     XISelectEvents: XISelectEvents,
     XGetEventData: XGetEventData,
     XFreeEventData: XFreeEventData,
+    xi_extension_opcode: Option<i32>,
 }
 
 impl LibXi {
@@ -81,9 +83,19 @@ impl LibXi {
                 XISelectEvents: module.get_symbol("XISelectEvents").unwrap(),
                 XGetEventData: module.get_symbol("XGetEventData").unwrap(),
                 XFreeEventData: module.get_symbol("XFreeEventData").unwrap(),
-                _module: module,
+                xi_extension_opcode: None,
+                _module: std::rc::Rc::new(module),
             })
             .ok()
+    }
+
+    pub unsafe fn xi_extension_opcode(
+        &mut self,
+        libx11: &mut libx11::LibX11,
+        display: *mut Display,
+    ) -> Option<i32> {
+        self.xi_extension_opcode
+            .or_else(|| self.query_xi_extension(libx11, display))
     }
 
     pub unsafe fn query_xi_extension(

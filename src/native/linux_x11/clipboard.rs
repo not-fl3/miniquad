@@ -4,7 +4,7 @@
 //! Clipboard API on X11 is pretty weird https://www.uninformativ.de/blog/postings/2017-04-02/0/POSTING-en.html
 //! so use this with caution.
 
-use super::{libx11::*, X11Display};
+use super::libx11::*;
 
 const CurrentTime: libc::c_long = 0 as libc::c_long;
 const SelectionRequest: libc::c_int = 30 as libc::c_int;
@@ -14,7 +14,9 @@ const AnyPropertyType: libc::c_long = 0 as libc::c_long;
 type Time = libc::c_ulong;
 
 pub unsafe fn get_clipboard(
-    display: &mut X11Display,
+    libx11: &mut LibX11,
+    display: *mut Display,
+    window: Window,
     bufname: *const libc::c_char,
     fmtname: *const libc::c_char,
 ) -> Option<String> {
@@ -22,15 +24,15 @@ pub unsafe fn get_clipboard(
     let mut ressize: libc::c_ulong = 0;
     let mut restail: libc::c_ulong = 0;
     let mut resbits: libc::c_int = 0;
-    let bufid = (display.libx11.XInternAtom)(display.display, bufname, false as _);
-    let mut fmtid = (display.libx11.XInternAtom)(display.display, fmtname, false as _);
-    let propid = (display.libx11.XInternAtom)(
-        display.display,
+    let bufid = (libx11.XInternAtom)(display, bufname, false as _);
+    let mut fmtid = (libx11.XInternAtom)(display, fmtname, false as _);
+    let propid = (libx11.XInternAtom)(
+        display,
         b"XSEL_DATA\x00" as *const u8 as *const libc::c_char,
         false as _,
     );
-    let incrid = (display.libx11.XInternAtom)(
-        display.display,
+    let incrid = (libx11.XInternAtom)(
+        display,
         b"INCR\x00" as *const u8 as *const libc::c_char,
         false as _,
     );
@@ -40,14 +42,7 @@ pub unsafe fn get_clipboard(
     // Selection owner is other X11 application and if it will not satisfy our request for any reason -
     // we will wait for appropriate event forever
     // but OK lets believe that all other linux apps will gracefully send us nice utf-8 strings
-    (display.libx11.XConvertSelection)(
-        display.display,
-        bufid,
-        fmtid,
-        propid,
-        display.window,
-        CurrentTime as Time,
-    );
+    (libx11.XConvertSelection)(display, bufid, fmtid, propid, window, CurrentTime as Time);
 
     // And now X server will respond with clipboard data
     // But we want "get_clipboard" to be blocking function and get result asap
@@ -55,12 +50,12 @@ pub unsafe fn get_clipboard(
     // In case that our app already is clipboard owner - we need to handle SelectionNotify for data response
     // and SelectionRequest - to handle this request we just did couple of lines above
     loop {
-        (display.libx11.XNextEvent)(display.display, &mut event);
+        (libx11.XNextEvent)(display, &mut event);
         if !(event.type_0 != SelectionNotify || event.xselection.selection != bufid) {
             break;
         }
         if event.type_0 == SelectionRequest {
-            respond_to_clipboard_request(display, &mut event as *mut _);
+            respond_to_clipboard_request(libx11, display, &mut event as *mut _);
         }
     }
     if event.xselection.property != 0 {
@@ -68,9 +63,9 @@ pub unsafe fn get_clipboard(
         let mut bytes: Vec<u8> = vec![];
         let mut offset: libc::c_long = 0 as libc::c_long;
         loop {
-            (display.libx11.XGetWindowProperty)(
-                display.display,
-                display.window,
+            (libx11.XGetWindowProperty)(
+                display,
+                window,
                 propid,
                 offset,
                 read_size,
@@ -83,13 +78,13 @@ pub unsafe fn get_clipboard(
                 &mut result as *mut *mut libc::c_char as *mut *mut libc::c_uchar,
             );
             if fmtid == incrid {
-                (display.libx11.XFree)(result as *mut libc::c_void);
+                (libx11.XFree)(result as *mut libc::c_void);
                 panic!("Buffer is too large and INCR reading is not implemented yet.");
             } else {
                 let slice = std::slice::from_raw_parts(result as *const _, ressize as _);
                 bytes.extend(slice);
 
-                (display.libx11.XFree)(result as *mut libc::c_void);
+                (libx11.XFree)(result as *mut libc::c_void);
 
                 if restail == 0 {
                     return std::str::from_utf8(&bytes[..]).map(|s| s.to_owned()).ok();
@@ -109,22 +104,19 @@ static mut MESSAGE: Option<String> = None;
 /// Claim that our app is X11 clipboard owner
 /// Now when some other linux app will ask X11 for clipboard content - it will be redirected to our app
 pub unsafe fn claim_clipboard_ownership(
-    display: &mut X11Display,
+    libx11: &mut LibX11,
+    display: *mut Display,
+    window: Window,
     bufname: *const libc::c_char,
     message: String,
 ) {
-    let selection = (display.libx11.XInternAtom)(
-        display.display,
+    let selection = (libx11.XInternAtom)(
+        display,
         bufname as *const u8 as *const libc::c_char,
         0 as libc::c_int,
     );
 
-    (display.libx11.XSetSelectionOwner)(
-        display.display,
-        selection,
-        display.window,
-        0 as libc::c_int as Time,
-    );
+    (libx11.XSetSelectionOwner)(display, selection, window, 0 as libc::c_int as Time);
 
     MESSAGE = Some(message);
 }
@@ -132,14 +124,18 @@ pub unsafe fn claim_clipboard_ownership(
 /// this function is supposed to be called from sapp's event loop
 /// when XSelectionEvent received.
 /// It will parse event and call XSendEvent with event response
-pub(crate) unsafe fn respond_to_clipboard_request(display: &mut X11Display, event: *const XEvent) {
+pub(crate) unsafe fn respond_to_clipboard_request(
+    libx11: &mut LibX11,
+    display: *mut Display,
+    event: *const XEvent,
+) {
     assert!((*event).type_0 == 30); // is it really SelectionRequest
 
     let empty_message = String::new();
     let message = MESSAGE.as_ref().unwrap_or(&empty_message);
 
-    let UTF8 = (display.libx11.XInternAtom)(
-        display.display,
+    let UTF8 = (libx11.XInternAtom)(
+        display,
         b"UTF8_STRING\x00" as *const u8 as *const libc::c_char,
         1 as libc::c_int,
     );
@@ -158,7 +154,7 @@ pub(crate) unsafe fn respond_to_clipboard_request(display: &mut X11Display, even
 
     // only UTF8 requests are supported
     if xselectionrequest.target == UTF8 {
-        (display.libx11.XChangeProperty)(
+        (libx11.XChangeProperty)(
             xselectionrequest.display,
             xselectionrequest.requestor,
             xselectionrequest.property,
@@ -169,8 +165,8 @@ pub(crate) unsafe fn respond_to_clipboard_request(display: &mut X11Display, even
             message.as_bytes().len() as _,
         );
 
-        (display.libx11.XSendEvent)(
-            display.display,
+        (libx11.XSendEvent)(
+            display,
             ev.requestor,
             0 as libc::c_int,
             0 as libc::c_int as libc::c_long,
@@ -180,8 +176,8 @@ pub(crate) unsafe fn respond_to_clipboard_request(display: &mut X11Display, even
         // signal X that request is denied
         ev.property = 0 as Atom;
 
-        (display.libx11.XSendEvent)(
-            display.display,
+        (libx11.XSendEvent)(
+            display,
             ev.requestor,
             0 as libc::c_int,
             0 as libc::c_int as libc::c_long,

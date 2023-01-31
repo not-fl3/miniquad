@@ -10,30 +10,31 @@ struct Stage {
     offscreen_pass: RenderPass,
     rx: f32,
     ry: f32,
+    ctx: Box<dyn RenderingBackend>,
 }
 
 impl Stage {
-    pub fn new(ctx: &mut Context) -> Stage {
-        let color_img = Texture::new_render_texture(
-            ctx,
-            TextureParams {
-                width: 256,
-                height: 256,
-                format: TextureFormat::RGBA8,
-                ..Default::default()
-            },
-        );
-        let depth_img = Texture::new_render_texture(
-            ctx,
-            TextureParams {
-                width: 256,
-                height: 256,
-                format: TextureFormat::Depth,
-                ..Default::default()
-            },
-        );
+    pub fn new(metal: bool) -> Stage {
+        let mut ctx: Box<dyn RenderingBackend> = if metal {
+            Box::new(MetalContext::new())
+        } else {
+            Box::new(GlContext::new())
+        };
 
-        let offscreen_pass = RenderPass::new(ctx, color_img, depth_img);
+        let color_img = ctx.new_render_texture(TextureParams {
+            width: 256,
+            height: 256,
+            format: TextureFormat::RGBA8,
+            ..Default::default()
+        });
+        let depth_img = ctx.new_render_texture(TextureParams {
+            width: 256,
+            height: 256,
+            format: TextureFormat::Depth,
+            ..Default::default()
+        });
+
+        let offscreen_pass = ctx.new_render_pass(color_img, Some(depth_img));
 
         #[rustfmt::skip]
         let vertices: &[f32] = &[
@@ -69,7 +70,8 @@ impl Stage {
              1.0,  1.0, -1.0,    1.0, 0.0, 0.5, 1.0,     0.0, 1.0
         ];
 
-        let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
+        let vertex_buffer =
+            ctx.new_buffer_immutable(BufferType::VertexBuffer, Arg::slice(&vertices));
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
@@ -81,7 +83,7 @@ impl Stage {
             22, 21, 20,  23, 22, 20
         ];
 
-        let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
+        let index_buffer = ctx.new_buffer_immutable(BufferType::IndexBuffer, Arg::slice(&indices));
 
         let offscreen_bind = Bindings {
             vertex_buffers: vec![vertex_buffer.clone()],
@@ -95,21 +97,23 @@ impl Stage {
             images: vec![color_img],
         };
 
-        let default_shader = Shader::new(
-            ctx,
-            display_shader::VERTEX,
-            display_shader::FRAGMENT,
-            display_shader::meta(),
-        )
-        .unwrap();
+        let default_shader = ctx
+            .new_shader(
+                ShaderSource {
+                    glsl_vertex: Some(display_shader::VERTEX),
+                    glsl_fragment: Some(display_shader::FRAGMENT),
+                    metal_shader: Some(display_shader::METAL),
+                },
+                display_shader::meta(),
+            )
+            .unwrap();
 
-        let display_pipeline = Pipeline::with_params(
-            ctx,
+        let display_pipeline = ctx.new_pipeline_with_params(
             &[BufferLayout::default()],
             &[
-                VertexAttribute::new("pos", VertexFormat::Float3),
-                VertexAttribute::new("color0", VertexFormat::Float4),
-                VertexAttribute::new("uv0", VertexFormat::Float2),
+                VertexAttribute::new("in_pos", VertexFormat::Float3),
+                VertexAttribute::new("in_color", VertexFormat::Float4),
+                VertexAttribute::new("in_uv", VertexFormat::Float2),
             ],
             default_shader,
             PipelineParams {
@@ -119,23 +123,25 @@ impl Stage {
             },
         );
 
-        let offscreen_shader = Shader::new(
-            ctx,
-            offscreen_shader::VERTEX,
-            offscreen_shader::FRAGMENT,
-            offscreen_shader::meta(),
-        )
-        .unwrap();
+        let offscreen_shader = ctx
+            .new_shader(
+                ShaderSource {
+                    glsl_vertex: Some(offscreen_shader::VERTEX),
+                    glsl_fragment: Some(offscreen_shader::FRAGMENT),
+                    metal_shader: Some(offscreen_shader::METAL),
+                },
+                offscreen_shader::meta(),
+            )
+            .unwrap();
 
-        let offscreen_pipeline = Pipeline::with_params(
-            ctx,
+        let offscreen_pipeline = ctx.new_pipeline_with_params(
             &[BufferLayout {
                 stride: 36,
                 ..Default::default()
             }],
             &[
-                VertexAttribute::new("pos", VertexFormat::Float3),
-                VertexAttribute::new("color0", VertexFormat::Float4),
+                VertexAttribute::new("in_pos", VertexFormat::Float3),
+                VertexAttribute::new("in_color", VertexFormat::Float4),
             ],
             offscreen_shader,
             PipelineParams {
@@ -153,15 +159,16 @@ impl Stage {
             offscreen_pass,
             rx: 0.,
             ry: 0.,
+            ctx,
         }
     }
 }
 
 impl EventHandler for Stage {
-    fn update(&mut self, _ctx: &mut Context) {}
+    fn update(&mut self) {}
 
-    fn draw(&mut self, ctx: &mut Context) {
-        let (width, height) = ctx.screen_size();
+    fn draw(&mut self) {
+        let (width, height) = screen_size();
         let proj = Mat4::perspective_rh_gl(60.0f32.to_radians(), width / height, 0.01, 10.0);
         let view = Mat4::look_at_rh(
             vec3(0.0, 1.5, 3.0),
@@ -178,46 +185,51 @@ impl EventHandler for Stage {
             mvp: view_proj * model,
         };
 
+
         // the offscreen pass, rendering an rotating, untextured cube into a render target image
-        ctx.begin_pass(
-            self.offscreen_pass,
-            PassAction::clear_color(1.0, 1.0, 1.0, 1.),
+        self.ctx.begin_pass(
+            Some(self.offscreen_pass),
+            PassAction::clear_color(1.0, 1.0, 1.0, 1.0),
         );
-        ctx.apply_pipeline(&self.offscreen_pipeline);
-        ctx.apply_bindings(&self.offscreen_bind);
-        ctx.apply_uniforms(&vs_params);
-        ctx.draw(0, 36, 1);
-        ctx.end_render_pass();
+        self.ctx.apply_pipeline(&self.offscreen_pipeline);
+        self.ctx.apply_bindings(&self.offscreen_bind);
+        self.ctx.apply_uniforms(Arg::val(&vs_params));
+        self.ctx.draw(0, 36, 1);
+        self.ctx.end_render_pass();
 
         // and the display-pass, rendering a rotating, textured cube, using the
         // previously rendered offscreen render-target as texture
-        ctx.begin_default_pass(PassAction::clear_color(0.0, 0., 0.45, 1.));
-        ctx.apply_pipeline(&self.display_pipeline);
-        ctx.apply_bindings(&self.display_bind);
-        ctx.apply_uniforms(&vs_params);
-        ctx.draw(0, 36, 1);
-        ctx.end_render_pass();
-        ctx.commit_frame();
+        self.ctx
+            .begin_default_pass(PassAction::clear_color(0.0, 0., 0.45, 1.));
+        self.ctx.apply_pipeline(&self.display_pipeline);
+        self.ctx.apply_bindings(&self.display_bind);
+        self.ctx.apply_uniforms(Arg::val(&vs_params));
+        self.ctx.draw(0, 36, 1);
+        self.ctx.end_render_pass();
+
+        self.ctx.commit_frame();
     }
 }
 
 fn main() {
-    miniquad::start(
-        conf::Conf {
-            window_title: "Miniquad".to_string(),
-            ..Default::default()
-        },
-        |mut ctx| Box::new(Stage::new(&mut ctx)),
-    );
+    let mut conf = conf::Conf::default();
+    let metal = std::env::args().nth(1).as_deref() == Some("metal");
+    conf.platform.macos_gfx_api = if metal {
+        conf::MacosGfxApi::Metal
+    } else {
+        conf::MacosGfxApi::OpenGl
+    };
+
+    miniquad::start(conf, move || Box::new(Stage::new(metal)));
 }
 
 mod display_shader {
     use miniquad::*;
 
     pub const VERTEX: &str = r#"#version 100
-    attribute vec4 pos;
-    attribute vec4 color0;
-    attribute vec2 uv0;
+    attribute vec4 in_pos;
+    attribute vec4 in_color;
+    attribute vec2 in_uv;
 
     varying lowp vec4 color;
     varying lowp vec2 uv;
@@ -225,9 +237,9 @@ mod display_shader {
     uniform mat4 mvp;
 
     void main() {
-        gl_Position = mvp * pos;
-        color = color0;
-        uv = uv0;
+        gl_Position = mvp * in_pos;
+        color = in_color;
+        uv = in_uv;
     }
     "#;
 
@@ -241,6 +253,44 @@ mod display_shader {
         gl_FragColor = color * texture2D(tex, uv);
     }
     "#;
+
+    pub const METAL: &str = r#"#include <metal_stdlib>
+    using namespace metal;
+
+    struct Uniforms
+    {
+        float4x4 mvp;
+    };
+
+    struct Vertex
+    {
+        float3 in_pos      [[attribute(0)]];
+        float4 in_color    [[attribute(1)]];
+        float2 in_uv       [[attribute(2)]];
+    };
+
+    struct RasterizerData
+    {
+        float4 position [[position]];
+        float4 color [[user(locn0)]];
+        float2 uv [[user(locn1)]];
+    };
+
+    vertex RasterizerData vertexShader(Vertex v [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
+    {
+        RasterizerData out;
+
+        out.position = uniforms.mvp * float4(v.in_pos, 1.0);
+        out.color = v.in_color;
+        out.uv = v.in_uv;
+
+        return out;
+    }
+
+    fragment float4 fragmentShader(RasterizerData in [[stage_in]], texture2d<float> tex [[texture(0)]], sampler texSmplr [[sampler(0)]])
+    {
+        return in.color * tex.sample(texSmplr, in.uv);
+    }"#;
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {
@@ -261,16 +311,16 @@ mod offscreen_shader {
     use miniquad::*;
 
     pub const VERTEX: &str = r#"#version 100
-    attribute vec4 pos;
-    attribute vec4 color0;
+    attribute vec4 in_pos;
+    attribute vec4 in_color;
 
     varying lowp vec4 color;
 
     uniform mat4 mvp;
 
     void main() {
-        gl_Position = mvp * pos;
-        color = color0;
+        gl_Position = mvp * in_pos;
+        color = in_color;
     }
     "#;
 
@@ -281,6 +331,42 @@ mod offscreen_shader {
         gl_FragColor = color;
     }
     "#;
+
+    pub const METAL: &str = r#"#include <metal_stdlib>
+
+    using namespace metal;
+
+    struct Uniforms
+    {
+        float4x4 mvp;
+    };
+
+    struct Vertex
+    {
+        float3 in_pos      [[attribute(0)]];
+        float4 in_color    [[attribute(1)]];
+    };
+
+    struct RasterizerData
+    {
+        float4 position [[position]];
+        float4 color [[user(locn0)]];
+    };
+
+    vertex RasterizerData vertexShader(Vertex v [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
+    {
+        RasterizerData out;
+
+        out.position = uniforms.mvp * float4(v.in_pos, 1.0);
+        out.color = v.in_color;
+
+        return out;
+    }
+
+    fragment float4 fragmentShader(RasterizerData in [[stage_in]])
+    {
+        return in.color;
+    }"#;
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {

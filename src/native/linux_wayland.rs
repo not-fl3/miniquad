@@ -13,10 +13,9 @@ use libwayland_egl::*;
 use crate::{
     event::EventHandler,
     native::{egl, NativeDisplayData},
-    Context, GraphicsContext,
 };
 
-pub(crate) struct WaylandDisplay {
+pub struct WaylandDisplay {
     client: LibWaylandClient,
     // this is libwayland-egl.so, a library with ~4 functions
     // not the libEGL.so(which will be loaded, but not here)
@@ -75,24 +74,46 @@ impl crate::native::NativeDisplay for WaylandDisplay {
         self
     }
 }
+pub mod tl_display {
+    use super::*;
+    use crate::NATIVE_DISPLAY;
+    use std::cell::RefCell;
+
+    thread_local! {
+        static DISPLAY: RefCell<Option<WaylandDisplay>> = RefCell::new(None);
+    }
+
+    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let d = d.as_mut().unwrap();
+            f(&mut *d);
+        })
+    }
+
+    pub fn with<T>(mut f: impl FnMut(&mut WaylandDisplay) -> T) -> T {
+        DISPLAY.with(|d| {
+            let mut d = d.borrow_mut();
+            let d = d.as_mut().unwrap();
+            f(&mut *d)
+        })
+    }
+
+    pub fn is_display_set() -> bool {
+        DISPLAY.with(|d| d.borrow().is_some())
+    }
+
+    pub fn set_display(display: WaylandDisplay) {
+        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
+        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
+    }
+}
 
 /// A thing to pass around within *void pointer of wayland's event handler
 struct WaylandPayload {
-    display: WaylandDisplay,
-    context: Option<GraphicsContext>,
     event_handler: Option<Box<dyn EventHandler>>,
-}
-
-impl WaylandPayload {
-    pub fn context(&mut self) -> (&mut Context, &mut Option<Box<dyn EventHandler>>) {
-        (
-            self.context
-                .as_mut()
-                .unwrap()
-                .with_display(&mut self.display),
-            &mut self.event_handler,
-        )
-    }
+    client: LibWaylandClient,
+    surface: *mut wl_surface,
 }
 
 #[macro_export]
@@ -157,8 +178,12 @@ unsafe extern "C" fn registry_add_object(
     interface: *const ::std::os::raw::c_char,
     version: u32,
 ) {
-    let payload: &mut WaylandPayload = &mut *(data as *mut _);
-    let display = &mut payload.display;
+    assert!(
+        !tl_display::is_display_set(),
+        "registry_add_object assume display was not moved into a thread local yet"
+    );
+
+    let display: &mut WaylandDisplay = &mut *(data as *mut _);
 
     let interface = std::ffi::CStr::from_ptr(interface).to_str().unwrap();
     println!("{:?}", interface);
@@ -245,16 +270,12 @@ unsafe extern "C" fn xdg_surface_handle_configure(
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
 
     wl_request!(
-        payload.display.client,
+        payload.client,
         xdg_surface,
         extensions::xdg_shell::xdg_surface::ack_configure,
         serial
     );
-    wl_request!(
-        payload.display.client,
-        payload.display.surface,
-        WL_SURFACE_COMMIT
-    );
+    wl_request!(payload.client, payload.surface, WL_SURFACE_COMMIT)
 }
 
 unsafe extern "C" fn xdg_toplevel_handle_close(
@@ -262,9 +283,9 @@ unsafe extern "C" fn xdg_toplevel_handle_close(
     _xdg_toplevel: *mut extensions::xdg_shell::xdg_toplevel,
 ) {
     assert!(!data.is_null());
-    let mut payload: &mut WaylandPayload = &mut *(data as *mut _);
-
-    payload.display.closed = true;
+    tl_display::with(|d| {
+        d.closed = true;
+    });
 }
 
 unsafe extern "C" fn xdg_toplevel_handle_configure(
@@ -276,38 +297,37 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
 ) -> () {
     assert!(!data.is_null());
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
-    let display = &mut payload.display;
 
     if width != 0 && height != 0 {
-        let (egl_w, egl_h) = if display.decorations.is_some() {
-            // Otherwise window will resize iteself on sway
-            // I have no idea why
-            (
-                width - decorations::Decorations::WIDTH * 2,
-                height - decorations::Decorations::BAR_HEIGHT - decorations::Decorations::WIDTH,
-            )
-        } else {
-            (width, height)
-        };
-        (display.egl.wl_egl_window_resize)(display.egl_window, egl_w, egl_h, 0, 0);
+        tl_display::with(|display| {
+            let (egl_w, egl_h) = if display.decorations.is_some() {
+                // Otherwise window will resize iteself on sway
+                // I have no idea why
+                (
+                    width - decorations::Decorations::WIDTH * 2,
+                    height - decorations::Decorations::BAR_HEIGHT - decorations::Decorations::WIDTH,
+                )
+            } else {
+                (width, height)
+            };
+            (display.egl.wl_egl_window_resize)(display.egl_window, egl_w, egl_h, 0, 0);
 
-        display.data.screen_width = width;
-        display.data.screen_height = height;
+            display.data.screen_width = width;
+            display.data.screen_height = height;
 
-        if let Some(ref decorations) = display.decorations {
-            decorations.resize(&mut display.client, width, height);
-        }
-
-        drop(display);
-        if let (mut context, Some(event_handler)) = payload.context() {
-            event_handler.resize_event(&mut context, width as _, height as _);
+            if let Some(ref decorations) = display.decorations {
+                decorations.resize(&mut display.client, width, height);
+            }
+        });
+        if let Some(ref mut event_handler) = payload.event_handler {
+            event_handler.resize_event(width as _, height as _);
         }
     }
 }
 
 pub fn run<F>(conf: &crate::conf::Conf, f: &mut Option<F>) -> Option<()>
 where
-    F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     unsafe {
         let client = LibWaylandClient::try_load()?;
@@ -315,7 +335,7 @@ where
 
         let wdisplay = (client.wl_display_connect)(std::ptr::null_mut());
         if wdisplay.is_null() {
-            println!("Failed to connect to Wayland payload.display.");
+            println!("Failed to connect to Wayland display.");
             return None;
         }
 
@@ -332,8 +352,8 @@ where
             global_remove: Some(registry_remove_object),
         };
 
-        let display = WaylandDisplay {
-            client,
+        let mut display = WaylandDisplay {
+            client: client.clone(),
             egl,
             compositor: std::ptr::null_mut(),
             subcompositor: std::ptr::null_mut(),
@@ -353,24 +373,19 @@ where
             closed: false,
             data: Default::default(),
         };
-        let mut payload = WaylandPayload {
-            display,
-            context: None,
-            event_handler: None,
-        };
-        (payload.display.client.wl_proxy_add_listener)(
+        (display.client.wl_proxy_add_listener)(
             registry,
             &registry_listener as *const _ as _,
-            &mut payload as *mut _ as _,
+            &mut display as *mut _ as _,
         );
-        (payload.display.client.wl_display_roundtrip)(wdisplay);
+        (display.client.wl_display_roundtrip)(wdisplay);
 
-        assert!(payload.display.compositor.is_null() == false);
-        assert!(payload.display.xdg_wm_base.is_null() == false);
-        assert!(payload.display.subcompositor.is_null() == false);
-        assert!(payload.display.seat.is_null() == false);
+        assert!(display.compositor.is_null() == false);
+        assert!(display.xdg_wm_base.is_null() == false);
+        assert!(display.subcompositor.is_null() == false);
+        assert!(display.seat.is_null() == false);
 
-        if payload.display.decoration_manager.is_null() {
+        if display.decoration_manager.is_null() {
             println!("Decoration manager not found, will draw fallback decorations");
         }
 
@@ -382,20 +397,20 @@ where
         )
         .unwrap();
 
-        payload.display.surface = wl_request_constructor!(
-            payload.display.client,
-            payload.display.compositor,
+        display.surface = wl_request_constructor!(
+            display.client,
+            display.compositor,
             WL_COMPOSITOR_CREATE_SURFACE,
-            payload.display.client.wl_surface_interface
+            display.client.wl_surface_interface
         );
-        assert!(payload.display.surface.is_null() == false);
+        assert!(display.surface.is_null() == false);
 
         let xdg_surface: *mut extensions::xdg_shell::xdg_surface = wl_request_constructor!(
-            payload.display.client,
-            payload.display.xdg_wm_base,
+            display.client,
+            display.xdg_wm_base,
             extensions::xdg_shell::xdg_wm_base::get_xdg_surface,
             &extensions::xdg_shell::xdg_surface_interface,
-            payload.display.surface
+            display.surface
         );
         assert!(xdg_surface.is_null() == false);
 
@@ -403,40 +418,42 @@ where
             configure: Some(xdg_surface_handle_configure),
         };
 
-        (payload.display.client.wl_proxy_add_listener)(
+        let mut payload = WaylandPayload {
+            event_handler: None,
+            client: client.clone(),
+            surface: display.surface,
+        };
+
+        (display.client.wl_proxy_add_listener)(
             xdg_surface as _,
             &xdg_surface_listener as *const _ as _,
             &mut payload as *mut _ as _,
         );
 
-        payload.display.xdg_toplevel = wl_request_constructor!(
-            payload.display.client,
+        display.xdg_toplevel = wl_request_constructor!(
+            display.client,
             xdg_surface,
             extensions::xdg_shell::xdg_surface::get_toplevel,
             &extensions::xdg_shell::xdg_toplevel_interface
         );
-        assert!(payload.display.xdg_toplevel.is_null() == false);
+        assert!(display.xdg_toplevel.is_null() == false);
 
         let xdg_toplevel_listener = extensions::xdg_shell::xdg_toplevel_listener {
             configure: Some(xdg_toplevel_handle_configure),
             close: Some(xdg_toplevel_handle_close),
         };
 
-        (payload.display.client.wl_proxy_add_listener)(
-            payload.display.xdg_toplevel as _,
+        (display.client.wl_proxy_add_listener)(
+            display.xdg_toplevel as _,
             &xdg_toplevel_listener as *const _ as _,
             &mut payload as *mut _ as _,
         );
 
-        wl_request!(
-            payload.display.client,
-            payload.display.surface,
-            WL_SURFACE_COMMIT
-        );
-        (payload.display.client.wl_display_roundtrip)(wdisplay);
+        wl_request!(display.client, display.surface, WL_SURFACE_COMMIT);
+        (display.client.wl_display_roundtrip)(wdisplay);
 
-        payload.display.egl_window = (payload.display.egl.wl_egl_window_create)(
-            payload.display.surface as _,
+        display.egl_window = (display.egl.wl_egl_window_create)(
+            display.surface as _,
             conf.window_width as _,
             conf.window_height as _,
         );
@@ -444,7 +461,7 @@ where
         let egl_surface = (libegl.eglCreateWindowSurface.unwrap())(
             egl_display,
             config,
-            payload.display.egl_window as _,
+            display.egl_window as _,
             std::ptr::null_mut(),
         );
 
@@ -460,43 +477,44 @@ where
             libegl.eglGetProcAddress.expect("non-null function pointer")(name.as_ptr() as _)
         });
 
-        if payload.display.decoration_manager.is_null() == false {
+        if display.decoration_manager.is_null() == false {
             let server_decoration: *mut extensions::xdg_decoration::zxdg_toplevel_decoration_v1 = wl_request_constructor!(
-                payload.display.client,
-                payload.display.decoration_manager,
+                display.client,
+                display.decoration_manager,
                 extensions::xdg_decoration::zxdg_decoration_manager_v1::get_toplevel_decoration,
                 &extensions::xdg_decoration::zxdg_toplevel_decoration_v1_interface,
-                payload.display.xdg_toplevel
+                display.xdg_toplevel
             );
             assert!(server_decoration.is_null() == false);
 
             wl_request!(
-                payload.display.client,
+                display.client,
                 server_decoration,
                 extensions::xdg_decoration::zxdg_toplevel_decoration_v1::set_mode,
                 extensions::xdg_decoration::ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
             );
         } else {
-            payload.display.decorations = Some(decorations::Decorations::new(
-                &mut payload.display,
+            display.decorations = Some(decorations::Decorations::new(
+                &mut display,
                 conf.window_width,
                 conf.window_height,
             ));
         }
+        display.data.screen_width = conf.window_width;
+        display.data.screen_height = conf.window_height;
 
-        payload.context = Some(crate::GraphicsContext::new(false));
-        payload.display.data.screen_width = conf.window_width;
-        payload.display.data.screen_height = conf.window_height;
+        tl_display::set_display(display);
 
-        let event_handler = (f.take().unwrap())(&mut payload.context().0);
+        let event_handler = (f.take().unwrap())();
         payload.event_handler = Some(event_handler);
 
-        while payload.display.closed == false {
-            (payload.display.client.wl_display_dispatch_pending)(wdisplay);
+        while tl_display::with(|d| d.closed == false) {
+            (client.wl_display_dispatch_pending)(wdisplay);
 
-            let (mut context, event_handler) = payload.context();
-            event_handler.as_mut().unwrap().update(&mut context);
-            event_handler.as_mut().unwrap().draw(&mut context);
+            if let Some(ref mut event_handler) = payload.event_handler {
+                event_handler.update();
+                event_handler.draw();
+            }
 
             (libegl.eglSwapBuffers.unwrap())(egl_display, egl_surface);
         }

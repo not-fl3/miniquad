@@ -977,8 +977,20 @@ pub type XCreatePixmapCursor = unsafe extern "C" fn(
 pub type XFreePixmap = unsafe extern "C" fn(_: *mut Display, _: Pixmap) -> libc::c_int;
 pub type XDefineCursor = unsafe extern "C" fn(_: *mut Display, _: Window, _: Cursor) -> libc::c_int;
 
+#[derive(Clone, Default)]
+pub struct X11Extensions {
+    pub utf8_string: Atom,
+    pub wm_protocols: Atom,
+    pub wm_delete_window: Atom,
+    pub _wm_state: Atom,
+    pub net_wm_name: Atom,
+    pub net_wm_icon_name: Atom,
+}
+
+#[derive(Clone)]
 pub struct LibX11 {
-    pub module: module::Module,
+    pub module: std::rc::Rc<module::Module>,
+    pub extensions: X11Extensions,
     pub XSetWMNormalHints: XSetWMNormalHints,
     pub XAllocSizeHints: XAllocSizeHints,
     pub Xutf8SetWMProperties: Xutf8SetWMProperties,
@@ -1076,8 +1088,44 @@ impl LibX11 {
                 XCreatePixmapCursor: module.get_symbol("XCreatePixmapCursor").unwrap(),
                 XFreePixmap: module.get_symbol("XFreePixmap").unwrap(),
                 XDefineCursor: module.get_symbol("XDefineCursor").unwrap(),
-                module,
+                extensions: X11Extensions::default(),
+                module: std::rc::Rc::new(module),
             })
             .ok()
+    }
+
+    pub unsafe fn load_extensions(&mut self, display: *mut Display) {
+        self.extensions = X11Extensions {
+            utf8_string: (self.XInternAtom)(
+                display,
+                b"UTF8_STRING\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            wm_protocols: (self.XInternAtom)(
+                display,
+                b"WM_PROTOCOLS\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            wm_delete_window: (self.XInternAtom)(
+                display,
+                b"WM_DELETE_WINDOW\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            _wm_state: (self.XInternAtom)(
+                display,
+                b"WM_STATE\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            net_wm_name: (self.XInternAtom)(
+                display,
+                b"_NET_WM_NAME\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            net_wm_icon_name: (self.XInternAtom)(
+                display,
+                b"_NET_WM_ICON_NAME\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+        };
     }
 }
