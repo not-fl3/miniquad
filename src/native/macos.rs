@@ -335,7 +335,8 @@ unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
     Some(unsafe { std::mem::transmute_copy(&symbol) })
 }
 
-unsafe fn wtf(decl: &mut ClassDecl) {
+// methods for both metal or opengl view
+unsafe fn view_base_decl(decl: &mut ClassDecl) {
     extern "C" fn mouse_moved(this: &Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
 
@@ -592,7 +593,7 @@ pub fn define_opengl_view_class() -> *const Class {
             draw_rect as extern "C" fn(&Object, Sel, NSRect),
         );
 
-        wtf(&mut decl);
+        view_base_decl(&mut decl);
     }
 
     decl.add_ivar::<*mut c_void>("display_ptr");
@@ -643,7 +644,7 @@ pub fn define_metal_view_class() -> *const Class {
             draw_rect as extern "C" fn(&Object, Sel, NSRect),
         );
 
-        wtf(&mut decl);
+        view_base_decl(&mut decl);
     }
 
     return decl.register();

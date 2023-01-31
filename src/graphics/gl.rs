@@ -745,7 +745,7 @@ impl RenderingBackend for GlContext {
     /// let buffer = ctx.new_buffer_immutable(BufferType::VertexBuffer, &vertices);
     /// ```
     fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: Arg) -> BufferId {
-        assert!(data.is_slice);
+        debug_assert!(data.is_slice);
         let index_type = if buffer_type == BufferType::IndexBuffer {
             Some(IndexType::for_type_size(data.element_size))
         } else {
@@ -829,7 +829,7 @@ impl RenderingBackend for GlContext {
     }
 
     fn buffer_update(&mut self, buffer: BufferId, data: Arg) {
-        assert!(data.is_slice);
+        debug_assert!(data.is_slice);
         let buffer = &self.buffers[buffer.0];
         if buffer.buffer_type == BufferType::IndexBuffer {
             assert!(buffer.index_type.is_some());

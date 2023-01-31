@@ -8,7 +8,13 @@ use std::{error::Error, fmt::Display};
 
 mod gl;
 
+#[cfg(target_vendor = "apple")]
+mod metal;
+
 pub use gl::GlContext;
+
+#[cfg(target_vendor = "apple")]
+pub use metal::MetalContext;
 
 #[derive(Clone, Copy, Debug)]
 pub enum UniformType {
