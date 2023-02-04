@@ -1410,6 +1410,7 @@ pub enum PrimitiveType {
     TriangleStrip,
     Lines,
     LineStrip,
+    Points,
 }
 
 impl From<PrimitiveType> for GLenum {
@@ -1419,6 +1420,7 @@ impl From<PrimitiveType> for GLenum {
             PrimitiveType::TriangleStrip => GL_TRIANGLE_STRIP,
             PrimitiveType::Lines => GL_LINES,
             PrimitiveType::LineStrip => GL_LINE_STRIP,
+            PrimitiveType::Points => GL_POINTS,
         }
     }
 }
