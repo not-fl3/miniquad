@@ -1406,19 +1406,29 @@ impl From<CompareFunc> for GLenum {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum PrimitiveType {
+    Points,
+    Lines,
+    LineLoop,
+    LineStrip,
     Triangles,
     TriangleStrip,
-    Lines,
-    LineStrip,
+    TriangleFan,
+    Quads,
+    QuadStrip,
 }
 
 impl From<PrimitiveType> for GLenum {
     fn from(primitive_type: PrimitiveType) -> Self {
         match primitive_type {
+            PrimitiveType::Points => GL_POINTS,
+            PrimitiveType::Lines => GL_LINES,
+            PrimitiveType::LineLoop => GL_LINE_LOOP,
+            PrimitiveType::LineStrip => GL_LINE_STRIP,
             PrimitiveType::Triangles => GL_TRIANGLES,
             PrimitiveType::TriangleStrip => GL_TRIANGLE_STRIP,
-            PrimitiveType::Lines => GL_LINES,
-            PrimitiveType::LineStrip => GL_LINE_STRIP,
+            PrimitiveType::TriangleFan => GL_TRIANGLE_FAN,
+            PrimitiveType::Quads => GL_QUADS,
+            PrimitiveType::QuadStrip => GL_QUAD_STRIP,
         }
     }
 }
