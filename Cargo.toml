@@ -33,6 +33,6 @@ ndk-sys = "0.2"
 objc = "0.2"
 
 [dev-dependencies]
-glam = {version = "0.14", features = ["scalar-math"] }
+glam = { version = "0.22" }
 quad-rand = "0.1"
 
