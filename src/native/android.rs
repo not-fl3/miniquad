@@ -17,12 +17,12 @@ pub mod ndk_utils;
 
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(
-    vm: *mut ndk_sys::JavaVM,
+    vm: *mut jni_sys::JavaVM,
     _: std::ffi::c_void,
-) -> ndk_sys::jint {
+) -> jni_sys::jint {
     VM = vm as *mut _ as _;
 
-    ndk_sys::JNI_VERSION_1_6 as _
+    jni_sys::JNI_VERSION_1_6 as _
 }
 
 extern "C" {
@@ -82,8 +82,8 @@ fn send_message(message: Message) {
     })
 }
 
-static mut ACTIVITY: ndk_sys::jobject = std::ptr::null_mut();
-static mut VM: *mut ndk_sys::JavaVM = std::ptr::null_mut();
+static mut ACTIVITY: jni_sys::jobject = std::ptr::null_mut();
+static mut VM: *mut jni_sys::JavaVM = std::ptr::null_mut();
 
 struct AndroidDisplay {
     screen_width: f32,
@@ -343,11 +343,11 @@ impl MainThreadState {
 /// TODO: Figure how to get into the thread destructor to correctly call Detach
 /// TODO: (this should be a GH issue)
 /// TODO: for reference - grep for "pthread_setspecific" in SDL2 sources, SDL fixed it!
-pub unsafe fn attach_jni_env() -> *mut ndk_sys::JNIEnv {
-    let mut env: *mut ndk_sys::JNIEnv = std::ptr::null_mut();
+pub unsafe fn attach_jni_env() -> *mut jni_sys::JNIEnv {
+    let mut env: *mut jni_sys::JNIEnv = std::ptr::null_mut();
     let attach_current_thread = (**VM).AttachCurrentThread.unwrap();
 
-    let res = attach_current_thread(VM, &mut env, std::ptr::null_mut());
+    let res = attach_current_thread(VM, &mut (env as *mut _), std::ptr::null_mut());
     assert!(res == 0);
 
     env
@@ -482,7 +482,7 @@ extern "C" fn jni_on_load(vm: *mut std::ffi::c_void) {
     }
 }
 
-unsafe fn create_native_window(surface: ndk_sys::jobject) -> *mut ndk_sys::ANativeWindow {
+unsafe fn create_native_window(surface: jni_sys::jobject) -> *mut ndk_sys::ANativeWindow {
     let env = attach_jni_env();
 
     ndk_sys::ANativeWindow_fromSurface(env, surface)
@@ -490,9 +490,9 @@ unsafe fn create_native_window(surface: ndk_sys::jobject) -> *mut ndk_sys::ANati
 
 #[no_mangle]
 pub unsafe extern "C" fn Java_quad_1native_QuadNative_activityOnCreate(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
-    activity: ndk_sys::jobject,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
+    activity: jni_sys::jobject,
 ) {
     let env = attach_jni_env();
     ACTIVITY = (**env).NewGlobalRef.unwrap()(env, activity);
@@ -501,33 +501,33 @@ pub unsafe extern "C" fn Java_quad_1native_QuadNative_activityOnCreate(
 
 #[no_mangle]
 unsafe extern "C" fn Java_quad_1native_QuadNative_activityOnResume(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
 ) {
     send_message(Message::Resume);
 }
 
 #[no_mangle]
 unsafe extern "C" fn Java_quad_1native_QuadNative_activityOnPause(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
 ) {
     send_message(Message::Pause);
 }
 
 #[no_mangle]
 unsafe extern "C" fn Java_quad_1native_QuadNative_activityOnDestroy(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
 ) {
     send_message(Message::Destroy);
 }
 
 #[no_mangle]
 extern "C" fn Java_quad_1native_QuadNative_surfaceOnSurfaceCreated(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
-    surface: ndk_sys::jobject,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
+    surface: jni_sys::jobject,
 ) {
     let window = unsafe { create_native_window(surface) };
     send_message(Message::SurfaceCreated { window });
@@ -535,19 +535,19 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnSurfaceCreated(
 
 #[no_mangle]
 extern "C" fn Java_quad_1native_QuadNative_surfaceOnSurfaceDestroyed(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
 ) {
     send_message(Message::SurfaceDestroyed);
 }
 
 #[no_mangle]
 extern "C" fn Java_quad_1native_QuadNative_surfaceOnSurfaceChanged(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
-    surface: ndk_sys::jobject,
-    width: ndk_sys::jint,
-    height: ndk_sys::jint,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
+    surface: jni_sys::jobject,
+    width: jni_sys::jint,
+    height: jni_sys::jint,
 ) {
     let window = unsafe { create_native_window(surface) };
 
@@ -560,12 +560,12 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnSurfaceChanged(
 
 #[no_mangle]
 extern "C" fn Java_quad_1native_QuadNative_surfaceOnTouch(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
-    touch_id: ndk_sys::jint,
-    action: ndk_sys::jint,
-    x: ndk_sys::jfloat,
-    y: ndk_sys::jfloat,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
+    touch_id: jni_sys::jint,
+    action: jni_sys::jint,
+    x: jni_sys::jfloat,
+    y: jni_sys::jfloat,
 ) {
     let phase = match action {
         0 => TouchPhase::Moved,
@@ -585,9 +585,9 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnTouch(
 
 #[no_mangle]
 extern "C" fn Java_quad_1native_QuadNative_surfaceOnKeyDown(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
-    keycode: ndk_sys::jint,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
+    keycode: jni_sys::jint,
 ) {
     let keycode = keycodes::translate_keycode(keycode as _);
 
@@ -596,9 +596,9 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnKeyDown(
 
 #[no_mangle]
 extern "C" fn Java_quad_1native_QuadNative_surfaceOnKeyUp(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
-    keycode: ndk_sys::jint,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
+    keycode: jni_sys::jint,
 ) {
     let keycode = keycodes::translate_keycode(keycode as _);
 
@@ -607,16 +607,16 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnKeyUp(
 
 #[no_mangle]
 extern "C" fn Java_quad_1native_QuadNative_surfaceOnCharacter(
-    _: *mut ndk_sys::JNIEnv,
-    _: ndk_sys::jobject,
-    character: ndk_sys::jint,
+    _: *mut jni_sys::JNIEnv,
+    _: jni_sys::jobject,
+    character: jni_sys::jint,
 ) {
     send_message(Message::Character {
         character: character as u32,
     });
 }
 
-unsafe fn set_full_screen(env: *mut ndk_sys::JNIEnv, fullscreen: bool) {
+unsafe fn set_full_screen(env: *mut jni_sys::JNIEnv, fullscreen: bool) {
     ndk_utils::call_void_method!(env, ACTIVITY, "setFullScreen", "(Z)V", fullscreen as i32);
 }
 
@@ -632,8 +632,8 @@ pub struct android_asset {
 // For some reason it is missing fron ndk_sys binding
 extern "C" {
     pub fn AAssetManager_fromJava(
-        env: *mut ndk_sys::JNIEnv,
-        assetManager: ndk_sys::jobject,
+        env: *mut jni_sys::JNIEnv,
+        assetManager: jni_sys::jobject,
     ) -> *mut ndk_sys::AAssetManager;
 }
 
