@@ -132,7 +132,7 @@ impl NativeDisplay for AndroidDisplay {
 
 pub unsafe fn console_debug(msg: *const ::std::os::raw::c_char) {
     ndk_sys::__android_log_write(
-        ndk_sys::android_LogPriority_ANDROID_LOG_DEBUG as _,
+        ndk_sys::android_LogPriority::ANDROID_LOG_DEBUG.0 as _,
         b"SAPP\0".as_ptr() as _,
         msg,
     );
@@ -140,7 +140,7 @@ pub unsafe fn console_debug(msg: *const ::std::os::raw::c_char) {
 
 pub unsafe fn console_info(msg: *const ::std::os::raw::c_char) {
     ndk_sys::__android_log_write(
-        ndk_sys::android_LogPriority_ANDROID_LOG_INFO as _,
+        ndk_sys::android_LogPriority::ANDROID_LOG_INFO.0 as _,
         b"SAPP\0".as_ptr() as _,
         msg,
     );
@@ -148,7 +148,7 @@ pub unsafe fn console_info(msg: *const ::std::os::raw::c_char) {
 
 pub unsafe fn console_warn(msg: *const ::std::os::raw::c_char) {
     ndk_sys::__android_log_write(
-        ndk_sys::android_LogPriority_ANDROID_LOG_WARN as _,
+        ndk_sys::android_LogPriority::ANDROID_LOG_WARN.0 as _,
         b"SAPP\0".as_ptr() as _,
         msg,
     );
@@ -156,7 +156,7 @@ pub unsafe fn console_warn(msg: *const ::std::os::raw::c_char) {
 
 pub unsafe fn console_error(msg: *const ::std::os::raw::c_char) {
     ndk_sys::__android_log_write(
-        ndk_sys::android_LogPriority_ANDROID_LOG_ERROR as _,
+        ndk_sys::android_LogPriority::ANDROID_LOG_ERROR.0 as _,
         b"SAPP\0".as_ptr() as _,
         msg,
     );
