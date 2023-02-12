@@ -14,12 +14,8 @@ struct Stage {
 }
 
 impl Stage {
-    pub fn new(metal: bool) -> Stage {
-        let mut ctx: Box<dyn RenderingBackend> = if metal {
-            Box::new(MetalContext::new())
-        } else {
-            Box::new(GlContext::new())
-        };
+    pub fn new() -> Stage {
+        let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
 
         let color_img = ctx.new_render_texture(TextureParams {
             width: 256,
@@ -169,7 +165,7 @@ impl EventHandler for Stage {
     fn update(&mut self) {}
 
     fn draw(&mut self) {
-        let (width, height) = screen_size();
+        let (width, height) = window::screen_size();
         let proj = Mat4::perspective_rh_gl(60.0f32.to_radians(), width / height, 0.01, 10.0);
         let view = Mat4::look_at_rh(
             vec3(0.0, 1.5, 3.0),
@@ -185,7 +181,6 @@ impl EventHandler for Stage {
         let vs_params = display_shader::Uniforms {
             mvp: view_proj * model,
         };
-
 
         // the offscreen pass, rendering an rotating, untextured cube into a render target image
         self.ctx.begin_pass(
@@ -215,13 +210,13 @@ impl EventHandler for Stage {
 fn main() {
     let mut conf = conf::Conf::default();
     let metal = std::env::args().nth(1).as_deref() == Some("metal");
-    conf.platform.macos_gfx_api = if metal {
-        conf::MacosGfxApi::Metal
+    conf.platform.apple_gfx_api = if metal {
+        conf::AppleGfxApi::Metal
     } else {
-        conf::MacosGfxApi::OpenGl
+        conf::AppleGfxApi::OpenGl
     };
 
-    miniquad::start(conf, move || Box::new(Stage::new(metal)));
+    miniquad::start(conf, move || Box::new(Stage::new()));
 }
 
 mod display_shader {

@@ -3,14 +3,14 @@ use miniquad::*;
 struct Stage {}
 
 impl EventHandler for Stage {
-    fn update(&mut self, _ctx: &mut Context) {}
+    fn update(&mut self) {}
 
-    fn draw(&mut self, _ctx: &mut Context) {}
+    fn draw(&mut self) {}
 
-    fn char_event(&mut self, ctx: &mut Context, character: char, _: KeyMods, _: bool) {
+    fn char_event(&mut self, character: char, _: KeyMods, _: bool) {
         match character {
-            'z' => ctx.show_mouse(false),
-            'x' => ctx.show_mouse(true),
+            'z' => window::show_mouse(false),
+            'x' => window::show_mouse(true),
             _ => (),
         }
 
@@ -29,10 +29,10 @@ impl EventHandler for Stage {
             'w' => CursorIcon::NWSEResize,
             _ => return,
         };
-        ctx.set_mouse_cursor(icon);
+        window::set_mouse_cursor(icon);
     }
 }
 
 fn main() {
-    miniquad::start(conf::Conf::default(), |_ctx| Box::new(Stage {}));
+    miniquad::start(conf::Conf::default(), || Box::new(Stage {}));
 }
