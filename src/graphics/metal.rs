@@ -355,7 +355,10 @@ impl RenderingBackend for MetalContext {
     fn set_stencil(&mut self, stencil_test: Option<StencilState>) {}
     fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) {}
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {}
-
+    fn texture_set_filter(&self, texture: TextureId, filter: FilterMode) {}
+    fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap) {}
+    fn texture_resize(&mut self, texture: TextureId, width: u32, height: u32, bytes: Option<&[u8]>) {}
+    fn texture_read_pixels(&mut self, texture: TextureId, bytes: &mut [u8]) {}
     fn clear(&self, color: Option<(f32, f32, f32, f32)>, depth: Option<f32>, stencil: Option<i32>) {
     }
 
@@ -607,12 +610,12 @@ impl RenderingBackend for MetalContext {
                 bytes.len()
             );
 
-            self.update_texture_part(texture, 0, 0, params.width as _, params.height as _, bytes);
+            self.texture_update_part(texture, 0, 0, params.width as _, params.height as _, bytes);
         }
         texture
     }
 
-    fn update_texture_part(
+    fn texture_update_part(
         &mut self,
         texture: TextureId,
         x_offset: i32,

@@ -491,7 +491,29 @@ impl RenderingBackend for GlContext {
         self.textures.push(texture);
         TextureId(self.textures.len() - 1)
     }
-    fn update_texture_part(
+    fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {
+        let t = self.textures[texture.0];
+        t.set_filter(self, filter);
+    }
+    fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap) {
+        let t = self.textures[texture.0];
+        t.set_wrap(self, wrap);
+    }
+    fn texture_resize(
+        &mut self,
+        texture: TextureId,
+        width: u32,
+        height: u32,
+        bytes: Option<&[u8]>,
+    ) {
+        let mut t = self.textures[texture.0];
+        t.resize(self, width, height, bytes);
+    }
+    fn texture_read_pixels(&mut self, texture: TextureId, bytes: &mut [u8]) {
+        let t = self.textures[texture.0];
+        t.read_pixels(bytes);
+    }
+    fn texture_update_part(
         &mut self,
         texture: TextureId,
         x_offset: i32,
