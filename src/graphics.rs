@@ -983,35 +983,38 @@ impl ElapsedQuery {
 /// A vtable-erased generic argument.
 /// Basically, the same thing as fn f<U>(a: &U), but
 /// trait-object friendly.
-pub struct Arg<'a> {
+pub(crate) struct Arg<'a> {
     ptr: *const std::ffi::c_void,
     element_size: usize,
     size: usize,
     is_slice: bool,
     _phantom: std::marker::PhantomData<&'a ()>,
 }
-impl<'a> Arg<'a> {
-    pub fn slice<T>(data: &'a [T]) -> Arg<'a> {
-        Arg {
+
+pub struct BufferSource<'a>(Arg<'a>);
+impl<'a> BufferSource<'a> {
+    pub fn slice<T>(data: &'a [T]) -> BufferSource<'a> {
+        Self(Arg {
             ptr: data.as_ptr() as _,
             size: std::mem::size_of_val(data),
             element_size: std::mem::size_of::<T>(),
             is_slice: true,
             _phantom: std::marker::PhantomData,
-        }
+        })
     }
-
-    pub fn val<T>(data: &'a T) -> Arg<'a> {
-        Arg {
+}
+pub struct UniformsSource<'a>(Arg<'a>);
+impl<'a> UniformsSource<'a> {
+    pub fn table<T>(data: &'a T) -> UniformsSource<'a> {
+        Self(Arg {
             ptr: data as *const T as _,
             size: std::mem::size_of_val(data),
             element_size: std::mem::size_of::<T>(),
             is_slice: false,
             _phantom: std::marker::PhantomData,
-        }
+        })
     }
 }
-
 pub struct ShaderSource<'a> {
     pub glsl_vertex: Option<&'a str>,
     pub glsl_fragment: Option<&'a str>,
@@ -1109,10 +1112,10 @@ pub trait RenderingBackend {
     /// ];
     /// let buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
     /// ```
-    fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: Arg) -> BufferId;
+    fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: BufferSource) -> BufferId;
     fn new_buffer_stream(&mut self, buffer_type: BufferType, size: usize) -> BufferId;
     fn new_buffer_index_stream(&mut self, index_type: IndexType, size: usize) -> BufferId;
-    fn buffer_update(&mut self, buffer: BufferId, data: Arg);
+    fn buffer_update(&mut self, buffer: BufferId, data: BufferSource);
     /// Size of buffer in bytes
     fn buffer_size(&mut self, buffer: BufferId) -> usize;
 
@@ -1143,8 +1146,8 @@ pub trait RenderingBackend {
 
     fn apply_bindings(&mut self, bindings: &Bindings);
 
-    fn apply_uniforms(&mut self, uniforms: Arg) {
-        self.apply_uniforms_from_bytes(uniforms.ptr as _, uniforms.size)
+    fn apply_uniforms(&mut self, uniforms: UniformsSource) {
+        self.apply_uniforms_from_bytes(uniforms.0.ptr as _, uniforms.0.size)
     }
     fn apply_uniforms_from_bytes(&mut self, uniform_ptr: *const u8, size: usize);
 

@@ -71,7 +71,7 @@ impl Stage {
         ];
 
         let vertex_buffer =
-            ctx.new_buffer_immutable(BufferType::VertexBuffer, Arg::slice(&vertices));
+            ctx.new_buffer_immutable(BufferType::VertexBuffer, BufferSource::slice(&vertices));
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
@@ -83,7 +83,8 @@ impl Stage {
             22, 21, 20,  23, 22, 20
         ];
 
-        let index_buffer = ctx.new_buffer_immutable(BufferType::IndexBuffer, Arg::slice(&indices));
+        let index_buffer =
+            ctx.new_buffer_immutable(BufferType::IndexBuffer, BufferSource::slice(&indices));
 
         let offscreen_bind = Bindings {
             vertex_buffers: vec![vertex_buffer.clone()],
@@ -193,7 +194,7 @@ impl EventHandler for Stage {
         );
         self.ctx.apply_pipeline(&self.offscreen_pipeline);
         self.ctx.apply_bindings(&self.offscreen_bind);
-        self.ctx.apply_uniforms(Arg::val(&vs_params));
+        self.ctx.apply_uniforms(UniformsSource::table(&vs_params));
         self.ctx.draw(0, 36, 1);
         self.ctx.end_render_pass();
 
@@ -203,7 +204,7 @@ impl EventHandler for Stage {
             .begin_default_pass(PassAction::clear_color(0.0, 0., 0.45, 1.));
         self.ctx.apply_pipeline(&self.display_pipeline);
         self.ctx.apply_bindings(&self.display_bind);
-        self.ctx.apply_uniforms(Arg::val(&vs_params));
+        self.ctx.apply_uniforms(UniformsSource::table(&vs_params));
         self.ctx.draw(0, 36, 1);
         self.ctx.end_render_pass();
 

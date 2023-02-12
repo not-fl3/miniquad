@@ -33,10 +33,11 @@ impl Stage {
             Vertex { pos : Vec2 { x: -1.0, y:  1.0 }, uv: Vec2 { x: 0., y: 1. } },
         ];
         let vertex_buffer =
-            ctx.new_buffer_immutable(BufferType::VertexBuffer, Arg::slice(&vertices));
+            ctx.new_buffer_immutable(BufferType::VertexBuffer, BufferSource::slice(&vertices));
 
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
-        let index_buffer = ctx.new_buffer_immutable(BufferType::IndexBuffer, Arg::slice(&indices));
+        let index_buffer =
+            ctx.new_buffer_immutable(BufferType::IndexBuffer, BufferSource::slice(&indices));
 
         let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
@@ -129,7 +130,8 @@ impl EventHandler for Stage {
         self.ctx.begin_default_pass(Default::default());
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
-        self.ctx.apply_uniforms(Arg::val(&self.uniforms));
+        self.ctx
+            .apply_uniforms(UniformsSource::table(&self.uniforms));
         self.ctx.draw(0, 6, 1);
         self.ctx.end_render_pass();
 
