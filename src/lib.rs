@@ -168,7 +168,15 @@ pub mod window {
         with_native_display!(d, d.show_keyboard(show))
     }
 
-    ///
+    /// The same as
+    /// ```ignore
+    /// if metal {
+    ///    Box::new(MetalContext::new())
+    /// } else {
+    ///   Box::new(GlContext::new())
+    /// };
+    /// ```
+    /// but under #[cfg] gate to avoid MetalContext on non-apple platforms
     pub fn new_rendering_backend() -> Box<dyn RenderingBackend> {
         #[cfg(target_vendor = "apple")]
         {
