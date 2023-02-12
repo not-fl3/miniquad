@@ -355,7 +355,7 @@ impl RenderingBackend for MetalContext {
     fn set_stencil(&mut self, stencil_test: Option<StencilState>) {}
     fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) {}
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {}
-    fn texture_set_filter(&self, texture: TextureId, filter: FilterMode) {}
+    fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {}
     fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap) {}
     fn texture_resize(&mut self, texture: TextureId, width: u32, height: u32, bytes: Option<&[u8]>) {}
     fn texture_read_pixels(&mut self, texture: TextureId, bytes: &mut [u8]) {}
@@ -405,19 +405,19 @@ impl RenderingBackend for MetalContext {
         self.passes[render_pass.0].texture
     }
     fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: BufferSource) -> BufferId {
-        debug_assert!(data.is_slice);
+        debug_assert!(data.0.is_slice);
         let index_type = if buffer_type == BufferType::IndexBuffer {
-            Some(IndexType::for_type_size(data.element_size))
+            Some(IndexType::for_type_size(data.0.element_size))
         } else {
             None
         };
 
-        let size = data.size as u64;
+        let size = data.0.size as u64;
         let mut raw = [nil; WTF];
         for i in 0..WTF {
             let buffer: ObjcId = unsafe {
                 msg_send![self.device,
-                      newBufferWithBytes:data.ptr
+                      newBufferWithBytes:data.0.ptr
                       length:size
                       options:MTLResourceOptions::StorageModeShared]
             };
@@ -465,14 +465,14 @@ impl RenderingBackend for MetalContext {
 
     fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
         let mut buffer = &mut self.buffers[buffer.0];
-        assert!(data.size <= buffer.size);
+        assert!(data.0.size <= buffer.size);
 
         unsafe {
             let dest: *mut std::ffi::c_void = msg_send![buffer.raw[buffer.next_value], contents];
-            std::ptr::copy(data.ptr, dest, data.size);
+            std::ptr::copy(data.0.ptr, dest, data.0.size);
 
             #[cfg(target_os = "macos")]
-            msg_send_![buffer.raw[buffer.next_value], didModifyRange:NSRange::new(0, data.size as u64)];
+            msg_send_![buffer.raw[buffer.next_value], didModifyRange:NSRange::new(0, data.0.size as u64)];
         }
         buffer.value = buffer.next_value;
     }
