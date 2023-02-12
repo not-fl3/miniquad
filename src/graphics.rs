@@ -1065,10 +1065,11 @@ pub trait RenderingBackend {
         //TODO
         //assert_eq!(texture.size(width, height), bytes.len());
 
-        self.update_texture_part(texture, 0 as _, 0 as _, width as _, height as _, bytes)
+        self.texture_update_part(texture, 0 as _, 0 as _, width as _, height as _, bytes)
     }
-
-    fn update_texture_part(
+    fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode);
+    fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap);
+    fn texture_update_part(
         &mut self,
         texture: TextureId,
         x_offset: i32,

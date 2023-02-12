@@ -10,31 +10,28 @@ struct Stage {
     offscreen_pass: RenderPass,
     rx: f32,
     ry: f32,
+
+    ctx: Box<dyn RenderingBackend>,
 }
 
 impl Stage {
-    pub fn new(ctx: &mut Context) -> Stage {
-        let (w, h) = ctx.screen_size();
-        let color_img = Texture::new_render_texture(
-            ctx,
-            TextureParams {
-                width: w as _,
-                height: h as _,
-                format: TextureFormat::RGBA8,
-                ..Default::default()
-            },
-        );
-        let depth_img = Texture::new_render_texture(
-            ctx,
-            TextureParams {
-                width: w as _,
-                height: h as _,
-                format: TextureFormat::Depth,
-                ..Default::default()
-            },
-        );
+    pub fn new() -> Stage {
+        let mut ctx = window::new_rendering_backend();
+        let (w, h) = window::screen_size();
+        let color_img = ctx.new_render_texture(TextureParams {
+            width: w as _,
+            height: h as _,
+            format: TextureFormat::RGBA8,
+            ..Default::default()
+        });
+        let depth_img = ctx.new_render_texture(TextureParams {
+            width: w as _,
+            height: h as _,
+            format: TextureFormat::Depth,
+            ..Default::default()
+        });
 
-        let offscreen_pass = RenderPass::new(ctx, color_img, depth_img);
+        let offscreen_pass = ctx.new_render_pass(color_img, Some(depth_img));
 
         #[rustfmt::skip]
         let vertices: &[f32] = &[
@@ -70,7 +67,8 @@ impl Stage {
              1.0,  1.0, -1.0,    1.0, 0.0, 0.5, 1.0,     0.0, 1.0
         ];
 
-        let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
+        let vertex_buffer =
+            ctx.new_buffer_immutable(BufferType::VertexBuffer, BufferSource::slice(&vertices));
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
@@ -82,7 +80,8 @@ impl Stage {
             22, 21, 20,  23, 22, 20
         ];
 
-        let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
+        let index_buffer =
+            ctx.new_buffer_immutable(BufferType::IndexBuffer, BufferSource::slice(&indices));
 
         let offscreen_bind = Bindings {
             vertex_buffers: vec![vertex_buffer.clone()],
@@ -99,11 +98,13 @@ impl Stage {
             -1.0,  1.0,    0.0, 1.0,
         ];
 
-        let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
+        let vertex_buffer =
+            ctx.new_buffer_immutable(BufferType::VertexBuffer, BufferSource::slice(&vertices));
 
         let indices: &[u16] = &[0, 1, 2, 0, 2, 3];
 
-        let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
+        let index_buffer =
+            ctx.new_buffer_immutable(BufferType::IndexBuffer, BufferSource::slice(&indices));
 
         let post_processing_bind = Bindings {
             vertex_buffers: vec![vertex_buffer],
@@ -111,16 +112,18 @@ impl Stage {
             images: vec![color_img],
         };
 
-        let default_shader = Shader::new(
-            ctx,
-            post_processing_shader::VERTEX,
-            post_processing_shader::FRAGMENT,
-            post_processing_shader::meta(),
-        )
-        .unwrap();
+        let default_shader = ctx
+            .new_shader(
+                ShaderSource {
+                    glsl_vertex: Some(post_processing_shader::VERTEX),
+                    glsl_fragment: Some(post_processing_shader::FRAGMENT),
+                    metal_shader: None,
+                },
+                post_processing_shader::meta(),
+            )
+            .unwrap();
 
-        let post_processing_pipeline = Pipeline::new(
-            ctx,
+        let post_processing_pipeline = ctx.new_pipeline(
             &[BufferLayout::default()],
             &[
                 VertexAttribute::new("pos", VertexFormat::Float2),
@@ -129,16 +132,18 @@ impl Stage {
             default_shader,
         );
 
-        let offscreen_shader = Shader::new(
-            ctx,
-            offscreen_shader::VERTEX,
-            offscreen_shader::FRAGMENT,
-            offscreen_shader::meta(),
-        )
-        .unwrap();
+        let offscreen_shader = ctx
+            .new_shader(
+                ShaderSource {
+                    glsl_vertex: Some(offscreen_shader::VERTEX),
+                    glsl_fragment: Some(offscreen_shader::FRAGMENT),
+                    metal_shader: None,
+                },
+                offscreen_shader::meta(),
+            )
+            .unwrap();
 
-        let offscreen_pipeline = Pipeline::with_params(
-            ctx,
+        let offscreen_pipeline = ctx.new_pipeline_with_params(
             &[BufferLayout {
                 stride: 36,
                 ..Default::default()
@@ -163,42 +168,37 @@ impl Stage {
             offscreen_pass,
             rx: 0.,
             ry: 0.,
+            ctx,
         }
     }
 }
 
 impl EventHandler for Stage {
-    fn update(&mut self, _ctx: &mut Context) {}
+    fn update(&mut self) {}
 
-    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-        let color_img = Texture::new_render_texture(
-            ctx,
-            TextureParams {
-                width: width as _,
-                height: height as _,
-                format: TextureFormat::RGBA8,
-                ..Default::default()
-            },
-        );
-        let depth_img = Texture::new_render_texture(
-            ctx,
-            TextureParams {
-                width: width as _,
-                height: height as _,
-                format: TextureFormat::Depth,
-                ..Default::default()
-            },
-        );
+    fn resize_event(&mut self, width: f32, height: f32) {
+        let color_img = self.ctx.new_render_texture(TextureParams {
+            width: width as _,
+            height: height as _,
+            format: TextureFormat::RGBA8,
+            ..Default::default()
+        });
+        let depth_img = self.ctx.new_render_texture(TextureParams {
+            width: width as _,
+            height: height as _,
+            format: TextureFormat::Depth,
+            ..Default::default()
+        });
 
-        let offscreen_pass = RenderPass::new(ctx, color_img, depth_img);
+        let offscreen_pass = self.ctx.new_render_pass(color_img, Some(depth_img));
 
-        self.offscreen_pass.delete(ctx);
+        self.ctx.delete_render_pass(self.offscreen_pass);
         self.offscreen_pass = offscreen_pass;
         self.post_processing_bind.images[0] = color_img;
     }
 
-    fn draw(&mut self, ctx: &mut Context) {
-        let (width, height) = ctx.screen_size();
+    fn draw(&mut self) {
+        let (width, height) = window::screen_size();
         let proj = Mat4::perspective_rh_gl(60.0f32.to_radians(), width / height, 0.01, 10.0);
         let view = Mat4::look_at_rh(
             vec3(0.0, 1.5, 3.0),
@@ -211,39 +211,40 @@ impl EventHandler for Stage {
         self.ry += 0.03;
         let model = Mat4::from_rotation_ypr(self.rx, self.ry, 0.);
 
-        let (w, h) = ctx.screen_size();
+        let (w, h) = window::screen_size();
         // the offscreen pass, rendering an rotating, untextured cube into a render target image
-        ctx.begin_pass(
-            self.offscreen_pass,
+        self.ctx.begin_pass(
+            Some(self.offscreen_pass),
             PassAction::clear_color(1.0, 1.0, 1.0, 1.0),
         );
-        ctx.apply_pipeline(&self.offscreen_pipeline);
-        ctx.apply_uniforms(&self.offscreen_bind);
-        ctx.apply_bindings(&self.offscreen_bind);
-        ctx.apply_uniforms(&offscreen_shader::Uniforms {
-            mvp: view_proj * model,
-        });
-        ctx.draw(0, 36, 1);
-        ctx.end_render_pass();
+        self.ctx.apply_pipeline(&self.offscreen_pipeline);
+        self.ctx
+            .apply_uniforms(UniformsSource::table(&self.offscreen_bind));
+        self.ctx.apply_bindings(&self.offscreen_bind);
+        self.ctx
+            .apply_uniforms(UniformsSource::table(&offscreen_shader::Uniforms {
+                mvp: view_proj * model,
+            }));
+        self.ctx.draw(0, 36, 1);
+        self.ctx.end_render_pass();
 
         // and the post-processing-pass, rendering a rotating, textured cube, using the
         // previously rendered offscreen render-target as texture
-        ctx.begin_default_pass(PassAction::Nothing);
-        ctx.apply_pipeline(&self.post_processing_pipeline);
-        ctx.apply_bindings(&self.post_processing_bind);
-        ctx.apply_uniforms(&post_processing_shader::Uniforms {
-            resolution: glam::vec2(w, h),
-        });
-        ctx.draw(0, 6, 1);
-        ctx.end_render_pass();
-        ctx.commit_frame();
+        self.ctx.begin_default_pass(PassAction::Nothing);
+        self.ctx.apply_pipeline(&self.post_processing_pipeline);
+        self.ctx.apply_bindings(&self.post_processing_bind);
+        self.ctx
+            .apply_uniforms(UniformsSource::table(&post_processing_shader::Uniforms {
+                resolution: glam::vec2(w, h),
+            }));
+        self.ctx.draw(0, 6, 1);
+        self.ctx.end_render_pass();
+        self.ctx.commit_frame();
     }
 }
 
 fn main() {
-    miniquad::start(conf::Conf::default(), |mut ctx| {
-        Box::new(Stage::new(&mut ctx))
-    });
+    miniquad::start(conf::Conf::default(), || Box::new(Stage::new()));
 }
 
 mod post_processing_shader {

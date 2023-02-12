@@ -141,7 +141,7 @@ impl EventHandler for Stage {
 
 fn main() {
     let mut conf = conf::Conf::default();
-    let metal = true; //std::env::args().nth(1).as_deref() == Some("metal");
+    let metal = std::env::args().nth(1).as_deref() == Some("metal");
     conf.platform.apple_gfx_api = if metal {
         conf::AppleGfxApi::Metal
     } else {

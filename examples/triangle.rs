@@ -13,12 +13,8 @@ struct Stage {
 }
 
 impl Stage {
-    pub fn new(metal: bool) -> Stage {
-        let mut ctx: Box<dyn RenderingBackend> = if metal {
-            Box::new(MetalContext::new())
-        } else {
-            Box::new(GlContext::new())
-        };
+    pub fn new() -> Stage {
+        let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
 
         #[rustfmt::skip]
         let vertices: [Vertex; 3] = [
@@ -85,13 +81,13 @@ impl EventHandler for Stage {
 fn main() {
     let mut conf = conf::Conf::default();
     let metal = std::env::args().nth(1).as_deref() == Some("metal");
-    conf.platform.macos_gfx_api = if metal {
-        conf::MacosGfxApi::Metal
+    conf.platform.apple_gfx_api = if metal {
+        conf::AppleGfxApi::Metal
     } else {
-        conf::MacosGfxApi::OpenGl
+        conf::AppleGfxApi::OpenGl
     };
 
-    miniquad::start(conf, move || Box::new(Stage::new(metal)));
+    miniquad::start(conf, move || Box::new(Stage::new()));
 }
 
 mod shader {
