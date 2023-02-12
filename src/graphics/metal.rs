@@ -401,7 +401,7 @@ impl RenderingBackend for MetalContext {
     fn render_pass_texture(&self, render_pass: RenderPass) -> TextureId {
         self.passes[render_pass.0].texture
     }
-    fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: Arg) -> BufferId {
+    fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: BufferSource) -> BufferId {
         debug_assert!(data.is_slice);
         let index_type = if buffer_type == BufferType::IndexBuffer {
             Some(IndexType::for_type_size(data.element_size))
@@ -460,7 +460,7 @@ impl RenderingBackend for MetalContext {
         BufferId(self.buffers.len() - 1)
     }
 
-    fn buffer_update(&mut self, buffer: BufferId, data: Arg) {
+    fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
         let mut buffer = &mut self.buffers[buffer.0];
         assert!(data.size <= buffer.size);
 

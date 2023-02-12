@@ -33,14 +33,15 @@ impl Stage {
         ];
         // vertex buffer for static geometry
         let geometry_vertex_buffer =
-            ctx.new_buffer_immutable(BufferType::VertexBuffer, Arg::slice(&vertices));
+            ctx.new_buffer_immutable(BufferType::VertexBuffer, BufferSource::slice(&vertices));
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
             0, 1, 2,    0, 2, 3,    0, 3, 4,    0, 4, 1,
             5, 1, 2,    5, 2, 3,    5, 3, 4,    5, 4, 1
         ];
-        let index_buffer = ctx.new_buffer_immutable(BufferType::IndexBuffer, Arg::slice(&indices));
+        let index_buffer =
+            ctx.new_buffer_immutable(BufferType::IndexBuffer, BufferSource::slice(&indices));
 
         // empty, dynamic instance-data vertex buffer
         let positions_vertex_buffer = ctx.new_buffer_stream(
@@ -127,7 +128,7 @@ impl EventHandler for Stage {
         assert_eq!(std::mem::size_of::<Vec3>(), 12);
 
         self.ctx
-            .buffer_update(self.bindings.vertex_buffers[1], Arg::slice(&self.pos[..]));
+            .buffer_update(self.bindings.vertex_buffers[1], BufferSource::slice(&self.pos[..]));
 
         // model-view-projection matrix
         let (width, height) = window::screen_size();
@@ -147,7 +148,7 @@ impl EventHandler for Stage {
 
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
-        self.ctx.apply_uniforms(Arg::val(&shader::Uniforms { mvp }));
+        self.ctx.apply_uniforms(UniformsSource::table(&shader::Uniforms { mvp }));
         self.ctx.draw(0, 24, self.pos.len() as i32);
         self.ctx.end_render_pass();
 

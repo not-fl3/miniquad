@@ -744,17 +744,17 @@ impl RenderingBackend for GlContext {
     /// ];
     /// let buffer = ctx.new_buffer_immutable(BufferType::VertexBuffer, &vertices);
     /// ```
-    fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: Arg) -> BufferId {
-        debug_assert!(data.is_slice);
+    fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: BufferSource) -> BufferId {
+        debug_assert!(data.0.is_slice);
         let index_type = if buffer_type == BufferType::IndexBuffer {
-            Some(IndexType::for_type_size(data.element_size))
+            Some(IndexType::for_type_size(data.0.element_size))
         } else {
             None
         };
 
         let gl_target = gl_buffer_target(&buffer_type);
         let gl_usage = gl_usage(&Usage::Immutable);
-        let size = data.size;
+        let size = data.0.size;
         let mut gl_buf: u32 = 0;
 
         unsafe {
@@ -762,7 +762,7 @@ impl RenderingBackend for GlContext {
             self.cache.store_buffer_binding(gl_target);
             self.cache.bind_buffer(gl_target, gl_buf, index_type);
             glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
-            glBufferSubData(gl_target, 0, size as _, data.ptr as _);
+            glBufferSubData(gl_target, 0, size as _, data.0.ptr as _);
             self.cache.restore_buffer_binding(gl_target);
         }
 
@@ -828,15 +828,15 @@ impl RenderingBackend for GlContext {
         BufferId(self.buffers.len() - 1)
     }
 
-    fn buffer_update(&mut self, buffer: BufferId, data: Arg) {
-        debug_assert!(data.is_slice);
+    fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
+        debug_assert!(data.0.is_slice);
         let buffer = &self.buffers[buffer.0];
         if buffer.buffer_type == BufferType::IndexBuffer {
             assert!(buffer.index_type.is_some());
-            assert!(buffer.index_type.unwrap() == IndexType::for_type_size(data.element_size));
+            assert!(buffer.index_type.unwrap() == IndexType::for_type_size(data.0.element_size));
         };
 
-        let size = data.size;
+        let size = data.0.size;
 
         assert!(size <= buffer.size);
 
@@ -844,7 +844,7 @@ impl RenderingBackend for GlContext {
         self.cache.store_buffer_binding(gl_target);
         self.cache
             .bind_buffer(gl_target, buffer.gl_buf, buffer.index_type);
-        unsafe { glBufferSubData(gl_target, 0, size as _, data.ptr as _) };
+        unsafe { glBufferSubData(gl_target, 0, size as _, data.0.ptr as _) };
         self.cache.restore_buffer_binding(gl_target);
     }
 
