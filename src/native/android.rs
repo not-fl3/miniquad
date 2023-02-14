@@ -344,7 +344,7 @@ impl MainThreadState {
 /// TODO: (this should be a GH issue)
 /// TODO: for reference - grep for "pthread_setspecific" in SDL2 sources, SDL fixed it!
 pub unsafe fn attach_jni_env() -> *mut jni_sys::JNIEnv {
-    let env: *mut jni_sys::JNIEnv = std::ptr::null_mut();
+    let mut env: *mut jni_sys::JNIEnv = std::ptr::null_mut();
     let attach_current_thread = (**VM).AttachCurrentThread.unwrap();
 
     let res = attach_current_thread(VM, &mut (env as *mut _), std::ptr::null_mut());
@@ -355,7 +355,7 @@ pub unsafe fn attach_jni_env() -> *mut jni_sys::JNIEnv {
 
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
 where
-    F: 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler> + Send,
+    F: 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>,
 {
     {
         use std::ffi::CString;

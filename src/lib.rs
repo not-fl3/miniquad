@@ -179,7 +179,7 @@ pub enum CursorIcon {
 /// Start miniquad.
 pub fn start<F>(conf: conf::Conf, f: F)
 where
-    F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler> + Send,
+    F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler>,
 {
     #[cfg(target_os = "linux")]
     {
