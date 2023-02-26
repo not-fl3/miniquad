@@ -314,6 +314,11 @@ pub fn define_app_delegate() -> *const Class {
     return decl.register();
 }
 
+pub fn log(message: &str) {
+    let nsstring = apple_util::str_to_nsstring(message);
+    let _: () = unsafe { frameworks::NSLog(nsstring) };
+}
+
 pub fn load_file<F: Fn(crate::fs::Response) + 'static>(path: &str, on_loaded: F) {
     let path = std::path::Path::new(&path);
     let path_without_extension = path.with_extension("");
