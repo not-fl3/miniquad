@@ -114,6 +114,8 @@ impl crate::native::NativeDisplay for Display {
         let mut final_new_height = new_height;
 
         let mut rect: RECT = unsafe { std::mem::zeroed() };
+        unsafe { GetClientRect(self.wnd, &mut rect as *mut _ as _) };
+
         rect.right = (rect.left + new_width as i32) as _;
         rect.top = (rect.bottom - new_height as i32) as _;
 
