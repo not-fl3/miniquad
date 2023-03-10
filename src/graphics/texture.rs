@@ -244,6 +244,7 @@ impl Texture {
         )
     }
 
+    /// Set the min and mag filter to `filter`
     pub fn set_filter(&self, ctx: &mut Context, filter: FilterMode) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
@@ -254,12 +255,35 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
     }
 
+    /// Set the min and mag filter separately
+    pub fn set_filter_min_mag(&self, ctx: &mut Context, min_filter: FilterMode, mag_filter: FilterMode) {
+        ctx.cache.store_texture_binding(0);
+        ctx.cache.bind_texture(0, self.texture);
+        unsafe {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter as i32);
+        }
+        ctx.cache.restore_texture_binding(0);
+    }
+
+    /// Set x and y wrap to `wrap`
     pub fn set_wrap(&self, ctx: &mut Context, wrap: TextureWrap) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
         unsafe {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap as i32);
+        }
+        ctx.cache.restore_texture_binding(0);
+    }
+
+    /// Set x and y wrap separately
+    pub fn set_wrap_xy(&self, ctx: &mut Context, x_wrap: TextureWrap, y_wrap: TextureWrap) {
+        ctx.cache.store_texture_binding(0);
+        ctx.cache.bind_texture(0, self.texture);
+        unsafe {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, x_wrap as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, y_wrap as i32);
         }
         ctx.cache.restore_texture_binding(0);
     }
