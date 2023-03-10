@@ -110,17 +110,10 @@ impl crate::native::NativeDisplay for Display {
         self.user_cursor = cursor_icon != CursorIcon::Default;
     }
     fn set_window_size(&mut self, new_width: u32, new_height: u32) {
-        let mut x = 0;
-        let mut y = 0;
         let mut final_new_width = new_width;
         let mut final_new_height = new_height;
 
         let mut rect: RECT = unsafe { std::mem::zeroed() };
-        if unsafe { GetClientRect(self.wnd, &mut rect as *mut _ as _) } != 0 {
-            x = rect.left;
-            y = rect.bottom;
-        }
-
         rect.right = (rect.left + new_width as i32) as _;
         rect.top = (rect.bottom - new_height as i32) as _;
 
@@ -143,12 +136,12 @@ impl crate::native::NativeDisplay for Display {
             SetWindowPos(
                 self.wnd,
                 HWND_TOP,
-                x,
-                y,
+                (GetSystemMetrics(SM_CXSCREEN) - final_new_width as i32) / 2,
+                (GetSystemMetrics(SM_CYSCREEN) - final_new_height as i32) / 2,
                 final_new_width as i32,
                 final_new_height as i32,
-                SWP_NOMOVE,
-            )
+                0,
+            );
         };
     }
 
