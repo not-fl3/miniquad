@@ -644,6 +644,9 @@ unsafe fn create_window(
     AdjustWindowRectEx(&rect as *const _ as _, win_style, false as _, win_ex_style);
     let win_width = rect.right - rect.left;
     let win_height = rect.bottom - rect.top;
+    let win_x = (GetSystemMetrics(SM_CXSCREEN) - win_width) / 2;
+    let win_y = (GetSystemMetrics(SM_CYSCREEN) - win_height) / 2;
+
     let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
     let mut window_name = window_title.encode_utf16().collect::<Vec<u16>>();
     window_name.push(0);
@@ -652,8 +655,8 @@ unsafe fn create_window(
         class_name.as_ptr(),         // lpClassName
         window_name.as_ptr(),        // lpWindowName
         win_style,                   // dwStyle
-        CW_USEDEFAULT,               // X
-        CW_USEDEFAULT,               // Y
+        win_x,                       // X
+        win_y,                       // Y
         win_width,                   // nWidth
         win_height,                  // nHeight
         NULL as _,                   // hWndParent
