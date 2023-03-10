@@ -1,3 +1,4 @@
+use std::os::raw::c_void;
 use std::{ffi::CString, mem};
 
 mod texture;
@@ -6,7 +7,6 @@ use crate::{native::gl::*, Context};
 
 use std::{error::Error, fmt::Display};
 
-use libc::c_void;
 pub use texture::{FilterMode, Texture, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 
 fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
