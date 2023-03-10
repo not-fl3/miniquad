@@ -1791,6 +1791,38 @@ impl Buffer {
         )
     }
 
+    /// Create a dynamic buffer resource object.
+    /// ```ignore
+    /// #[repr(C)]
+    /// struct Vertex {
+    ///     pos: Vec2,
+    ///     uv: Vec2,
+    /// }
+    /// let vertices: [Vertex; 4] = [
+    ///     Vertex { pos : Vec2 { x: -0.5, y: -0.5 }, uv: Vec2 { x: 0., y: 0. } },
+    ///     Vertex { pos : Vec2 { x:  0.5, y: -0.5 }, uv: Vec2 { x: 1., y: 0. } },
+    ///     Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 1. } },
+    ///     Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 1. } },
+    /// ];
+    /// let buffer = Buffer::dynamic(ctx, BufferType::VertexBuffer, &vertices);
+    /// ```
+    pub fn dynamic<T>(ctx: &mut Context, buffer_type: BufferType, data: &[T]) -> Buffer {
+        let index_type = if buffer_type == BufferType::IndexBuffer {
+            Some(IndexType::for_type::<T>())
+        } else {
+            None
+        };
+
+        Self::new(
+            ctx,
+            index_type,
+            buffer_type,
+            Usage::Dynamic,
+            mem::size_of_val(data),
+            data.as_ptr() as *const _,
+        )
+    }
+
     pub fn stream(ctx: &mut Context, buffer_type: BufferType, size: usize) -> Buffer {
         let index_type = if buffer_type == BufferType::IndexBuffer {
             Some(IndexType::Short)
