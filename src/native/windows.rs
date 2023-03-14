@@ -444,12 +444,15 @@ unsafe extern "system" fn win32_wndproc(
                 panic!("failed to retrieve raw input data");
             }
 
-            if data.data.mouse().usFlags & MOUSE_MOVE_ABSOLUTE == 1 {
-                unimplemented!("Got MOUSE_MOVE_ABSOLUTE on WM_INPUT, related issue: https://github.com/not-fl3/miniquad/issues/165");
+            let mut dx = data.data.mouse().lLastX as f32 * display.mouse_scale;
+            let mut dy = data.data.mouse().lLastY as f32 * display.mouse_scale;
+            // convert from normalised absolute coordinates
+            if (data.data.mouse().usFlags & MOUSE_MOVE_ABSOLUTE) == MOUSE_MOVE_ABSOLUTE {
+                let (width, height) = context.screen_size();
+                dx = dx / 65535.0 * width;
+                dy = dy / 65535.0 * height;
             }
 
-            let dx = data.data.mouse().lLastX as f32 * display.mouse_scale;
-            let dy = data.data.mouse().lLastY as f32 * display.mouse_scale;
             event_handler.raw_mouse_motion(context.with_display(display), dx as f32, dy as f32);
         }
 
@@ -762,9 +765,7 @@ impl Display {
     }
 
     unsafe fn init_dpi(&mut self, high_dpi: bool) {
-        if high_dpi {
-            self.dpi_aware = true;
-        }
+        self.dpi_aware = high_dpi;
         // get dpi scale factor for main monitor
         if self.dpi_aware {
             let pt = POINT { x: 1, y: 1 };
