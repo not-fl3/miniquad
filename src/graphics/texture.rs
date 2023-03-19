@@ -54,37 +54,23 @@ pub enum TextureFormat {
     RGBA8,
     Depth,
     Alpha,
-    LuminanceAlpha,
 }
 
-impl TextureFormat {
-    /// Converts from TextureFormat to (internal_format, format, pixel_type)
-    fn into_gl_params(self, alpha_texture: bool) -> (GLenum, GLenum, GLenum) {
-        match self {
+/// Converts from TextureFormat to (internal_format, format, pixel_type)
+impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
+    fn from(format: TextureFormat) -> Self {
+        match format {
             TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
             TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
             TextureFormat::Depth => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT),
-
             #[cfg(target_arch = "wasm32")]
             TextureFormat::Alpha => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
             #[cfg(not(target_arch = "wasm32"))]
-            TextureFormat::Alpha if alpha_texture => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
-            #[cfg(not(target_arch = "wasm32"))]
             TextureFormat::Alpha => (GL_R8, GL_RED, GL_UNSIGNED_BYTE), // texture updates will swizzle Red -> Alpha to match WASM
-
-            #[cfg(target_arch = "wasm32")]
-            TextureFormat::LuminanceAlpha => {
-                (GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE)
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            TextureFormat::LuminanceAlpha if alpha_texture => {
-                (GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE)
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            TextureFormat::LuminanceAlpha => (GL_RG, GL_RG, GL_UNSIGNED_BYTE), // texture updates will swizzle Green -> Alpha to match WASM
         }
     }
-
+}
+impl TextureFormat {
     /// Returns the size in bytes of texture with `dimensions`.
     pub fn size(self, width: u32, height: u32) -> u32 {
         let square = width * height;
@@ -93,7 +79,6 @@ impl TextureFormat {
             TextureFormat::RGBA8 => 4 * square,
             TextureFormat::Depth => 2 * square,
             TextureFormat::Alpha => 1 * square,
-            TextureFormat::LuminanceAlpha => 2 * square,
         }
     }
 }
@@ -163,8 +148,7 @@ impl Texture {
             );
         }
 
-        let (internal_format, format, pixel_type) =
-            params.format.into_gl_params(ctx.features().alpha_texture);
+        let (internal_format, format, pixel_type) = params.format.into();
 
         ctx.cache.store_texture_binding(0);
 
@@ -195,21 +179,16 @@ impl Texture {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, params.filter as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, params.filter as i32);
 
-            #[cfg(not(target_arch = "wasm32"))]
-            match params.format {
-                // on non-WASM alpha value is stored in red channel
-                // swizzle red -> alpha, zero red
-                TextureFormat::Alpha if !ctx.features().alpha_texture => {
+            if cfg!(not(target_arch = "wasm32")) {
+                // if not WASM
+                if params.format == TextureFormat::Alpha {
+                    // if alpha miniquad texture, the value on non-WASM is stored in red channel
+                    // swizzle red -> alpha
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_ZERO as _);
+                } else {
+                    // keep alpha -> alpha
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
                 }
-                // on non-WASM luminance is stored in red channel, alpha is stored in green channel
-                // keep red, swizzle green -> alpha, zero green
-                TextureFormat::LuminanceAlpha if !ctx.features().alpha_texture => {
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_GREEN as _);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_ZERO as _);
-                }
-                _ => {}
             }
         }
         ctx.cache.restore_texture_binding(0);
@@ -256,7 +235,12 @@ impl Texture {
     }
 
     /// Set the min and mag filter separately
-    pub fn set_filter_min_mag(&self, ctx: &mut Context, min_filter: FilterMode, mag_filter: FilterMode) {
+    pub fn set_filter_min_mag(
+        &self,
+        ctx: &mut Context,
+        min_filter: FilterMode,
+        mag_filter: FilterMode,
+    ) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
         unsafe {
@@ -292,8 +276,7 @@ impl Texture {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
 
-        let (internal_format, format, pixel_type) =
-            self.format.into_gl_params(ctx.features().alpha_texture);
+        let (internal_format, format, pixel_type) = self.format.into();
 
         self.width = width;
         self.height = height;
@@ -351,7 +334,7 @@ impl Texture {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
 
-        let (_, format, pixel_type) = self.format.into_gl_params(ctx.features().alpha_texture);
+        let (_, format, pixel_type) = self.format.into();
 
         unsafe {
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
@@ -374,10 +357,10 @@ impl Texture {
 
     /// Read texture data into CPU memory
     pub fn read_pixels(&self, bytes: &mut [u8]) {
-        if self.format == TextureFormat::Alpha || self.format == TextureFormat::LuminanceAlpha {
-            unimplemented!("read_pixels is not implement for Alpha and LuminanceAlpha textures");
+        if self.format == TextureFormat::Alpha {
+            unimplemented!("read_pixels is not implement for Alpha textures");
         }
-        let (_, format, pixel_type) = self.format.into_gl_params(false);
+        let (_, format, pixel_type) = self.format.into();
 
         let mut fbo = 0;
         unsafe {
