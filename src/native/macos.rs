@@ -149,11 +149,49 @@ impl MacosDisplay {
         }
     }
 }
+
+#[derive(Default)]
+struct Modifiers {
+    left_shift: bool,
+    right_shift: bool,
+    left_control: bool,
+    right_control: bool,
+    left_alt: bool,
+    right_alt: bool,
+    left_command: bool,
+    right_command: bool,
+}
+
+impl Modifiers {
+    const NS_RIGHT_SHIFT_KEY_MASK: u64 = 0x020004;
+    const NS_LEFT_SHIFT_KEY_MASK: u64 = 0x020002;
+    const NS_RIGHT_COMMAND_KEY_MASK: u64 = 0x100010;
+    const NS_LEFT_COMMAND_KEY_MASK: u64 = 0x100008;
+    const NS_RIGHT_ALTERNATE_KEY_MASK: u64 = 0x080040;
+    const NS_LEFT_ALTERNATE_KEY_MASK: u64 = 0x080020;
+    const NS_RIGHT_CONTROL_KEY_MASK: u64 = 0x042000;
+    const NS_LEFT_CONTROL_KEY_MASK: u64 = 0x040001;
+
+    pub fn new(flags: u64) -> Self {
+        Self {
+            left_shift: flags & Self::NS_LEFT_SHIFT_KEY_MASK == Self::NS_LEFT_SHIFT_KEY_MASK,
+            right_shift: flags & Self::NS_RIGHT_SHIFT_KEY_MASK == Self::NS_RIGHT_SHIFT_KEY_MASK,
+            left_alt: flags & Self::NS_LEFT_ALTERNATE_KEY_MASK == Self::NS_LEFT_ALTERNATE_KEY_MASK,
+            right_alt: flags & Self::NS_RIGHT_ALTERNATE_KEY_MASK == Self::NS_RIGHT_ALTERNATE_KEY_MASK,
+            left_control: flags & Self::NS_LEFT_CONTROL_KEY_MASK == Self::NS_LEFT_CONTROL_KEY_MASK,
+            right_control: flags & Self::NS_RIGHT_CONTROL_KEY_MASK == Self::NS_RIGHT_CONTROL_KEY_MASK,
+            left_command: flags & Self::NS_LEFT_COMMAND_KEY_MASK == Self::NS_LEFT_COMMAND_KEY_MASK,
+            right_command: flags & Self::NS_RIGHT_COMMAND_KEY_MASK == Self::NS_RIGHT_COMMAND_KEY_MASK,
+        }
+    }
+}
+
 struct WindowPayload {
     display: MacosDisplay,
     context: Option<GraphicsContext>,
     event_handler: Option<Box<dyn EventHandler>>,
     f: Option<Box<dyn 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>>>,
+    modifiers: Modifiers,
 }
 impl WindowPayload {
     pub fn context(&mut self) -> Option<(&mut Context, &mut dyn EventHandler)> {
@@ -427,6 +465,39 @@ pub fn define_cocoa_view_class() -> *const Class {
             }
         }
     }
+
+    fn produce_event(payload: &mut WindowPayload, keycode: crate::KeyCode, mods: crate::KeyMods,
+                     old_pressed: bool, new_pressed: bool) {
+        if new_pressed ^ old_pressed {
+            if new_pressed {
+                if let Some((context, event_handler)) = payload.context() {
+                    event_handler.key_down_event(context, keycode, mods, false);
+                }
+            } else {
+                if let Some((context, event_handler)) = payload.context() {
+                    event_handler.key_up_event(context, keycode, mods);
+                }
+            }
+        }
+    }
+
+    extern "C" fn flags_changed(this: &Object, _sel: Sel, event: ObjcId) {
+        let payload = get_window_payload(this);
+        let mods = get_event_key_modifier(event);
+        let flags: u64 = unsafe { msg_send![event, modifierFlags] };
+        let new_modifiers = Modifiers::new(flags);
+
+        produce_event(payload, crate::KeyCode::LeftShift, mods, payload.modifiers.left_shift, new_modifiers.left_shift);
+        produce_event(payload, crate::KeyCode::RightShift, mods, payload.modifiers.right_shift, new_modifiers.right_shift);
+        produce_event(payload, crate::KeyCode::LeftControl, mods, payload.modifiers.left_control, new_modifiers.left_control);
+        produce_event(payload, crate::KeyCode::RightControl, mods, payload.modifiers.right_control, new_modifiers.right_control);
+        produce_event(payload, crate::KeyCode::LeftSuper, mods, payload.modifiers.left_command, new_modifiers.left_command);
+        produce_event(payload, crate::KeyCode::RightSuper, mods, payload.modifiers.right_command, new_modifiers.right_command);
+        produce_event(payload, crate::KeyCode::LeftAlt, mods, payload.modifiers.left_alt, new_modifiers.left_alt);
+        produce_event(payload, crate::KeyCode::RightAlt, mods, payload.modifiers.right_alt, new_modifiers.right_alt);
+
+        payload.modifiers = new_modifiers;
+    }
     let superclass = class!(NSOpenGLView);
     let mut decl = ClassDecl::new("RenderViewClass", superclass).unwrap();
     unsafe {
@@ -505,6 +576,10 @@ pub fn define_cocoa_view_class() -> *const Class {
         decl.add_method(
             sel!(keyDown:),
             key_down as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(flagsChanged:),
+            flags_changed as extern "C" fn(&Object, Sel, ObjcId),
         );
         decl.add_method(sel!(keyUp:), key_up as extern "C" fn(&Object, Sel, ObjcId));
     }
@@ -592,6 +667,7 @@ where
         f: Some(Box::new(f)),
         event_handler: None,
         context: None,
+        modifiers: Modifiers::default(),
     };
 
     let app_delegate_class = define_app_delegate();
