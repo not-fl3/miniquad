@@ -136,6 +136,11 @@ impl Texture {
     pub fn set_filter(&self, ctx: &mut GlContext, filter: FilterMode) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
+
+        let filter = match filter {
+            FilterMode::Nearest => GL_NEAREST,
+            FilterMode::Linear => GL_LINEAR,
+        };
         unsafe {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter as i32);
@@ -146,6 +151,12 @@ impl Texture {
     pub fn set_wrap(&self, ctx: &mut GlContext, wrap: TextureWrap) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.texture);
+        let wrap = match wrap {
+            TextureWrap::Repeat => GL_REPEAT,
+            TextureWrap::Mirror => GL_MIRRORED_REPEAT,
+            TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
+        };
+
         unsafe {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap as i32);

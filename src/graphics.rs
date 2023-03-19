@@ -322,11 +322,11 @@ impl TextureFormat {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TextureWrap {
     /// Samples at coord x + 1 map to coord x.
-    Repeat = GL_REPEAT as isize,
+    Repeat,
     /// Samples at coord x + 1 map to coord 1 - x.
-    Mirror = GL_MIRRORED_REPEAT as isize,
+    Mirror,
     /// Samples at coord x + 1 map to coord 1.
-    Clamp = GL_CLAMP_TO_EDGE as isize,
+    Clamp,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
