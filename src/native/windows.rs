@@ -470,18 +470,23 @@ unsafe extern "system" fn win32_wndproc(
                 panic!("failed to retrieve raw input data");
             }
 
-            let mut dx = data.data.mouse().lLastX as f32 * display.mouse_scale;
-            let mut dy = data.data.mouse().lLastY as f32 * display.mouse_scale;
+            let mouse_scale = tl_display::with(|d| d.mouse_scale);
+            let mut dx = data.data.mouse().lLastX as f32 * mouse_scale;
+            let mut dy = data.data.mouse().lLastY as f32 * mouse_scale;
+
             // convert from normalised absolute coordinates
             if (data.data.mouse().usFlags & MOUSE_MOVE_ABSOLUTE) == MOUSE_MOVE_ABSOLUTE {
-                let (width, height) = context.screen_size();
+                let (width, height) = tl_display::with(|d| {
+                    (
+                        d.display_data.screen_width as f32,
+                        d.display_data.screen_height as f32,
+                    )
+                });
+
                 dx = dx / 65535.0 * width;
                 dy = dy / 65535.0 * height;
             }
 
-            let mouse_scale = tl_display::with(|d| d.mouse_scale);
-            let dx = data.data.mouse().lLastX as f32 * mouse_scale;
-            let dy = data.data.mouse().lLastY as f32 * mouse_scale;
             event_handler.raw_mouse_motion(dx as f32, dy as f32);
         }
 
