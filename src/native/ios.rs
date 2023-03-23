@@ -114,10 +114,8 @@ fn get_window_payload(this: &Object) -> &mut WindowPayload {
 pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
     let mut decl = ClassDecl::new("QuadView", superclass).unwrap();
 
-    extern "C" fn touches_began(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
+    fn on_touch(this: &Object, event: ObjcId, mut callback: impl FnMut(f32, f32)) {
         unsafe {
-            let payload = get_window_payload(this);
-
             let enumerator: ObjcId = msg_send![event, allTouches];
             let enumerator: ObjcId = msg_send![enumerator, objectEnumerator];
 
@@ -135,20 +133,46 @@ pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
                         ios_pos.y *= 2.;
                     }
                 });
-                if let Some(ref mut event_handler) = payload.event_handler {
-                    event_handler.mouse_button_down_event(
-                        MouseButton::Left,
-                        ios_pos.x as _,
-                        ios_pos.y as _,
-                    );
-                }
+
+                callback(ios_pos.x as _, ios_pos.y as _);
+            }
+        }
+    }
+    extern "C" fn touches_began(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
+        unsafe {
+            let payload = get_window_payload(this);
+
+            if let Some(ref mut event_handler) = payload.event_handler {
+                on_touch(this, event, |x, y| {
+                    event_handler.mouse_button_down_event(MouseButton::Left, x as _, y as _)
+                });
             }
         }
     }
 
-    extern "C" fn touches_moved(_: &Object, _: Sel, _: ObjcId, _: ObjcId) {}
+    extern "C" fn touches_moved(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
+        unsafe {
+            let payload = get_window_payload(this);
 
-    extern "C" fn touches_ended(_: &Object, _: Sel, _: ObjcId, _: ObjcId) {}
+            if let Some(ref mut event_handler) = payload.event_handler {
+                on_touch(this, event, |x, y| {
+                    event_handler.mouse_motion_event(x as _, y as _)
+                });
+            }
+        }
+    }
+
+    extern "C" fn touches_ended(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
+        unsafe {
+            let payload = get_window_payload(this);
+
+            if let Some(ref mut event_handler) = payload.event_handler {
+                on_touch(this, event, |x, y| {
+                    event_handler.mouse_button_up_event(MouseButton::Left, x as _, y as _)
+                });
+            }
+        }
+    }
 
     extern "C" fn touches_canceled(_: &Object, _: Sel, _: ObjcId, _: ObjcId) {}
 

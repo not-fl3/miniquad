@@ -256,23 +256,18 @@ pub fn define_cocoa_window_delegate() -> *const Class {
     }
 
     extern "C" fn window_did_change_screen(this: &Object, _: Sel, _: ObjcId) {
-        panic!()
-        // let payload = get_window_payload(this);
-        // if let Some((w, h)) = unsafe { payload.display.update_dimensions() } {
-        //     if let Some((context, event_handler)) = payload.context() {
-        //         event_handler.resize_event(context, w as _, h as _);
-        //     }
-        // }
+        let payload = get_window_payload(this);
+        if let Some((w, h)) = unsafe { tl_display::with(|d| d.update_dimensions()) } {
+            if let Some(event_handler) = payload.context() {
+                event_handler.resize_event(w as _, h as _);
+            }
+        }
     }
     extern "C" fn window_did_enter_fullscreen(this: &Object, _: Sel, _: ObjcId) {
-        panic!()
-        // let payload = get_window_payload(this);
-        // payload.display.fullscreen = true;
+        tl_display::with(|d| d.fullscreen = true);
     }
     extern "C" fn window_did_exit_fullscreen(this: &Object, _: Sel, _: ObjcId) {
-        panic!()
-        // let payload = get_window_payload(this);
-        // payload.display.fullscreen = false;
+        tl_display::with(|d| d.fullscreen = false);
     }
     let superclass = class!(NSObject);
     let mut decl = ClassDecl::new("RenderWindowDelegate", superclass).unwrap();
