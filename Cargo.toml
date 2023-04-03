@@ -7,7 +7,7 @@ license = "MIT/Apache-2.0"
 homepage = "https://github.com/loki-chat/lokinit"
 repository = "https://github.com/loki-chat/lokinit"
 description = "A fork of miniquad focused on windowing."
-readme="README.md"
+readme = "README.md"
 keywords = ["graphics", "gamedev", "windowing"]
 categories = ["rendering::graphics-api"]
 
@@ -15,7 +15,17 @@ categories = ["rendering::graphics-api"]
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["wingdi", "winuser", "libloaderapi", "windef", "shellscalingapi", "errhandlingapi", "windowsx", "winbase", "hidusage"] }
+winapi = { version = "0.3", features = [
+    "wingdi",
+    "winuser",
+    "libloaderapi",
+    "windef",
+    "shellscalingapi",
+    "errhandlingapi",
+    "windowsx",
+    "winbase",
+    "hidusage",
+] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 libc = "0.2"
