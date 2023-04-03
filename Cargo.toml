@@ -1,5 +1,5 @@
 [package]
-name = "lokinit"
+name = "miniquad"
 version = "0.3.15"
 authors = ["The Loki Authors", "not-fl3 <not.fl3@gmail.com>"]
 edition = "2021"
@@ -23,3 +23,6 @@ ndk-sys = "0.2"
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 objc = "0.2"
+
+[package.metadata.android.activity_attributes]
+"android:exported" = "true"

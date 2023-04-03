@@ -1,4 +1,4 @@
-use lokinit::*;
+use miniquad::*;
 
 struct Stage {}
 
@@ -39,5 +39,5 @@ impl EventHandler for Stage {
 }
 
 fn main() {
-    lokinit::start(conf::Conf::default(), |_ctx| Box::new(Stage {}));
+    miniquad::start(conf::Conf::default(), |_ctx| Box::new(Stage {}));
 }

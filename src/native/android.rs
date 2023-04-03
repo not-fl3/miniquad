@@ -2,7 +2,7 @@ use crate::{
     event::{EventHandler, KeyCode, TouchPhase},
     native::egl::{self, LibEgl},
     native::NativeDisplay,
-    GraphicsContext,
+    Context,
 };
 
 use std::{cell::RefCell, sync::mpsc, thread};
@@ -172,7 +172,7 @@ pub unsafe fn console_error(msg: *const ::std::os::raw::c_char) {
 
 struct MainThreadState {
     libegl: LibEgl,
-    context: GraphicsContext,
+    context: Context,
     egl_display: egl::EGLDisplay,
     egl_config: egl::EGLConfig,
     egl_context: egl::EGLContext,
@@ -355,7 +355,7 @@ pub unsafe fn attach_jni_env() -> *mut ndk_sys::JNIEnv {
 
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
 where
-    F: 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler> + std::marker::Send,
 {
     {
         use std::ffi::CString;
@@ -431,7 +431,7 @@ where
             panic!();
         }
 
-        let mut context = GraphicsContext::new(gl::is_gl2());
+        let mut context = Context::default();
 
         let mut display = AndroidDisplay {
             screen_width,
