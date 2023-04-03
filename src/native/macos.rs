@@ -177,11 +177,14 @@ impl Modifiers {
             left_shift: flags & Self::NS_LEFT_SHIFT_KEY_MASK == Self::NS_LEFT_SHIFT_KEY_MASK,
             right_shift: flags & Self::NS_RIGHT_SHIFT_KEY_MASK == Self::NS_RIGHT_SHIFT_KEY_MASK,
             left_alt: flags & Self::NS_LEFT_ALTERNATE_KEY_MASK == Self::NS_LEFT_ALTERNATE_KEY_MASK,
-            right_alt: flags & Self::NS_RIGHT_ALTERNATE_KEY_MASK == Self::NS_RIGHT_ALTERNATE_KEY_MASK,
+            right_alt: flags & Self::NS_RIGHT_ALTERNATE_KEY_MASK
+                == Self::NS_RIGHT_ALTERNATE_KEY_MASK,
             left_control: flags & Self::NS_LEFT_CONTROL_KEY_MASK == Self::NS_LEFT_CONTROL_KEY_MASK,
-            right_control: flags & Self::NS_RIGHT_CONTROL_KEY_MASK == Self::NS_RIGHT_CONTROL_KEY_MASK,
+            right_control: flags & Self::NS_RIGHT_CONTROL_KEY_MASK
+                == Self::NS_RIGHT_CONTROL_KEY_MASK,
             left_command: flags & Self::NS_LEFT_COMMAND_KEY_MASK == Self::NS_LEFT_COMMAND_KEY_MASK,
-            right_command: flags & Self::NS_RIGHT_COMMAND_KEY_MASK == Self::NS_RIGHT_COMMAND_KEY_MASK,
+            right_command: flags & Self::NS_RIGHT_COMMAND_KEY_MASK
+                == Self::NS_RIGHT_COMMAND_KEY_MASK,
         }
     }
 }
@@ -466,8 +469,13 @@ pub fn define_cocoa_view_class() -> *const Class {
         }
     }
 
-    fn produce_event(payload: &mut WindowPayload, keycode: crate::KeyCode, mods: crate::KeyMods,
-                     old_pressed: bool, new_pressed: bool) {
+    fn produce_event(
+        payload: &mut WindowPayload,
+        keycode: crate::KeyCode,
+        mods: crate::KeyMods,
+        old_pressed: bool,
+        new_pressed: bool,
+    ) {
         if new_pressed ^ old_pressed {
             if new_pressed {
                 if let Some((context, event_handler)) = payload.context() {
@@ -487,14 +495,62 @@ pub fn define_cocoa_view_class() -> *const Class {
         let flags: u64 = unsafe { msg_send![event, modifierFlags] };
         let new_modifiers = Modifiers::new(flags);
 
-        produce_event(payload, crate::KeyCode::LeftShift, mods, payload.modifiers.left_shift, new_modifiers.left_shift);
-        produce_event(payload, crate::KeyCode::RightShift, mods, payload.modifiers.right_shift, new_modifiers.right_shift);
-        produce_event(payload, crate::KeyCode::LeftControl, mods, payload.modifiers.left_control, new_modifiers.left_control);
-        produce_event(payload, crate::KeyCode::RightControl, mods, payload.modifiers.right_control, new_modifiers.right_control);
-        produce_event(payload, crate::KeyCode::LeftSuper, mods, payload.modifiers.left_command, new_modifiers.left_command);
-        produce_event(payload, crate::KeyCode::RightSuper, mods, payload.modifiers.right_command, new_modifiers.right_command);
-        produce_event(payload, crate::KeyCode::LeftAlt, mods, payload.modifiers.left_alt, new_modifiers.left_alt);
-        produce_event(payload, crate::KeyCode::RightAlt, mods, payload.modifiers.right_alt, new_modifiers.right_alt);
+        produce_event(
+            payload,
+            crate::KeyCode::LeftShift,
+            mods,
+            payload.modifiers.left_shift,
+            new_modifiers.left_shift,
+        );
+        produce_event(
+            payload,
+            crate::KeyCode::RightShift,
+            mods,
+            payload.modifiers.right_shift,
+            new_modifiers.right_shift,
+        );
+        produce_event(
+            payload,
+            crate::KeyCode::LeftControl,
+            mods,
+            payload.modifiers.left_control,
+            new_modifiers.left_control,
+        );
+        produce_event(
+            payload,
+            crate::KeyCode::RightControl,
+            mods,
+            payload.modifiers.right_control,
+            new_modifiers.right_control,
+        );
+        produce_event(
+            payload,
+            crate::KeyCode::LeftSuper,
+            mods,
+            payload.modifiers.left_command,
+            new_modifiers.left_command,
+        );
+        produce_event(
+            payload,
+            crate::KeyCode::RightSuper,
+            mods,
+            payload.modifiers.right_command,
+            new_modifiers.right_command,
+        );
+        produce_event(
+            payload,
+            crate::KeyCode::LeftAlt,
+            mods,
+            payload.modifiers.left_alt,
+            new_modifiers.left_alt,
+        );
+        produce_event(
+            payload,
+            crate::KeyCode::RightAlt,
+            mods,
+            payload.modifiers.right_alt,
+            new_modifiers.right_alt,
+        );
 
         payload.modifiers = new_modifiers;
     }

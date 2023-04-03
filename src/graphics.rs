@@ -199,15 +199,12 @@ impl VertexFormat {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-#[derive(Default)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 pub enum VertexStep {
     #[default]
     PerVertex,
     PerInstance,
 }
-
-
 
 #[derive(Clone, Debug)]
 pub struct BufferLayout {
@@ -1300,8 +1297,7 @@ impl From<Comparison> for GLenum {
 
 /// Specifies how incoming RGBA values (source) and the RGBA in framebuffer (destination)
 /// are combined.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[derive(Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 pub enum Equation {
     /// Adds source and destination. Source and destination are multiplied
     /// by blending parameters before addition.
@@ -1333,8 +1329,6 @@ pub enum BlendFactor {
     OneMinusValue(BlendValue),
     SourceAlphaSaturate,
 }
-
-
 
 impl From<Equation> for GLenum {
     fn from(eq: Equation) -> Self {

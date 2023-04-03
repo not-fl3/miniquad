@@ -176,7 +176,10 @@ impl X11Display {
                     b"Xft.Dpi\x00".as_ptr() as _,
                     &mut type_,
                     &mut value,
-                ) != 0 && !type_.is_null() && libc::strcmp(type_, b"String\x00".as_ptr() as _) == 0 {
+                ) != 0
+                    && !type_.is_null()
+                    && libc::strcmp(type_, b"String\x00".as_ptr() as _) == 0
+                {
                     self.dpi_scale = libc::atof(value.addr as *const _) as f32 / 96.0;
                 }
                 (self.libx11.XrmDestroyDatabase)(db);

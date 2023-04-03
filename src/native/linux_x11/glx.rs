@@ -403,11 +403,9 @@ unsafe fn choose_fbconfig(
 ) -> GLXFBConfig {
     let desired_sample_count = 0;
 
-    
-    
     let mut native_count: libc::c_int = 0;
     let mut usable_count;
-    
+
     let mut trust_window_bit = true;
     let vendor = (libgl.glxGetClientString.unwrap())(display, GLX_VENDOR);
     if !vendor.is_null()
@@ -416,7 +414,8 @@ unsafe fn choose_fbconfig(
     {
         trust_window_bit = false
     }
-    let native_configs: *mut GLXFBConfig = (libgl.glxGetFBConfigs.unwrap())(display, screen, &mut native_count);
+    let native_configs: *mut GLXFBConfig =
+        (libgl.glxGetFBConfigs.unwrap())(display, screen, &mut native_count);
 
     if native_configs.is_null() || native_count == 0 {
         panic!("GLX: No GLXFBConfigs returned");
@@ -559,7 +558,10 @@ pub unsafe extern "C" fn gl_choose_fbconfig(
             }
             if missing < least_missing {
                 closest = current
-            } else if missing == least_missing && (color_diff < least_color_diff || color_diff == least_color_diff && extra_diff < least_extra_diff) {
+            } else if missing == least_missing
+                && (color_diff < least_color_diff
+                    || color_diff == least_color_diff && extra_diff < least_extra_diff)
+            {
                 closest = current
             }
 
