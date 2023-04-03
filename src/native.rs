@@ -95,5 +95,3 @@ pub use wasm::webgl as gl;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub use apple::gl;
-
-pub mod query_stab;
