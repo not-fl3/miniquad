@@ -339,7 +339,7 @@ struct ShaderInternal {
 ///
 /// Example:
 ///```
-///# use miniquad::{BlendState, BlendFactor, BlendValue, Equation};
+///# use lokinit::{BlendState, BlendFactor, BlendValue, Equation};
 ///BlendState::new(
 ///    Equation::Add,
 ///    BlendFactor::Value(BlendValue::SourceAlpha),
@@ -1467,7 +1467,7 @@ pub struct PipelineParams {
     /// Color (RGB) blend function. If None - blending will be disabled for this pipeline.
     /// Usual use case to get alpha-blending:
     ///```
-    ///# use miniquad::{PipelineParams, BlendState, BlendValue, BlendFactor, Equation};
+    ///# use lokinit::{PipelineParams, BlendState, BlendValue, BlendFactor, Equation};
     ///PipelineParams {
     ///    color_blend: Some(BlendState::new(
     ///        Equation::Add,
@@ -1483,7 +1483,7 @@ pub struct PipelineParams {
     /// On webgl canvas's resulting alpha channel will be used to blend the whole canvas background.
     /// To avoid modifying only alpha channel, but keep usual transparency:
     ///```
-    ///# use miniquad::{PipelineParams, BlendState, BlendValue, BlendFactor, Equation};
+    ///# use lokinit::{PipelineParams, BlendState, BlendValue, BlendFactor, Equation};
     ///PipelineParams {
     ///    color_blend: Some(BlendState::new(
     ///        Equation::Add,
@@ -1860,7 +1860,7 @@ impl Buffer {
 ///
 /// The query is created using [`ElapsedQuery::new()`] function.
 /// ```
-/// use miniquad::graphics::ElapsedQuery;
+/// use lokinit::graphics::ElapsedQuery;
 /// // initialization
 /// let mut query = ElapsedQuery::new();
 /// ```
@@ -1868,7 +1868,7 @@ impl Buffer {
 /// [`ElapsedQuery::end_query()`]
 ///
 /// ```
-/// # use miniquad::graphics::ElapsedQuery;
+/// # use lokinit::graphics::ElapsedQuery;
 /// # let mut query = ElapsedQuery::new();
 ///
 /// query.begin_query();
@@ -1881,7 +1881,7 @@ impl Buffer {
 ///
 /// ```
 /// // couple frames later:
-/// # use miniquad::graphics::ElapsedQuery;
+/// # use lokinit::graphics::ElapsedQuery;
 /// # let mut query = ElapsedQuery::new();
 /// # query.begin_query();
 /// # query.end_query();
@@ -1894,7 +1894,7 @@ impl Buffer {
 /// And during finalization:
 /// ```
 /// // clean-up
-/// # use miniquad::graphics::ElapsedQuery;
+/// # use lokinit::graphics::ElapsedQuery;
 /// # let mut query = ElapsedQuery::new();
 /// # query.begin_query();
 /// # query.end_query();

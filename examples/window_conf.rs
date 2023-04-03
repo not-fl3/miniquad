@@ -1,4 +1,4 @@
-use miniquad::*;
+use lokinit::*;
 
 struct Stage {}
 impl EventHandler for Stage {
@@ -10,7 +10,7 @@ impl EventHandler for Stage {
 }
 
 fn main() {
-    miniquad::start(
+    lokinit::start(
         conf::Conf {
             window_title: "Miniquad".to_string(),
             window_width: 1024,
