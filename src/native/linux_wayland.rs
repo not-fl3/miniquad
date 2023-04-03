@@ -298,7 +298,6 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
             decorations.resize(&mut display.client, width, height);
         }
 
-        drop(display);
         if let (context, Some(event_handler)) = payload.context() {
             event_handler.resize_event(context, width as _, height as _);
         }
@@ -448,7 +447,7 @@ where
             std::ptr::null_mut(),
         );
 
-        if egl_surface == /* EGL_NO_SURFACE  */ std::ptr::null_mut() {
+        if egl_surface.is_null() /* EGL_NO_SURFACE  */ {
             panic!("surface creation failed");
         }
         if (libegl.eglMakeCurrent.unwrap())(egl_display, egl_surface, egl_surface, context) == 0 {

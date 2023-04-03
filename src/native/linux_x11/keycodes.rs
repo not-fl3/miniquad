@@ -3,6 +3,8 @@
 //!
 //! All the data entries in this file came from sokol_app.h
 
+use std::cmp::Ordering;
+
 use super::X11Display;
 use crate::event::{KeyCode, KeyMods, MouseButton};
 
@@ -1090,12 +1092,10 @@ impl X11Display {
         }
         while max >= min {
             mid = (min + max) / 2 as libc::c_int;
-            if (KEYSYMTAB[mid as usize].keysym as libc::c_ulong) < keysym {
-                min = mid + 1 as libc::c_int
-            } else if KEYSYMTAB[mid as usize].keysym as libc::c_ulong > keysym {
-                max = mid - 1 as libc::c_int
-            } else {
-                return KEYSYMTAB[mid as usize].ucs as i32;
+            match (KEYSYMTAB[mid as usize].keysym as libc::c_ulong).cmp(&keysym) {
+                Ordering::Less => min = mid + 1 as libc::c_int,
+                Ordering::Greater => max = mid - 1 as libc::c_int,
+                Ordering::Equal => return KEYSYMTAB[mid as usize].ucs as i32,
             }
         }
         -(1 as libc::c_int)

@@ -783,7 +783,7 @@ where
         std::ptr::null_mut(),
     );
 
-    if egl_surface == /* EGL_NO_SURFACE  */ std::ptr::null_mut() {
+    if egl_surface.is_null() /* EGL_NO_SURFACE  */ {
         panic!("surface creation failed");
     }
     if (egl_lib.eglMakeCurrent.unwrap())(egl_display, egl_surface, egl_surface, context) == 0 {

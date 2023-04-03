@@ -51,7 +51,7 @@ macro_rules! wayland_interface {
                 types: unsafe { $method_name::METHOD_ARGUMENTS_TYPES.as_ptr() as _ }
             }), *];
 
-            static mut events: [wl_message; crate::count!($($event_name)*)] = [$(wl_message {
+            static mut events: [wl_message; $crate::count!($($event_name)*)] = [$(wl_message {
                 name: concat!($event_name, '\0').as_ptr() as _,
                 signature: concat!($event_sign, '\0').as_ptr() as _,
                 types: std::ptr::null_mut()
@@ -60,9 +60,9 @@ macro_rules! wayland_interface {
             pub static mut $name: wl_interface = wl_interface {
                 name: concat!(stringify!($struct_name), '\0').as_ptr() as *const _,
                 version: $version,
-                method_count: crate::count!($($method_name)*) as i32,
+                method_count: $crate::count!($($method_name)*) as i32,
                 methods: unsafe { requests.as_ptr() },
-                event_count: crate::count!($($event_name)*) as i32,
+                event_count: $crate::count!($($event_name)*) as i32,
                 events: unsafe { events.as_ptr() },
             };
         }
@@ -74,7 +74,7 @@ macro_rules! wayland_interface {
         }
 
         impl $struct_name {
-            crate::method_consts!(0, ($($method_name,)*));
+            $crate::method_consts!(0, ($($method_name,)*));
         }
         pub use $name::$name;
     };

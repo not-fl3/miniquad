@@ -1,4 +1,4 @@
-#![allow(dead_code, non_snake_case)]
+#![allow(dead_code, non_snake_case, clippy::upper_case_acronyms)]
 
 use super::{libx11::*, X11Display};
 
@@ -458,28 +458,34 @@ unsafe fn choose_fbconfig(
         usable_count += 1
     }
 
-    let mut desired = GLFBConfig::default();
-    desired.red_bits = 8;
-    desired.green_bits = 8;
-    desired.blue_bits = 8;
-    desired.alpha_bits = 8;
-    desired.depth_bits = 24;
-    desired.stencil_bits = 8;
-    desired.doublebuffer = true;
-    desired.samples = if desired_sample_count > 1 {
-        desired_sample_count
-    } else {
-        0
+    let desired = GLFBConfig {
+        red_bits: 8,
+        green_bits: 8,
+        blue_bits: 8,
+        alpha_bits: 8,
+        depth_bits: 24,
+        stencil_bits: 8,
+        doublebuffer: true,
+        samples: if desired_sample_count > 1 {
+            desired_sample_count
+        } else {
+            0
+        },
+        ..Default::default()
     };
+
     let closest: *const GLFBConfig = gl_choose_fbconfig(
-        &mut desired,
+        &desired,
         usable_configs.as_mut_ptr(),
         usable_count as libc::c_uint,
     );
-    let mut result = 0 as GLXFBConfig;
-    if !closest.is_null() {
-        result = (*closest).handle as GLXFBConfig
-    }
+
+    let result = if !closest.is_null() {
+        (*closest).handle as GLXFBConfig
+    } else {
+        0 as GLXFBConfig
+    };
+
     (libx11.XFree)(native_configs as *mut libc::c_void);
     result
 }
@@ -556,11 +562,11 @@ pub unsafe extern "C" fn gl_choose_fbconfig(
                 extra_diff += ((*desired).samples - (*current).samples)
                     * ((*desired).samples - (*current).samples);
             }
-            if missing < least_missing {
-                closest = current
-            } else if missing == least_missing
-                && (color_diff < least_color_diff
-                    || color_diff == least_color_diff && extra_diff < least_extra_diff)
+
+            if missing < least_missing
+                || (missing == least_missing
+                    && (color_diff < least_color_diff
+                        || color_diff == least_color_diff && extra_diff < least_extra_diff))
             {
                 closest = current
             }

@@ -1984,7 +1984,7 @@ impl ElapsedQuery {
     ///
     /// Implemented as `glDeleteQueries(...)` on OpenGL/WebGL platforms.
     pub fn delete(&mut self) {
-        unsafe { glDeleteQueries(1, &mut self.gl_query) }
+        unsafe { glDeleteQueries(1, &self.gl_query) }
         self.gl_query = 0;
     }
 }
