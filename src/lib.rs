@@ -1,40 +1,18 @@
 pub mod conf;
 mod event;
 pub mod fs;
-pub mod graphics;
 
 pub mod native;
 
-#[cfg(feature = "log-impl")]
-pub mod log;
-
 pub use event::*;
-
-pub use graphics::*;
 
 mod default_icon;
 
 pub use native::{gl, NativeDisplay};
 
-pub use graphics::GraphicsContext as Context;
-
-pub mod date {
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn now() -> f64 {
-        use std::time::SystemTime;
-
-        let time = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap_or_else(|e| panic!("{}", e));
-        time.as_secs_f64()
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub fn now() -> f64 {
-        use crate::native;
-
-        unsafe { native::wasm::now() }
-    }
+#[derive(Default)]
+pub struct Context {
+    pub(crate) display: Option<*mut dyn crate::NativeDisplay>,
 }
 
 impl Context {

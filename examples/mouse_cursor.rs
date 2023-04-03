@@ -5,7 +5,12 @@ struct Stage {}
 impl EventHandler for Stage {
     fn update(&mut self, _ctx: &mut Context) {}
 
-    fn draw(&mut self, _ctx: &mut Context) {}
+    fn draw(&mut self, _ctx: &mut Context) {
+        unsafe {
+            gl::glClearColor(0.1, 0.1, 0.1, 1.);
+            gl::glClear(gl::GL_COLOR_BUFFER_BIT);
+        }
+    }
 
     fn char_event(&mut self, ctx: &mut Context, character: char, _: KeyMods, _: bool) {
         match character {

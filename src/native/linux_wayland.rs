@@ -13,7 +13,7 @@ use libwayland_egl::*;
 use crate::{
     event::EventHandler,
     native::{egl, NativeDisplayData},
-    Context, GraphicsContext,
+    Context,
 };
 
 pub(crate) struct WaylandDisplay {
@@ -79,7 +79,7 @@ impl crate::native::NativeDisplay for WaylandDisplay {
 /// A thing to pass around within *void pointer of wayland's event handler
 struct WaylandPayload {
     display: WaylandDisplay,
-    context: Option<GraphicsContext>,
+    context: Option<Context>,
     event_handler: Option<Box<dyn EventHandler>>,
 }
 
@@ -447,7 +447,9 @@ where
             std::ptr::null_mut(),
         );
 
-        if egl_surface.is_null() /* EGL_NO_SURFACE  */ {
+        if egl_surface.is_null()
+        /* EGL_NO_SURFACE  */
+        {
             panic!("surface creation failed");
         }
         if (libegl.eglMakeCurrent.unwrap())(egl_display, egl_surface, egl_surface, context) == 0 {
@@ -483,7 +485,7 @@ where
             ));
         }
 
-        payload.context = Some(crate::GraphicsContext::new(false));
+        payload.context = Some(crate::Context::default());
         payload.display.data.screen_width = conf.window_width;
         payload.display.data.screen_height = conf.window_height;
 

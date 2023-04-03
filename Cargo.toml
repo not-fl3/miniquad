@@ -23,7 +23,3 @@ ndk-sys = "0.2"
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 objc = "0.2"
-
-[dev-dependencies]
-glam = {version = "0.14", features = ["scalar-math"] }
-quad-rand = "0.1"

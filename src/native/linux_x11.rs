@@ -11,7 +11,6 @@ mod xi_input;
 use crate::{
     event::EventHandler,
     gl,
-    graphics::GraphicsContext,
     native::{egl, NativeDisplayData},
     Context, CursorIcon,
 };
@@ -455,7 +454,7 @@ impl X11Display {
 
     unsafe fn process_event(
         &mut self,
-        context: &mut GraphicsContext,
+        context: &mut Context,
         event_handler: &mut dyn EventHandler,
         event: &mut XEvent,
     ) {
@@ -719,7 +718,7 @@ where
     display.data.screen_width = w;
     display.data.screen_height = h;
 
-    let mut context = GraphicsContext::new(gl::is_gl2());
+    let mut context = Context::default();
 
     let mut data = (f.take().unwrap())(context.with_display(&mut display));
 
@@ -783,7 +782,9 @@ where
         std::ptr::null_mut(),
     );
 
-    if egl_surface.is_null() /* EGL_NO_SURFACE  */ {
+    if egl_surface.is_null()
+    /* EGL_NO_SURFACE  */
+    {
         panic!("surface creation failed");
     }
     if (egl_lib.eglMakeCurrent.unwrap())(egl_display, egl_surface, egl_surface, context) == 0 {
@@ -805,7 +806,7 @@ where
 
     (display.libx11.XFlush)(display.display);
 
-    let mut context = GraphicsContext::new(gl::is_gl2());
+    let mut context = Context::default();
 
     let (w, h) = display.query_window_size(window);
     display.data.screen_width = w;
