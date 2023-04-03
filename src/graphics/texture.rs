@@ -78,7 +78,7 @@ impl TextureFormat {
             TextureFormat::RGB8 => 3 * square,
             TextureFormat::RGBA8 => 4 * square,
             TextureFormat::Depth => 2 * square,
-            TextureFormat::Alpha => 1 * square,
+            TextureFormat::Alpha => square,
         }
     }
 }

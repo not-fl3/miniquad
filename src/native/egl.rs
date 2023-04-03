@@ -335,5 +335,5 @@ pub unsafe fn create_egl_context(
         return Err(EglError::CreateContextFailed);
     }
 
-    return Ok((context, config, display));
+    Ok((context, config, display))
 }

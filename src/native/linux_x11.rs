@@ -167,7 +167,7 @@ impl X11Display {
             if !db.is_null() {
                 let mut value = XrmValue {
                     size: 0,
-                    addr: 0 as *mut libc::c_char,
+                    addr: std::ptr::null_mut::<libc::c_char>(),
                 };
                 let mut type_ = std::ptr::null_mut();
                 if (self.libx11.XrmGetResource)(
@@ -176,11 +176,8 @@ impl X11Display {
                     b"Xft.Dpi\x00".as_ptr() as _,
                     &mut type_,
                     &mut value,
-                ) != 0
-                {
-                    if !type_.is_null() && libc::strcmp(type_, b"String\x00".as_ptr() as _) == 0 {
-                        self.dpi_scale = libc::atof(value.addr as *const _) as f32 / 96.0;
-                    }
+                ) != 0 && !type_.is_null() && libc::strcmp(type_, b"String\x00".as_ptr() as _) == 0 {
+                    self.dpi_scale = libc::atof(value.addr as *const _) as f32 / 96.0;
                 }
                 (self.libx11.XrmDestroyDatabase)(db);
             }
@@ -193,7 +190,7 @@ impl X11Display {
             event: *mut XErrorEvent,
         ) -> libc::c_int {
             println!("Error: {}", (*event).error_code);
-            return 0 as libc::c_int;
+            0 as libc::c_int
         }
 
         (self.libx11.XSetErrorHandler)(Some(
@@ -288,7 +285,7 @@ impl X11Display {
         );
         let mut hints = (self.libx11.XAllocSizeHints)();
         (*hints).flags |= PWinGravity;
-        if conf.window_resizable == false {
+        if !conf.window_resizable {
             (*hints).flags |= PMinSize | PMaxSize;
             (*hints).min_width = conf.window_width;
             (*hints).min_height = conf.window_height;
@@ -332,7 +329,7 @@ impl X11Display {
             8 as libc::c_int,
             PropModeReplace,
             c_title.as_ptr() as *mut libc::c_uchar,
-            libc::strlen(c_title.as_ptr()) as libc::c_int,
+            c_title.as_bytes().len() as libc::c_int,
         );
         (self.libx11.XChangeProperty)(
             self.display,
@@ -342,7 +339,7 @@ impl X11Display {
             8 as libc::c_int,
             PropModeReplace,
             c_title.as_ptr() as *mut libc::c_uchar,
-            libc::strlen(c_title.as_ptr()) as libc::c_int,
+            c_title.as_bytes().len() as libc::c_int,
         );
         (self.libx11.XFlush)(self.display);
     }
@@ -399,7 +396,7 @@ impl X11Display {
                 serial: 0,
                 send_event: true as _,
                 message_type: wm_state,
-                window: window,
+                window,
                 display: self.display,
                 format: 32,
                 data: ClientMessageData {
@@ -891,19 +888,19 @@ where
 
         match conf.platform.linux_x11_gl {
             crate::conf::LinuxX11Gl::GLXOnly => {
-                glx_main_loop(display, &conf, f).ok().unwrap();
+                glx_main_loop(display, conf, f).ok().unwrap();
             }
             crate::conf::LinuxX11Gl::EGLOnly => {
-                egl_main_loop(display, &conf, f).ok().unwrap();
+                egl_main_loop(display, conf, f).ok().unwrap();
             }
             crate::conf::LinuxX11Gl::GLXWithEGLFallback => {
-                if let Err(display) = glx_main_loop(display, &conf, f) {
-                    egl_main_loop(display, &conf, f).ok().unwrap();
+                if let Err(display) = glx_main_loop(display, conf, f) {
+                    egl_main_loop(display, conf, f).ok().unwrap();
                 }
             }
             crate::conf::LinuxX11Gl::EGLWithGLXFallback => {
-                if let Err(display) = egl_main_loop(display, &conf, f) {
-                    glx_main_loop(display, &conf, f).ok().unwrap();
+                if let Err(display) = egl_main_loop(display, conf, f) {
+                    glx_main_loop(display, conf, f).ok().unwrap();
                 }
             }
         }

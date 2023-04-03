@@ -273,7 +273,7 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
     width: i32,
     height: i32,
     _states: *mut wl_array,
-) -> () {
+) {
     assert!(!data.is_null());
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
     let display = &mut payload.display;
@@ -299,8 +299,8 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
         }
 
         drop(display);
-        if let (mut context, Some(event_handler)) = payload.context() {
-            event_handler.resize_event(&mut context, width as _, height as _);
+        if let (context, Some(event_handler)) = payload.context() {
+            event_handler.resize_event(context, width as _, height as _);
         }
     }
 }
@@ -365,10 +365,10 @@ where
         );
         (payload.display.client.wl_display_roundtrip)(wdisplay);
 
-        assert!(payload.display.compositor.is_null() == false);
-        assert!(payload.display.xdg_wm_base.is_null() == false);
-        assert!(payload.display.subcompositor.is_null() == false);
-        assert!(payload.display.seat.is_null() == false);
+        assert!(!payload.display.compositor.is_null());
+        assert!(!payload.display.xdg_wm_base.is_null());
+        assert!(!payload.display.subcompositor.is_null());
+        assert!(!payload.display.seat.is_null());
 
         if payload.display.decoration_manager.is_null() {
             println!("Decoration manager not found, will draw fallback decorations");
@@ -388,7 +388,7 @@ where
             WL_COMPOSITOR_CREATE_SURFACE,
             payload.display.client.wl_surface_interface
         );
-        assert!(payload.display.surface.is_null() == false);
+        assert!(!payload.display.surface.is_null());
 
         let xdg_surface: *mut extensions::xdg_shell::xdg_surface = wl_request_constructor!(
             payload.display.client,
@@ -397,7 +397,7 @@ where
             &extensions::xdg_shell::xdg_surface_interface,
             payload.display.surface
         );
-        assert!(xdg_surface.is_null() == false);
+        assert!(!xdg_surface.is_null());
 
         let xdg_surface_listener = extensions::xdg_shell::xdg_surface_listener {
             configure: Some(xdg_surface_handle_configure),
@@ -415,7 +415,7 @@ where
             extensions::xdg_shell::xdg_surface::get_toplevel,
             &extensions::xdg_shell::xdg_toplevel_interface
         );
-        assert!(payload.display.xdg_toplevel.is_null() == false);
+        assert!(!payload.display.xdg_toplevel.is_null());
 
         let xdg_toplevel_listener = extensions::xdg_shell::xdg_toplevel_listener {
             configure: Some(xdg_toplevel_handle_configure),
@@ -460,7 +460,7 @@ where
             libegl.eglGetProcAddress.expect("non-null function pointer")(name.as_ptr() as _)
         });
 
-        if payload.display.decoration_manager.is_null() == false {
+        if !payload.display.decoration_manager.is_null() {
             let server_decoration: *mut extensions::xdg_decoration::zxdg_toplevel_decoration_v1 = wl_request_constructor!(
                 payload.display.client,
                 payload.display.decoration_manager,
@@ -468,7 +468,7 @@ where
                 &extensions::xdg_decoration::zxdg_toplevel_decoration_v1_interface,
                 payload.display.xdg_toplevel
             );
-            assert!(server_decoration.is_null() == false);
+            assert!(!server_decoration.is_null());
 
             wl_request!(
                 payload.display.client,
@@ -488,15 +488,15 @@ where
         payload.display.data.screen_width = conf.window_width;
         payload.display.data.screen_height = conf.window_height;
 
-        let event_handler = (f.take().unwrap())(&mut payload.context().0);
+        let event_handler = (f.take().unwrap())(payload.context().0);
         payload.event_handler = Some(event_handler);
 
-        while payload.display.closed == false {
+        while !payload.display.closed {
             (payload.display.client.wl_display_dispatch_pending)(wdisplay);
 
-            let (mut context, event_handler) = payload.context();
-            event_handler.as_mut().unwrap().update(&mut context);
-            event_handler.as_mut().unwrap().draw(&mut context);
+            let (context, event_handler) = payload.context();
+            event_handler.as_mut().unwrap().update(context);
+            event_handler.as_mut().unwrap().draw(context);
 
             (libegl.eglSwapBuffers.unwrap())(egl_display, egl_surface);
         }

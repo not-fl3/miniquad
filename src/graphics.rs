@@ -156,7 +156,7 @@ impl VertexFormat {
 
     pub fn byte_len(&self) -> i32 {
         match self {
-            VertexFormat::Float1 => 1 * 4,
+            VertexFormat::Float1 => 4,
             VertexFormat::Float2 => 2 * 4,
             VertexFormat::Float3 => 3 * 4,
             VertexFormat::Float4 => 4 * 4,
@@ -164,11 +164,11 @@ impl VertexFormat {
             VertexFormat::Byte2 => 2,
             VertexFormat::Byte3 => 3,
             VertexFormat::Byte4 => 4,
-            VertexFormat::Short1 => 1 * 2,
+            VertexFormat::Short1 => 2,
             VertexFormat::Short2 => 2 * 2,
             VertexFormat::Short3 => 3 * 2,
             VertexFormat::Short4 => 4 * 2,
-            VertexFormat::Int1 => 1 * 4,
+            VertexFormat::Int1 => 4,
             VertexFormat::Int2 => 2 * 4,
             VertexFormat::Int3 => 3 * 4,
             VertexFormat::Int4 => 4 * 4,
@@ -200,16 +200,14 @@ impl VertexFormat {
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Default)]
 pub enum VertexStep {
+    #[default]
     PerVertex,
     PerInstance,
 }
 
-impl Default for VertexStep {
-    fn default() -> VertexStep {
-        VertexStep::PerVertex
-    }
-}
+
 
 #[derive(Clone, Debug)]
 pub struct BufferLayout {
@@ -487,11 +485,9 @@ impl GlCache {
                 self.bind_buffer(target, self.stored_vertex_buffer, None);
                 self.stored_vertex_buffer = 0;
             }
-        } else {
-            if self.stored_index_buffer != 0 {
-                self.bind_buffer(target, self.stored_index_buffer, self.stored_index_type);
-                self.stored_index_buffer = 0;
-            }
+        } else if self.stored_index_buffer != 0 {
+            self.bind_buffer(target, self.stored_index_buffer, self.stored_index_type);
+            self.stored_index_buffer = 0;
         }
     }
 
@@ -857,7 +853,7 @@ impl GraphicsContext {
                 glStencilFuncSeparate(
                     GL_BACK,
                     back.test_func.into(),
-                    back.test_ref.into(),
+                    back.test_ref,
                     back.test_mask,
                 );
                 glStencilMaskSeparate(GL_BACK, back.write_mask);
@@ -945,13 +941,11 @@ impl GraphicsContext {
                         gl_vbuf: vb.gl_buf,
                     });
                 }
-            } else {
-                if cached_attr.is_some() {
-                    unsafe {
-                        glDisableVertexAttribArray(attr_index as GLuint);
-                    }
-                    *cached_attr = None;
+            } else if cached_attr.is_some() {
+                unsafe {
+                    glDisableVertexAttribArray(attr_index as GLuint);
                 }
+                *cached_attr = None;
             }
         }
     }
@@ -978,8 +972,8 @@ impl GraphicsContext {
             );
 
             unsafe {
-                let data = (uniform_ptr as *const f32).offset(offset as isize);
-                let data_int = (uniform_ptr as *const i32).offset(offset as isize);
+                let data = (uniform_ptr as *const f32).add(offset);
+                let data_int = (uniform_ptr as *const i32).add(offset);
 
                 if let Some(gl_loc) = uniform.gl_loc {
                     match uniform.uniform_type {
@@ -1307,9 +1301,11 @@ impl From<Comparison> for GLenum {
 /// Specifies how incoming RGBA values (source) and the RGBA in framebuffer (destination)
 /// are combined.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Default)]
 pub enum Equation {
     /// Adds source and destination. Source and destination are multiplied
     /// by blending parameters before addition.
+    #[default]
     Add,
     /// Subtracts destination from source. Source and destination are
     /// multiplied by blending parameters before subtraction.
@@ -1338,11 +1334,7 @@ pub enum BlendFactor {
     SourceAlphaSaturate,
 }
 
-impl Default for Equation {
-    fn default() -> Equation {
-        Equation::Add
-    }
-}
+
 
 impl From<Equation> for GLenum {
     fn from(eq: Equation) -> Self {
