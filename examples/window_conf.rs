@@ -1,6 +1,7 @@
 use miniquad::*;
 
-struct Stage {}
+struct Stage;
+
 impl EventHandler for Stage {
     fn update(&mut self, _ctx: &mut Context) {}
 
@@ -20,6 +21,6 @@ fn main() {
             window_height: 768,
             ..Default::default()
         },
-        |_ctx| Box::new(Stage {}),
+        |_ctx| Box::new(Stage),
     );
 }
