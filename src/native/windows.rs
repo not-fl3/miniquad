@@ -2,7 +2,7 @@ use crate::{
     conf::{Conf, Icon},
     event::{KeyMods, MouseButton},
     native::NativeDisplayData,
-    Context, CursorIcon, EventHandler, GraphicsContext,
+    Context, CursorIcon, EventHandler, 
 };
 
 use winapi::{
@@ -199,7 +199,7 @@ impl crate::native::NativeDisplay for Display {
 
 struct WindowPayload {
     event_handler: Box<dyn EventHandler>,
-    context: GraphicsContext,
+    context: Context,
     display: Display,
 }
 
@@ -848,7 +848,7 @@ where
 
         super::gl::load_gl_funcs(|proc| display.get_proc_address(proc));
 
-        let mut context = GraphicsContext::new(crate::gl::is_gl2());
+        let mut context = Context::default();
 
         let event_handler = f(context.with_display(&mut display));
 
