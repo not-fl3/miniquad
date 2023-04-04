@@ -9,7 +9,7 @@ use {
             apple::{apple_util::*, frameworks::*},
             NativeDisplayData,
         },
-        Context, CursorIcon, GraphicsContext,
+        Context, CursorIcon,
     },
     std::{collections::HashMap, os::raw::c_void},
 };
@@ -191,7 +191,7 @@ impl Modifiers {
 
 struct WindowPayload {
     display: MacosDisplay,
-    context: Option<GraphicsContext>,
+    context: Option<Context>,
     event_handler: Option<Box<dyn EventHandler>>,
     f: Option<Box<dyn 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>>>,
     modifiers: Modifiers,
@@ -368,7 +368,7 @@ pub fn define_cocoa_view_class() -> *const Class {
             let () = msg_send![ctx, makeCurrentContext];
         }
 
-        payload.context = Some(GraphicsContext::new(false));
+        payload.context = Some(Context::default());
 
         let f = payload.f.take().unwrap();
         payload.event_handler = Some(f(payload
