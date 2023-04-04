@@ -34,5 +34,8 @@ ndk-sys = "0.2"
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 objc = "0.2"
 
+[dependencies]
+skia-safe = {version = "0", features = ["default", "gl"]}
+
 [package.metadata.android.activity_attributes]
 "android:exported" = "true"

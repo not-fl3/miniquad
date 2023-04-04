@@ -189,11 +189,12 @@ impl Modifiers {
     }
 }
 
+type Function = dyn 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>;
 struct WindowPayload {
     display: MacosDisplay,
     context: Option<Context>,
     event_handler: Option<Box<dyn EventHandler>>,
-    f: Option<Box<dyn 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>>>,
+    f: Option<Box<Function>>,
     modifiers: Modifiers,
 }
 impl WindowPayload {
@@ -236,9 +237,9 @@ pub fn define_cocoa_window_delegate() -> *const Class {
             }
         }
         if payload.display.data.quit_ordered {
-            return YES;
+            YES
         } else {
-            return NO;
+            NO
         }
     }
 
@@ -326,7 +327,7 @@ pub fn define_cocoa_view_class() -> *const Class {
                 .display
                 .cursors
                 .entry(current_cursor)
-                .or_insert_with(|| load_mouse_cursor(current_cursor.clone()));
+                .or_insert_with(|| load_mouse_cursor(current_cursor));
             assert!(!cursor_id.is_null());
             let bounds: NSRect = msg_send![this, bounds];
             let _: () = msg_send![
@@ -481,10 +482,8 @@ pub fn define_cocoa_view_class() -> *const Class {
                 if let Some((context, event_handler)) = payload.context() {
                     event_handler.key_down_event(context, keycode, mods, false);
                 }
-            } else {
-                if let Some((context, event_handler)) = payload.context() {
-                    event_handler.key_up_event(context, keycode, mods);
-                }
+            } else if let Some((context, event_handler)) = payload.context() {
+                event_handler.key_up_event(context, keycode, mods);
             }
         }
     }
@@ -655,20 +654,21 @@ fn get_window_payload(this: &Object) -> &mut WindowPayload {
 unsafe fn create_opengl_view(window_frame: NSRect, sample_count: i32, high_dpi: bool) -> ObjcId {
     use NSOpenGLPixelFormatAttribute::*;
 
-    let mut attrs: Vec<u32> = vec![];
+    let mut attrs: Vec<u32> = vec![
+        NSOpenGLPFAAccelerated as _,
+        NSOpenGLPFADoubleBuffer as _,
+        NSOpenGLPFAOpenGLProfile as _,
+        NSOpenGLPFAOpenGLProfiles::NSOpenGLProfileVersion3_2Core as _,
+        NSOpenGLPFAColorSize as _,
+        24,
+        NSOpenGLPFAAlphaSize as _,
+        8,
+        NSOpenGLPFADepthSize as _,
+        24,
+        NSOpenGLPFAStencilSize as _,
+        8,
+    ];
 
-    attrs.push(NSOpenGLPFAAccelerated as _);
-    attrs.push(NSOpenGLPFADoubleBuffer as _);
-    attrs.push(NSOpenGLPFAOpenGLProfile as _);
-    attrs.push(NSOpenGLPFAOpenGLProfiles::NSOpenGLProfileVersion3_2Core as _);
-    attrs.push(NSOpenGLPFAColorSize as _);
-    attrs.push(24);
-    attrs.push(NSOpenGLPFAAlphaSize as _);
-    attrs.push(8);
-    attrs.push(NSOpenGLPFADepthSize as _);
-    attrs.push(24);
-    attrs.push(NSOpenGLPFAStencilSize as _);
-    attrs.push(8);
     if sample_count > 1 {
         attrs.push(NSOpenGLPFAMultisample as _);
         attrs.push(NSOpenGLPFASampleBuffers as _);
@@ -756,7 +756,7 @@ where
     let window: ObjcId = msg_send![
         window,
         initWithContentRect: window_frame
-        styleMask: window_masks as u64
+        styleMask: window_masks
         backing: NSBackingStoreType::NSBackingStoreBuffered as u64
         defer: NO
     ];
