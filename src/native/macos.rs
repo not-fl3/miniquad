@@ -219,7 +219,7 @@ pub fn define_app_delegate() -> *const Class {
 }
 
 pub fn define_cocoa_window_delegate() -> *const Class {
-    extern "C" fn window_should_close(this: &Object, _: Sel, _: ObjcId) -> BOOL {
+    extern "C" fn window_should_close(this: &mut Object, _: Sel, _: ObjcId) -> BOOL {
         let payload = get_window_payload(this);
 
         // only give user-code a chance to intervene when sapp_quit() wasn't already called
@@ -243,7 +243,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
         }
     }
 
-    extern "C" fn window_did_resize(this: &Object, _: Sel, _: ObjcId) {
+    extern "C" fn window_did_resize(this: &mut Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
         if let Some((w, h)) = unsafe { payload.display.update_dimensions() } {
             if let Some((context, event_handler)) = payload.context() {
@@ -252,7 +252,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
         }
     }
 
-    extern "C" fn window_did_change_screen(this: &Object, _: Sel, _: ObjcId) {
+    extern "C" fn window_did_change_screen(this: &mut Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
         if let Some((w, h)) = unsafe { payload.display.update_dimensions() } {
             if let Some((context, event_handler)) = payload.context() {
@@ -260,11 +260,11 @@ pub fn define_cocoa_window_delegate() -> *const Class {
             }
         }
     }
-    extern "C" fn window_did_enter_fullscreen(this: &Object, _: Sel, _: ObjcId) {
+    extern "C" fn window_did_enter_fullscreen(this: &mut Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
         payload.display.fullscreen = true;
     }
-    extern "C" fn window_did_exit_fullscreen(this: &Object, _: Sel, _: ObjcId) {
+    extern "C" fn window_did_exit_fullscreen(this: &mut Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
         payload.display.fullscreen = false;
     }
@@ -275,24 +275,24 @@ pub fn define_cocoa_window_delegate() -> *const Class {
     unsafe {
         decl.add_method(
             sel!(windowShouldClose:),
-            window_should_close as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
+            window_should_close as extern "C" fn(&mut Object, Sel, ObjcId) -> BOOL,
         );
 
         decl.add_method(
             sel!(windowDidResize:),
-            window_did_resize as extern "C" fn(&Object, Sel, ObjcId),
+            window_did_resize as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(windowDidChangeScreen:),
-            window_did_change_screen as extern "C" fn(&Object, Sel, ObjcId),
+            window_did_change_screen as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(windowDidEnterFullScreen:),
-            window_did_enter_fullscreen as extern "C" fn(&Object, Sel, ObjcId),
+            window_did_enter_fullscreen as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(windowDidExitFullScreen:),
-            window_did_exit_fullscreen as extern "C" fn(&Object, Sel, ObjcId),
+            window_did_exit_fullscreen as extern "C" fn(&mut Object, Sel, ObjcId),
         );
     }
     // Store internal state as user data
@@ -304,13 +304,12 @@ pub fn define_cocoa_window_delegate() -> *const Class {
 pub fn define_cocoa_view_class() -> *const Class {
     //extern "C" fn dealloc(this: &Object, _sel: Sel) {}
 
-    extern "C" fn reshape(this: &Object, _sel: Sel) {
-        let payload = get_window_payload(this);
-
+    extern "C" fn reshape(this: &mut Object, _sel: Sel) {
         unsafe {
             let superclass = superclass(this);
             let () = msg_send![super(this, superclass), reshape];
 
+            let payload = get_window_payload(this);
             if let Some((w, h)) = payload.display.update_dimensions() {
                 if let Some((context, event_handler)) = payload.context() {
                     event_handler.resize_event(context, w as _, h as _);
@@ -319,7 +318,7 @@ pub fn define_cocoa_view_class() -> *const Class {
         }
     }
 
-    extern "C" fn reset_cursor_rects(this: &Object, _sel: Sel) {
+    extern "C" fn reset_cursor_rects(this: &mut Object, _sel: Sel) {
         let payload = get_window_payload(this);
         unsafe {
             let current_cursor = payload.display.current_cursor;
@@ -338,17 +337,17 @@ pub fn define_cocoa_view_class() -> *const Class {
         }
     }
 
-    extern "C" fn draw_rect(this: &Object, _sel: Sel, _rect: NSRect) {
-        let payload = get_window_payload(this);
-        if let Some((context, event_handler)) = payload.context() {
-            event_handler.update(context);
-            event_handler.draw(context);
-        }
-
+    extern "C" fn draw_rect(this: &mut Object, _sel: Sel, _rect: NSRect) {
         unsafe {
             let ctx: ObjcId = msg_send![this, openGLContext];
             assert!(!ctx.is_null());
             let () = msg_send![ctx, flushBuffer];
+
+            let payload = get_window_payload(this);
+            if let Some((context, event_handler)) = payload.context() {
+                event_handler.update(context);
+                event_handler.draw(context);
+            }
 
             if payload.display.data.quit_requested || payload.display.data.quit_ordered {
                 let () = msg_send![payload.display.window, performClose: nil];
@@ -356,8 +355,7 @@ pub fn define_cocoa_view_class() -> *const Class {
         }
     }
 
-    extern "C" fn prepare_open_gl(this: &Object, _sel: Sel) {
-        let payload = get_window_payload(this);
+    extern "C" fn prepare_open_gl(this: &mut Object, _sel: Sel) {
         unsafe {
             let superclass = superclass(this);
             let () = msg_send![super(this, superclass), prepareOpenGL];
@@ -369,6 +367,7 @@ pub fn define_cocoa_view_class() -> *const Class {
             let () = msg_send![ctx, makeCurrentContext];
         }
 
+        let payload = get_window_payload(this);
         payload.context = Some(Context::default());
 
         let f = payload.f.take().unwrap();
@@ -379,12 +378,12 @@ pub fn define_cocoa_view_class() -> *const Class {
             .with_display(&mut payload.display)));
     }
 
-    extern "C" fn timer_fired(this: &Object, _sel: Sel, _: ObjcId) {
+    extern "C" fn timer_fired(this: &mut Object, _sel: Sel, _: ObjcId) {
         unsafe {
             let () = msg_send!(this, setNeedsDisplay: YES);
         }
     }
-    extern "C" fn mouse_moved(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn mouse_moved(this: &mut Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
 
         unsafe {
@@ -396,7 +395,7 @@ pub fn define_cocoa_view_class() -> *const Class {
         }
     }
 
-    fn fire_mouse_event(this: &Object, event: ObjcId, down: bool, btn: MouseButton) {
+    fn fire_mouse_event(this: &mut Object, event: ObjcId, down: bool, btn: MouseButton) {
         let payload = get_window_payload(this);
 
         unsafe {
@@ -411,25 +410,25 @@ pub fn define_cocoa_view_class() -> *const Class {
             }
         }
     }
-    extern "C" fn mouse_down(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn mouse_down(this: &mut Object, _sel: Sel, event: ObjcId) {
         fire_mouse_event(this, event, true, MouseButton::Left);
     }
-    extern "C" fn mouse_up(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn mouse_up(this: &mut Object, _sel: Sel, event: ObjcId) {
         fire_mouse_event(this, event, false, MouseButton::Left);
     }
-    extern "C" fn right_mouse_down(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn right_mouse_down(this: &mut Object, _sel: Sel, event: ObjcId) {
         fire_mouse_event(this, event, true, MouseButton::Right);
     }
-    extern "C" fn right_mouse_up(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn right_mouse_up(this: &mut Object, _sel: Sel, event: ObjcId) {
         fire_mouse_event(this, event, false, MouseButton::Right);
     }
-    extern "C" fn other_mouse_down(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn other_mouse_down(this: &mut Object, _sel: Sel, event: ObjcId) {
         fire_mouse_event(this, event, true, MouseButton::Middle);
     }
-    extern "C" fn other_mouse_up(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn other_mouse_up(this: &mut Object, _sel: Sel, event: ObjcId) {
         fire_mouse_event(this, event, false, MouseButton::Middle);
     }
-    extern "C" fn scroll_wheel(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn scroll_wheel(this: &mut Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
         unsafe {
             let mut dx: f64 = msg_send![event, scrollingDeltaX];
@@ -444,7 +443,7 @@ pub fn define_cocoa_view_class() -> *const Class {
             }
         }
     }
-    extern "C" fn key_down(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn key_down(this: &mut Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
         let mods = get_event_key_modifier(event);
         let repeat: bool = unsafe { msg_send!(event, isARepeat) };
@@ -460,7 +459,7 @@ pub fn define_cocoa_view_class() -> *const Class {
             }
         }
     }
-    extern "C" fn key_up(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn key_up(this: &mut Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
         let mods = get_event_key_modifier(event);
         if let Some(key) = get_event_keycode(event) {
@@ -488,7 +487,7 @@ pub fn define_cocoa_view_class() -> *const Class {
         }
     }
 
-    extern "C" fn flags_changed(this: &Object, _sel: Sel, event: ObjcId) {
+    extern "C" fn flags_changed(this: &mut Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
         let mods = get_event_key_modifier(event);
         let flags: u64 = unsafe { msg_send![event, modifierFlags] };
@@ -559,13 +558,13 @@ pub fn define_cocoa_view_class() -> *const Class {
         //decl.add_method(sel!(dealloc), dealloc as extern "C" fn(&Object, Sel));
         decl.add_method(
             sel!(timerFired:),
-            timer_fired as extern "C" fn(&Object, Sel, ObjcId),
+            timer_fired as extern "C" fn(&mut Object, Sel, ObjcId),
         );
 
-        decl.add_method(sel!(reshape), reshape as extern "C" fn(&Object, Sel));
+        decl.add_method(sel!(reshape), reshape as extern "C" fn(&mut Object, Sel));
         decl.add_method(
             sel!(prepareOpenGL),
-            prepare_open_gl as extern "C" fn(&Object, Sel),
+            prepare_open_gl as extern "C" fn(&mut Object, Sel),
         );
         decl.add_method(
             sel!(canBecomeKey),
@@ -578,65 +577,68 @@ pub fn define_cocoa_view_class() -> *const Class {
         decl.add_method(sel!(isOpaque), yes as extern "C" fn(&Object, Sel) -> BOOL);
         decl.add_method(
             sel!(resetCursorRects),
-            reset_cursor_rects as extern "C" fn(&Object, Sel),
+            reset_cursor_rects as extern "C" fn(&mut Object, Sel),
         );
         decl.add_method(
             sel!(drawRect:),
-            draw_rect as extern "C" fn(&Object, Sel, NSRect),
+            draw_rect as extern "C" fn(&mut Object, Sel, NSRect),
         );
         decl.add_method(
             sel!(mouseMoved:),
-            mouse_moved as extern "C" fn(&Object, Sel, ObjcId),
+            mouse_moved as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(mouseDragged:),
-            mouse_moved as extern "C" fn(&Object, Sel, ObjcId),
+            mouse_moved as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(rightMouseDragged:),
-            mouse_moved as extern "C" fn(&Object, Sel, ObjcId),
+            mouse_moved as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(otherMouseDragged:),
-            mouse_moved as extern "C" fn(&Object, Sel, ObjcId),
+            mouse_moved as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(mouseDown:),
-            mouse_down as extern "C" fn(&Object, Sel, ObjcId),
+            mouse_down as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(mouseUp:),
-            mouse_up as extern "C" fn(&Object, Sel, ObjcId),
+            mouse_up as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(rightMouseDown:),
-            right_mouse_down as extern "C" fn(&Object, Sel, ObjcId),
+            right_mouse_down as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(rightMouseUp:),
-            right_mouse_up as extern "C" fn(&Object, Sel, ObjcId),
+            right_mouse_up as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(otherMouseDown:),
-            other_mouse_down as extern "C" fn(&Object, Sel, ObjcId),
+            other_mouse_down as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(otherMouseUp:),
-            other_mouse_up as extern "C" fn(&Object, Sel, ObjcId),
+            other_mouse_up as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(scrollWheel:),
-            scroll_wheel as extern "C" fn(&Object, Sel, ObjcId),
+            scroll_wheel as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(keyDown:),
-            key_down as extern "C" fn(&Object, Sel, ObjcId),
+            key_down as extern "C" fn(&mut Object, Sel, ObjcId),
         );
         decl.add_method(
             sel!(flagsChanged:),
-            flags_changed as extern "C" fn(&Object, Sel, ObjcId),
+            flags_changed as extern "C" fn(&mut Object, Sel, ObjcId),
         );
-        decl.add_method(sel!(keyUp:), key_up as extern "C" fn(&Object, Sel, ObjcId));
+        decl.add_method(
+            sel!(keyUp:),
+            key_up as extern "C" fn(&mut Object, Sel, ObjcId),
+        );
     }
 
     decl.add_ivar::<*mut c_void>("display_ptr");
@@ -644,7 +646,7 @@ pub fn define_cocoa_view_class() -> *const Class {
     return decl.register();
 }
 
-fn get_window_payload(this: &Object) -> &mut WindowPayload {
+fn get_window_payload(this: &mut Object) -> &mut WindowPayload {
     unsafe {
         let ptr: *mut c_void = *this.get_ivar("display_ptr");
         &mut *(ptr as *mut WindowPayload)
@@ -703,6 +705,8 @@ unsafe fn create_opengl_view(window_frame: NSRect, sample_count: i32, high_dpi: 
     view
 }
 
+/// # Safety
+/// be careful idk i just addded this to get clippy to shut up
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
 where
     F: 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>,
