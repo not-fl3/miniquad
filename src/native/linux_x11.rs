@@ -17,6 +17,12 @@ use crate::{
 
 use libx11::*;
 
+#[cfg(feature = "skia")]
+use crate::SkiaContext;
+
+#[cfg(feature = "skia")]
+use skia_safe::gpu::{gl::FramebufferInfo, DirectContext};
+
 use std::collections::HashMap;
 
 pub struct Dummy;
@@ -692,10 +698,12 @@ where
         Some(glx) => glx,
         _ => return Err(display),
     };
+
     let visual = glx.visual;
     let depth = glx.depth;
     let window = display.create_window(visual, depth, conf);
     display.window = window;
+
     let (glx_context, glx_window) = glx.create_context(&mut display, window);
     glx.swap_interval(
         &mut display,
@@ -703,7 +711,38 @@ where
         glx_context,
         conf.platform.swap_interval.unwrap_or(1),
     );
+
+    // OpenGL functions need to be loaded even for Skia
     gl::load_gl_funcs(|proc| glx.libgl.get_procaddr(proc));
+
+    #[cfg(feature = "skia")]
+    let (dctx, fb_info) = {
+        let interface = skia_safe::gpu::gl::Interface::new_load_with(|proc| {
+            if proc == "eglGetCurrentDisplay" {
+                return std::ptr::null();
+            }
+            match glx.libgl.get_procaddr(proc) {
+                Some(procaddr) => procaddr as *const libc::c_void,
+                None => std::ptr::null(),
+            }
+        })
+        .expect("Failed to create Skia <-> OpenGL interface");
+
+        let dctx = DirectContext::new_gl(Some(interface), None)
+            .expect("Failed to create Skia's direct context");
+
+        let fb_info = {
+            let mut fboid: glx::GLint = 0;
+            unsafe { gl::glGetIntegerv(gl::GL_FRAMEBUFFER_BINDING, &mut fboid) };
+
+            FramebufferInfo {
+                fboid: fboid.try_into().unwrap(),
+                format: gl::GL_RGBA8,
+            }
+        };
+
+        (dctx, fb_info)
+    };
 
     display.show_window(window);
 
@@ -718,6 +757,10 @@ where
     display.data.screen_width = w;
     display.data.screen_height = h;
 
+    #[cfg(feature = "skia")]
+    let mut context = Context::skia(SkiaContext::new(dctx, fb_info, w, h));
+
+    #[cfg(not(feature = "skia"))]
     let mut context = Context::default();
 
     let mut data = (f.take().unwrap())(context.with_display(&mut display));
