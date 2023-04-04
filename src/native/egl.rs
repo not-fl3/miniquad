@@ -263,7 +263,9 @@ pub unsafe fn create_egl_context(
     alpha: bool,
 ) -> Result<(EGLContext, EGLConfig, EGLDisplay), EglError> {
     let display = (egl.eglGetDisplay.unwrap())(display as _);
-    if display.is_null() /* EGL_NO_DISPLAY */ {
+
+    // EGL_NO_DISPLAY
+    if display.is_null() {
         return Err(EglError::NoDisplay);
     }
 

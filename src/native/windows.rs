@@ -2,7 +2,7 @@ use crate::{
     conf::{Conf, Icon},
     event::{KeyMods, MouseButton},
     native::NativeDisplayData,
-    Context, CursorIcon, EventHandler, 
+    Context, CursorIcon, EventHandler,
 };
 
 use winapi::{
