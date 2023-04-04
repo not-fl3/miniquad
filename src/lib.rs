@@ -154,7 +154,7 @@ pub enum CursorIcon {
     NWSEResize,
 }
 
-/// Start miniquad.
+/// Start lokinit.
 pub fn start<F>(conf: conf::Conf, f: F)
 where
     F: 'static + FnOnce(&mut Context) -> Box<dyn EventHandler> + std::marker::Send,
