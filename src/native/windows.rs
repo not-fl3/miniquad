@@ -860,9 +860,10 @@ where
                 if proc == "eglGetCurrentDisplay" {
                     return std::ptr::null();
                 }
-                let c_proc = std::ffi::CString::new(proc).unwrap();
-                let proc_pointer = (display.libopengl32.wglGetProcAddress)(c_proc.as_ptr());
-                proc_pointer as *const std::ffi::c_void
+                match display.get_proc_address(proc) {
+                    Some(procaddr) => procaddr as *const libc::c_void,
+                    None => std::ptr::null(),
+                }
             })
             .expect("Failed to create Skia <-> OpenGL interface");
 
