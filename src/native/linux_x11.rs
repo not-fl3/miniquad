@@ -722,7 +722,7 @@ where
                 return std::ptr::null();
             }
             match glx.libgl.get_procaddr(proc) {
-                Some(procaddr) => procaddr as *const libc::c_void,
+                Some(procaddr) => procaddr as *const std::ffi::c_void,
                 None => std::ptr::null(),
             }
         })

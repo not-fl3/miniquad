@@ -861,7 +861,7 @@ where
                     return std::ptr::null();
                 }
                 match display.get_proc_address(proc) {
-                    Some(procaddr) => procaddr as *const libc::c_void,
+                    Some(procaddr) => procaddr as *const std::ffi::c_void,
                     None => std::ptr::null(),
                 }
             })
