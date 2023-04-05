@@ -873,8 +873,6 @@ where
                 let mut fboid = 0;
                 crate::gl::glGetIntegerv(crate::gl::GL_FRAMEBUFFER_BINDING, &mut fboid);
 
-                dbg!(fboid);
-
                 FramebufferInfo {
                     fboid: fboid.try_into().unwrap(),
                     format: crate::gl::GL_RGBA8,
