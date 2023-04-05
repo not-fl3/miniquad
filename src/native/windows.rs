@@ -5,6 +5,12 @@ use crate::{
     Context, CursorIcon, EventHandler,
 };
 
+#[cfg(feature = "skia")]
+use crate::SkiaContext;
+
+#[cfg(feature = "skia")]
+use skia_safe::gpu::{gl::FramebufferInfo, DirectContext};
+
 use winapi::{
     shared::{
         hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_PAGE_GENERIC},
@@ -848,6 +854,44 @@ where
 
         super::gl::load_gl_funcs(|proc| display.get_proc_address(proc));
 
+        #[cfg(feature = "skia")]
+        let (dctx, fb_info) = {
+            let interface = skia_safe::gpu::gl::Interface::new_load_with(|proc| {
+                if proc == "eglGetCurrentDisplay" {
+                    return std::ptr::null();
+                }
+                let c_proc = std::ffi::CString::new(proc).unwrap();
+                let proc_pointer = (display.libopengl32.wglGetProcAddress)(c_proc.as_ptr());
+                proc_pointer as *const std::ffi::c_void
+            })
+            .expect("Failed to create Skia <-> OpenGL interface");
+
+            let dctx = DirectContext::new_gl(Some(interface), None)
+                .expect("Failed to create Skia's direct context");
+
+            let fb_info = {
+                let mut fboid = 0;
+                crate::gl::glGetIntegerv(crate::gl::GL_FRAMEBUFFER_BINDING, &mut fboid);
+
+                dbg!(fboid);
+
+                FramebufferInfo {
+                    fboid: fboid.try_into().unwrap(),
+                    format: crate::gl::GL_RGBA8,
+                }
+            };
+            (dctx, fb_info)
+        };
+
+        #[cfg(feature = "skia")]
+        let mut context = Context::skia(SkiaContext::new(
+            dctx,
+            fb_info,
+            conf.window_width,
+            conf.window_height,
+        ));
+
+        #[cfg(not(feature = "skia"))]
         let mut context = Context::default();
 
         let event_handler = f(context.with_display(&mut display));
