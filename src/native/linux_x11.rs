@@ -718,9 +718,11 @@ where
     #[cfg(feature = "skia")]
     let (dctx, fb_info) = {
         let interface = skia_safe::gpu::gl::Interface::new_load_with(|proc| {
+            // Skia segfaults on Linux if we don't filter out this GLES function.
             if proc == "eglGetCurrentDisplay" {
                 return std::ptr::null();
             }
+
             match glx.libgl.get_procaddr(proc) {
                 Some(procaddr) => procaddr as *const std::ffi::c_void,
                 None => std::ptr::null(),
