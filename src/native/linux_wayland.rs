@@ -1,5 +1,11 @@
 #![allow(dead_code)]
 
+#[cfg(feature = "skia")]
+use crate::SkiaContext;
+
+#[cfg(feature = "skia")]
+use skia_safe::gpu::{gl::FramebufferInfo, DirectContext};
+
 mod libwayland_client;
 mod libwayland_egl;
 
@@ -485,7 +491,47 @@ where
             ));
         }
 
-        payload.context = Some(crate::Context::default());
+        #[cfg(feature = "skia")]
+        let (dctx, fb_info) = {
+            let interface = skia_safe::gpu::gl::Interface::new_load_with(|proc| {
+                let c_proc = std::ffi::CString::new(proc).unwrap();
+                let procaddr =
+                    libegl.eglGetProcAddress.expect("non-null function pointer")(c_proc.as_ptr());
+                match procaddr {
+                    Some(procaddr) => procaddr as *const libc::c_void,
+                    None => std::ptr::null(),
+                }
+            })
+            .expect("Failed to create Skia <-> OpenGL interface");
+
+            let dctx = DirectContext::new_gl(Some(interface), None)
+                .expect("Failed to create Skia's direct context");
+
+            let fb_info = {
+                let mut fboid = 0;
+                crate::gl::glGetIntegerv(crate::gl::GL_FRAMEBUFFER_BINDING, &mut fboid);
+
+                FramebufferInfo {
+                    fboid: fboid.try_into().unwrap(),
+                    format: crate::gl::GL_RGBA8,
+                }
+            };
+
+            (dctx, fb_info)
+        };
+
+        payload.context = {
+            #[cfg(feature = "skia")]
+            let context = Some(crate::Context::skia(SkiaContext::new(
+                dctx,
+                fb_info,
+                conf.window_width,
+                conf.window_height,
+            )));
+            #[cfg(not(feature = "skia"))]
+            let context = Some(crate::Context::default());
+            context
+        };
         payload.display.data.screen_width = conf.window_width;
         payload.display.data.screen_height = conf.window_height;
 
