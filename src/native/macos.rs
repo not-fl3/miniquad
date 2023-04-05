@@ -199,10 +199,10 @@ struct WindowPayload {
 }
 impl WindowPayload {
     pub fn context(&mut self) -> Option<(&mut Context, &mut dyn EventHandler)> {
-        let a = self.context.as_mut()?;
+        let context = self.context.as_mut()?;
         let event_handler = self.event_handler.as_deref_mut()?;
 
-        Some((a.with_display(&mut self.display), event_handler))
+        Some((context.with_display(&mut self.display), event_handler))
     }
 }
 pub fn define_app_delegate() -> *const Class {
