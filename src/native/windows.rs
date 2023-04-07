@@ -190,10 +190,10 @@ impl crate::native::NativeDisplay for WindowsDisplay {
         let win_style: DWORD = get_win_style(self.fullscreen, self.window_resizable);
 
         unsafe {
-            #[cfg(target = "x86_64")]
-            SetWindowLongPtrA(wnd, GWLP_USERDATA, win_style as _);
-            #[cfg(target = "i686")]
-            SetWindowLong(wnd, GWLP_USERDATA, win_style as _);
+            #[cfg(target_arch = "x86_64")]
+            SetWindowLongPtrA(self.wnd, GWLP_USERDATA, win_style as _);
+            #[cfg(target_arch = "i686")]
+            SetWindowLong(self.wnd, GWLP_USERDATA, win_style as _);
 
             if self.fullscreen {
                 SetWindowPos(
@@ -304,14 +304,14 @@ unsafe extern "system" fn win32_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let mut display_ptr: isize = 0;
+    let mut display_ptr: isize;
 
-    #[cfg(target = "x86_64")]
+    #[cfg(target_arch = "x86_64")]
     {
         display_ptr = GetWindowLongPtrA(hwnd, GWLP_USERDATA)
     }
 
-    #[cfg(target = "i686")]
+    #[cfg(target_arch = "i686")]
     {
         display_ptr = GetWindowLong(hwnd, GWLP_USERDATA)
     }
@@ -881,9 +881,9 @@ where
         let mut p = WindowPayload { event_handler };
         // well, technically this is UB and we are suppose to use *mut WindowPayload instead of &mut WindowPayload forever from now on...
         // so if there going to be some weird bugs someday in the future - check this out!
-        #[cfg(target = "x86_64")]
+        #[cfg(target_arch = "x86_64")]
         SetWindowLongPtrA(wnd, GWLP_USERDATA, &mut p as *mut _ as isize);
-        #[cfg(target = "i686")]
+        #[cfg(target_arch = "i686")]
         SetWindowLong(wnd, GWLP_USERDATA, &mut p as *mut _ as isize);
 
         let mut done = false;
