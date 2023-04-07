@@ -799,6 +799,8 @@ where
 
     display.window = window;
     display.view = view;
+    let _ = display.update_dimensions();
+    tl_display::set_display(display);
 
     let nstimer: ObjcId = msg_send![
         class!(NSTimer),
@@ -821,11 +823,7 @@ where
 
     let () = msg_send![window, makeKeyAndOrderFront: nil];
 
-    let _ = display.update_dimensions();
-
     let ns_app: ObjcId = msg_send![class!(NSApplication), sharedApplication];
-
-    tl_display::set_display(display);
 
     let () = msg_send![ns_app, run];
 
