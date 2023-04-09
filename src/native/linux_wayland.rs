@@ -186,7 +186,6 @@ unsafe extern "C" fn registry_add_object(
     let display: &mut WaylandDisplay = &mut *(data as *mut _);
 
     let interface = std::ffi::CStr::from_ptr(interface).to_str().unwrap();
-    println!("{:?}", interface);
     match interface {
         "wl_compositor" => {
             display.compositor = display.client.wl_registry_bind(
