@@ -334,7 +334,7 @@ where
 
         let wdisplay = (client.wl_display_connect)(std::ptr::null_mut());
         if wdisplay.is_null() {
-            println!("Failed to connect to Wayland display.");
+            eprintln!("Failed to connect to Wayland display.");
             return None;
         }
 
@@ -385,7 +385,7 @@ where
         assert!(display.seat.is_null() == false);
 
         if display.decoration_manager.is_null() {
-            println!("Decoration manager not found, will draw fallback decorations");
+            eprintln!("Decoration manager not found, will draw fallback decorations");
         }
 
         let mut libegl = egl::LibEgl::try_load()?;

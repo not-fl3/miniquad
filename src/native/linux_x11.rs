@@ -113,7 +113,7 @@ impl crate::native::NativeDisplay for X11Display {
     }
 
     fn set_window_size(&mut self, _new_width: u32, _new_height: u32) {
-        println!("set_window_size not implemented on linux/x11")
+        eprintln!("set_window_size not implemented on linux/x11")
     }
 
     fn set_fullscreen(&mut self, fullscreen: bool) {

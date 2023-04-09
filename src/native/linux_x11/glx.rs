@@ -219,7 +219,7 @@ impl Glx {
         let mut eventbase = 0;
 
         if (libgl.glxQueryExtension.unwrap())(display, &mut errorbase, &mut eventbase) == 0 {
-            println!("GLX: GLX extension not found");
+            eprintln!("GLX: GLX extension not found");
             return None;
         }
 
@@ -227,11 +227,11 @@ impl Glx {
         let mut glx_minor = 0;
 
         if (libgl.glxQueryVersion.unwrap())(display, &mut glx_major, &mut glx_minor) == 0 {
-            println!("GLX: Failed to query GLX version");
+            eprintln!("GLX: Failed to query GLX version");
             return None;
         }
         if glx_major == 1 && glx_minor < 3 {
-            println!("GLX: GLX version 1.3 is required");
+            eprintln!("GLX: GLX version 1.3 is required");
             return None;
         }
 

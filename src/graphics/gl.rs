@@ -1282,8 +1282,8 @@ impl RenderingBackend for GlContext {
         );
 
         if !self.features.instancing && num_instances != 1 {
-            println!("Instanced rendering is not supported by the GPU");
-            println!("Ignoring this draw call");
+            eprintln!("Instanced rendering is not supported by the GPU");
+            eprintln!("Ignoring this draw call");
             return;
         }
 

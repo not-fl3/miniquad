@@ -639,7 +639,6 @@ pub unsafe fn is_gl2() -> bool {
         .to_str()
         .unwrap();
 
-    version_string.starts_with("2") || version_string.starts_with("OpenGL ES 2")
     version_string.is_empty()
         || version_string.starts_with("2")
         || version_string.starts_with("OpenGL ES 2")

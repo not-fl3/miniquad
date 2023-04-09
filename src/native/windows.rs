@@ -759,7 +759,7 @@ impl WindowsDisplay {
             proc_ptr = GetProcAddress(self.libopengl32.module.0, proc.as_ptr());
         }
         if proc_ptr.is_null() {
-            println!("Load GL func {:?} failed.", proc);
+            eprintln!("Load GL func {:?} failed.", proc);
             return None;
         }
         Some(std::mem::transmute(proc_ptr))

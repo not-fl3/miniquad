@@ -36,7 +36,7 @@ impl LibX11 {
             mut _display: *mut Display,
             event: *mut XErrorEvent,
         ) -> libc::c_int {
-            println!("Error: {}", (*event).error_code);
+            eprintln!("Error: {}", (*event).error_code);
             return 0 as libc::c_int;
         }
 
