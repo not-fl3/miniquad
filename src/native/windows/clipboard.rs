@@ -31,7 +31,7 @@ unsafe fn get_raw_clipboard() -> Option<Vec<u16>> {
     let guard = ClipboardGuard::open();
 
     if guard.is_none() {
-        println!("Failed to open clipboard");
+        eprintln!("Failed to open clipboard");
         return None;
     }
 
@@ -62,14 +62,14 @@ unsafe fn set_raw_clipboard(data: *const u8, len: usize) {
     let guard = ClipboardGuard::open();
 
     if guard.is_none() {
-        println!("Failed to open clipboard");
+        eprintln!("Failed to open clipboard");
         return;
     }
 
     let alloc_handle = GlobalAlloc(GMEM_MOVEABLE, len);
 
     if alloc_handle.is_null() {
-        println!("Failed to set clipboard: memory not allocated");
+        eprintln!("Failed to set clipboard: memory not allocated");
         return;
     }
 
