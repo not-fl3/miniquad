@@ -43,7 +43,7 @@ mod tl_display {
     fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
-            let mut d = d.as_mut().unwrap();
+            let d = d.as_mut().unwrap();
             f(&mut *d);
         })
     }
@@ -51,7 +51,7 @@ mod tl_display {
     pub(super) fn with<T>(mut f: impl FnMut(&mut MacosDisplay) -> T) -> T {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
-            let mut d = d.as_mut().unwrap();
+            let d = d.as_mut().unwrap();
             f(&mut *d)
         })
     }
@@ -263,10 +263,10 @@ pub fn define_cocoa_window_delegate() -> *const Class {
             }
         }
     }
-    extern "C" fn window_did_enter_fullscreen(this: &Object, _: Sel, _: ObjcId) {
+    extern "C" fn window_did_enter_fullscreen(_: &Object, _: Sel, _: ObjcId) {
         tl_display::with(|d| d.fullscreen = true);
     }
-    extern "C" fn window_did_exit_fullscreen(this: &Object, _: Sel, _: ObjcId) {
+    extern "C" fn window_did_exit_fullscreen(_: &Object, _: Sel, _: ObjcId) {
         tl_display::with(|d| d.fullscreen = false);
     }
     let superclass = class!(NSObject);
@@ -312,25 +312,25 @@ unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
             pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
         }
     }
-    static mut opengl: *mut std::ffi::c_void = std::ptr::null_mut();
+    static mut OPENGL: *mut std::ffi::c_void = std::ptr::null_mut();
 
-    if opengl.is_null() {
-        opengl = libc::dlopen(
+    if OPENGL.is_null() {
+        OPENGL = libc::dlopen(
             b"/System/Library/Frameworks/OpenGL.framework/Versions/Current/OpenGL\0".as_ptr() as _,
             libc::RTLD_LAZY,
         );
     }
 
-    assert!(!opengl.is_null());
+    assert!(!OPENGL.is_null());
 
-    let symbol = libc::dlsym(opengl, name as _);
+    let symbol = libc::dlsym(OPENGL, name as _);
     if symbol.is_null() {
         return None;
     }
     Some(unsafe { std::mem::transmute_copy(&symbol) })
 }
 
-// methods for both metal or opengl view
+// methods for both metal or OPENGL view
 unsafe fn view_base_decl(decl: &mut ClassDecl) {
     extern "C" fn mouse_moved(this: &Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
@@ -393,7 +393,6 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         }
     }
     extern "C" fn reset_cursor_rects(this: &Object, _sel: Sel) {
-        let payload = get_window_payload(this);
         unsafe {
             let cursor_id = tl_display::with(|d| {
                 let current_cursor = d.current_cursor;
@@ -652,7 +651,7 @@ fn get_window_payload(this: &Object) -> &mut WindowPayload {
     }
 }
 
-unsafe fn create_metal_view(window_frame: NSRect, sample_count: i32, high_dpi: bool) -> ObjcId {
+unsafe fn create_metal_view(_: NSRect, sample_count: i32, _: bool) -> ObjcId {
     let mtl_device_obj = MTLCreateSystemDefaultDevice();
     let view_class = define_metal_view_class();
     let view: ObjcId = msg_send![view_class, alloc];

@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use crate::native::apple::{
     apple_util::{self, msg_send_},
     frameworks::*,
@@ -6,10 +8,7 @@ use crate::native::apple::{
 use super::*;
 
 // https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
-const MAX_BUFFERS_PER_STAGE: usize = 14;
 const MAX_UNIFORM_BUFFER_SIZE: u64 = 4 * 1024 * 1024;
-const MAX_VERTEX_ATTRIBUTES: usize = 31;
-const UNIFORM_BUFFER_INDEX: u64 = 0;
 const NUM_INFLIGHT_FRAMES: usize = 3;
 #[cfg(any(target_os = "macos", all(target_os = "ios", target_arch = "x86_64")))]
 const UNIFORM_BUFFER_ALIGN: u64 = 256;
@@ -36,7 +35,6 @@ impl From<VertexFormat> for MTLVertexFormat {
             VertexFormat::Int3 => MTLVertexFormat::Int3,
             VertexFormat::Int4 => MTLVertexFormat::Int4,
             VertexFormat::Mat4 => MTLVertexFormat::Float4,
-            _ => unreachable!(),
         }
     }
 }
@@ -53,7 +51,6 @@ impl From<UniformType> for MTLVertexFormat {
             UniformType::Int3 => MTLVertexFormat::Int3,
             UniformType::Int4 => MTLVertexFormat::Int4,
             UniformType::Mat4 => MTLVertexFormat::Float4,
-            _ => unreachable!(),
         }
     }
 }
@@ -201,9 +198,9 @@ const WTF: usize = 200;
 #[derive(Clone, Copy, Debug)]
 pub struct Buffer {
     raw: [ObjcId; WTF],
-    buffer_type: BufferType,
+    //buffer_type: BufferType,
     size: usize,
-    index_type: Option<IndexType>,
+    //index_type: Option<IndexType>,
     value: usize,
     next_value: usize,
 }
@@ -219,25 +216,25 @@ struct ShaderUniform {
 struct ShaderInternal {
     vertex_function: ObjcId,
     fragment_function: ObjcId,
-    uniforms: Vec<ShaderUniform>,
+    //uniforms: Vec<ShaderUniform>,
     // the distance, in bytes, between two uniforms in uniforms buffer
-    stride: u64,
+    //stride: u64,
 }
 
 struct RenderPassInternal {
     render_pass_desc: ObjcId,
     texture: TextureId,
-    depth_texture: Option<TextureId>,
+    _depth_texture: Option<TextureId>,
 }
 
 #[derive(Clone, Debug)]
 struct PipelineInternal {
     pipeline_state: ObjcId,
     depth_stencil_state: ObjcId,
-    layout: Vec<BufferLayout>,
+    //layout: Vec<BufferLayout>,
     //attributes: Vec<VertexAttributeInternal>,
-    shader: ShaderId,
-    params: PipelineParams,
+    _shader: ShaderId,
+    //params: PipelineParams,
 }
 
 struct TextureInternal {
@@ -340,26 +337,38 @@ impl MetalContext {
 }
 
 impl RenderingBackend for MetalContext {
-    fn delete_render_pass(&mut self, render_pass: RenderPass) {}
-    fn pipeline_set_blend(&mut self, pipeline: &Pipeline, color_blend: Option<BlendState>) {}
-    fn new_buffer_index_stream(&mut self, index_type: IndexType, size: usize) -> BufferId {
+    fn delete_render_pass(&mut self, _render_pass: RenderPass) {}
+    fn pipeline_set_blend(&mut self, _pipeline: &Pipeline, _color_blend: Option<BlendState>) {}
+    fn new_buffer_index_stream(&mut self, _index_type: IndexType, _size: usize) -> BufferId {
         unimplemented!()
     }
-    fn buffer_size(&mut self, buffer: BufferId) -> usize {
+    fn buffer_size(&mut self, _buffer: BufferId) -> usize {
         unimplemented!()
     }
-    fn buffer_delete(&mut self, buffer: BufferId) {}
-    fn set_cull_face(&mut self, cull_face: CullFace) {}
-    fn set_color_write(&mut self, color_write: ColorMask) {}
-    fn set_blend(&mut self, color_blend: Option<BlendState>, alpha_blend: Option<BlendState>) {}
-    fn set_stencil(&mut self, stencil_test: Option<StencilState>) {}
-    fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) {}
-    fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {}
-    fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {}
-    fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap) {}
-    fn texture_resize(&mut self, texture: TextureId, width: u32, height: u32, bytes: Option<&[u8]>) {}
-    fn texture_read_pixels(&mut self, texture: TextureId, bytes: &mut [u8]) {}
-    fn clear(&self, color: Option<(f32, f32, f32, f32)>, depth: Option<f32>, stencil: Option<i32>) {
+    fn buffer_delete(&mut self, _buffer: BufferId) {}
+    fn set_cull_face(&mut self, _cull_face: CullFace) {}
+    fn set_color_write(&mut self, _color_write: ColorMask) {}
+    fn set_blend(&mut self, _color_blend: Option<BlendState>, _alpha_blend: Option<BlendState>) {}
+    fn set_stencil(&mut self, _stencil_test: Option<StencilState>) {}
+    fn apply_viewport(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
+    fn apply_scissor_rect(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
+    fn texture_set_filter(&mut self, _texture: TextureId, _filter: FilterMode) {}
+    fn texture_set_wrap(&mut self, _texture: TextureId, _wrap: TextureWrap) {}
+    fn texture_resize(
+        &mut self,
+        _texture: TextureId,
+        _width: u32,
+        _height: u32,
+        _bytes: Option<&[u8]>,
+    ) {
+    }
+    fn texture_read_pixels(&mut self, _texture: TextureId, _bytes: &mut [u8]) {}
+    fn clear(
+        &self,
+        _color: Option<(f32, f32, f32, f32)>,
+        _depth: Option<f32>,
+        _stencil: Option<i32>,
+    ) {
     }
 
     fn new_render_pass(
@@ -393,7 +402,7 @@ impl RenderingBackend for MetalContext {
             let pass = RenderPassInternal {
                 render_pass_desc,
                 texture: color_img,
-                depth_texture: depth_img,
+                _depth_texture: depth_img,
             };
 
             self.passes.push(pass);
@@ -404,13 +413,13 @@ impl RenderingBackend for MetalContext {
     fn render_pass_texture(&self, render_pass: RenderPass) -> TextureId {
         self.passes[render_pass.0].texture
     }
-    fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: BufferSource) -> BufferId {
+    fn new_buffer_immutable(&mut self, _buffer_type: BufferType, data: BufferSource) -> BufferId {
         debug_assert!(data.0.is_slice);
-        let index_type = if buffer_type == BufferType::IndexBuffer {
-            Some(IndexType::for_type_size(data.0.element_size))
-        } else {
-            None
-        };
+        // let index_type = if buffer_type == BufferType::IndexBuffer {
+        //     Some(IndexType::for_type_size(data.0.element_size))
+        // } else {
+        //     None
+        // };
 
         let size = data.0.size as u64;
         let mut raw = [nil; WTF];
@@ -428,9 +437,9 @@ impl RenderingBackend for MetalContext {
         }
         let buffer = Buffer {
             raw,
-            buffer_type,
+            //buffer_type,
             size: size as usize,
-            index_type,
+            //index_type,
             value: 0,
             next_value: 0,
         };
@@ -438,7 +447,7 @@ impl RenderingBackend for MetalContext {
         BufferId(self.buffers.len() - 1)
     }
 
-    fn new_buffer_stream(&mut self, buffer_type: BufferType, size: usize) -> BufferId {
+    fn new_buffer_stream(&mut self, _buffer_type: BufferType, size: usize) -> BufferId {
         let mut raw = [nil; WTF];
         for i in 0..WTF {
             let buffer: ObjcId = unsafe {
@@ -453,9 +462,9 @@ impl RenderingBackend for MetalContext {
         }
         let buffer = Buffer {
             raw,
-            buffer_type,
+            //buffer_type,
             size: size as usize,
-            index_type: None,
+            //index_type: None,
             value: 0,
             next_value: 0,
         };
@@ -480,7 +489,7 @@ impl RenderingBackend for MetalContext {
     fn new_shader(
         &mut self,
         shader: ShaderSource,
-        meta: ShaderMeta,
+        _meta: ShaderMeta,
     ) -> Result<ShaderId, ShaderError> {
         unsafe {
             let shader = apple_util::str_to_nsstring(shader.metal_shader.unwrap());
@@ -502,31 +511,31 @@ impl RenderingBackend for MetalContext {
             let fragment_function: ObjcId = msg_send![library, newFunctionWithName: apple_util::str_to_nsstring("fragmentShader")];
             assert!(!fragment_function.is_null());
 
-            let mut stride = 0;
-            let mut index = 0;
-            let uniforms = meta
-                .uniforms
-                .uniforms
-                .iter()
-                .scan(0, |offset, uniform| {
-                    let size = uniform.uniform_type.size() as u64;
-                    stride += size;
-                    let shader_uniform = ShaderUniform {
-                        size: uniform.uniform_type.size() as u64,
-                        offset: *offset,
-                        format: uniform.uniform_type.into(),
-                    };
-                    index += 1;
-                    *offset += size as u64;
-                    Some(shader_uniform)
-                })
-                .collect();
+            // let mut stride = 0;
+            // let mut index = 0;
+            // let uniforms = meta
+            //     .uniforms
+            //     .uniforms
+            //     .iter()
+            //     .scan(0, |offset, uniform| {
+            //         let size = uniform.uniform_type.size() as u64;
+            //         stride += size;
+            //         let shader_uniform = ShaderUniform {
+            //             size: uniform.uniform_type.size() as u64,
+            //             offset: *offset,
+            //             format: uniform.uniform_type.into(),
+            //         };
+            //         index += 1;
+            //         *offset += size as u64;
+            //         Some(shader_uniform)
+            //     })
+            //     .collect();
 
             let shader = ShaderInternal {
                 vertex_function,
                 fragment_function,
-                uniforms,
-                stride,
+                //uniforms,
+                //stride,
             };
             self.shaders.push(shader);
             Ok(ShaderId(self.shaders.len() - 1))
@@ -580,21 +589,14 @@ impl RenderingBackend for MetalContext {
 
         let texture = unsafe {
             let sampler_dsc = msg_send_![class!(MTLSamplerDescriptor), new];
-            unsafe {
-                msg_send_![sampler_dsc, retain];
-            }
+            msg_send_![sampler_dsc, retain];
             msg_send_![sampler_dsc, setMinFilter: MTLSamplerMinMagFilter::Linear];
             msg_send_![sampler_dsc, setMagFilter: MTLSamplerMinMagFilter::Linear];
 
             let sampler_state = msg_send_![self.device, newSamplerStateWithDescriptor: sampler_dsc];
-            unsafe {
-                msg_send_![sampler_state, retain];
-            }
+            msg_send_![sampler_state, retain];
             let raw_texture = msg_send_![self.device, newTextureWithDescriptor: descriptor];
-
-            unsafe {
-                msg_send_![raw_texture, retain];
-            }
+            msg_send_![raw_texture, retain];
             self.textures.push(TextureInternal {
                 sampler: sampler_state,
                 texture: raw_texture,
@@ -815,10 +817,10 @@ impl RenderingBackend for MetalContext {
             let pipeline = PipelineInternal {
                 pipeline_state,
                 depth_stencil_state,
-                layout: buffer_layout.to_vec(),
+                //layout: buffer_layout.to_vec(),
                 //attributes: vertex_layout,
-                shader,
-                params,
+                _shader: shader,
+                //params,
             };
 
             self.pipelines.push(pipeline);
@@ -892,14 +894,9 @@ impl RenderingBackend for MetalContext {
             "apply_uniforms before begin_pass"
         );
 
-        let current_pipeline = &self.pipelines[self.current_pipeline.unwrap().0];
         let render_encoder = self.render_encoder.unwrap();
 
         self.current_frame_index = (self.current_frame_index + 1) % NUM_INFLIGHT_FRAMES;
-
-        let shader = &self.shaders[current_pipeline.shader.0];
-
-        let data_lenght = shader.stride;
 
         assert!(size < MAX_UNIFORM_BUFFER_SIZE as usize);
 
@@ -939,7 +936,7 @@ impl RenderingBackend for MetalContext {
                 self.command_buffer = Some(msg_send![self.command_queue, commandBuffer]);
             }
 
-            let (descriptor, w, h) = match pass {
+            let (descriptor, _, _) = match pass {
                 None => {
                     let (screen_width, screen_height) = crate::window::screen_size();
                     (
@@ -953,8 +950,6 @@ impl RenderingBackend for MetalContext {
                     )
                 }
                 Some(pass) => {
-                    //self.current_pass = Some(pass);
-
                     let pass_internal = &self.passes[pass.0];
                     (
                         pass_internal.render_pass_desc,
@@ -971,11 +966,7 @@ impl RenderingBackend for MetalContext {
             msg_send_![color_attachment, setStoreAction: MTLStoreAction::Store];
 
             match action {
-                PassAction::Clear {
-                    color,
-                    depth,
-                    stencil,
-                } => {
+                PassAction::Clear { color, .. } => {
                     msg_send_![color_attachment, setLoadAction: MTLLoadAction::Clear];
 
                     if let Some(color) = color {
