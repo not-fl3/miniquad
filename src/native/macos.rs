@@ -153,6 +153,10 @@ impl NativeDisplay for MacosDisplay {
     fn apple_view(&mut self) -> Option<crate::native::apple::frameworks::ObjcId> {
         Some(self.view)
     }
+    #[cfg(target_vendor = "apple")]
+    fn apple_view(&mut self) -> Option<crate::native::apple::frameworks::ObjcId> {
+        Some(self.view_ctrl)
+    }
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
     }

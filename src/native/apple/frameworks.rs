@@ -136,6 +136,9 @@ pub enum GLKViewDrawableStencilFormat {
 #[cfg(target_os = "ios")]
 #[link(name = "UIKit", kind = "framework")]
 extern "C" {
+    pub static UIKeyboardDidShowNotification: ObjcId;
+    pub static UIKeyboardWillHideNotification: ObjcId;
+    pub static UIKeyboardDidChangeFrameNotification: ObjcId;
     pub fn UIApplicationMain(
         argc: i32,
         argv: *mut *mut i8,
@@ -255,7 +258,17 @@ pub struct NSRect {
     pub origin: NSPoint,
     pub size: NSSize,
 }
-
+impl NSRect {
+    pub fn new(x: f64, y: f64, w: f64, h: f64) -> NSRect {
+        NSRect {
+            origin: NSPoint { x, y },
+            size: NSSize {
+                width: w,
+                height: h,
+            },
+        }
+    }
+}
 unsafe impl Encode for NSRect {
     fn encode() -> Encoding {
         let encoding = format!(

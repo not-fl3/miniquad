@@ -21,6 +21,9 @@ use {
 struct IosDisplay {
     data: NativeDisplayData,
     view: ObjcId,
+    view_ctrl: ObjcId,
+    _textfield_dlg: ObjcId,
+    textfield: ObjcId,
     gfx_api: conf::AppleGfxApi,
 }
 
@@ -53,6 +56,15 @@ impl crate::native::NativeDisplay for IosDisplay {
         None
     }
     fn clipboard_set(&mut self, _data: &str) {}
+    fn show_keyboard(&mut self, show: bool) {
+        unsafe {
+            if show {
+                msg_send_![self.textfield, becomeFirstResponder];
+            } else {
+                msg_send_![self.textfield, resignFirstResponder];
+            }
+        }
+    }
     #[cfg(target_vendor = "apple")]
     fn apple_gfx_api(&self) -> crate::conf::AppleGfxApi {
         self.gfx_api
@@ -60,6 +72,11 @@ impl crate::native::NativeDisplay for IosDisplay {
     #[cfg(target_vendor = "apple")]
     fn apple_view(&mut self) -> Option<crate::native::apple::frameworks::ObjcId> {
         Some(self.view)
+    }
+
+    #[cfg(target_vendor = "apple")]
+    fn apple_view_ctrl(&mut self) -> Option<crate::native::apple::frameworks::ObjcId> {
+        Some(self.view_ctrl)
     }
 
     fn as_any(&mut self) -> &mut dyn std::any::Any {
@@ -138,31 +155,31 @@ pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
     extern "C" fn touches_began(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
         let payload = get_window_payload(this);
 
-            if let Some(ref mut event_handler) = payload.event_handler {
-                on_touch(this, event, |id, x, y| {
-                    event_handler.touch_event(TouchPhase::Started, id, x as _, y as _);
-                });
-            }
+        if let Some(ref mut event_handler) = payload.event_handler {
+            on_touch(this, event, |id, x, y| {
+                event_handler.touch_event(TouchPhase::Started, id, x as _, y as _);
+            });
+        }
     }
 
     extern "C" fn touches_moved(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
         let payload = get_window_payload(this);
 
-            if let Some(ref mut event_handler) = payload.event_handler {
-                on_touch(this, event, |id, x, y| {
-                    event_handler.touch_event(TouchPhase::Moved, id, x as _, y as _);
-                });
-            }
+        if let Some(ref mut event_handler) = payload.event_handler {
+            on_touch(this, event, |id, x, y| {
+                event_handler.touch_event(TouchPhase::Moved, id, x as _, y as _);
+            });
+        }
     }
 
     extern "C" fn touches_ended(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
         let payload = get_window_payload(this);
 
-            if let Some(ref mut event_handler) = payload.event_handler {
-                on_touch(this, event, |id, x, y| {
-                    event_handler.touch_event(TouchPhase::Ended, id, x as _, y as _);
-                });
-            }
+        if let Some(ref mut event_handler) = payload.event_handler {
+            on_touch(this, event, |id, x, y| {
+                event_handler.touch_event(TouchPhase::Ended, id, x as _, y as _);
+            });
+        }
     }
 
     extern "C" fn touches_canceled(_: &Object, _: Sel, _: ObjcId, _: ObjcId) {}
@@ -421,6 +438,33 @@ pub fn define_app_delegate() -> *const Class {
                 }
             };
 
+            let (textfield_dlg, textfield) = {
+                let textfield_dlg = msg_send_![msg_send_![define_textfield_dlg(), alloc], init];
+                let textfield = msg_send_![
+                    msg_send_![class!(UITextField), alloc],
+                    initWithFrame:NSRect::new(10.0, 10.0, 100.0, 50.0)];
+                msg_send_![textfield, setAutocapitalizationType:0]; // UITextAutocapitalizationTypeNone
+                msg_send_![textfield, setAutocorrectionType:1]; // UITextAutocorrectionTypeNo
+                msg_send_![textfield, setSpellCheckingType:1]; // UITextSpellCheckingTypeNo
+                msg_send_![textfield, setHidden: YES];
+                msg_send_![textfield, setDelegate: textfield_dlg];
+                // to make backspace work - with empty text there is no event on text removal
+                msg_send_![textfield, setText: apple_util::str_to_nsstring("x")];
+                msg_send_![view.view, addSubview: textfield];
+
+                let notification_center = msg_send_![class!(NSNotificationCenter), defaultCenter];
+                msg_send_![notification_center, addObserver:textfield_dlg
+                           selector:sel!(keyboardWasShown:)
+                           name:UIKeyboardDidShowNotification object:nil];
+                msg_send_![notification_center, addObserver:textfield_dlg
+                           selector:sel!(keyboardWillBeHidden:)
+                           name:UIKeyboardWillHideNotification object:nil];
+                msg_send_![notification_center, addObserver:textfield_dlg
+                           selector:sel!(keyboardDidChangeFrame:)
+                           name:UIKeyboardDidChangeFrameNotification object:nil];
+                (textfield_dlg, textfield)
+            };
+
             tl_display::set_display(IosDisplay {
                 data: NativeDisplayData {
                     screen_width,
@@ -429,6 +473,9 @@ pub fn define_app_delegate() -> *const Class {
                     ..Default::default()
                 },
                 view: view.view,
+                view_ctrl: view.view_ctrl,
+                textfield,
+                _textfield_dlg: textfield_dlg,
                 gfx_api: conf.platform.apple_gfx_api,
             });
             let payload = Box::new(WindowPayload {
@@ -440,6 +487,7 @@ pub fn define_app_delegate() -> *const Class {
 
             (*view.view).set_ivar("display_ptr", payload_ptr);
             (*view.view_dlg).set_ivar("display_ptr", payload_ptr);
+            (*textfield_dlg).set_ivar("display_ptr", payload_ptr);
 
             msg_send_![window_obj, addSubview: view.view];
 
@@ -458,6 +506,109 @@ pub fn define_app_delegate() -> *const Class {
         );
     }
 
+    return decl.register();
+}
+
+fn define_textfield_dlg() -> *const Class {
+    let superclass = class!(NSObject);
+    let mut decl = ClassDecl::new("NSTexfieldDlg", superclass).unwrap();
+
+    // those 3 callbacks are for resizing the canvas when keyboard is opened
+    // which is not currenlty supported by miniquad
+    extern "C" fn keyboard_was_shown(_: &Object, _: Sel, _notif: ObjcId) {}
+    extern "C" fn keyboard_will_be_hidden(_: &Object, _: Sel, _notif: ObjcId) {}
+    extern "C" fn keyboard_did_change_frame(_: &Object, _: Sel, _notif: ObjcId) {}
+
+    extern "C" fn should_change_characters_in_range(
+        this: &Object,
+        _: Sel,
+        _textfield: ObjcId,
+        _range: NSRange,
+        string: ObjcId,
+    ) -> BOOL {
+        let payload = get_window_payload(this);
+
+        unsafe {
+            let len: u64 = msg_send![string, length];
+            log(&format!("WTF {len}"));
+            if len > 0 {
+                for i in 0..len {
+                    let c: u16 = msg_send![string, characterAtIndex: i];
+
+                    match c {
+                        c if c >= 32 && (c < 0xD800 || c > 0xDFFF) => {
+                            let c: char = char::from_u32(c as u32).unwrap();
+                            if let Some(ref mut event_handler) = payload.event_handler {
+                                event_handler.char_event(c, Default::default(), false);
+                            }
+                        }
+                        10 => {
+                            if let Some(ref mut event_handler) = payload.event_handler {
+                                event_handler.key_down_event(
+                                    crate::event::KeyCode::Enter,
+                                    Default::default(),
+                                    false,
+                                );
+                                event_handler.key_up_event(
+                                    crate::event::KeyCode::Enter,
+                                    Default::default(),
+                                );
+                            }
+                        }
+                        32 => {
+                            if let Some(ref mut event_handler) = payload.event_handler {
+                                event_handler.char_event(' ', Default::default(), false);
+                                event_handler.key_down_event(
+                                    crate::event::KeyCode::Space,
+                                    Default::default(),
+                                    false,
+                                );
+                                event_handler.key_up_event(
+                                    crate::event::KeyCode::Space,
+                                    Default::default(),
+                                );
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            } else {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.key_down_event(
+                        crate::event::KeyCode::Backspace,
+                        Default::default(),
+                        false,
+                    );
+                    event_handler.key_up_event(
+                        crate::event::KeyCode::Backspace,
+                        Default::default(),
+                    );
+                }
+            }
+        }
+        NO
+    }
+
+    unsafe {
+        decl.add_method(
+            sel!(keyboardWasShown:),
+            keyboard_was_shown as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(keyboardWillBeHidden:),
+            keyboard_will_be_hidden as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(keyboardDidChangeFrame:),
+            keyboard_did_change_frame as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(textField: shouldChangeCharactersInRange: replacementString:),
+            should_change_characters_in_range
+                as extern "C" fn(&Object, Sel, ObjcId, NSRange, ObjcId) -> BOOL,
+        );
+    }
+    decl.add_ivar::<*mut c_void>("display_ptr");
     return decl.register();
 }
 

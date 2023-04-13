@@ -191,9 +191,15 @@ pub mod window {
     }
 
     #[cfg(target_vendor = "apple")]
-    pub(crate) fn apple_view() -> Option<crate::native::apple::frameworks::ObjcId> {
+    pub unsafe fn apple_view() -> Option<crate::native::apple::frameworks::ObjcId> {
         with_native_display!(d, d.apple_view())
     }
+
+    #[cfg(target_vendor = "apple")]
+    pub unsafe fn apple_view_ctrl() -> Option<crate::native::apple::frameworks::ObjcId> {
+        with_native_display!(d, d.apple_view_ctrl())
+    }
+
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
