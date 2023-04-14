@@ -574,6 +574,12 @@ impl X11Display {
                 let y = (*event).xmotion.y as libc::c_float;
                 event_handler.mouse_motion_event(context.with_display(&mut *self), x, y);
             }
+            9 => {
+                event_handler.window_restored_event(context.with_display(&mut *self));
+            }
+            10 => {
+                event_handler.window_minimized_event(context.with_display(&mut *self));
+            }
             22 => {
                 if (*event).xconfigure.width != self.data.screen_width
                     || (*event).xconfigure.height != self.data.screen_height
