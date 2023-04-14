@@ -348,7 +348,7 @@ impl X11Display {
     }
 
     // Not 100% this is the correct way to leave fullscreen, but seems to work.
-    // TODO: Fix: On going back to windowed Title disappears and window size has changed.
+    // TODO: Restore window size.
     unsafe fn set_fullscreen(&mut self, window: Window, fullscreen: bool) {
         let wm_state = (self.libx11.XInternAtom)(
             self.display,
