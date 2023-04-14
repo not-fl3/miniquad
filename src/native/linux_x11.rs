@@ -634,32 +634,38 @@ impl X11Display {
         let libx11 = &mut self.libx11;
         let display = self.display;
 
-        let cursor = match cursor {
-            None => {
-                // empty_cursor was created during create_window
-                self.empty_cursor.unwrap()
-            }
-            Some(cursor_icon) => *self.cursor_cache.entry(cursor_icon).or_insert_with(|| {
-                (libx11.XCreateFontCursor)(
-                    display,
-                    match cursor_icon {
-                        CursorIcon::Default => libx11::XC_left_ptr,
-                        CursorIcon::Help => libx11::XC_question_arrow,
-                        CursorIcon::Pointer => libx11::XC_hand2,
-                        CursorIcon::Wait => libx11::XC_watch,
-                        CursorIcon::Crosshair => libx11::XC_crosshair,
-                        CursorIcon::Text => libx11::XC_xterm,
-                        CursorIcon::Move => libx11::XC_fleur,
-                        CursorIcon::NotAllowed => libx11::XC_pirate,
-                        CursorIcon::EWResize => libx11::XC_sb_h_double_arrow,
-                        CursorIcon::NSResize => libx11::XC_sb_v_double_arrow,
-                        CursorIcon::NESWResize => libx11::XC_top_right_corner,
-                        CursorIcon::NWSEResize => libx11::XC_top_left_corner,
-                    },
-                )
-            }),
-        };
-        (libx11.XDefineCursor)(display, window, cursor);
+        if cursor == Some(CursorIcon::Default) {
+            (libx11.XUndefineCursor)(display, window);
+        } else {
+            let cursor = match cursor {
+                None => {
+                    // empty_cursor was created during create_window
+                    self.empty_cursor.unwrap()
+                }
+                Some(cursor_icon) => *self.cursor_cache.entry(cursor_icon).or_insert_with(|| {
+                    (libx11.XCreateFontCursor)(
+                        display,
+                        match cursor_icon {
+                            CursorIcon::Default => libx11::XC_left_ptr,
+                            CursorIcon::Help => libx11::XC_question_arrow,
+                            CursorIcon::Pointer => libx11::XC_hand2,
+                            CursorIcon::Wait => libx11::XC_watch,
+                            CursorIcon::Crosshair => libx11::XC_crosshair,
+                            CursorIcon::Text => libx11::XC_xterm,
+                            CursorIcon::Move => libx11::XC_fleur,
+                            CursorIcon::NotAllowed => libx11::XC_pirate,
+                            CursorIcon::EWResize => libx11::XC_sb_h_double_arrow,
+                            CursorIcon::NSResize => libx11::XC_sb_v_double_arrow,
+                            CursorIcon::NESWResize => libx11::XC_top_right_corner,
+                            CursorIcon::NWSEResize => libx11::XC_top_left_corner,
+                        },
+                    )
+                }),
+            };
+            (libx11.XDefineCursor)(display, window, cursor);
+        }
+
+        
     }
 
     // pub unsafe fn process_requests(&mut self, window: Window, event_handler: &mut super::UserData) {

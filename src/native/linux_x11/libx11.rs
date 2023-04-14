@@ -976,6 +976,7 @@ pub type XCreatePixmapCursor = unsafe extern "C" fn(
 ) -> Cursor;
 pub type XFreePixmap = unsafe extern "C" fn(_: *mut Display, _: Pixmap) -> libc::c_int;
 pub type XDefineCursor = unsafe extern "C" fn(_: *mut Display, _: Window, _: Cursor) -> libc::c_int;
+pub type XUndefineCursor = unsafe extern "C" fn(_: *mut Display, _: Window) -> libc::c_int;
 
 pub struct LibX11 {
     pub module: module::Module,
@@ -1023,6 +1024,7 @@ pub struct LibX11 {
     pub XCreatePixmapCursor: XCreatePixmapCursor,
     pub XFreePixmap: XFreePixmap,
     pub XDefineCursor: XDefineCursor,
+    pub XUndefineCursor: XUndefineCursor,
 }
 
 impl LibX11 {
@@ -1076,6 +1078,7 @@ impl LibX11 {
                 XCreatePixmapCursor: module.get_symbol("XCreatePixmapCursor").unwrap(),
                 XFreePixmap: module.get_symbol("XFreePixmap").unwrap(),
                 XDefineCursor: module.get_symbol("XDefineCursor").unwrap(),
+                XUndefineCursor: module.get_symbol("XUndefineCursor").unwrap(),
                 module,
             })
             .ok()
