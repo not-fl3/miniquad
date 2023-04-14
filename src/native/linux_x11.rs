@@ -125,8 +125,10 @@ impl crate::native::NativeDisplay for X11Display {
         }
     }
 
-    fn set_window_size(&mut self, _new_width: u32, _new_height: u32) {
-        eprintln!("set_window_size not implemented on linux/x11")
+    fn set_window_size(&mut self, new_width: u32, new_height: u32) {
+        unsafe {
+            self.set_window_size(self.window, new_width as i32, new_height as i32);
+        }
     }
 
     fn set_fullscreen(&mut self, fullscreen: bool) {
@@ -344,6 +346,11 @@ impl X11Display {
             c_title.as_ptr() as *mut libc::c_uchar,
             libc::strlen(c_title.as_ptr()) as libc::c_int,
         );
+        (self.libx11.XFlush)(self.display);
+    }
+
+    unsafe fn set_window_size(&mut self, window: Window, new_width: i32, new_height: i32) {
+        (self.libx11.XResizeWindow)(self.display, window, new_width, new_height);
         (self.libx11.XFlush)(self.display);
     }
 
