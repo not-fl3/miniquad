@@ -198,11 +198,15 @@ pub trait EventHandler {
     fn raw_mouse_motion(&mut self, _dx: f32, _dy: f32) {}
 
     /// Window has been minimized
-    /// Right now is only implemented on Android, and is called on a Pause ndk callback
+    /// Right now is only implemented on Android, X11 and wasm,
+    /// On Andoid window_minimized_event is called on a Pause ndk callback
+    /// On X11 and wasm it will be called on focus change events.
     fn window_minimized_event(&mut self) {}
 
     /// Window has been restored
-    /// Right now is only implemented on Android, and is called on a Resume ndk callback
+    /// Right now is only implemented on Android, X11 and wasm,
+    /// On Andoid window_minimized_event is called on a Pause ndk callback
+    /// On X11 and wasm it will be called on focus change events.
     fn window_restored_event(&mut self) {}
 
     /// This event is sent when the userclicks the window's close button

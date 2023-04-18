@@ -394,6 +394,12 @@ impl X11MainLoopData {
                 let y = (*event).xmotion.y as libc::c_float;
                 event_handler.mouse_motion_event(x, y);
             }
+            9 => {
+                event_handler.window_restored_event();
+            }
+            10 => {
+                event_handler.window_minimized_event();
+            }
             22 => {
                 if (*event).xconfigure.width != tl_display::with(|d| d.data.screen_width)
                     || (*event).xconfigure.height != tl_display::with(|d| d.data.screen_height)

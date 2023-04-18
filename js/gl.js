@@ -1253,6 +1253,18 @@ var importObject = {
                 wasm_exports.on_files_dropped_finish();
             };
 
+            let lastFocus = document.hasFocus();
+            var checkFocus = function() {
+                let hasFocus = document.hasFocus();
+                if(lastFocus == hasFocus){
+                    wasm_exports.focus(hasFocus);
+                    lastFocus = hasFocus;
+                }
+            }
+            document.addEventListener("visibilitychange", checkFocus);
+            window.addEventListener("focus", checkFocus);
+            window.addEventListener("blur", checkFocus);
+
             window.requestAnimationFrame(animation);
         },
 
