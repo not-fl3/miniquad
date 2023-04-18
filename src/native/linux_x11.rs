@@ -354,9 +354,9 @@ impl X11Display {
         (self.libx11.XFlush)(self.display);
     }
 
-    // TODO: _fullscreen is not used, this function always setting window fullscreen
-    // should be able to able to go back from fullscreen to windowed instead
-    unsafe fn set_fullscreen(&mut self, window: Window, _fullscreen: bool) {
+    // Not 100% this is the correct way to leave fullscreen, but seems to work.
+    // TODO: Restore window size.
+    unsafe fn set_fullscreen(&mut self, window: Window, fullscreen: bool) {
         let wm_state = (self.libx11.XInternAtom)(
             self.display,
             b"_NET_WM_STATE\x00" as *const u8 as *const _,
@@ -376,7 +376,7 @@ impl X11Display {
             (self.libx11.XUnmapWindow)(self.display, window);
             (self.libx11.XSync)(self.display, false as _);
 
-            let mut atoms: [Atom; 2] = [wm_fullscreen, 0 as _];
+            let mut atoms: [Atom; 2] = [if fullscreen { wm_fullscreen } else { 0 as _ }, 0 as _];
             (self.libx11.XChangeProperty)(
                 self.display,
                 window,
@@ -385,7 +385,7 @@ impl X11Display {
                 32,
                 PropModeReplace,
                 atoms.as_mut_ptr() as *mut _ as *mut _,
-                1,
+                if fullscreen { 1 } else { 0 },
             );
             (self.libx11.XMapWindow)(self.display, window);
             (self.libx11.XRaiseWindow)(self.display, window);
@@ -397,7 +397,8 @@ impl X11Display {
         {
             let mut data = [0isize; 5];
 
-            data[0] = 1;
+            // changing this 1 to 0 seems to help with closing fullscreen
+            data[0] = if fullscreen { 1 } else { 0 };
             data[1] = wm_fullscreen as isize;
             data[2] = 0;
 
@@ -580,6 +581,12 @@ impl X11Display {
                 let x = (*event).xmotion.x as libc::c_float;
                 let y = (*event).xmotion.y as libc::c_float;
                 event_handler.mouse_motion_event(context.with_display(&mut *self), x, y);
+            }
+            9 => {
+                event_handler.window_restored_event(context.with_display(&mut *self));
+            }
+            10 => {
+                event_handler.window_minimized_event(context.with_display(&mut *self));
             }
             22 => {
                 if (*event).xconfigure.width != self.data.screen_width

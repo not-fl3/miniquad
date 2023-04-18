@@ -411,6 +411,22 @@ pub extern "C" fn touch(phase: u32, id: u32, x: f32, y: f32) {
 }
 
 #[no_mangle]
+pub extern "C" fn focus(hasFocus: bool) {
+    with(|globals| {
+        if hasFocus {
+            globals.event_handler.window_restored_event(
+                globals.context.with_display(&mut globals.display)
+            );
+        } else {
+            globals.event_handler.window_minimized_event(
+                globals.context.with_display(&mut globals.display)
+            );
+        }
+        
+    });
+}
+
+#[no_mangle]
 pub extern "C" fn on_files_dropped_start() {
     with(|globals| {
         globals.display.dropped_files = Default::default();
