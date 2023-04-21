@@ -1,4 +1,4 @@
-use std::{ffi::CString, mem};
+use std::{ffi::{CString, c_void}, mem};
 
 mod texture;
 
@@ -653,6 +653,8 @@ pub struct GraphicsContext {
 
     pub(crate) features: Features,
     pub(crate) display: Option<*mut dyn crate::NativeDisplay>,
+
+    pub(crate) gl_proc_addr_getter: Option<Box<dyn Fn(&str)->*const c_void>>
 }
 
 impl GraphicsContext {
@@ -668,6 +670,7 @@ impl GraphicsContext {
             glGenVertexArrays(1, &mut vao as *mut _);
             glBindVertexArray(vao);
             GraphicsContext {
+                gl_proc_addr_getter: None::<Box::<dyn Fn(&str)->*const c_void>>,
                 default_framebuffer,
                 shaders: vec![],
                 pipelines: vec![],
@@ -701,6 +704,14 @@ impl GraphicsContext {
 }
 
 impl GraphicsContext {
+    pub fn get_gl_proc_addr(&self, procname: &str)->*const c_void {
+        if self.gl_proc_addr_getter.is_none() {
+            panic!("get_gl_proc_addr not available on this platform");
+        }
+
+        (self.gl_proc_addr_getter.as_ref().unwrap())(procname)
+    }
+
     pub fn apply_pipeline(&mut self, pipeline: &Pipeline) {
         self.cache.cur_pipeline = Some(*pipeline);
 
