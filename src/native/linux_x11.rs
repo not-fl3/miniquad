@@ -1,6 +1,10 @@
 //!
 //! Spiritual successor of an X11 part of https://github.com/floooh/sokol/blob/master/sokol_app.h
 
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::ffi::c_void;
+
 mod clipboard;
 mod glx;
 mod keycodes;
@@ -734,6 +738,11 @@ where
     display.data.screen_height = h;
 
     let mut context = GraphicsContext::new(gl::is_gl2());
+
+    let libgl=glx.libgl.clone();
+    context.gl_proc_addr_getter=Some(Box::new(move|procname: &str|{
+        libgl.get_procaddr(procname).unwrap() as *const c_void
+    }));
 
     let mut data = (f.take().unwrap())(context.with_display(&mut display));
 

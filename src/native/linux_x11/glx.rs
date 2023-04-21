@@ -1,5 +1,7 @@
 #![allow(dead_code, non_snake_case)]
 
+use std::rc::Rc;
+
 use super::{libx11::*, X11Display};
 
 use crate::native::module;
@@ -203,7 +205,7 @@ pub struct GlxExtensions {
 }
 
 pub struct Glx {
-    pub libgl: LibGlx,
+    pub libgl: Rc<LibGlx>,
     multisample: bool,
     extensions: GlxExtensions,
     fbconfig: GLXFBConfig,
@@ -299,7 +301,7 @@ impl Glx {
         };
 
         Some(Glx {
-            libgl,
+            libgl: Rc::new(libgl),
             multisample,
             visual,
             depth,
