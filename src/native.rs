@@ -53,7 +53,7 @@ pub trait NativeDisplay: std::any::Any {
     fn apple_gfx_api(&self) -> crate::conf::AppleGfxApi;
     #[cfg(target_vendor = "apple")]
     fn apple_view(&mut self) -> Option<crate::native::apple::frameworks::ObjcId>;
-    #[cfg(target_vendor = "apple")]
+    #[cfg(target_os = "ios")]
     fn apple_view_ctrl(&mut self) -> Option<crate::native::apple::frameworks::ObjcId>;
 
     fn as_any(&mut self) -> &mut dyn std::any::Any;
