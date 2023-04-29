@@ -802,7 +802,11 @@ where
 
     display.window = window;
     display.view = view;
+
+    let () = msg_send![window, setContentView: view];
+
     let _ = display.update_dimensions();
+
     tl_display::set_display(display);
 
     let nstimer: ObjcId = msg_send![
@@ -817,7 +821,6 @@ where
     let () = msg_send![nsrunloop, addTimer: nstimer forMode: NSDefaultRunLoopMode];
     assert!(!view.is_null());
 
-    let () = msg_send![window, setContentView: view];
     let () = msg_send![window, makeFirstResponder: view];
 
     if conf.fullscreen {
