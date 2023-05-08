@@ -22,12 +22,18 @@ impl Stage {
             Vertex { pos : [  0.5, -0.5 ], color: [0., 1., 0., 1.] },
             Vertex { pos : [  0.0,  0.5 ], color: [0., 0., 1., 1.] },
         ];
-        let vertex_buffer =
-            ctx.new_buffer_immutable(BufferType::VertexBuffer, BufferSource::slice(&vertices));
+        let vertex_buffer = ctx.new_buffer(
+            BufferType::VertexBuffer,
+            BufferUsage::Immutable,
+            BufferSource::slice(&vertices),
+        );
 
         let indices: [u16; 3] = [0, 1, 2];
-        let index_buffer =
-            ctx.new_buffer_immutable(BufferType::IndexBuffer, BufferSource::slice(&indices));
+        let index_buffer = ctx.new_buffer(
+            BufferType::IndexBuffer,
+            BufferUsage::Immutable,
+            BufferSource::slice(&indices),
+        );
 
         let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],

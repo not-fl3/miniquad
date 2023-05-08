@@ -681,16 +681,6 @@ pub enum IndexType {
     Int,
 }
 
-impl From<IndexType> for GLenum {
-    fn from(index_type: IndexType) -> Self {
-        match index_type {
-            IndexType::Byte => GL_UNSIGNED_BYTE,
-            IndexType::Short => GL_UNSIGNED_SHORT,
-            IndexType::Int => GL_UNSIGNED_INT,
-        }
-    }
-}
-
 impl IndexType {
     pub fn for_type_size(size: usize) -> IndexType {
         match size {
@@ -804,7 +794,7 @@ pub enum BufferType {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Usage {
+pub enum BufferUsage {
     Immutable,
     Dynamic,
     Stream,
@@ -817,11 +807,11 @@ fn gl_buffer_target(buffer_type: &BufferType) -> GLenum {
     }
 }
 
-fn gl_usage(usage: &Usage) -> GLenum {
+fn gl_usage(usage: &BufferUsage) -> GLenum {
     match usage {
-        Usage::Immutable => GL_STATIC_DRAW,
-        Usage::Dynamic => GL_DYNAMIC_DRAW,
-        Usage::Stream => GL_STREAM_DRAW,
+        BufferUsage::Immutable => GL_STATIC_DRAW,
+        BufferUsage::Dynamic => GL_DYNAMIC_DRAW,
+        BufferUsage::Stream => GL_STREAM_DRAW,
     }
 }
 
@@ -983,7 +973,7 @@ impl ElapsedQuery {
 /// A vtable-erased generic argument.
 /// Basically, the same thing as fn f<U>(a: &U), but
 /// trait-object friendly.
-pub(crate) struct Arg<'a> {
+pub struct Arg<'a> {
     ptr: *const std::ffi::c_void,
     element_size: usize,
     size: usize,
@@ -991,10 +981,37 @@ pub(crate) struct Arg<'a> {
     _phantom: std::marker::PhantomData<&'a ()>,
 }
 
-pub struct BufferSource<'a>(Arg<'a>);
+pub enum BufferSource<'a> {
+    Slice(Arg<'a>),
+    Empty {
+        size: usize,
+        element_size: Option<usize>,
+    },
+}
 impl<'a> BufferSource<'a> {
+    pub fn empty_vertex_buffer(size: usize) -> BufferSource<'a> {
+        BufferSource::Empty {
+            size,
+            element_size: None,
+        }
+    }
+
+    pub fn empty_index_u16_buffer(size: usize) -> BufferSource<'a>{
+        BufferSource::Empty {
+            size,
+            element_size: Some(2),
+        }
+    }
+
+    pub fn empty_index_u32_buffer(size: usize) -> BufferSource<'a>{
+        BufferSource::Empty {
+            size,
+            element_size: Some(4),
+        }
+    }
+
     pub fn slice<T>(data: &'a [T]) -> BufferSource<'a> {
-        Self(Arg {
+        BufferSource::Slice(Arg {
             ptr: data.as_ptr() as _,
             size: std::mem::size_of_val(data),
             element_size: std::mem::size_of::<T>(),
@@ -1003,6 +1020,7 @@ impl<'a> BufferSource<'a> {
         })
     }
 }
+
 pub struct UniformsSource<'a>(Arg<'a>);
 impl<'a> UniformsSource<'a> {
     pub fn table<T>(data: &'a T) -> UniformsSource<'a> {
@@ -1100,7 +1118,7 @@ pub trait RenderingBackend {
     fn pipeline_set_blend(&mut self, pipeline: &Pipeline, color_blend: Option<BlendState>);
     fn apply_pipeline(&mut self, pipeline: &Pipeline);
 
-    /// Create an immutable buffer resource object.
+    /// Create a buffer resource object.
     /// ```ignore
     /// #[repr(C)]
     /// struct Vertex {
@@ -1113,11 +1131,14 @@ pub trait RenderingBackend {
     ///     Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 1. } },
     ///     Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 1. } },
     /// ];
-    /// let buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
+    ///    let buffer = ctx.new_buffer(
+    ///        BufferType::VertexBuffer,
+    ///        BufferUsage::Immutable,
+    ///        BufferSource::slice(&vertices),
+    ///    );
     /// ```
-    fn new_buffer_immutable(&mut self, buffer_type: BufferType, data: BufferSource) -> BufferId;
-    fn new_buffer_stream(&mut self, buffer_type: BufferType, size: usize) -> BufferId;
-    fn new_buffer_index_stream(&mut self, index_type: IndexType, size: usize) -> BufferId;
+    fn new_buffer(&mut self, type_: BufferType, usage: BufferUsage, data: BufferSource)
+        -> BufferId;
     fn buffer_update(&mut self, buffer: BufferId, data: BufferSource);
     /// Size of buffer in bytes
     fn buffer_size(&mut self, buffer: BufferId) -> usize;
@@ -1154,7 +1175,12 @@ pub trait RenderingBackend {
     }
     fn apply_uniforms_from_bytes(&mut self, uniform_ptr: *const u8, size: usize);
 
-    fn clear(&self, color: Option<(f32, f32, f32, f32)>, depth: Option<f32>, stencil: Option<i32>);
+    fn clear(
+        &mut self,
+        color: Option<(f32, f32, f32, f32)>,
+        depth: Option<f32>,
+        stencil: Option<i32>,
+    );
     /// start rendering to the default frame buffer
     fn begin_default_pass(&mut self, action: PassAction);
     /// start rendering to an offscreen framebuffer

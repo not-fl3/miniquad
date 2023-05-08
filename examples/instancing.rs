@@ -32,21 +32,28 @@ impl Stage {
              0.0,   r, 0.0,       1.0, 0.0, 1.0, 1.0
         ];
         // vertex buffer for static geometry
-        let geometry_vertex_buffer =
-            ctx.new_buffer_immutable(BufferType::VertexBuffer, BufferSource::slice(&vertices));
+        let geometry_vertex_buffer = ctx.new_buffer(
+            BufferType::VertexBuffer,
+            BufferUsage::Immutable,
+            BufferSource::slice(&vertices),
+        );
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
             0, 1, 2,    0, 2, 3,    0, 3, 4,    0, 4, 1,
             5, 1, 2,    5, 2, 3,    5, 3, 4,    5, 4, 1
         ];
-        let index_buffer =
-            ctx.new_buffer_immutable(BufferType::IndexBuffer, BufferSource::slice(&indices));
+        let index_buffer = ctx.new_buffer(
+            BufferType::IndexBuffer,
+            BufferUsage::Immutable,
+            BufferSource::slice(&indices),
+        );
 
-        // empty, dynamic instance-data vertex buffer
-        let positions_vertex_buffer = ctx.new_buffer_stream(
+        // empty, dynamic instance data vertex buffer
+        let positions_vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
-            MAX_PARTICLES * std::mem::size_of::<Vec3>(),
+            BufferUsage::Stream,
+            BufferSource::empty_vertex_buffer(MAX_PARTICLES * std::mem::size_of::<Vec3>()),
         );
 
         let bindings = Bindings {
@@ -127,8 +134,10 @@ impl EventHandler for Stage {
         // by default glam-rs can vec3 as u128 or #[reprc(C)](f32, f32, f32). need to ensure that the second option was used
         assert_eq!(std::mem::size_of::<Vec3>(), 12);
 
-        self.ctx
-            .buffer_update(self.bindings.vertex_buffers[1], BufferSource::slice(&self.pos[..]));
+        self.ctx.buffer_update(
+            self.bindings.vertex_buffers[1],
+            BufferSource::slice(&self.pos[..]),
+        );
 
         // model-view-projection matrix
         let (width, height) = window::screen_size();
@@ -148,7 +157,8 @@ impl EventHandler for Stage {
 
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
-        self.ctx.apply_uniforms(UniformsSource::table(&shader::Uniforms { mvp }));
+        self.ctx
+            .apply_uniforms(UniformsSource::table(&shader::Uniforms { mvp }));
         self.ctx.draw(0, 24, self.pos.len() as i32);
         self.ctx.end_render_pass();
 

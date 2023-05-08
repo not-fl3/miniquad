@@ -144,17 +144,19 @@ impl From<PrimitiveType> for MTLPrimitiveType {
     }
 }
 
-impl Usage {
+impl BufferUsage {
     fn to_u64(self) -> u64 {
         match self {
-            Usage::Immutable => MTLResourceOptions::StorageModeShared,
+            BufferUsage::Immutable => MTLResourceOptions::StorageModeShared,
             #[cfg(target_os = "macos")]
-            Usage::Dynamic | Usage::Stream => {
+            BufferUsage::Dynamic | BufferUsage::Stream => {
                 MTLResourceOptions::CPUCacheModeWriteCombined
                     | MTLResourceOptions::StorageModeManaged
             }
             #[cfg(target_os = "ios")]
-            Usage::Dynamic | Usage::Stream => MTLResourceOptions::CPUCacheModeWriteCombined,
+            BufferUsage::Dynamic | BufferUsage::Stream => {
+                MTLResourceOptions::CPUCacheModeWriteCombined
+            }
         }
     }
 }
@@ -194,10 +196,18 @@ fn roundup_ub_buffer(current_buffer: u64) -> u64 {
     ((current_buffer) + ((UNIFORM_BUFFER_ALIGN) - 1)) & !((UNIFORM_BUFFER_ALIGN) - 1)
 }
 
-const WTF: usize = 200;
+// this scenario:
+// buffer.update(); draw(buffer); buffer.update(); draw(buffer);
+// is very problematic with metal's ownership model.
+// buffer.update() half-update buffer - it doesn't really send data to the GPU claiming ownership,
+// it postpone reading the CPU memory until drawcall will actually happen.
+// There is no way to flush the buffer and makes metal's "update" function to update GPU memory right away.
+// Thus miniquad keeps a lot of buffer's copies...
+const BUFFERS_IN_ROTATION: usize = 30;
+
 #[derive(Clone, Copy, Debug)]
 pub struct Buffer {
-    raw: [ObjcId; WTF],
+    raw: [ObjcId; BUFFERS_IN_ROTATION],
     //buffer_type: BufferType,
     size: usize,
     //index_type: Option<IndexType>,
@@ -308,11 +318,11 @@ impl MetalContext {
 
             let uniform_buffers = [
                 msg_send![device, newBufferWithLength:MAX_UNIFORM_BUFFER_SIZE
-                          options:Usage::Stream.to_u64()],
+                          options:BufferUsage::Stream.to_u64()],
                 msg_send![device, newBufferWithLength:MAX_UNIFORM_BUFFER_SIZE
-                          options:Usage::Stream.to_u64()],
+                          options:BufferUsage::Stream.to_u64()],
                 msg_send![device, newBufferWithLength:MAX_UNIFORM_BUFFER_SIZE
-                          options:Usage::Stream.to_u64()],
+                          options:BufferUsage::Stream.to_u64()],
             ];
 
             MetalContext {
@@ -339,9 +349,6 @@ impl MetalContext {
 impl RenderingBackend for MetalContext {
     fn delete_render_pass(&mut self, _render_pass: RenderPass) {}
     fn pipeline_set_blend(&mut self, _pipeline: &Pipeline, _color_blend: Option<BlendState>) {}
-    fn new_buffer_index_stream(&mut self, _index_type: IndexType, _size: usize) -> BufferId {
-        unimplemented!()
-    }
     fn buffer_size(&mut self, _buffer: BufferId) -> usize {
         unimplemented!()
     }
@@ -363,12 +370,20 @@ impl RenderingBackend for MetalContext {
     ) {
     }
     fn texture_read_pixels(&mut self, _texture: TextureId, _bytes: &mut [u8]) {}
+
     fn clear(
-        &self,
-        _color: Option<(f32, f32, f32, f32)>,
-        _depth: Option<f32>,
-        _stencil: Option<i32>,
+        &mut self,
+        color: Option<(f32, f32, f32, f32)>,
+        depth: Option<f32>,
+        stencil: Option<i32>,
     ) {
+        // TODO: begin_pass/end_pass works, but is far from optimal
+        self.begin_default_pass(PassAction::Clear {
+            color,
+            depth,
+            stencil,
+        });
+        self.end_render_pass();
     }
 
     fn new_render_pass(
@@ -410,51 +425,35 @@ impl RenderingBackend for MetalContext {
             RenderPass(self.passes.len() - 1)
         }
     }
+
     fn render_pass_texture(&self, render_pass: RenderPass) -> TextureId {
         self.passes[render_pass.0].texture
     }
-    fn new_buffer_immutable(&mut self, _buffer_type: BufferType, data: BufferSource) -> BufferId {
-        debug_assert!(data.0.is_slice);
-        // let index_type = if buffer_type == BufferType::IndexBuffer {
-        //     Some(IndexType::for_type_size(data.0.element_size))
-        // } else {
-        //     None
-        // };
 
-        let size = data.0.size as u64;
-        let mut raw = [nil; WTF];
-        for i in 0..WTF {
-            let buffer: ObjcId = unsafe {
-                msg_send![self.device,
-                      newBufferWithBytes:data.0.ptr
-                      length:size
-                      options:MTLResourceOptions::StorageModeShared]
-            };
-            unsafe {
-                msg_send_![buffer, retain];
-            }
-            raw[i] = buffer;
-        }
-        let buffer = Buffer {
-            raw,
-            //buffer_type,
-            size: size as usize,
-            //index_type,
-            value: 0,
-            next_value: 0,
+    fn new_buffer(&mut self, _: BufferType, _usage: BufferUsage, data: BufferSource) -> BufferId {
+        let mut raw = [nil; BUFFERS_IN_ROTATION];
+        let size = match &data {
+            BufferSource::Slice(data) => data.size,
+            BufferSource::Empty { size, .. } => *size,
         };
-        self.buffers.push(buffer);
-        BufferId(self.buffers.len() - 1)
-    }
-
-    fn new_buffer_stream(&mut self, _buffer_type: BufferType, size: usize) -> BufferId {
-        let mut raw = [nil; WTF];
-        for i in 0..WTF {
-            let buffer: ObjcId = unsafe {
-                msg_send![self.device,
-                      newBufferWithLength:size
-                      options:MTLResourceOptions::CPUCacheModeWriteCombined | MTLResourceOptions::StorageModeManaged]
+        for i in 0..BUFFERS_IN_ROTATION {
+            let buffer: ObjcId = if let BufferSource::Slice(data) = &data {
+                debug_assert!(data.is_slice);
+                let size = data.size as u64;
+                unsafe {
+                    msg_send![self.device,
+                              newBufferWithBytes:data.ptr
+                              length:size
+                              options:MTLResourceOptions::StorageModeShared]
+                }
+            } else {
+                unsafe {
+                    msg_send![self.device,
+                              newBufferWithLength:size
+                              options:MTLResourceOptions::CPUCacheModeWriteCombined | MTLResourceOptions::StorageModeManaged]
+                }
             };
+
             unsafe {
                 msg_send_![buffer, retain];
             }
@@ -462,9 +461,7 @@ impl RenderingBackend for MetalContext {
         }
         let buffer = Buffer {
             raw,
-            //buffer_type,
             size: size as usize,
-            //index_type: None,
             value: 0,
             next_value: 0,
         };
@@ -473,15 +470,19 @@ impl RenderingBackend for MetalContext {
     }
 
     fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
+        let data = match data {
+            BufferSource::Slice(data) => data,
+            _ => panic!("buffer_update expects BufferSource::slice"),
+        };
         let mut buffer = &mut self.buffers[buffer.0];
-        assert!(data.0.size <= buffer.size);
+        assert!(data.size <= buffer.size);
 
         unsafe {
             let dest: *mut std::ffi::c_void = msg_send![buffer.raw[buffer.next_value], contents];
-            std::ptr::copy(data.0.ptr, dest, data.0.size);
+            std::ptr::copy(data.ptr, dest, data.size);
 
             #[cfg(target_os = "macos")]
-            msg_send_![buffer.raw[buffer.next_value], didModifyRange:NSRange::new(0, data.0.size as u64)];
+            msg_send_![buffer.raw[buffer.next_value], didModifyRange:NSRange::new(0, data.size as u64)];
         }
         buffer.value = buffer.next_value;
     }
