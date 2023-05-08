@@ -353,10 +353,6 @@ impl RenderingBackend for MetalContext {
         unimplemented!()
     }
     fn buffer_delete(&mut self, _buffer: BufferId) {}
-    fn set_cull_face(&mut self, _cull_face: CullFace) {}
-    fn set_color_write(&mut self, _color_write: ColorMask) {}
-    fn set_blend(&mut self, _color_blend: Option<BlendState>, _alpha_blend: Option<BlendState>) {}
-    fn set_stencil(&mut self, _stencil_test: Option<StencilState>) {}
     fn apply_viewport(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
     fn apply_scissor_rect(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
     fn texture_set_filter(&mut self, _texture: TextureId, _filter: FilterMode) {}

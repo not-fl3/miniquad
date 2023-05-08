@@ -1152,14 +1152,6 @@ pub trait RenderingBackend {
     /// this function is not marked as unsafe
     fn buffer_delete(&mut self, buffer: BufferId);
 
-    fn set_cull_face(&mut self, cull_face: CullFace);
-
-    fn set_color_write(&mut self, color_write: ColorMask);
-
-    fn set_blend(&mut self, color_blend: Option<BlendState>, alpha_blend: Option<BlendState>);
-
-    fn set_stencil(&mut self, stencil_test: Option<StencilState>);
-
     /// Set a new viewport rectangle.
     /// Should be applied after begin_pass.
     fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32);

@@ -487,6 +487,131 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderEr
     }
 }
 
+impl GlContext {
+    fn set_blend(&mut self, color_blend: Option<BlendState>, alpha_blend: Option<BlendState>) {
+        if color_blend.is_none() && alpha_blend.is_some() {
+            panic!("AlphaBlend without ColorBlend");
+        }
+        if self.cache.color_blend == color_blend && self.cache.alpha_blend == alpha_blend {
+            return;
+        }
+
+        unsafe {
+            if let Some(color_blend) = color_blend {
+                if self.cache.color_blend.is_none() {
+                    glEnable(GL_BLEND);
+                }
+
+                let BlendState {
+                    equation: eq_rgb,
+                    sfactor: src_rgb,
+                    dfactor: dst_rgb,
+                } = color_blend;
+
+                if let Some(BlendState {
+                    equation: eq_alpha,
+                    sfactor: src_alpha,
+                    dfactor: dst_alpha,
+                }) = alpha_blend
+                {
+                    glBlendFuncSeparate(
+                        src_rgb.into(),
+                        dst_rgb.into(),
+                        src_alpha.into(),
+                        dst_alpha.into(),
+                    );
+                    glBlendEquationSeparate(eq_rgb.into(), eq_alpha.into());
+                } else {
+                    glBlendFunc(src_rgb.into(), dst_rgb.into());
+                    glBlendEquationSeparate(eq_rgb.into(), eq_rgb.into());
+                }
+            } else if self.cache.color_blend.is_some() {
+                glDisable(GL_BLEND);
+            }
+        }
+
+        self.cache.color_blend = color_blend;
+        self.cache.alpha_blend = alpha_blend;
+    }
+
+    fn set_stencil(&mut self, stencil_test: Option<StencilState>) {
+        if self.cache.stencil == stencil_test {
+            return;
+        }
+        unsafe {
+            if let Some(stencil) = stencil_test {
+                if self.cache.stencil.is_none() {
+                    glEnable(GL_STENCIL_TEST);
+                }
+
+                let front = &stencil.front;
+                glStencilOpSeparate(
+                    GL_FRONT,
+                    front.fail_op.into(),
+                    front.depth_fail_op.into(),
+                    front.pass_op.into(),
+                );
+                glStencilFuncSeparate(
+                    GL_FRONT,
+                    front.test_func.into(),
+                    front.test_ref,
+                    front.test_mask,
+                );
+                glStencilMaskSeparate(GL_FRONT, front.write_mask);
+
+                let back = &stencil.back;
+                glStencilOpSeparate(
+                    GL_BACK,
+                    back.fail_op.into(),
+                    back.depth_fail_op.into(),
+                    back.pass_op.into(),
+                );
+                glStencilFuncSeparate(
+                    GL_BACK,
+                    back.test_func.into(),
+                    back.test_ref.into(),
+                    back.test_mask,
+                );
+                glStencilMaskSeparate(GL_BACK, back.write_mask);
+            } else if self.cache.stencil.is_some() {
+                glDisable(GL_STENCIL_TEST);
+            }
+        }
+
+        self.cache.stencil = stencil_test;
+    }
+
+    fn set_cull_face(&mut self, cull_face: CullFace) {
+        if self.cache.cull_face == cull_face {
+            return;
+        }
+
+        match cull_face {
+            CullFace::Nothing => unsafe {
+                glDisable(GL_CULL_FACE);
+            },
+            CullFace::Front => unsafe {
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_FRONT);
+            },
+            CullFace::Back => unsafe {
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+            },
+        }
+        self.cache.cull_face = cull_face;
+    }
+
+    fn set_color_write(&mut self, color_write: ColorMask) {
+        if self.cache.color_write == color_write {
+            return;
+        }
+        let (r, g, b, a) = color_write;
+        unsafe { glColorMask(r as _, g as _, b as _, a as _) }
+        self.cache.color_write = color_write;
+    }
+}
+
 impl RenderingBackend for GlContext {
     fn new_shader(
         &mut self,
@@ -853,129 +978,6 @@ impl RenderingBackend for GlContext {
     /// this function is not marked as unsafe
     fn buffer_delete(&mut self, buffer: BufferId) {
         unsafe { glDeleteBuffers(1, &self.buffers[buffer.0].gl_buf as *const _) }
-    }
-
-    fn set_cull_face(&mut self, cull_face: CullFace) {
-        if self.cache.cull_face == cull_face {
-            return;
-        }
-
-        match cull_face {
-            CullFace::Nothing => unsafe {
-                glDisable(GL_CULL_FACE);
-            },
-            CullFace::Front => unsafe {
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_FRONT);
-            },
-            CullFace::Back => unsafe {
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
-            },
-        }
-        self.cache.cull_face = cull_face;
-    }
-
-    fn set_color_write(&mut self, color_write: ColorMask) {
-        if self.cache.color_write == color_write {
-            return;
-        }
-        let (r, g, b, a) = color_write;
-        unsafe { glColorMask(r as _, g as _, b as _, a as _) }
-        self.cache.color_write = color_write;
-    }
-
-    fn set_blend(&mut self, color_blend: Option<BlendState>, alpha_blend: Option<BlendState>) {
-        if color_blend.is_none() && alpha_blend.is_some() {
-            panic!("AlphaBlend without ColorBlend");
-        }
-        if self.cache.color_blend == color_blend && self.cache.alpha_blend == alpha_blend {
-            return;
-        }
-
-        unsafe {
-            if let Some(color_blend) = color_blend {
-                if self.cache.color_blend.is_none() {
-                    glEnable(GL_BLEND);
-                }
-
-                let BlendState {
-                    equation: eq_rgb,
-                    sfactor: src_rgb,
-                    dfactor: dst_rgb,
-                } = color_blend;
-
-                if let Some(BlendState {
-                    equation: eq_alpha,
-                    sfactor: src_alpha,
-                    dfactor: dst_alpha,
-                }) = alpha_blend
-                {
-                    glBlendFuncSeparate(
-                        src_rgb.into(),
-                        dst_rgb.into(),
-                        src_alpha.into(),
-                        dst_alpha.into(),
-                    );
-                    glBlendEquationSeparate(eq_rgb.into(), eq_alpha.into());
-                } else {
-                    glBlendFunc(src_rgb.into(), dst_rgb.into());
-                    glBlendEquationSeparate(eq_rgb.into(), eq_rgb.into());
-                }
-            } else if self.cache.color_blend.is_some() {
-                glDisable(GL_BLEND);
-            }
-        }
-
-        self.cache.color_blend = color_blend;
-        self.cache.alpha_blend = alpha_blend;
-    }
-
-    fn set_stencil(&mut self, stencil_test: Option<StencilState>) {
-        if self.cache.stencil == stencil_test {
-            return;
-        }
-        unsafe {
-            if let Some(stencil) = stencil_test {
-                if self.cache.stencil.is_none() {
-                    glEnable(GL_STENCIL_TEST);
-                }
-
-                let front = &stencil.front;
-                glStencilOpSeparate(
-                    GL_FRONT,
-                    front.fail_op.into(),
-                    front.depth_fail_op.into(),
-                    front.pass_op.into(),
-                );
-                glStencilFuncSeparate(
-                    GL_FRONT,
-                    front.test_func.into(),
-                    front.test_ref,
-                    front.test_mask,
-                );
-                glStencilMaskSeparate(GL_FRONT, front.write_mask);
-
-                let back = &stencil.back;
-                glStencilOpSeparate(
-                    GL_BACK,
-                    back.fail_op.into(),
-                    back.depth_fail_op.into(),
-                    back.pass_op.into(),
-                );
-                glStencilFuncSeparate(
-                    GL_BACK,
-                    back.test_func.into(),
-                    back.test_ref.into(),
-                    back.test_mask,
-                );
-                glStencilMaskSeparate(GL_BACK, back.write_mask);
-            } else if self.cache.stencil.is_some() {
-                glDisable(GL_STENCIL_TEST);
-            }
-        }
-
-        self.cache.stencil = stencil_test;
     }
 
     /// Set a new viewport rectangle.
