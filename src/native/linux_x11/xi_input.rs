@@ -70,7 +70,7 @@ pub struct LibXi {
     XISelectEvents: XISelectEvents,
     XGetEventData: XGetEventData,
     XFreeEventData: XFreeEventData,
-    xi_extension_opcode: Option<i32>,
+    pub xi_extension_opcode: Option<i32>,
 }
 
 impl LibXi {
@@ -89,20 +89,11 @@ impl LibXi {
             .ok()
     }
 
-    pub unsafe fn xi_extension_opcode(
-        &mut self,
-        libx11: &mut libx11::LibX11,
-        display: *mut Display,
-    ) -> Option<i32> {
-        self.xi_extension_opcode
-            .or_else(|| self.query_xi_extension(libx11, display))
-    }
-
     pub unsafe fn query_xi_extension(
         &mut self,
         libx11: &mut libx11::LibX11,
         display: *mut Display,
-    ) -> Option<i32> {
+    ) {
         let mut ev = 0;
         let mut err = 0;
         let mut xi_opcode = 0;
@@ -115,14 +106,14 @@ impl LibXi {
             &mut err,
         ) == 0
         {
-            return None;
+            return;
         }
 
         // check the version of XInput
         let mut major = 2;
         let mut minor = 3;
         if (self.XIQueryVersion)(display, &mut major, &mut minor) != 0 {
-            return None;
+            return;
         }
 
         // select events to listen
@@ -132,6 +123,7 @@ impl LibXi {
             mask_len: ::std::mem::size_of::<libc::c_int>() as _,
             mask: &mut mask as *mut _ as *mut _,
         };
+
         (self.XISelectEvents)(
             display,
             // this weird pointers is macro expansion of DefaultRootWindow(display)
@@ -142,7 +134,7 @@ impl LibXi {
             &mut masks,
             1 as libc::c_int,
         );
-        Some(xi_opcode)
+        self.xi_extension_opcode = Some(xi_opcode);
     }
 
     /// Get mouse delta from XI_RawMotion's event XGenericEventCookie data

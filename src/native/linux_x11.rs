@@ -421,11 +421,7 @@ impl X11MainLoopData {
             17 => {}
 
             // GenericEvent
-            35 if Some((*event).xcookie.extension)
-                == self
-                    .libxi
-                    .xi_extension_opcode(&mut self.libx11, self.display) =>
-            {
+            35 if Some((*event).xcookie.extension) == self.libxi.xi_extension_opcode => {
                 if (*event).xcookie.evtype == xi_input::XI_RawMotion {
                     let (dx, dy) = self.libxi.read_cookie(&mut (*event).xcookie, self.display);
                     event_handler.raw_mouse_motion(dx as f32, dy as f32);
@@ -628,13 +624,15 @@ where
         (libx11.XkbSetDetectableAutoRepeat)(x11_display, true as _, std::ptr::null_mut());
 
         libx11.load_extensions(x11_display);
-        let display = X11MainLoopData {
+        let mut display = X11MainLoopData {
             display: x11_display,
             root: x11_root,
             libx11,
             libxi,
             repeated_keycodes: [false; 256],
         };
+
+        display.libxi.query_xi_extension(&mut display.libx11, display.display);
 
         match conf.platform.linux_x11_gl {
             crate::conf::LinuxX11Gl::GLXOnly => {
