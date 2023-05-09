@@ -66,8 +66,11 @@ impl Stage {
              1.0,  1.0, -1.0,    1.0, 0.0, 0.5, 1.0,     0.0, 1.0
         ];
 
-        let vertex_buffer =
-            ctx.new_buffer_immutable(BufferType::VertexBuffer, BufferSource::slice(&vertices));
+        let vertex_buffer = ctx.new_buffer(
+            BufferType::VertexBuffer,
+            BufferUsage::Immutable,
+            BufferSource::slice(&vertices),
+        );
 
         #[rustfmt::skip]
         let indices: &[u16] = &[
@@ -79,8 +82,11 @@ impl Stage {
             22, 21, 20,  23, 22, 20
         ];
 
-        let index_buffer =
-            ctx.new_buffer_immutable(BufferType::IndexBuffer, BufferSource::slice(&indices));
+        let index_buffer = ctx.new_buffer(
+            BufferType::IndexBuffer,
+            BufferUsage::Immutable,
+            BufferSource::slice(&indices),
+        );
 
         let offscreen_bind = Bindings {
             vertex_buffers: vec![vertex_buffer.clone()],

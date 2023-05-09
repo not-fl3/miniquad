@@ -19,11 +19,11 @@ pub struct CachedAttribute {
 
 pub struct GlCache {
     pub stored_index_buffer: GLuint,
-    pub stored_index_type: Option<IndexType>,
+    pub stored_index_type: Option<u32>,
     pub stored_vertex_buffer: GLuint,
     pub stored_texture: GLuint,
     pub index_buffer: GLuint,
-    pub index_type: Option<IndexType>,
+    pub index_type: Option<u32>,
     pub vertex_buffer: GLuint,
     pub textures: [GLuint; MAX_SHADERSTAGE_IMAGES],
     pub cur_pipeline: Option<Pipeline>,
@@ -36,7 +36,7 @@ pub struct GlCache {
 }
 
 impl GlCache {
-    pub fn bind_buffer(&mut self, target: GLenum, buffer: GLuint, index_type: Option<IndexType>) {
+    pub fn bind_buffer(&mut self, target: GLenum, buffer: GLuint, index_type: Option<u32>) {
         if target == GL_ARRAY_BUFFER {
             if self.vertex_buffer != buffer {
                 self.vertex_buffer = buffer;

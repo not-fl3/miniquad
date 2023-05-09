@@ -8,22 +8,13 @@ use crate::{native::gl::*, window};
 
 use super::*;
 
-impl From<IndexType> for GLenum {
-    fn from(index_type: IndexType) -> Self {
-        match index_type {
-            IndexType::Byte => GL_UNSIGNED_BYTE,
-            IndexType::Short => GL_UNSIGNED_SHORT,
-            IndexType::Int => GL_UNSIGNED_INT,
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
-pub struct Buffer {
+struct Buffer {
     gl_buf: GLuint,
     buffer_type: BufferType,
     size: usize,
-    index_type: Option<IndexType>,
+    // 1, 2, 4
+    index_type: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -130,13 +121,6 @@ impl Texture {
         }
     }
 
-    /// Delete GPU texture, leaving handle unmodified.
-    ///
-    /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
-    /// more RAII buffer object.
-    ///
-    /// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why
-    /// this function is not marked as unsafe
     pub fn delete(&self) {
         unsafe {
             glDeleteTextures(1, &self.texture as *const _);
@@ -906,16 +890,17 @@ impl RenderingBackend for GlContext {
         let gl_target = gl_buffer_target(&type_);
         let gl_usage = gl_usage(&usage);
         let (size, element_size) = match &data {
-            BufferSource::Slice(data) => (data.size, Some(data.element_size)),
+            BufferSource::Slice(data) => (data.size, data.element_size),
             BufferSource::Empty { size, element_size } => (*size, *element_size),
         };
-        let mut gl_buf: u32 = 0;
-
-        let index_type = if type_ == BufferType::IndexBuffer && element_size.is_some() {
-            Some(IndexType::for_type_size(element_size.unwrap()))
-        } else {
-            None
+        let index_type = match type_ {
+            BufferType::IndexBuffer if element_size == 1 => Some(GL_UNSIGNED_BYTE),
+            BufferType::IndexBuffer if element_size == 2 => Some(GL_UNSIGNED_SHORT),
+            BufferType::IndexBuffer if element_size == 4 => Some(GL_UNSIGNED_INT),
+            BufferType::IndexBuffer => panic!("unsupported index buffer dimension"),
+            BufferType::VertexBuffer => None,
         };
+        let mut gl_buf: u32 = 0;
 
         unsafe {
             glGenBuffers(1, &mut gl_buf as *mut _);
@@ -947,9 +932,10 @@ impl RenderingBackend for GlContext {
         };
         debug_assert!(data.is_slice);
         let buffer = &self.buffers[buffer.0];
-        if buffer.buffer_type == BufferType::IndexBuffer {
+
+        if matches!(buffer.buffer_type, BufferType::IndexBuffer) {
             assert!(buffer.index_type.is_some());
-            assert!(buffer.index_type.unwrap() == IndexType::for_type_size(data.element_size));
+            assert!(buffer.index_type.unwrap() == data.element_size as u32);
         };
 
         let size = data.size;
@@ -976,7 +962,7 @@ impl RenderingBackend for GlContext {
     ///
     /// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why
     /// this function is not marked as unsafe
-    fn buffer_delete(&mut self, buffer: BufferId) {
+    fn delete_buffer(&mut self, buffer: BufferId) {
         unsafe { glDeleteBuffers(1, &self.buffers[buffer.0].gl_buf as *const _) }
     }
 
@@ -1233,7 +1219,7 @@ impl RenderingBackend for GlContext {
                 primitive_type,
                 num_elements,
                 index_type.into(),
-                (index_type.size() as i32 * base_element) as *mut _,
+                (index_type as i32 * base_element) as *mut _,
                 num_instances,
             );
         }

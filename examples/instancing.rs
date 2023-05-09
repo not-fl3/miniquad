@@ -53,7 +53,7 @@ impl Stage {
         let positions_vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
             BufferUsage::Stream,
-            BufferSource::empty_vertex_buffer(MAX_PARTICLES * std::mem::size_of::<Vec3>()),
+            BufferSource::empty::<Vec3>(MAX_PARTICLES),
         );
 
         let bindings = Bindings {

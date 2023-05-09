@@ -144,23 +144,6 @@ impl From<PrimitiveType> for MTLPrimitiveType {
     }
 }
 
-impl BufferUsage {
-    fn to_u64(self) -> u64 {
-        match self {
-            BufferUsage::Immutable => MTLResourceOptions::StorageModeShared,
-            #[cfg(target_os = "macos")]
-            BufferUsage::Dynamic | BufferUsage::Stream => {
-                MTLResourceOptions::CPUCacheModeWriteCombined
-                    | MTLResourceOptions::StorageModeManaged
-            }
-            #[cfg(target_os = "ios")]
-            BufferUsage::Dynamic | BufferUsage::Stream => {
-                MTLResourceOptions::CPUCacheModeWriteCombined
-            }
-        }
-    }
-}
-
 impl From<TextureFormat> for MTLPixelFormat {
     fn from(format: TextureFormat) -> Self {
         match format {
@@ -316,13 +299,21 @@ impl MetalContext {
                 }
             }
 
+            #[cfg(target_os = "macos")]
+            let options = {
+                MTLResourceOptions::CPUCacheModeWriteCombined
+                    | MTLResourceOptions::StorageModeManaged
+            };
+            #[cfg(target_os = "ios")]
+            let options = { MTLResourceOptions::CPUCacheModeWriteCombined };
+
             let uniform_buffers = [
                 msg_send![device, newBufferWithLength:MAX_UNIFORM_BUFFER_SIZE
-                          options:BufferUsage::Stream.to_u64()],
+                          options:options],
                 msg_send![device, newBufferWithLength:MAX_UNIFORM_BUFFER_SIZE
-                          options:BufferUsage::Stream.to_u64()],
+                          options:options],
                 msg_send![device, newBufferWithLength:MAX_UNIFORM_BUFFER_SIZE
-                          options:BufferUsage::Stream.to_u64()],
+                          options:options],
             ];
 
             MetalContext {
@@ -443,10 +434,15 @@ impl RenderingBackend for MetalContext {
                               options:MTLResourceOptions::StorageModeShared]
                 }
             } else {
+                #[cfg(target_os = "macos")]
+                let options = MTLResourceOptions::CPUCacheModeWriteCombined
+                    | MTLResourceOptions::StorageModeManaged;
+                #[cfg(target_os = "ios")]
+                let options = MTLResourceOptions::CPUCacheModeWriteCombined;
                 unsafe {
                     msg_send![self.device,
                               newBufferWithLength:size
-                              options:MTLResourceOptions::CPUCacheModeWriteCombined | MTLResourceOptions::StorageModeManaged]
+                              options:options]
                 }
             };
 
@@ -567,31 +563,32 @@ impl RenderingBackend for MetalContext {
                         | MTLTextureUsage::ShaderWrite as u64
                 ];
             } else {
-                msg_send_![descriptor, setUsage: MTLTextureUsage::ShaderRead];
                 #[cfg(target_os = "macos")]
                 {
+                    msg_send_![descriptor, setUsage: MTLTextureUsage::ShaderRead];
                     msg_send_![descriptor, setStorageMode: MTLStorageMode::Managed];
                     msg_send_![
                         descriptor,
                         setResourceOptions: MTLResourceOptions::StorageModeManaged
                     ];
                 }
-                // #[cfg(target_os = "ios")]
-                // {
-                //     texture_dsc.set_storage_mode(MTLStorageMode::Shared);
-                //     texture_dsc.set_resource_options(MTLResourceOptions::StorageModeShared);
-                // }
+                #[cfg(target_os = "ios")]
+                {
+                    msg_send_![descriptor, setStorageMode: MTLStorageMode::Shared];
+                    msg_send_![
+                        descriptor,
+                        setResourceOptions: MTLResourceOptions::StorageModeShared
+                    ];
+                }
             }
         };
 
         let texture = unsafe {
             let sampler_dsc = msg_send_![class!(MTLSamplerDescriptor), new];
-            msg_send_![sampler_dsc, retain];
             msg_send_![sampler_dsc, setMinFilter: MTLSamplerMinMagFilter::Linear];
             msg_send_![sampler_dsc, setMagFilter: MTLSamplerMinMagFilter::Linear];
 
             let sampler_state = msg_send_![self.device, newSamplerStateWithDescriptor: sampler_dsc];
-            msg_send_![sampler_state, retain];
             let raw_texture = msg_send_![self.device, newTextureWithDescriptor: descriptor];
             msg_send_![raw_texture, retain];
             self.textures.push(TextureInternal {

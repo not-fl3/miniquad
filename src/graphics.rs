@@ -675,32 +675,6 @@ impl From<PrimitiveType> for GLenum {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum IndexType {
-    Byte,
-    Short,
-    Int,
-}
-
-impl IndexType {
-    pub fn for_type_size(size: usize) -> IndexType {
-        match size {
-            1 => IndexType::Byte,
-            2 => IndexType::Short,
-            4 => IndexType::Int,
-            _ => panic!("Unsupported index buffer index type"),
-        }
-    }
-
-    pub fn size(self) -> u8 {
-        match self {
-            IndexType::Byte => 1,
-            IndexType::Short => 2,
-            IndexType::Int => 4,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct PipelineParams {
     pub cull_face: CullFace,
     pub front_face_order: FrontFaceOrder,
@@ -983,30 +957,23 @@ pub struct Arg<'a> {
 
 pub enum BufferSource<'a> {
     Slice(Arg<'a>),
-    Empty {
-        size: usize,
-        element_size: Option<usize>,
-    },
+    Empty { size: usize, element_size: usize },
 }
 impl<'a> BufferSource<'a> {
-    pub fn empty_vertex_buffer(size: usize) -> BufferSource<'a> {
+    /// Empty buffer of `size * size_of::<T>` bytes
+    ///
+    /// Platform specific note, OpenGL:
+    /// For VertexBuffer T could be anything, it is only used to calculate total size,
+    /// but for IndexBuffers T should be either u8, u16 or u32, other
+    /// types are not supported.
+    ///
+    /// For vertex buffers ff the type is not yet known, only total byte size,
+    /// it is OK to use empty::<u8>(byte_size);
+    pub fn empty<T>(size: usize) -> BufferSource<'a> {
+        let element_size = std::mem::size_of::<T>();
         BufferSource::Empty {
-            size,
-            element_size: None,
-        }
-    }
-
-    pub fn empty_index_u16_buffer(size: usize) -> BufferSource<'a>{
-        BufferSource::Empty {
-            size,
-            element_size: Some(2),
-        }
-    }
-
-    pub fn empty_index_u32_buffer(size: usize) -> BufferSource<'a>{
-        BufferSource::Empty {
-            size,
-            element_size: Some(4),
+            size: size * std::mem::size_of::<T>(),
+            element_size,
         }
     }
 
