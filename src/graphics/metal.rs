@@ -340,10 +340,24 @@ impl MetalContext {
 impl RenderingBackend for MetalContext {
     fn delete_render_pass(&mut self, _render_pass: RenderPass) {}
     fn pipeline_set_blend(&mut self, _pipeline: &Pipeline, _color_blend: Option<BlendState>) {}
-    fn buffer_size(&mut self, _buffer: BufferId) -> usize {
-        unimplemented!()
+    fn buffer_size(&mut self, buffer: BufferId) -> usize {
+        let buffer = &self.buffers[buffer.0];
+        buffer.size
     }
-    fn buffer_delete(&mut self, _buffer: BufferId) {}
+    fn delete_buffer(&mut self, buffer: BufferId) {
+        let buffer = &self.buffers[buffer.0];
+        unsafe {
+            for buffer in &buffer.raw {
+                msg_send_![*buffer, release];
+            }
+        }
+    }
+    fn delete_texture(&mut self, texture: TextureId) {
+        let texture = &self.textures[texture.0];
+        unsafe {
+            msg_send_![texture.texture, release];
+        }
+    }
     fn apply_viewport(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
     fn apply_scissor_rect(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
     fn texture_set_filter(&mut self, _texture: TextureId, _filter: FilterMode) {}
@@ -381,7 +395,7 @@ impl RenderingBackend for MetalContext {
         unsafe {
             let render_pass_desc =
                 msg_send_![class!(MTLRenderPassDescriptor), renderPassDescriptor];
-            msg_send_![render_pass_desc, retain];
+            //msg_send_![render_pass_desc, retain];
             assert!(!render_pass_desc.is_null());
             let color_texture = self.textures[color_img.0].texture;
             let color_attachment = msg_send_![msg_send_![render_pass_desc, colorAttachments], objectAtIndexedSubscript:0];
@@ -503,32 +517,9 @@ impl RenderingBackend for MetalContext {
             assert!(!vertex_function.is_null());
             let fragment_function: ObjcId = msg_send![library, newFunctionWithName: apple_util::str_to_nsstring("fragmentShader")];
             assert!(!fragment_function.is_null());
-
-            // let mut stride = 0;
-            // let mut index = 0;
-            // let uniforms = meta
-            //     .uniforms
-            //     .uniforms
-            //     .iter()
-            //     .scan(0, |offset, uniform| {
-            //         let size = uniform.uniform_type.size() as u64;
-            //         stride += size;
-            //         let shader_uniform = ShaderUniform {
-            //             size: uniform.uniform_type.size() as u64,
-            //             offset: *offset,
-            //             format: uniform.uniform_type.into(),
-            //         };
-            //         index += 1;
-            //         *offset += size as u64;
-            //         Some(shader_uniform)
-            //     })
-            //     .collect();
-
             let shader = ShaderInternal {
                 vertex_function,
                 fragment_function,
-                //uniforms,
-                //stride,
             };
             self.shaders.push(shader);
             Ok(ShaderId(self.shaders.len() - 1))
@@ -542,9 +533,9 @@ impl RenderingBackend for MetalContext {
         params: TextureParams,
     ) -> TextureId {
         let descriptor = unsafe { msg_send_![class!(MTLTextureDescriptor), new] };
-        unsafe {
-            msg_send_![descriptor, retain];
-        }
+        // unsafe {
+        //     msg_send_![descriptor, retain];
+        // }
         unsafe {
             msg_send_![descriptor, setWidth:params.width as u64];
             msg_send_![descriptor, setHeight:params.height as u64];
@@ -936,7 +927,7 @@ impl RenderingBackend for MetalContext {
                     (
                         {
                             let a = msg_send_![self.view, currentRenderPassDescriptor];
-                            msg_send_![a, retain];
+                            //msg_send_![a, retain];
                             a
                         },
                         screen_width as f64,
@@ -1033,7 +1024,7 @@ impl RenderingBackend for MetalContext {
         unsafe {
             assert!(!self.command_queue.is_null());
             let drawable: ObjcId = msg_send!(self.view, currentDrawable);
-            msg_send_![drawable, retain];
+            //msg_send_![drawable, retain];
             msg_send_![self.command_buffer.unwrap(), presentDrawable: drawable];
             msg_send_![self.command_buffer.unwrap(), commit];
             msg_send_![self.command_buffer.unwrap(), waitUntilCompleted];

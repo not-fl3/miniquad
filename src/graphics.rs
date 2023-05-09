@@ -1117,7 +1117,16 @@ pub trait RenderingBackend {
     ///
     /// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why
     /// this function is not marked as unsafe
-    fn buffer_delete(&mut self, buffer: BufferId);
+    fn delete_buffer(&mut self, buffer: BufferId);
+
+    /// Delete GPU texture, leaving handle unmodified.
+    ///
+    /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
+    /// more RAII buffer object.
+    ///
+    /// There is no protection against using deleted textures later. However its not a CPU-level UB and thats why
+    /// this function is not marked as unsafe
+    fn delete_texture(&mut self, texture: TextureId);
 
     /// Set a new viewport rectangle.
     /// Should be applied after begin_pass.

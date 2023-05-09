@@ -621,6 +621,10 @@ impl RenderingBackend for GlContext {
         self.textures.push(texture);
         TextureId(self.textures.len() - 1)
     }
+    fn delete_texture(&mut self, texture: TextureId) {
+        let t = self.textures[texture.0];
+        t.delete();
+    }
     fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {
         let t = self.textures[texture.0];
         t.set_filter(self, filter);
