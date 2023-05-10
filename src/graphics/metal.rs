@@ -339,7 +339,6 @@ impl MetalContext {
 
 impl RenderingBackend for MetalContext {
     fn delete_render_pass(&mut self, _render_pass: RenderPass) {}
-    fn pipeline_set_blend(&mut self, _pipeline: &Pipeline, _color_blend: Option<BlendState>) {}
     fn buffer_size(&mut self, buffer: BufferId) -> usize {
         let buffer = &self.buffers[buffer.0];
         buffer.size

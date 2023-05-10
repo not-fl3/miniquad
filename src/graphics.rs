@@ -1082,7 +1082,6 @@ pub trait RenderingBackend {
         shader: ShaderId,
         params: PipelineParams,
     ) -> Pipeline;
-    fn pipeline_set_blend(&mut self, pipeline: &Pipeline, color_blend: Option<BlendState>);
     fn apply_pipeline(&mut self, pipeline: &Pipeline);
 
     /// Create a buffer resource object.

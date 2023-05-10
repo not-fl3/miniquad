@@ -835,11 +835,6 @@ impl RenderingBackend for GlContext {
         Pipeline(self.pipelines.len() - 1)
     }
 
-    fn pipeline_set_blend(&mut self, pipeline: &Pipeline, color_blend: Option<BlendState>) {
-        let mut pipeline = &mut self.pipelines[pipeline.0];
-        pipeline.params.color_blend = color_blend;
-    }
-
     fn apply_pipeline(&mut self, pipeline: &Pipeline) {
         self.cache.cur_pipeline = Some(*pipeline);
 
