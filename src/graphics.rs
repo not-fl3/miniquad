@@ -601,64 +601,6 @@ impl Default for Equation {
     }
 }
 
-impl From<Equation> for GLenum {
-    fn from(eq: Equation) -> Self {
-        match eq {
-            Equation::Add => GL_FUNC_ADD,
-            Equation::Subtract => GL_FUNC_SUBTRACT,
-            Equation::ReverseSubtract => GL_FUNC_REVERSE_SUBTRACT,
-        }
-    }
-}
-
-impl From<BlendFactor> for GLenum {
-    fn from(factor: BlendFactor) -> GLenum {
-        match factor {
-            BlendFactor::Zero => GL_ZERO,
-            BlendFactor::One => GL_ONE,
-            BlendFactor::Value(BlendValue::SourceColor) => GL_SRC_COLOR,
-            BlendFactor::Value(BlendValue::SourceAlpha) => GL_SRC_ALPHA,
-            BlendFactor::Value(BlendValue::DestinationColor) => GL_DST_COLOR,
-            BlendFactor::Value(BlendValue::DestinationAlpha) => GL_DST_ALPHA,
-            BlendFactor::OneMinusValue(BlendValue::SourceColor) => GL_ONE_MINUS_SRC_COLOR,
-            BlendFactor::OneMinusValue(BlendValue::SourceAlpha) => GL_ONE_MINUS_SRC_ALPHA,
-            BlendFactor::OneMinusValue(BlendValue::DestinationColor) => GL_ONE_MINUS_DST_COLOR,
-            BlendFactor::OneMinusValue(BlendValue::DestinationAlpha) => GL_ONE_MINUS_DST_ALPHA,
-            BlendFactor::SourceAlphaSaturate => GL_SRC_ALPHA_SATURATE,
-        }
-    }
-}
-
-impl From<StencilOp> for GLenum {
-    fn from(op: StencilOp) -> Self {
-        match op {
-            StencilOp::Keep => GL_KEEP,
-            StencilOp::Zero => GL_ZERO,
-            StencilOp::Replace => GL_REPLACE,
-            StencilOp::IncrementClamp => GL_INCR,
-            StencilOp::DecrementClamp => GL_DECR,
-            StencilOp::Invert => GL_INVERT,
-            StencilOp::IncrementWrap => GL_INCR_WRAP,
-            StencilOp::DecrementWrap => GL_DECR_WRAP,
-        }
-    }
-}
-
-impl From<CompareFunc> for GLenum {
-    fn from(cf: CompareFunc) -> Self {
-        match cf {
-            CompareFunc::Always => GL_ALWAYS,
-            CompareFunc::Never => GL_NEVER,
-            CompareFunc::Less => GL_LESS,
-            CompareFunc::Equal => GL_EQUAL,
-            CompareFunc::LessOrEqual => GL_LEQUAL,
-            CompareFunc::Greater => GL_GREATER,
-            CompareFunc::NotEqual => GL_NOTEQUAL,
-            CompareFunc::GreaterOrEqual => GL_GEQUAL,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum PrimitiveType {
     Triangles,
@@ -1042,14 +984,15 @@ pub trait RenderingBackend {
             },
         )
     }
-    fn texture_size(&self, texture: TextureId) -> (u32, u32);
+    fn texture_params(&self, texture: TextureId) -> TextureParams;
+    fn texture_size(&self, texture: TextureId) -> (u32, u32) {
+        let params = self.texture_params(texture);
+        (params.width, params.height)
+    }
     /// Update whole texture content
     /// bytes should be width * height * 4 size - non rgba8 textures are not supported yet anyway
-    fn update_texture(&mut self, texture: TextureId, bytes: &[u8]) {
+    fn texture_update(&mut self, texture: TextureId, bytes: &[u8]) {
         let (width, height) = self.texture_size(texture);
-        //TODO
-        //assert_eq!(texture.size(width, height), bytes.len());
-
         self.texture_update_part(texture, 0 as _, 0 as _, width as _, height as _, bytes)
     }
     fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode);

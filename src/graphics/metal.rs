@@ -111,6 +111,16 @@ impl From<BlendFactor> for MTLBlendFactor {
 //     }
 // }
 
+impl From<Equation> for MTLBlendOperation {
+    fn from(cf: Equation) -> Self {
+        match cf {
+            Equation::Add => MTLBlendOperation::Add,
+            Equation::Subtract => MTLBlendOperation::Subtract,
+            Equation::ReverseSubtract => MTLBlendOperation::ReverseSubtract,
+        }
+    }
+}
+
 impl From<CompareFunc> for MTLCompareFunction {
     fn from(cf: CompareFunc) -> Self {
         match cf {
@@ -230,18 +240,17 @@ struct PipelineInternal {
     //params: PipelineParams,
 }
 
-struct TextureInternal {
+struct Texture {
     texture: ObjcId,
     sampler: ObjcId,
-    width: u32,
-    height: u32,
+    params: TextureParams,
 }
 
 pub struct MetalContext {
     buffers: Vec<Buffer>,
     shaders: Vec<ShaderInternal>,
     pipelines: Vec<PipelineInternal>,
-    textures: Vec<TextureInternal>,
+    textures: Vec<Texture>,
     passes: Vec<RenderPassInternal>,
     command_queue: ObjcId,
     command_buffer: Option<ObjcId>,
@@ -370,7 +379,10 @@ impl RenderingBackend for MetalContext {
     ) {
     }
     fn texture_read_pixels(&mut self, _texture: TextureId, _bytes: &mut [u8]) {}
-
+    fn texture_params(&self, texture: TextureId) -> TextureParams {
+        let texture = &self.textures[texture.0];
+        texture.params
+    }
     fn clear(
         &mut self,
         color: Option<(f32, f32, f32, f32)>,
@@ -581,11 +593,10 @@ impl RenderingBackend for MetalContext {
             let sampler_state = msg_send_![self.device, newSamplerStateWithDescriptor: sampler_dsc];
             let raw_texture = msg_send_![self.device, newTextureWithDescriptor: descriptor];
             msg_send_![raw_texture, retain];
-            self.textures.push(TextureInternal {
+            self.textures.push(Texture {
                 sampler: sampler_state,
                 texture: raw_texture,
-                width: params.width as _,
-                height: params.height as _,
+                params,
             });
             TextureId(self.textures.len() - 1)
         };
@@ -629,11 +640,6 @@ impl RenderingBackend for MetalContext {
                        withBytes:bytes.as_ptr()
                        bytesPerRow:(width * 4) as u64];
         }
-    }
-
-    fn texture_size(&self, texture: TextureId) -> (u32, u32) {
-        let texture = &self.textures[texture.0];
-        (texture.width as _, texture.height as _)
     }
 
     fn new_pipeline(
@@ -711,36 +717,46 @@ impl RenderingBackend for MetalContext {
 
             let view_pixel_format: MTLPixelFormat = msg_send![self.view, colorPixelFormat];
             msg_send_![color_attachment, setPixelFormat: view_pixel_format];
-            if params.color_blend.is_some() {
+            if let Some(color_blend) = params.color_blend {
                 msg_send_![color_attachment, setBlendingEnabled: true];
-                //TODO: Set from pipe params
+
+                let BlendState {
+                    equation: eq_rgb,
+                    sfactor: src_rgb,
+                    dfactor: dst_rgb,
+                } = color_blend;
+                let BlendState {
+                    equation: eq_alpha,
+                    sfactor: src_alpha,
+                    dfactor: dst_alpha,
+                } = color_blend;
                 msg_send_![
                     color_attachment,
-                    setRgbBlendOperation: MTLBlendOperation::Add
+                    setRgbBlendOperation: MTLBlendOperation::from(eq_rgb)
                 ];
                 msg_send_![
                     color_attachment,
-                    setAlphaBlendOperation: MTLBlendOperation::Add
+                    setAlphaBlendOperation: MTLBlendOperation::from(eq_alpha)
                 ];
                 msg_send_![
                     color_attachment,
-                    setSourceRGBBlendFactor: MTLBlendFactor::SourceAlpha
+                    setSourceRGBBlendFactor: MTLBlendFactor::from(src_rgb)
                 ];
                 msg_send_![
                     color_attachment,
-                    setSourceRGBBlendFactor: MTLBlendFactor::SourceAlpha
+                    setSourceRGBBlendFactor: MTLBlendFactor::from(src_rgb)
                 ];
                 msg_send_![
                     color_attachment,
-                    setSourceAlphaBlendFactor: MTLBlendFactor::SourceAlpha
+                    setSourceAlphaBlendFactor: MTLBlendFactor::from(src_alpha)
                 ];
                 msg_send_![
                     color_attachment,
-                    setDestinationRGBBlendFactor: MTLBlendFactor::OneMinusSourceAlpha
+                    setDestinationRGBBlendFactor: MTLBlendFactor::from(dst_rgb)
                 ];
                 msg_send_![
                     color_attachment,
-                    setDestinationAlphaBlendFactor: MTLBlendFactor::OneMinusSourceAlpha
+                    setDestinationAlphaBlendFactor: MTLBlendFactor::from(dst_alpha)
                 ];
             }
 
@@ -854,7 +870,7 @@ impl RenderingBackend for MetalContext {
             let img_count = bindings.images.len();
             if img_count > 0 {
                 for (n, img) in bindings.images.iter().enumerate() {
-                    let TextureInternal {
+                    let Texture {
                         sampler, texture, ..
                     } = self.textures[img.0];
                     msg_send_![render_encoder, setFragmentSamplerState:sampler
@@ -937,8 +953,8 @@ impl RenderingBackend for MetalContext {
                     let pass_internal = &self.passes[pass.0];
                     (
                         pass_internal.render_pass_desc,
-                        self.textures[pass_internal.texture.0].width as f64,
-                        self.textures[pass_internal.texture.0].height as f64,
+                        self.textures[pass_internal.texture.0].params.width as f64,
+                        self.textures[pass_internal.texture.0].params.height as f64,
                     )
                 }
             };

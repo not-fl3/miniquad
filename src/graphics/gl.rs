@@ -30,12 +30,10 @@ struct ShaderInternal {
     uniforms: Vec<ShaderUniform>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug)]
 struct Texture {
-    texture: GLuint,
-    width: u32,
-    height: u32,
-    format: TextureFormat,
+    raw: GLuint,
+    params: TextureParams,
 }
 
 /// Converts from TextureFormat to (internal_format, format, pixel_type)
@@ -49,6 +47,64 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
             TextureFormat::Alpha => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
             #[cfg(not(target_arch = "wasm32"))]
             TextureFormat::Alpha => (GL_R8, GL_RED, GL_UNSIGNED_BYTE), // texture updates will swizzle Red -> Alpha to match WASM
+        }
+    }
+}
+
+impl From<Equation> for GLenum {
+    fn from(eq: Equation) -> Self {
+        match eq {
+            Equation::Add => GL_FUNC_ADD,
+            Equation::Subtract => GL_FUNC_SUBTRACT,
+            Equation::ReverseSubtract => GL_FUNC_REVERSE_SUBTRACT,
+        }
+    }
+}
+
+impl From<BlendFactor> for GLenum {
+    fn from(factor: BlendFactor) -> GLenum {
+        match factor {
+            BlendFactor::Zero => GL_ZERO,
+            BlendFactor::One => GL_ONE,
+            BlendFactor::Value(BlendValue::SourceColor) => GL_SRC_COLOR,
+            BlendFactor::Value(BlendValue::SourceAlpha) => GL_SRC_ALPHA,
+            BlendFactor::Value(BlendValue::DestinationColor) => GL_DST_COLOR,
+            BlendFactor::Value(BlendValue::DestinationAlpha) => GL_DST_ALPHA,
+            BlendFactor::OneMinusValue(BlendValue::SourceColor) => GL_ONE_MINUS_SRC_COLOR,
+            BlendFactor::OneMinusValue(BlendValue::SourceAlpha) => GL_ONE_MINUS_SRC_ALPHA,
+            BlendFactor::OneMinusValue(BlendValue::DestinationColor) => GL_ONE_MINUS_DST_COLOR,
+            BlendFactor::OneMinusValue(BlendValue::DestinationAlpha) => GL_ONE_MINUS_DST_ALPHA,
+            BlendFactor::SourceAlphaSaturate => GL_SRC_ALPHA_SATURATE,
+        }
+    }
+}
+
+impl From<StencilOp> for GLenum {
+    fn from(op: StencilOp) -> Self {
+        match op {
+            StencilOp::Keep => GL_KEEP,
+            StencilOp::Zero => GL_ZERO,
+            StencilOp::Replace => GL_REPLACE,
+            StencilOp::IncrementClamp => GL_INCR,
+            StencilOp::DecrementClamp => GL_DECR,
+            StencilOp::Invert => GL_INVERT,
+            StencilOp::IncrementWrap => GL_INCR_WRAP,
+            StencilOp::DecrementWrap => GL_DECR_WRAP,
+        }
+    }
+}
+
+impl From<CompareFunc> for GLenum {
+    fn from(cf: CompareFunc) -> Self {
+        match cf {
+            CompareFunc::Always => GL_ALWAYS,
+            CompareFunc::Never => GL_NEVER,
+            CompareFunc::Less => GL_LESS,
+            CompareFunc::Equal => GL_EQUAL,
+            CompareFunc::LessOrEqual => GL_LEQUAL,
+            CompareFunc::Greater => GL_GREATER,
+            CompareFunc::NotEqual => GL_NOTEQUAL,
+            CompareFunc::GreaterOrEqual => GL_GEQUAL,
         }
     }
 }
@@ -114,22 +170,20 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
 
         Texture {
-            texture,
-            width: params.width,
-            height: params.height,
-            format: params.format,
+            raw: texture,
+            params,
         }
     }
 
     pub fn delete(&self) {
         unsafe {
-            glDeleteTextures(1, &self.texture as *const _);
+            glDeleteTextures(1, &self.raw as *const _);
         }
     }
 
     pub fn set_filter(&self, ctx: &mut GlContext, filter: FilterMode) {
         ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.texture);
+        ctx.cache.bind_texture(0, self.raw);
 
         let filter = match filter {
             FilterMode::Nearest => GL_NEAREST,
@@ -144,7 +198,7 @@ impl Texture {
 
     pub fn set_wrap(&self, ctx: &mut GlContext, wrap: TextureWrap) {
         ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.texture);
+        ctx.cache.bind_texture(0, self.raw);
         let wrap = match wrap {
             TextureWrap::Repeat => GL_REPEAT,
             TextureWrap::Mirror => GL_MIRRORED_REPEAT,
@@ -161,18 +215,18 @@ impl Texture {
     pub fn resize(&mut self, ctx: &mut GlContext, width: u32, height: u32, bytes: Option<&[u8]>) {
         ctx.cache.store_texture_binding(0);
 
-        let (internal_format, format, pixel_type) = self.format.into();
+        let (internal_format, format, pixel_type) = self.params.format.into();
 
-        self.width = width;
-        self.height = height;
+        self.params.width = width;
+        self.params.height = height;
 
         unsafe {
             glTexImage2D(
                 GL_TEXTURE_2D,
                 0,
                 internal_format as i32,
-                self.width as i32,
-                self.height as i32,
+                self.params.width as i32,
+                self.params.height as i32,
                 0,
                 format,
                 pixel_type,
@@ -196,20 +250,20 @@ impl Texture {
         bytes: &[u8],
     ) {
         assert_eq!(self.size(width as _, height as _), bytes.len());
-        assert!(x_offset + width <= self.width as _);
-        assert!(y_offset + height <= self.height as _);
+        assert!(x_offset + width <= self.params.width as _);
+        assert!(y_offset + height <= self.params.height as _);
 
         ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.texture);
+        ctx.cache.bind_texture(0, self.raw);
 
-        let (_, format, pixel_type) = self.format.into();
+        let (_, format, pixel_type) = self.params.format.into();
 
         unsafe {
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
 
             if cfg!(not(target_arch = "wasm32")) {
                 // if not WASM
-                if self.format == TextureFormat::Alpha {
+                if self.params.format == TextureFormat::Alpha {
                     // if alpha miniquad texture, the value on non-WASM is stored in red channel
                     // swizzle red -> alpha
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
@@ -237,7 +291,7 @@ impl Texture {
 
     /// Read texture data into CPU memory
     pub fn read_pixels(&self, bytes: &mut [u8]) {
-        let (_, format, pixel_type) = self.format.into();
+        let (_, format, pixel_type) = self.params.format.into();
 
         let mut fbo = 0;
         unsafe {
@@ -249,15 +303,15 @@ impl Texture {
                 gl::GL_FRAMEBUFFER,
                 gl::GL_COLOR_ATTACHMENT0,
                 gl::GL_TEXTURE_2D,
-                self.texture,
+                self.raw,
                 0,
             );
 
             glReadPixels(
                 0,
                 0,
-                self.width as _,
-                self.height as _,
+                self.params.width as _,
+                self.params.height as _,
                 format,
                 pixel_type,
                 bytes.as_mut_ptr() as _,
@@ -270,7 +324,7 @@ impl Texture {
 
     #[inline]
     fn size(&self, width: u32, height: u32) -> usize {
-        self.format.size(width, height) as usize
+        self.params.format.size(width, height) as usize
     }
 }
 
@@ -659,9 +713,9 @@ impl RenderingBackend for GlContext {
         let t = self.textures[texture.0];
         t.update_texture_part(self, x_offset, y_offset, width, height, bytes);
     }
-    fn texture_size(&self, texture: TextureId) -> (u32, u32) {
+    fn texture_params(&self, texture: TextureId) -> TextureParams {
         let texture = self.textures[texture.0];
-        (texture.width as _, texture.height as _)
+        texture.params
     }
     fn new_render_pass(
         &mut self,
@@ -677,7 +731,7 @@ impl RenderingBackend for GlContext {
                 GL_FRAMEBUFFER,
                 GL_COLOR_ATTACHMENT0,
                 GL_TEXTURE_2D,
-                self.textures[color_img.0].texture,
+                self.textures[color_img.0].raw,
                 0,
             );
             if let Some(depth_img) = depth_img {
@@ -685,7 +739,7 @@ impl RenderingBackend for GlContext {
                     GL_FRAMEBUFFER,
                     GL_DEPTH_ATTACHMENT,
                     GL_TEXTURE_2D,
-                    self.textures[depth_img.0].texture,
+                    self.textures[depth_img.0].raw,
                     0,
                 );
             }
@@ -993,7 +1047,7 @@ impl RenderingBackend for GlContext {
             if let Some(gl_loc) = shader_image.gl_loc {
                 unsafe {
                     self.cache
-                        .bind_texture(n, self.textures[bindings_image.0].texture);
+                        .bind_texture(n, self.textures[bindings_image.0].raw);
                     glUniform1i(gl_loc, n as i32);
                 }
             }
@@ -1162,8 +1216,8 @@ impl RenderingBackend for GlContext {
                 let pass = &self.passes[pass.0];
                 (
                     pass.gl_fb,
-                    self.textures[pass.texture.0].width as i32,
-                    self.textures[pass.texture.0].height as i32,
+                    self.textures[pass.texture.0].params.width as i32,
+                    self.textures[pass.texture.0].params.height as i32,
                 )
             }
         };
