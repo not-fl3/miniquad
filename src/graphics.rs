@@ -889,7 +889,7 @@ impl ElapsedQuery {
 }
 
 /// A vtable-erased generic argument.
-/// Basically, the same thing as fn f<U>(a: &U), but
+/// Basically, the same thing as `fn f<U>(a: &U)`, but
 /// trait-object friendly.
 pub struct Arg<'a> {
     ptr: *const std::ffi::c_void,
@@ -912,7 +912,7 @@ impl<'a> BufferSource<'a> {
     /// types are not supported.
     ///
     /// For vertex buffers ff the type is not yet known, only total byte size,
-    /// it is OK to use empty::<u8>(byte_size);
+    /// it is OK to use `empty::<u8>(byte_size);`
     pub fn empty<T>(size: usize) -> BufferSource<'a> {
         let element_size = std::mem::size_of::<T>();
         BufferSource::Empty {
