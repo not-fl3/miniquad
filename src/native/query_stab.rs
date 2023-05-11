@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::gl::{GLenum, GLint, GLuint, GLuint64};
+use crate::native::gl::{GLenum, GLint, GLuint, GLuint64};
 
 pub const GL_TIME_ELAPSED: u32 = 35007;
 

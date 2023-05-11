@@ -1,12 +1,25 @@
 use std::ffi::CString;
 
-mod cache;
-
-use cache::*;
-
 use crate::{native::gl::*, window};
 
+mod cache;
+
 use super::*;
+use cache::*;
+
+/// Raw OpenGL bindings
+/// Highly unsafe, some of the functions could be missing due to incompatible GL version
+/// or all of them might be missing alltogether if rendering context is not a GL one.
+pub mod raw_gl {
+    use super::*;
+
+    #[doc(inline)]
+    pub use crate::native::gl::*;
+
+    pub fn texture_format_into_gl(format: TextureFormat) -> (GLenum, GLenum, GLenum) {
+        format.into()
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Buffer {
@@ -717,6 +730,11 @@ impl RenderingBackend for GlContext {
         let texture = self.textures[texture.0];
         texture.params
     }
+    unsafe fn texture_raw_id(&self, texture: TextureId) -> RawId {
+        let texture = self.textures[texture.0];
+        RawId::OpenGl(texture.raw)
+    }
+
     fn new_render_pass(
         &mut self,
         color_img: TextureId,

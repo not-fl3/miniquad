@@ -8,6 +8,8 @@ use std::{error::Error, fmt::Display};
 
 mod gl;
 
+pub use gl::raw_gl;
+
 #[cfg(target_vendor = "apple")]
 mod metal;
 
@@ -948,6 +950,11 @@ pub struct ShaderSource<'a> {
     pub metal_shader: Option<&'a str>,
 }
 
+pub enum RawId {
+    OpenGl(crate::native::gl::GLuint),
+    Metal(*mut objc::runtime::Object),
+}
+
 pub trait RenderingBackend {
     fn new_shader(
         &mut self,
@@ -989,6 +996,10 @@ pub trait RenderingBackend {
         let params = self.texture_params(texture);
         (params.width, params.height)
     }
+
+    /// Get OpenGL's GLuint texture ID or metals ObjcId
+    unsafe fn texture_raw_id(&self, texture: TextureId) -> RawId;
+
     /// Update whole texture content
     /// bytes should be width * height * 4 size - non rgba8 textures are not supported yet anyway
     fn texture_update(&mut self, texture: TextureId, bytes: &[u8]) {

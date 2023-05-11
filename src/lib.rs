@@ -14,8 +14,6 @@ pub use graphics::*;
 
 mod default_icon;
 
-pub use native::{gl, NativeDisplay};
-
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn now() -> f64 {
@@ -37,9 +35,9 @@ pub mod date {
 
 use std::cell::RefCell;
 thread_local! {
-    static NATIVE_DISPLAY: RefCell<Option<fn (&mut dyn FnMut(&mut dyn crate::NativeDisplay))>> = RefCell::new(None);
+    static NATIVE_DISPLAY: RefCell<Option<fn (&mut dyn FnMut(&mut dyn crate::native::NativeDisplay))>> = RefCell::new(None);
 }
-pub(crate) fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+pub(crate) fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::native::NativeDisplay)) {
     NATIVE_DISPLAY.with(|d| (d.borrow().as_ref().unwrap())(f))
 }
 

@@ -383,6 +383,11 @@ impl RenderingBackend for MetalContext {
         let texture = &self.textures[texture.0];
         texture.params
     }
+    unsafe fn texture_raw_id(&self, texture: TextureId) -> RawId {
+        let texture = &self.textures[texture.0];
+        RawId::Metal(texture.texture)
+    }
+
     fn clear(
         &mut self,
         color: Option<(f32, f32, f32, f32)>,

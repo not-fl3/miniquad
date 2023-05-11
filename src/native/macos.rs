@@ -40,7 +40,7 @@ mod tl_display {
         static DISPLAY: RefCell<Option<MacosDisplay>> = RefCell::new(None);
     }
 
-    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::native::NativeDisplay)) {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
             let d = d.as_mut().unwrap();
