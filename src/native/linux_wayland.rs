@@ -272,34 +272,36 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
     width: i32,
     height: i32,
     _states: *mut wl_array,
-) -> () {
+) {
     assert!(!data.is_null());
-    let payload: &mut WaylandPayload = &mut *(data as *mut _);
-    let display = &mut payload.display;
 
     if width != 0 && height != 0 {
-        let (egl_w, egl_h) = if display.decorations.is_some() {
-            // Otherwise window will resize iteself on sway
-            // I have no idea why
-            (
-                width - decorations::Decorations::WIDTH * 2,
-                height - decorations::Decorations::BAR_HEIGHT - decorations::Decorations::WIDTH,
-            )
-        } else {
-            (width, height)
-        };
-        (display.egl.wl_egl_window_resize)(display.egl_window, egl_w, egl_h, 0, 0);
+        let payload: &mut WaylandPayload = &mut *(data as *mut _);
 
-        display.data.screen_width = width;
-        display.data.screen_height = height;
+        {
+            let display = &mut payload.display;
 
-        if let Some(ref decorations) = display.decorations {
-            decorations.resize(&mut display.client, width, height);
+            let (egl_w, egl_h) = if display.decorations.is_some() {
+                // Otherwise window will resize iteself on sway
+                // I have no idea why
+                (
+                    width - decorations::Decorations::WIDTH * 2,
+                    height - decorations::Decorations::BAR_HEIGHT - decorations::Decorations::WIDTH,
+                )
+            } else {
+                (width, height)
+            };
+            (display.egl.wl_egl_window_resize)(display.egl_window, egl_w, egl_h, 0, 0);
+
+            display.data.screen_width = width;
+            display.data.screen_height = height;
+
+            if let Some(ref decorations) = display.decorations {
+                decorations.resize(&mut display.client, width, height);
+            }
         }
-
-        drop(display);
-        if let (mut context, Some(event_handler)) = payload.context() {
-            event_handler.resize_event(&mut context, width as _, height as _);
+        if let (context, Some(event_handler)) = payload.context() {
+            event_handler.resize_event(context, width as _, height as _);
         }
     }
 }
@@ -487,15 +489,15 @@ where
         payload.display.data.screen_width = conf.window_width;
         payload.display.data.screen_height = conf.window_height;
 
-        let event_handler = (f.take().unwrap())(&mut payload.context().0);
+        let event_handler = (f.take().unwrap())(payload.context().0);
         payload.event_handler = Some(event_handler);
 
         while payload.display.closed == false {
             (payload.display.client.wl_display_dispatch_pending)(wdisplay);
 
-            let (mut context, event_handler) = payload.context();
-            event_handler.as_mut().unwrap().update(&mut context);
-            event_handler.as_mut().unwrap().draw(&mut context);
+            let (context, event_handler) = payload.context();
+            event_handler.as_mut().unwrap().update(context);
+            event_handler.as_mut().unwrap().draw(context);
 
             (libegl.eglSwapBuffers.unwrap())(egl_display, egl_surface);
         }

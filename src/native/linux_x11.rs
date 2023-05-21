@@ -169,7 +169,7 @@ impl X11Display {
             if !db.is_null() {
                 let mut value = XrmValue {
                     size: 0,
-                    addr: 0 as *mut libc::c_char,
+                    addr: std::ptr::null_mut::<libc::c_char>(),
                 };
                 let mut type_ = std::ptr::null_mut();
                 if (self.libx11.XrmGetResource)(
@@ -179,10 +179,10 @@ impl X11Display {
                     &mut type_,
                     &mut value,
                 ) != 0
+                    && !type_.is_null()
+                    && libc::strcmp(type_, b"String\x00".as_ptr() as _) == 0
                 {
-                    if !type_.is_null() && libc::strcmp(type_, b"String\x00".as_ptr() as _) == 0 {
-                        self.dpi_scale = libc::atof(value.addr as *const _) as f32 / 96.0;
-                    }
+                    self.dpi_scale = libc::atof(value.addr as *const _) as f32 / 96.0;
                 }
                 (self.libx11.XrmDestroyDatabase)(db);
             }
