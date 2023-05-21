@@ -19,6 +19,11 @@ fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
     Some(location)
 }
 
+fn align_up_to(alignment: i32, value: i64)->i64 {
+    let alignment = alignment as i64;
+    (value + alignment - 1) / alignment * alignment
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum UniformType {
     /// One 32-bit wide float (equivalent to `f32`)
@@ -1551,6 +1556,8 @@ impl Pipeline {
         let mut buffer_cache: Vec<BufferCacheData> =
             vec![BufferCacheData::default(); buffer_layout.len()];
 
+        let mut biggest_element_size = 1;
+
         for VertexAttribute {
             format,
             buffer_index,
@@ -1563,12 +1570,22 @@ impl Pipeline {
                 .unwrap_or_else(|| panic!());
 
             if layout.stride == 0 {
-                cache.stride += format.byte_len();
+                let element_size = format.byte_len() / format.size(); 
+                biggest_element_size = biggest_element_size.max(element_size);
+                cache.stride = (align_up_to(element_size, cache.stride as _) + format.byte_len() as i64) as i32;
             } else {
                 cache.stride = layout.stride;
             }
             // WebGL 1 limitation
             assert!(cache.stride <= 255);
+        }
+
+        // round struct size to the biggest element
+        for (i, layout) in buffer_layout.iter().enumerate() {
+            if layout.stride == 0 {
+                let mut cache = buffer_cache.get_mut(i).unwrap_or_else(|| panic!());
+                cache.stride = align_up_to(biggest_element_size, cache.stride as _) as i32;
+            }
         }
 
         let program = ctx.shaders[shader.0].program;
