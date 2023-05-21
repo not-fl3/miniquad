@@ -1,6 +1,6 @@
 use miniquad::*;
 
-use glam::{vec3, Mat4};
+use glam::{vec3, Mat4, EulerRot};
 
 struct Stage {
     post_processing_pipeline: Pipeline,
@@ -209,7 +209,7 @@ impl EventHandler for Stage {
 
         self.rx += 0.01;
         self.ry += 0.03;
-        let model = Mat4::from_rotation_ypr(self.rx, self.ry, 0.);
+        let model = Mat4::from_euler(EulerRot::YXZ, self.rx, self.ry, 0.);
 
         let (w, h) = ctx.screen_size();
         // the offscreen pass, rendering an rotating, untextured cube into a render target image

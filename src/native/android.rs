@@ -355,7 +355,7 @@ pub unsafe fn attach_jni_env() -> *mut ndk_sys::JNIEnv {
 
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
 where
-    F: 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler>,
+    F: 'static + FnOnce(&mut crate::Context) -> Box<dyn EventHandler> + Send,
 {
     {
         use std::ffi::CString;
