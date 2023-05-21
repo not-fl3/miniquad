@@ -1,4 +1,6 @@
-use std::{ffi::CString, mem};
+use std::ffi::CStr;
+use std::ffi::CString;
+use std::mem;
 
 mod texture;
 
@@ -2000,5 +2002,38 @@ impl ElapsedQuery {
     pub fn delete(&mut self) {
         unsafe { glDeleteQueries(1, &mut self.gl_query) }
         self.gl_query = 0;
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct Info {
+    pub vendor: String,
+    pub renderer: String,
+    pub version: String,
+}
+
+impl Info {
+    pub fn get_info() -> Info {
+        Info {
+            vendor: unsafe {
+                CStr::from_ptr(glGetString(GL_VENDOR) as *const i8)
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            },
+            renderer: unsafe {
+                CStr::from_ptr(glGetString(GL_RENDERER) as *const i8)
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            },
+            version: unsafe {
+                CStr::from_ptr(glGetString(GL_VERSION) as *const i8)
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            },
+        }
     }
 }

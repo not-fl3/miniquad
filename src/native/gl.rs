@@ -245,6 +245,7 @@ pub const GL_TIME_ELAPSED: u32 = 35007;
 pub const GL_QUERY_RESULT: u32 = 34918;
 pub const GL_QUERY_RESULT_AVAILABLE: u32 = 34919;
 pub const GL_VENDOR: u32 = 0x1F00;
+pub const GL_RENDERER: u32 = 0x1F01;
 pub const GL_VERSION: u32 = 0x1F02;
 
 pub const WGL_NUMBER_PIXEL_FORMATS_ARB: u32 = 0x2000;
