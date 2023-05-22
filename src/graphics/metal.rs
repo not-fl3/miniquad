@@ -347,7 +347,6 @@ impl MetalContext {
 }
 
 impl RenderingBackend for MetalContext {
-    fn delete_render_pass(&mut self, _render_pass: RenderPass) {}
     fn buffer_size(&mut self, buffer: BufferId) -> usize {
         let buffer = &self.buffers[buffer.0];
         buffer.size
@@ -411,7 +410,7 @@ impl RenderingBackend for MetalContext {
         unsafe {
             let render_pass_desc =
                 msg_send_![class!(MTLRenderPassDescriptor), renderPassDescriptor];
-            //msg_send_![render_pass_desc, retain];
+            msg_send_![render_pass_desc, retain];
             assert!(!render_pass_desc.is_null());
             let color_texture = self.textures[color_img.0].texture;
             let color_attachment = msg_send_![msg_send_![render_pass_desc, colorAttachments], objectAtIndexedSubscript:0];
@@ -440,6 +439,13 @@ impl RenderingBackend for MetalContext {
             self.passes.push(pass);
 
             RenderPass(self.passes.len() - 1)
+        }
+    }
+
+    fn delete_render_pass(&mut self, render_pass: RenderPass) {
+        let render_pass = &self.passes[render_pass.0];
+        unsafe {
+            msg_send_![render_pass.render_pass_desc, release];
         }
     }
 
