@@ -1006,7 +1006,13 @@ impl RenderingBackend for GlContext {
 
         if matches!(buffer.buffer_type, BufferType::IndexBuffer) {
             assert!(buffer.index_type.is_some());
-            assert!(buffer.index_type.unwrap() == data.element_size as u32);
+
+            match data.element_size {
+                1 => assert_eq!(buffer.index_type.unwrap(), GL_UNSIGNED_BYTE),
+                2 => assert_eq!(buffer.index_type.unwrap(), GL_UNSIGNED_SHORT),
+                4 => assert_eq!(buffer.index_type.unwrap(), GL_UNSIGNED_INT),
+                _ => panic!("unsupported index buffer type"),
+            }
         };
 
         let size = data.size;
