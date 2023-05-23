@@ -369,6 +369,23 @@ impl RenderingBackend for MetalContext {
     fn apply_scissor_rect(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
     fn texture_set_filter(&mut self, _texture: TextureId, _filter: FilterMode) {}
     fn texture_set_wrap(&mut self, _texture: TextureId, _wrap: TextureWrap) {}
+    fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {
+        let mut texture = &mut self.textures[texture.0];
+
+        let filter = match filter {
+            FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
+            FilterMode::Linear => MTLSamplerMinMagFilter::Linear,
+        };
+
+        texture.sampler = unsafe {
+            let sampler_dsc = msg_send_![class!(MTLSamplerDescriptor), new];
+
+            msg_send_![sampler_dsc, setMinFilter: filter];
+            msg_send_![sampler_dsc, setMagFilter: filter];
+
+            msg_send_![self.device, newSamplerStateWithDescriptor: sampler_dsc]
+        };
+    }
     fn texture_resize(
         &mut self,
         _texture: TextureId,
