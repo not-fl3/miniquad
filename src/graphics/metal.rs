@@ -369,6 +369,18 @@ impl RenderingBackend for MetalContext {
     fn apply_scissor_rect(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
     fn texture_set_filter(&mut self, _texture: TextureId, _filter: FilterMode) {}
     fn texture_set_wrap(&mut self, _texture: TextureId, _wrap: TextureWrap) {}
+    fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
+        assert!(self.render_encoder.is_some());
+
+        let (_, screen_height) = crate::window::screen_size();
+        let r = MTLScissorRect {
+            x: x as _,
+            y: (screen_height as i32 - (y + h)) as u64,
+            width: w as _,
+            height: h as _,
+        };
+        unsafe { msg_send_![self.render_encoder.unwrap(), setScissorRect: r] };
+    }
     fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {
         let mut texture = &mut self.textures[texture.0];
 

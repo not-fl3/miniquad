@@ -805,6 +805,15 @@ unsafe impl Encode for NSDragOperation {
     }
 }
 
+#[repr(C)]
+#[derive(Copy, Debug, Clone)]
+pub struct MTLScissorRect {
+    pub x: u64,
+    pub y: u64,
+    pub width: u64,
+    pub height: u64,
+}
+
 // CORE AUDIO
 
 pub const kAudioUnitManufacturer_Apple: u32 = 1634758764;
