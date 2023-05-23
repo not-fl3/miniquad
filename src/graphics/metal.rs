@@ -366,9 +366,6 @@ impl RenderingBackend for MetalContext {
         }
     }
     fn apply_viewport(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
-    fn apply_scissor_rect(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
-    fn texture_set_filter(&mut self, _texture: TextureId, _filter: FilterMode) {}
-    fn texture_set_wrap(&mut self, _texture: TextureId, _wrap: TextureWrap) {}
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
         assert!(self.render_encoder.is_some());
 
@@ -398,6 +395,9 @@ impl RenderingBackend for MetalContext {
             msg_send_![self.device, newSamplerStateWithDescriptor: sampler_dsc]
         };
     }
+    fn texture_set_wrap(&mut self, _texture: TextureId, _wrap: TextureWrap) {
+        unimplemented!()
+    }
     fn texture_resize(
         &mut self,
         _texture: TextureId,
@@ -405,8 +405,11 @@ impl RenderingBackend for MetalContext {
         _height: u32,
         _bytes: Option<&[u8]>,
     ) {
+        unimplemented!()
     }
-    fn texture_read_pixels(&mut self, _texture: TextureId, _bytes: &mut [u8]) {}
+    fn texture_read_pixels(&mut self, _texture: TextureId, _bytes: &mut [u8]) {
+        unimplemented!()
+    }
     fn texture_params(&self, texture: TextureId) -> TextureParams {
         let texture = &self.textures[texture.0];
         texture.params
