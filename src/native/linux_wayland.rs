@@ -76,14 +76,14 @@ impl crate::native::NativeDisplay for WaylandDisplay {
 }
 pub mod tl_display {
     use super::*;
-    use crate::NATIVE_DISPLAY;
+    use crate::{native::NativeDisplay, NATIVE_DISPLAY};
     use std::cell::RefCell;
 
     thread_local! {
         static DISPLAY: RefCell<Option<WaylandDisplay>> = RefCell::new(None);
     }
 
-    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+    fn with_native_display(f: &mut dyn FnMut(&mut dyn NativeDisplay)) {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
             let d = d.as_mut().unwrap();

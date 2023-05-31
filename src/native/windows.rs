@@ -52,7 +52,7 @@ pub(crate) struct WindowsDisplay {
 
 mod tl_display {
     use super::*;
-    use crate::NATIVE_DISPLAY;
+    use crate::{native::NativeDisplay, NATIVE_DISPLAY};
 
     use std::cell::RefCell;
 
@@ -60,10 +60,10 @@ mod tl_display {
         static DISPLAY: RefCell<Option<WindowsDisplay>> = RefCell::new(None);
     }
 
-    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+    fn with_native_display(f: &mut dyn FnMut(&mut dyn NativeDisplay)) {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
-            let mut d = d.as_mut().unwrap();
+            let d = d.as_mut().unwrap();
             f(&mut *d);
         })
     }
@@ -71,7 +71,7 @@ mod tl_display {
     pub(super) fn with<T>(mut f: impl FnMut(&mut WindowsDisplay) -> T) -> T {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
-            let mut d = d.as_mut().unwrap();
+            let d = d.as_mut().unwrap();
             f(&mut *d)
         })
     }
@@ -304,7 +304,7 @@ unsafe extern "system" fn win32_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let mut display_ptr: isize;
+    let display_ptr: isize;
 
     #[cfg(target_arch = "x86_64")]
     {

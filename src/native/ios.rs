@@ -85,7 +85,7 @@ impl crate::native::NativeDisplay for IosDisplay {
 }
 mod tl_display {
     use super::*;
-    use crate::NATIVE_DISPLAY;
+    use crate::{native::NativeDisplay, NATIVE_DISPLAY};
 
     use std::cell::RefCell;
 
@@ -93,7 +93,7 @@ mod tl_display {
         static DISPLAY: RefCell<Option<IosDisplay>> = RefCell::new(None);
     }
 
-    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::NativeDisplay)) {
+    fn with_native_display(f: &mut dyn FnMut(&mut dyn NativeDisplay)) {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
             let d = d.as_mut().unwrap();
@@ -549,10 +549,8 @@ fn define_textfield_dlg() -> *const Class {
                                     Default::default(),
                                     false,
                                 );
-                                event_handler.key_up_event(
-                                    crate::event::KeyCode::Enter,
-                                    Default::default(),
-                                );
+                                event_handler
+                                    .key_up_event(crate::event::KeyCode::Enter, Default::default());
                             }
                         }
                         32 => {
@@ -563,10 +561,8 @@ fn define_textfield_dlg() -> *const Class {
                                     Default::default(),
                                     false,
                                 );
-                                event_handler.key_up_event(
-                                    crate::event::KeyCode::Space,
-                                    Default::default(),
-                                );
+                                event_handler
+                                    .key_up_event(crate::event::KeyCode::Space, Default::default());
                             }
                         }
                         _ => {}
@@ -579,10 +575,8 @@ fn define_textfield_dlg() -> *const Class {
                         Default::default(),
                         false,
                     );
-                    event_handler.key_up_event(
-                        crate::event::KeyCode::Backspace,
-                        Default::default(),
-                    );
+                    event_handler
+                        .key_up_event(crate::event::KeyCode::Backspace, Default::default());
                 }
             }
         }

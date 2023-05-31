@@ -952,6 +952,7 @@ pub struct ShaderSource<'a> {
 
 pub enum RawId {
     OpenGl(crate::native::gl::GLuint),
+    #[cfg(target_vendor = "apple")]
     Metal(*mut objc::runtime::Object),
 }
 
