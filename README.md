@@ -12,16 +12,12 @@ Miniquad aims to provide a graphics abstraction that works the same way on any p
 
 ## Supported Platforms
 
-* Windows, OpenGL 3;
-* Linux, OpenGL 3, GLES 2, GLES 3;
-* macOS, OpenGL 3;
-* iOS, GLES 2, GLES 3;
+* Windows, OpenGL 3, OpenGL 2.2;
+* Linux, OpenGL 2.2, OpenGL 3, GLES 2, GLES 3;
+* macOS, OpenGL 3, Metal;
+* iOS, GLES 2, GLES 3, Metal;
 * WASM, WebGL 1 - tested on iOS Safari, Firefox, Chrome;
 * Android, GLES 2, GLES 3.
-
-## Not Supported, but Desirable Platforms
-
-* Metal. For both macOS and iOS metal rendering backend next to opengl one is highly desirable. But I just dont have any macOS capable hardware to start working on it :/
 
 ## Examples
 
