@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use crate::{native::gl::*, window};
+use crate::window;
 
 mod cache;
 

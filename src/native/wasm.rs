@@ -102,15 +102,15 @@ mod tl_display {
     fn with_native_display(f: &mut dyn FnMut(&mut dyn NativeDisplay)) {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
-            let mut d = d.as_mut().unwrap();
+            let d = d.as_mut().unwrap();
             f(&mut *d);
         })
     }
 
-    pub(super) fn with<T>(mut f: impl FnOnce(&mut WasmDisplay) -> T) -> T {
+    pub(super) fn with<T>(f: impl FnOnce(&mut WasmDisplay) -> T) -> T {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
-            let mut d = d.as_mut().unwrap();
+            let d = d.as_mut().unwrap();
             f(&mut *d)
         })
     }
@@ -121,8 +121,8 @@ mod tl_display {
     }
 }
 
-static mut cursor_icon: crate::CursorIcon = crate::CursorIcon::Default;
-static mut cursor_shown: bool = true;
+static mut CURSOR_ICON: crate::CursorIcon = crate::CursorIcon::Default;
+static mut CURSOR_SHOW: bool = true;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -211,26 +211,26 @@ extern "C" {
 }
 
 unsafe fn show_mouse(shown: bool) {
-    if shown != cursor_shown {
-        cursor_shown = shown;
+    if shown != CURSOR_SHOW {
+        CURSOR_SHOW = shown;
         update_cursor();
     }
 }
 
 unsafe fn set_mouse_cursor(icon: crate::CursorIcon) {
-    if cursor_icon != icon {
-        cursor_icon = icon;
-        if cursor_shown {
+    if CURSOR_ICON != icon {
+        CURSOR_ICON = icon;
+        if CURSOR_SHOW {
             update_cursor();
         }
     }
 }
 
 pub unsafe fn update_cursor() {
-    let css_name = if !cursor_shown {
+    let css_name = if !CURSOR_SHOW {
         "none"
     } else {
-        match cursor_icon {
+        match CURSOR_ICON {
             crate::CursorIcon::Default => "default",
             crate::CursorIcon::Help => "help",
             crate::CursorIcon::Pointer => "pointer",
@@ -378,18 +378,13 @@ pub extern "C" fn touch(phase: u32, id: u32, x: f32, y: f32) {
 }
 
 #[no_mangle]
-pub extern "C" fn focus(hasFocus: bool) {
-    with(|globals| {
-        if hasFocus {
-            globals.event_handler.window_restored_event(
-                globals.context.with_display(&mut globals.display)
-            );
+pub extern "C" fn focus(has_focus: bool) {
+    tl_event_handler(|event_handler| {
+        if has_focus {
+            event_handler.window_restored_event();
         } else {
-            globals.event_handler.window_minimized_event(
-                globals.context.with_display(&mut globals.display)
-            );
+            event_handler.window_minimized_event();
         }
-        
     });
 }
 

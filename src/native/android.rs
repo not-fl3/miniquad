@@ -1,12 +1,14 @@
 use crate::{
     event::{EventHandler, KeyCode, TouchPhase},
-    native::egl::{self, LibEgl},
-    native::NativeDisplay,
+    native::{
+        egl::{self, LibEgl},
+        NativeDisplay,
+    },
 };
 
 use std::{cell::RefCell, sync::mpsc, thread};
 
-pub use crate::gl::{self, *};
+pub use crate::native::gl::{self, *};
 
 mod keycodes;
 
@@ -103,7 +105,7 @@ mod tl_display {
     fn with_native_display(f: &mut dyn FnMut(&mut dyn NativeDisplay)) {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
-            let mut d = d.as_mut().unwrap();
+            let d = d.as_mut().unwrap();
             f(&mut *d);
         })
     }
@@ -111,7 +113,7 @@ mod tl_display {
     pub(super) fn with<T>(mut f: impl FnMut(&mut AndroidDisplay) -> T) -> T {
         DISPLAY.with(|d| {
             let mut d = d.borrow_mut();
-            let mut d = d.as_mut().unwrap();
+            let d = d.as_mut().unwrap();
             f(&mut *d)
         })
     }
