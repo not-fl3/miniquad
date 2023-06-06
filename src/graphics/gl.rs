@@ -1290,13 +1290,19 @@ impl RenderingBackend for GlContext {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let primitive_type = pip.params.primitive_type.into();
         let index_type = self.cache.index_type.expect("Unset index buffer type");
+        let element_size = match index_type {
+            GL_UNSIGNED_BYTE => 1,
+            GL_UNSIGNED_SHORT => 2,
+            GL_UNSIGNED_INT => 4,
+            _ => panic!("Unsupported index buffer type!"),
+        };
 
         unsafe {
             glDrawElementsInstanced(
                 primitive_type,
                 num_elements,
                 index_type.into(),
-                (index_type as i32 * base_element) as *mut _,
+                (element_size * base_element) as *mut _,
                 num_instances,
             );
         }
