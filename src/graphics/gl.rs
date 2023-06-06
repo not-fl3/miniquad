@@ -26,7 +26,9 @@ struct Buffer {
     gl_buf: GLuint,
     buffer_type: BufferType,
     size: usize,
-    // 1, 2, 4
+    // Dimension of the indices for this buffer,
+    // used only as a type argument for glDrawElements and can be
+    // 1, 2 or 4
     index_type: Option<u32>,
 }
 
@@ -965,9 +967,11 @@ impl RenderingBackend for GlContext {
             BufferSource::Empty { size, element_size } => (*size, *element_size),
         };
         let index_type = match type_ {
-            BufferType::IndexBuffer if element_size == 1 => Some(GL_UNSIGNED_BYTE),
-            BufferType::IndexBuffer if element_size == 2 => Some(GL_UNSIGNED_SHORT),
-            BufferType::IndexBuffer if element_size == 4 => Some(GL_UNSIGNED_INT),
+            BufferType::IndexBuffer
+                if element_size == 1 || element_size == 2 || element_size == 4 =>
+            {
+                Some(element_size as u32)
+            }
             BufferType::IndexBuffer => panic!("unsupported index buffer dimension"),
             BufferType::VertexBuffer => None,
         };
@@ -1006,13 +1010,7 @@ impl RenderingBackend for GlContext {
 
         if matches!(buffer.buffer_type, BufferType::IndexBuffer) {
             assert!(buffer.index_type.is_some());
-
-            match data.element_size {
-                1 => assert_eq!(buffer.index_type.unwrap(), GL_UNSIGNED_BYTE),
-                2 => assert_eq!(buffer.index_type.unwrap(), GL_UNSIGNED_SHORT),
-                4 => assert_eq!(buffer.index_type.unwrap(), GL_UNSIGNED_INT),
-                _ => panic!("unsupported index buffer type"),
-            }
+            assert!(data.element_size as u32 == buffer.index_type.unwrap());
         };
 
         let size = data.size;
@@ -1290,19 +1288,18 @@ impl RenderingBackend for GlContext {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let primitive_type = pip.params.primitive_type.into();
         let index_type = self.cache.index_type.expect("Unset index buffer type");
-        let element_size = match index_type {
-            GL_UNSIGNED_BYTE => 1,
-            GL_UNSIGNED_SHORT => 2,
-            GL_UNSIGNED_INT => 4,
-            _ => panic!("Unsupported index buffer type!"),
-        };
 
         unsafe {
             glDrawElementsInstanced(
                 primitive_type,
                 num_elements,
-                index_type.into(),
-                (element_size * base_element) as *mut _,
+                match index_type {
+                    1 => GL_UNSIGNED_BYTE,
+                    2 => GL_UNSIGNED_SHORT,
+                    4 => GL_UNSIGNED_INT,
+                    _ => panic!("Unsupported index buffer type!"),
+                },
+                (index_type as i32 * base_element) as *mut _,
                 num_instances,
             );
         }
