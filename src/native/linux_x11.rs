@@ -1,5 +1,4 @@
-//!
-//! Spiritual successor of an X11 part of https://github.com/floooh/sokol/blob/master/sokol_app.h
+// Spiritual successor of an X11 part of https://github.com/floooh/sokol/blob/master/sokol_app.h
 
 mod clipboard;
 mod glx;
@@ -18,8 +17,6 @@ use crate::{
 use libx11::*;
 
 use std::collections::HashMap;
-
-pub struct Dummy;
 
 // part of the X11 display that lives in thread local and is accessible from miniquad::window
 pub struct X11Display {

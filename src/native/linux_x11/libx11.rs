@@ -1,4 +1,4 @@
-#![allow(non_snake_case, non_upper_case_globals)]
+#![allow(non_snake_case, non_upper_case_globals, dead_code)]
 pub use X_h::*;
 pub use Xlib_h::*;
 pub use Xresource_h::*;
