@@ -1,4 +1,4 @@
-#![allow(non_snake_case)]
+#![allow(non_snake_case, dead_code)]
 
 use crate::native::gl::{GLenum, GLint, GLuint, GLuint64};
 

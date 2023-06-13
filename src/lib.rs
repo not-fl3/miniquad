@@ -4,8 +4,7 @@ pub mod conf;
 mod event;
 pub mod fs;
 pub mod graphics;
-
-pub mod native;
+mod native;
 
 #[cfg(feature = "log-impl")]
 pub mod log;
@@ -15,6 +14,8 @@ pub use event::*;
 pub use graphics::*;
 
 mod default_icon;
+
+pub use native::gl;
 
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
