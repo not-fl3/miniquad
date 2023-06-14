@@ -1044,6 +1044,8 @@ impl RenderingBackend for GlContext {
     /// this function is not marked as unsafe
     fn delete_buffer(&mut self, buffer: BufferId) {
         unsafe { glDeleteBuffers(1, &self.buffers[buffer.0].gl_buf as *const _) }
+        self.cache.clear_buffer_bindings();
+        self.cache.clear_vertex_attributes();
     }
 
     /// Set a new viewport rectangle.
