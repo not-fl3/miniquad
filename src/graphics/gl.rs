@@ -24,6 +24,7 @@ pub mod raw_gl {
 #[derive(Clone, Copy, Debug)]
 struct Buffer {
     gl_buf: GLuint,
+    gl_usage: GLuint,
     buffer_type: BufferType,
     size: usize,
     // Dimension of the indices for this buffer,
@@ -997,6 +998,7 @@ impl RenderingBackend for GlContext {
 
         let buffer = Buffer {
             gl_buf,
+            gl_usage,
             buffer_type: type_,
             size,
             index_type,
@@ -1020,13 +1022,15 @@ impl RenderingBackend for GlContext {
 
         let size = data.size;
 
-        assert!(size <= buffer.size);
-
         let gl_target = gl_buffer_target(&buffer.buffer_type);
         self.cache.store_buffer_binding(gl_target);
         self.cache
             .bind_buffer(gl_target, buffer.gl_buf, buffer.index_type);
-        unsafe { glBufferSubData(gl_target, 0, size as _, data.ptr as _) };
+        if size > buffer.size {
+            unsafe { glBufferData(gl_target, size as _, data.ptr as _, buffer.gl_usage) };
+        } else {
+            unsafe { glBufferSubData(gl_target, 0, size as _, data.ptr as _) };
+        }
         self.cache.restore_buffer_binding(gl_target);
     }
 
