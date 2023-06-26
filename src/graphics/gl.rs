@@ -176,16 +176,21 @@ impl Texture {
                 },
             );
 
-            // TODO: filter as i32 doesn't work anymore
             let wrap = match params.wrap {
                 TextureWrap::Repeat => GL_REPEAT,
                 TextureWrap::Mirror => GL_MIRRORED_REPEAT,
                 TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
             };
+
+            let filter = match params.filter {
+                FilterMode::Nearest => GL_NEAREST,
+                FilterMode::Linear => GL_LINEAR,
+            };
+
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap as i32);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter as i32);
         }
         ctx.cache.restore_texture_binding(0);
 
