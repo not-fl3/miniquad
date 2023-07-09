@@ -773,14 +773,15 @@ impl WindowsDisplay {
         if GetClientRect(hwnd, &mut rect as *mut _ as _) != 0 {
             let window_width = ((rect.right - rect.left) as f32 / self.window_scale) as i32;
             let window_height = ((rect.bottom - rect.top) as f32 / self.window_scale) as i32;
-            let fb_width = (window_width as f32 * self.content_scale) as i32;
-            let fb_height = (window_height as f32 * self.content_scale) as i32;
+
+            // prevent a framebuffer size of 0 when window is minimized
+            let fb_width = ((window_width as f32 * self.content_scale) as i32).max(1);
+            let fb_height = ((window_height as f32 * self.content_scale) as i32).max(1);
             if fb_width != self.display_data.screen_width
                 || fb_height != self.display_data.screen_height
             {
-                // prevent a framebuffer size of 0 when window is minimized
-                self.display_data.screen_width = fb_width.max(1);
-                self.display_data.screen_height = fb_height.max(1);
+                self.display_data.screen_width = fb_width;
+                self.display_data.screen_height = fb_height;
                 return true;
             }
         } else {
