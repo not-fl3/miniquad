@@ -84,7 +84,7 @@ And then use the following .html to load .wasm:
 </head>
 
 <body>
-    <canvas id="glcanvas" tabindex='1'></canvas>
+    <canvas id="glcanvas" tabindex='1' oncontextmenu="return false;"></canvas>
     <!-- Minified and statically hosted version of https://github.com/not-fl3/miniquad/blob/master/native/sapp-wasm/js/gl.js -->
     <script src="https://not-fl3.github.io/miniquad-samples/gl.js"></script>
     <script>load("quad.wasm");</script> <!-- Your compiled wasm file -->
