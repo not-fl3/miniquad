@@ -365,11 +365,11 @@ impl Default for TextureParams {
     }
 }
 
-#[derive(Clone, Debug, Copy, PartialEq)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub struct ShaderId(usize);
 
-#[derive(Clone, Debug, Copy, PartialEq)]
-pub struct TextureId(pub usize);
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+pub struct TextureId(usize);
 
 /// Pixel arithmetic description for blending operations.
 /// Will be used in an equation:
@@ -666,7 +666,8 @@ pub struct PipelineParams {
     pub primitive_type: PrimitiveType,
 }
 
-#[derive(Copy, Clone, Debug)]
+// TODO(next major version bump): should be PipelineId
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Pipeline(usize);
 
 impl Default for PipelineParams {
@@ -733,7 +734,7 @@ fn gl_usage(usage: &BufferUsage) -> GLenum {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct BufferId(usize);
 
 /// `ElapsedQuery` is used to measure duration of GPU operations.
@@ -944,12 +945,15 @@ impl<'a> UniformsSource<'a> {
         })
     }
 }
+
+#[derive(Default, Debug)]
 pub struct ShaderSource<'a> {
     pub glsl_vertex: Option<&'a str>,
     pub glsl_fragment: Option<&'a str>,
     pub metal_shader: Option<&'a str>,
 }
 
+#[derive(Debug)]
 pub enum RawId {
     OpenGl(crate::native::gl::GLuint),
     #[cfg(target_vendor = "apple")]
