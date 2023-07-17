@@ -103,6 +103,10 @@ pub struct Platform {
     /// TODO: Make it works on web, on web it should make a transparent HTML5 canvas
     /// TODO: Document(and check) what does it actually mean on android. Transparent window?
     pub framebuffer_alpha: bool,
+
+    /// Whether to draw the default window decorations on Wayland.
+    /// Only works when using the Wayland backend.
+    pub wayland_use_fallback_decorations: bool,
 }
 
 impl Default for Platform {
@@ -113,6 +117,7 @@ impl Default for Platform {
             linux_backend: LinuxBackend::X11Only,
             apple_gfx_api: AppleGfxApi::OpenGl,
             framebuffer_alpha: false,
+            wayland_use_fallback_decorations: true,
         }
     }
 }
