@@ -384,7 +384,7 @@ where
         assert!(display.subcompositor.is_null() == false);
         assert!(display.seat.is_null() == false);
 
-        if display.decoration_manager.is_null() {
+        if display.decoration_manager.is_null() && conf.platform.wayland_use_fallback_decorations {
             eprintln!("Decoration manager not found, will draw fallback decorations");
         }
 
@@ -492,7 +492,7 @@ where
                 extensions::xdg_decoration::zxdg_toplevel_decoration_v1::set_mode,
                 extensions::xdg_decoration::ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
             );
-        } else {
+        } else if conf.platform.wayland_use_fallback_decorations {
             display.decorations = Some(decorations::Decorations::new(
                 &mut display,
                 conf.window_width,
