@@ -171,17 +171,35 @@ impl crate::native::NativeDisplay for WindowsDisplay {
             final_new_height = (rect.bottom - rect.top) as _;
         }
 
-        unsafe {
-            SetWindowPos(
-                self.wnd,
-                HWND_TOP,
-                x,
-                y,
-                final_new_width as i32,
-                final_new_height as i32,
-                SWP_NOMOVE,
-            )
-        };
+        // TODO: find a better solution!
+        // miniquad assumes that wndproc is only triggered from main loop, from
+        // DispatchMessage
+        // which makes it safe to borrow NativeDisplay in the wndproc.
+        // Well.. this assumption was wrong.
+        // When new message is coming to a window, WinAPI check the thread. If the
+        // messages comes from the same thread - it calls the handler directly, without
+        // waiting for a queue processing.
+        // This makes impossible to call basically any winapi function directly
+        // from miniquad's event handlers.
+        // This was a miniquad's architecture mistake, something should be changed,
+        // but to makes things works - here is this fix.
+        struct SendHack<T>(*mut T);
+        unsafe impl<T> Send for SendHack<T> {}
+        unsafe impl<T> Sync for SendHack<T> {}
+        let wnd = SendHack(self.wnd);
+        std::thread::spawn(move || {
+            unsafe {
+                SetWindowPos(
+                    wnd.0,
+                    HWND_TOP,
+                    x,
+                    y,
+                    final_new_width as i32,
+                    final_new_height as i32,
+                    SWP_NOMOVE,
+                )
+            };
+        });
     }
 
     fn set_fullscreen(&mut self, fullscreen: bool) {
@@ -196,26 +214,42 @@ impl crate::native::NativeDisplay for WindowsDisplay {
             SetWindowLong(self.wnd, GWL_STYLE, win_style as _);
 
             if self.fullscreen {
-                SetWindowPos(
-                    self.wnd,
-                    HWND_TOP,
-                    0,
-                    0,
-                    GetSystemMetrics(SM_CXSCREEN),
-                    GetSystemMetrics(SM_CYSCREEN),
-                    SWP_FRAMECHANGED,
-                );
+                struct SendHack<T>(*mut T);
+                unsafe impl<T> Send for SendHack<T> {}
+                unsafe impl<T> Sync for SendHack<T> {}
+                let wnd = SendHack(self.wnd);
+                // check set_window_size for "why threads"
+                std::thread::spawn(move || {
+                    SetWindowPos(
+                        wnd.0,
+                        HWND_TOP,
+                        0,
+                        0,
+                        GetSystemMetrics(SM_CXSCREEN),
+                        GetSystemMetrics(SM_CYSCREEN),
+                        SWP_FRAMECHANGED ,
+                    );
+                });
             } else {
-                SetWindowPos(
-                    self.wnd,
-                    HWND_TOP,
-                    0,
-                    0,
-                    // this is probably not correct: with high dpi content_width and window_width are actually different..
-                    self.display_data.screen_width,
-                    self.display_data.screen_height,
-                    SWP_FRAMECHANGED,
-                );
+                let w = self.display_data.screen_width;
+                let h = self.display_data.screen_height;
+                struct SendHack<T>(*mut T);
+                unsafe impl<T> Send for SendHack<T> {}
+                unsafe impl<T> Sync for SendHack<T> {}
+                let wnd = SendHack(self.wnd);
+                // check set_window_size for "why threads"
+                std::thread::spawn(move || {
+                    SetWindowPos(
+                        wnd.0,
+                        HWND_TOP,
+                        0,
+                        0,
+                        // this is probably not correct: with high dpi content_width and window_width are actually different..
+                        w,
+                        h,
+                        SWP_FRAMECHANGED,
+                    );
+                });
             }
 
             ShowWindow(self.wnd, SW_SHOW);
@@ -899,6 +933,7 @@ where
                     DispatchMessageW(&mut msg as *mut _ as _);
                 }
             }
+
             p.event_handler.update();
             p.event_handler.draw();
 
