@@ -158,9 +158,86 @@ static mut SEAT_LISTENER: wl_seat_listener = wl_seat_listener {
 };
 
 unsafe extern "C" fn seat_handle_capabilities(
-    _data: *mut std::ffi::c_void,
-    _seat: *mut wl_seat,
-    _caps: wl_seat_capability,
+    data: *mut std::ffi::c_void,
+    seat: *mut wl_seat,
+    caps: wl_seat_capability,
+) {
+    let display: &mut WaylandDisplay = &mut *(data as *mut _);
+
+    if caps & wl_seat_capability_WL_SEAT_CAPABILITY_KEYBOARD != 0 {
+        // struct wl_keyboard *keyboard = wl_seat_get_keyboard(seat);
+        let id: *mut wl_proxy = wl_request_constructor!(
+            display.client,
+            seat,
+            WL_SEAT_GET_KEYBOARD,
+            display.client.wl_keyboard_interface
+        );
+        assert!(!id.is_null());
+        // wl_keyboard_add_listener(keyboard, &keyboard_listener, NULL);
+        (display.client.wl_proxy_add_listener)(
+            id,
+            &KEYBOARD_LISTENER as *const _ as _,
+            data,
+        );
+    }
+}
+
+static mut KEYBOARD_LISTENER: wl_keyboard_listener = wl_keyboard_listener {
+    keymap: Some(keyboard_handle_keymap),
+    enter: Some(keyboard_handle_enter),
+    leave: Some(keyboard_handle_leave),
+    key: Some(keyboard_handle_key),
+    modifiers: Some(keyboard_handle_modifiers),
+    repeat_info: Some(keyboard_handle_repeat_info),
+};
+
+unsafe extern "C" fn keyboard_handle_keymap(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_keyboard: *mut wl_keyboard,
+    _format: u32,
+    _fd: i32,
+    _size: u32,
+) {
+}
+unsafe extern "C" fn keyboard_handle_enter(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_keyboard: *mut wl_keyboard,
+    _serial: u32,
+    _surface: *mut wl_surface,
+    _keys: *mut wl_array,
+) {
+}
+unsafe extern "C" fn keyboard_handle_leave(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_keyboard: *mut wl_keyboard,
+    _serial: u32,
+    _surface: *mut wl_surface,
+) {
+}
+unsafe extern "C" fn keyboard_handle_key(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_keyboard: *mut wl_keyboard,
+    _serial: u32,
+    _time: u32,
+    _key: u32,
+    _state: u32,
+) {
+}
+unsafe extern "C" fn keyboard_handle_modifiers(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_keyboard: *mut wl_keyboard,
+    _serial: u32,
+    _mods_depressed: u32,
+    _mods_latched: u32,
+    _mods_locked: u32,
+    _group: u32,
+) {
+}
+unsafe extern "C" fn keyboard_handle_repeat_info(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_keyboard: *mut wl_keyboard,
+    _rate: i32,
+    _delay: i32,
 ) {
 }
 
