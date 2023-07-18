@@ -191,9 +191,9 @@ impl crate::native::NativeDisplay for WindowsDisplay {
 
         unsafe {
             #[cfg(target_arch = "x86_64")]
-            SetWindowLongPtrA(self.wnd, GWLP_USERDATA, win_style as _);
+            SetWindowLongPtrA(self.wnd, GWL_STYLE, win_style as _);
             #[cfg(target_arch = "i686")]
-            SetWindowLong(self.wnd, GWLP_USERDATA, win_style as _);
+            SetWindowLong(self.wnd, GWL_STYLE, win_style as _);
 
             if self.fullscreen {
                 SetWindowPos(
