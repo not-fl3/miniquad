@@ -412,6 +412,66 @@ pub struct wl_seat_listener {
     >,
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct wl_keyboard_listener {
+    pub keymap: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_keyboard: *mut wl_keyboard,
+            format: u32,
+            fd: i32,
+            size: u32,
+        ),
+    >,
+    pub enter: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_keyboard: *mut wl_keyboard,
+            serial: u32,
+            surface: *mut wl_surface,
+            keys: *mut wl_array,
+        ),
+    >,
+    pub leave: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_keyboard: *mut wl_keyboard,
+            serial: u32,
+            surface: *mut wl_surface,
+        ),
+    >,
+    pub key: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_keyboard: *mut wl_keyboard,
+            serial: u32,
+            time: u32,
+            key: u32,
+            state: u32,
+        ),
+    >,
+    pub modifiers: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_keyboard: *mut wl_keyboard,
+            serial: u32,
+            mods_depressed: u32,
+            mods_latched: u32,
+            mods_locked: u32,
+            group: u32,
+        ),
+    >,
+    pub repeat_info: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_keyboard: *mut wl_keyboard,
+            rate: i32,
+            delay: i32,
+        ),
+    >,
+}
+
 pub type wl_display_connect =
     unsafe extern "C" fn(name: *const ::std::os::raw::c_char) -> *mut wl_display;
 pub type wl_proxy_destroy = unsafe extern "C" fn(proxy: *mut wl_proxy);
@@ -460,6 +520,7 @@ pub struct LibWaylandClient {
     pub wl_seat_interface: *mut wl_interface,
     pub wl_shm_interface: *mut wl_interface,
     pub wl_shm_pool_interface: *mut wl_interface,
+    pub wl_keyboard_interface: *mut wl_interface,
 }
 
 impl LibWaylandClient {
@@ -494,6 +555,7 @@ impl LibWaylandClient {
                 wl_seat_interface: module.get_symbol("wl_seat_interface").unwrap(),
                 wl_shm_interface: module.get_symbol("wl_shm_interface").unwrap(),
                 wl_shm_pool_interface: module.get_symbol("wl_shm_pool_interface").unwrap(),
+                wl_keyboard_interface: module.get_symbol("wl_keyboard_interface").unwrap(),
 
                 _module: std::rc::Rc::new(module),
             })
