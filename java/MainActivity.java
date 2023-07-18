@@ -5,6 +5,7 @@ import javax.microedition.khronos.opengles.GL10;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Build;
 import android.util.Log;
 
 import android.view.View;
@@ -244,18 +245,19 @@ public class MainActivity extends Activity {
                     if (fullscreen) {
                         getWindow().setFlags(LayoutParams.FLAG_LAYOUT_NO_LIMITS, LayoutParams.FLAG_LAYOUT_NO_LIMITS);
                         getWindow().getAttributes().layoutInDisplayCutoutMode = LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-                        // Android deprecate dsetSystemUiVisibility, but it is not clear
-                        // from the deprecation notes what exaclty we should do instead
-                        // hope this works! but just in case, left the old code in a comment below
-                        //int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-                        //decorView.setSystemUiVisibility(uiOptions);
-                        getWindow().setDecorFitsSystemWindows(false);
+                        if (Build.VERSION.SDK_INT >= 30) {
+                            getWindow().setDecorFitsSystemWindows(false);
+                        } else {
+                            int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+                            decorView.setSystemUiVisibility(uiOptions);
+                        }
                     }
                     else {
-                       // there might be a bug hidden here: setSystemUiVisibility was dealing with the bars
-                        // and setDecorFitsSystemWindows might not, needs some testing
-                        //decorView.setSystemUiVisibility(0);
-                        getWindow().setDecorFitsSystemWindows(true);
+                        if (Build.VERSION.SDK_INT >= 30) {
+                            getWindow().setDecorFitsSystemWindows(true);
+                        } else {
+                          decorView.setSystemUiVisibility(0);
+                        }
 
                     }
                 }
