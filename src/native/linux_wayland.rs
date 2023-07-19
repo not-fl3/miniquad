@@ -2,24 +2,30 @@
 
 mod libwayland_client;
 mod libwayland_egl;
+mod libxkbcommon;
 
 mod decorations;
 mod extensions;
+mod keycodes;
 mod shm;
 
 use libwayland_client::*;
 use libwayland_egl::*;
+use libxkbcommon::*;
 
 use crate::{
-    event::EventHandler,
+    event::{EventHandler, KeyCode, KeyMods},
     native::{egl, NativeDisplayData},
 };
+
+use std::collections::HashSet;
 
 pub struct WaylandDisplay {
     client: LibWaylandClient,
     // this is libwayland-egl.so, a library with ~4 functions
     // not the libEGL.so(which will be loaded, but not here)
     egl: LibWaylandEgl,
+    xkb: LibXkbCommon,
     compositor: *mut wl_compositor,
     subcompositor: *mut wl_subcompositor,
     xdg_toplevel: *mut extensions::xdg_shell::xdg_toplevel,
@@ -29,6 +35,9 @@ pub struct WaylandDisplay {
     viewporter: *mut extensions::viewporter::wp_viewporter,
     shm: *mut wl_shm,
     seat: *mut wl_seat,
+    xkb_context: *mut xkb_context,
+    keymap: *mut xkb_keymap,
+    xkb_state: *mut xkb_state,
 
     egl_window: *mut wl_egl_window,
     pointer: *mut wl_pointer,
@@ -174,13 +183,15 @@ unsafe extern "C" fn seat_handle_capabilities(
         );
         assert!(!id.is_null());
         // wl_keyboard_add_listener(keyboard, &keyboard_listener, NULL);
-        (display.client.wl_proxy_add_listener)(
-            id,
-            &KEYBOARD_LISTENER as *const _ as _,
-            data,
-        );
+        (display.client.wl_proxy_add_listener)(id, &KEYBOARD_LISTENER as *const _ as _, data);
     }
 }
+
+enum WaylandEvent {
+    KeyboardKey(KeyCode, bool),
+}
+
+static mut EVENTS: Vec<WaylandEvent> = Vec::new();
 
 static mut KEYBOARD_LISTENER: wl_keyboard_listener = wl_keyboard_listener {
     keymap: Some(keyboard_handle_keymap),
@@ -192,12 +203,33 @@ static mut KEYBOARD_LISTENER: wl_keyboard_listener = wl_keyboard_listener {
 };
 
 unsafe extern "C" fn keyboard_handle_keymap(
-    _data: *mut ::std::os::raw::c_void,
+    data: *mut ::std::os::raw::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _format: u32,
-    _fd: i32,
-    _size: u32,
+    fd: i32,
+    size: u32,
 ) {
+    let display: &mut WaylandDisplay = &mut *(data as *mut _);
+    let map_shm = libc::mmap(
+        std::ptr::null_mut::<std::ffi::c_void>(),
+        size as usize,
+        libc::PROT_READ,
+        libc::MAP_PRIVATE,
+        fd,
+        0,
+    );
+    assert!(map_shm != libc::MAP_FAILED);
+    (display.xkb.xkb_keymap_unref)(display.keymap);
+    display.keymap = (display.xkb.xkb_keymap_new_from_string)(
+        display.xkb_context,
+        map_shm as *mut libc::FILE,
+        1,
+        0,
+    );
+    libc::munmap(map_shm, size as usize);
+    libc::close(fd);
+    (display.xkb.xkb_state_unref)(display.xkb_state);
+    display.xkb_state = (display.xkb.xkb_state_new)(display.keymap);
 }
 unsafe extern "C" fn keyboard_handle_enter(
     _data: *mut ::std::os::raw::c_void,
@@ -215,23 +247,39 @@ unsafe extern "C" fn keyboard_handle_leave(
 ) {
 }
 unsafe extern "C" fn keyboard_handle_key(
-    _data: *mut ::std::os::raw::c_void,
+    data: *mut ::std::os::raw::c_void,
     _wl_keyboard: *mut wl_keyboard,
-    _serial: u32,
-    _time: u32,
-    _key: u32,
-    _state: u32,
+    serial: u32,
+    time: u32,
+    key: u32,
+    state: u32,
 ) {
+    let display: &mut WaylandDisplay = &mut *(data as *mut _);
+    // https://wayland-book.com/seat/keyboard.html
+    // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
+    let keysym = (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
+    let keycode = keycodes::translate(keysym);
+    EVENTS.push(WaylandEvent::KeyboardKey(keycode, state == 1));
 }
 unsafe extern "C" fn keyboard_handle_modifiers(
-    _data: *mut ::std::os::raw::c_void,
+    data: *mut ::std::os::raw::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _serial: u32,
-    _mods_depressed: u32,
-    _mods_latched: u32,
-    _mods_locked: u32,
-    _group: u32,
+    mods_depressed: u32,
+    mods_latched: u32,
+    mods_locked: u32,
+    group: u32,
 ) {
+    let display: &mut WaylandDisplay = &mut *(data as *mut _);
+    (display.xkb.xkb_state_update_mask)(
+        display.xkb_state,
+        mods_depressed,
+        mods_latched,
+        mods_locked,
+        0,
+        0,
+        group,
+    );
 }
 unsafe extern "C" fn keyboard_handle_repeat_info(
     _data: *mut ::std::os::raw::c_void,
@@ -408,6 +456,7 @@ where
     unsafe {
         let client = LibWaylandClient::try_load()?;
         let egl = LibWaylandEgl::try_load()?;
+        let xkb = LibXkbCommon::try_load()?;
 
         let wdisplay = (client.wl_display_connect)(std::ptr::null_mut());
         if wdisplay.is_null() {
@@ -428,9 +477,12 @@ where
             global_remove: Some(registry_remove_object),
         };
 
+        let xkb_context = (xkb.xkb_context_new)(0);
+
         let mut display = WaylandDisplay {
             client: client.clone(),
             egl,
+            xkb,
             compositor: std::ptr::null_mut(),
             subcompositor: std::ptr::null_mut(),
             xdg_toplevel: std::ptr::null_mut(),
@@ -440,6 +492,9 @@ where
             viewporter: std::ptr::null_mut(),
             shm: std::ptr::null_mut(),
             seat: std::ptr::null_mut(),
+            xkb_context,
+            keymap: std::ptr::null_mut(),
+            xkb_state: std::ptr::null_mut(),
             egl_window: std::ptr::null_mut(),
             pointer: std::ptr::null_mut(),
             keyboard: std::ptr::null_mut(),
@@ -460,6 +515,8 @@ where
         assert!(display.xdg_wm_base.is_null() == false);
         assert!(display.subcompositor.is_null() == false);
         assert!(display.seat.is_null() == false);
+        //assert!(display.keymap.is_null() == false);
+        //assert!(display.xkb_state.is_null() == false);
 
         if display.decoration_manager.is_null() && conf.platform.wayland_use_fallback_decorations {
             eprintln!("Decoration manager not found, will draw fallback decorations");
@@ -584,10 +641,44 @@ where
         let event_handler = (f.take().unwrap())();
         payload.event_handler = Some(event_handler);
 
+        let mut keymods = KeyMods {
+            shift: false,
+            ctrl: false,
+            alt: false,
+            logo: false,
+        };
+        let mut repeated_keys: HashSet<KeyCode> = HashSet::new();
+
         while tl_display::with(|d| d.closed == false) {
             (client.wl_display_dispatch_pending)(wdisplay);
 
             if let Some(ref mut event_handler) = payload.event_handler {
+                for keycode in &repeated_keys {
+                    event_handler.key_down_event(keycode.clone(), keymods, true);
+                }
+
+                for event in EVENTS.drain(..) {
+                    match event {
+                        WaylandEvent::KeyboardKey(keycode, state) => {
+                            match keycode {
+                                KeyCode::LeftShift | KeyCode::RightShift => keymods.shift = state,
+                                KeyCode::LeftControl | KeyCode::RightControl => keymods.ctrl = state,
+                                KeyCode::LeftAlt | KeyCode::RightAlt => keymods.alt = state,
+                                KeyCode::LeftSuper | KeyCode::RightSuper => keymods.logo = state,
+                                _ => {}
+                            }
+
+                            if state {
+                                event_handler.key_down_event(keycode, keymods, false);
+                                repeated_keys.insert(keycode);
+                            } else {
+                                event_handler.key_up_event(keycode, keymods);
+                                repeated_keys.remove(&keycode);
+                            }
+                        }
+                    }
+                }
+
                 event_handler.update();
                 event_handler.draw();
             }
