@@ -14,11 +14,15 @@ use libwayland_egl::*;
 use libxkbcommon::*;
 
 use crate::{
-    event::{EventHandler, KeyCode, KeyMods},
+    event::{EventHandler, KeyCode, KeyMods, MouseButton},
     native::{egl, NativeDisplayData},
 };
 
 use std::collections::HashSet;
+
+fn wl_fixed_to_double(f: i32) -> f32 {
+    (f as f32) / 256.0
+}
 
 pub struct WaylandDisplay {
     client: LibWaylandClient,
@@ -173,6 +177,19 @@ unsafe extern "C" fn seat_handle_capabilities(
 ) {
     let display: &mut WaylandDisplay = &mut *(data as *mut _);
 
+    if caps & wl_seat_capability_WL_SEAT_CAPABILITY_POINTER != 0 {
+        // struct wl_pointer *pointer = wl_seat_get_pointer (seat);
+        let id: *mut wl_proxy = wl_request_constructor!(
+            display.client,
+            seat,
+            WL_SEAT_GET_POINTER,
+            display.client.wl_pointer_interface
+        );
+        assert!(!id.is_null());
+        // wl_pointer_add_listener (pointer, &pointer_listener, NULL);
+        (display.client.wl_proxy_add_listener)(id, &POINTER_LISTENER as *const _ as _, data);
+    }
+
     if caps & wl_seat_capability_WL_SEAT_CAPABILITY_KEYBOARD != 0 {
         // struct wl_keyboard *keyboard = wl_seat_get_keyboard(seat);
         let id: *mut wl_proxy = wl_request_constructor!(
@@ -189,6 +206,9 @@ unsafe extern "C" fn seat_handle_capabilities(
 
 enum WaylandEvent {
     KeyboardKey(KeyCode, bool),
+    PointerMotion(f32, f32),
+    PointerButton(MouseButton, bool),
+    PointerAxis(f32, f32),
 }
 
 static mut EVENTS: Vec<WaylandEvent> = Vec::new();
@@ -249,8 +269,8 @@ unsafe extern "C" fn keyboard_handle_leave(
 unsafe extern "C" fn keyboard_handle_key(
     data: *mut ::std::os::raw::c_void,
     _wl_keyboard: *mut wl_keyboard,
-    serial: u32,
-    time: u32,
+    _serial: u32,
+    _time: u32,
     key: u32,
     state: u32,
 ) {
@@ -286,6 +306,126 @@ unsafe extern "C" fn keyboard_handle_repeat_info(
     _wl_keyboard: *mut wl_keyboard,
     _rate: i32,
     _delay: i32,
+) {
+}
+
+static mut POINTER_LISTENER: wl_pointer_listener = wl_pointer_listener {
+    enter: Some(pointer_handle_enter),
+    leave: Some(pointer_handle_leave),
+    motion: Some(pointer_handle_motion),
+    button: Some(pointer_handle_button),
+    axis: Some(pointer_handle_axis),
+    frame: Some(pointer_handle_frame),
+    axis_source: Some(pointer_handle_axis_source),
+    axis_stop: Some(pointer_handle_axis_stop),
+    axis_discrete: Some(pointer_handle_axis_discrete),
+    axis_value120: Some(pointer_handle_axis_value120),
+    axis_relative_direction: Some(pointer_handle_axis_relative_direction),
+};
+
+unsafe extern "C" fn pointer_handle_enter(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _serial: u32,
+    _surface: *mut wl_surface,
+    _surface_x: i32,
+    _surface_y: i32,
+) {
+}
+unsafe extern "C" fn pointer_handle_leave(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _serial: u32,
+    _surface: *mut wl_surface,
+) {
+}
+unsafe extern "C" fn pointer_handle_motion(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _time: u32,
+    surface_x: i32,
+    surface_y: i32,
+) {
+    // From wl_fixed_to_double(), it simply divides by 256
+    let (x, y) = (wl_fixed_to_double(surface_x), wl_fixed_to_double(surface_y));
+    EVENTS.push(WaylandEvent::PointerMotion(x, y));
+}
+unsafe extern "C" fn pointer_handle_button(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _serial: u32,
+    _time: u32,
+    button: u32,
+    state: u32,
+) {
+	// The code is defined in the kernel's linux/input-event-codes.h header file, e.g. BTN_LEFT
+    let button = match button {
+        272 => MouseButton::Left,
+        273 => MouseButton::Right,
+        274 => MouseButton::Middle,
+        _ => MouseButton::Unknown
+    };
+    EVENTS.push(WaylandEvent::PointerButton(button, state == 1));
+}
+unsafe extern "C" fn pointer_handle_axis(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _time: u32,
+    axis: u32,
+    value: i32,
+) {
+    let mut value = wl_fixed_to_double(value);
+    // Normalize the value to {-1, 0, 1}
+    value /= value.abs();
+
+    // https://wayland-book.com/seat/pointer.html
+    if axis == 0 {
+        // Vertical scroll
+        // Wayland defines the direction differently to miniquad so lets flip it
+        value = -value;
+        EVENTS.push(WaylandEvent::PointerAxis(0.0, value));
+    } else if axis == 1 {
+        // Horizontal scroll
+        EVENTS.push(WaylandEvent::PointerAxis(value, 0.0));
+    }
+}
+unsafe extern "C" fn pointer_handle_frame(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+) {
+}
+unsafe extern "C" fn pointer_handle_axis_source(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _axis_source: u32,
+) {
+}
+unsafe extern "C" fn pointer_handle_axis_stop(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _time: u32,
+    _axis: u32,
+) {
+}
+unsafe extern "C" fn pointer_handle_axis_discrete(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _axis: u32,
+    _discrete: i32,
+) {
+}
+unsafe extern "C" fn pointer_handle_axis_value120(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _axis: u32,
+    _value120: i32,
+) {
+}
+unsafe extern "C" fn pointer_handle_axis_relative_direction(
+    _data: *mut ::std::os::raw::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _axis: u32,
+    _direction: u32,
 ) {
 }
 
@@ -648,6 +788,7 @@ where
             logo: false,
         };
         let mut repeated_keys: HashSet<KeyCode> = HashSet::new();
+        let (mut last_mouse_x, mut last_mouse_y) = (0.0, 0.0);
 
         while tl_display::with(|d| d.closed == false) {
             (client.wl_display_dispatch_pending)(wdisplay);
@@ -662,7 +803,9 @@ where
                         WaylandEvent::KeyboardKey(keycode, state) => {
                             match keycode {
                                 KeyCode::LeftShift | KeyCode::RightShift => keymods.shift = state,
-                                KeyCode::LeftControl | KeyCode::RightControl => keymods.ctrl = state,
+                                KeyCode::LeftControl | KeyCode::RightControl => {
+                                    keymods.ctrl = state
+                                }
                                 KeyCode::LeftAlt | KeyCode::RightAlt => keymods.alt = state,
                                 KeyCode::LeftSuper | KeyCode::RightSuper => keymods.logo = state,
                                 _ => {}
@@ -676,6 +819,18 @@ where
                                 repeated_keys.remove(&keycode);
                             }
                         }
+                        WaylandEvent::PointerMotion(x, y) => {
+                            event_handler.mouse_motion_event(x, y);
+                            (last_mouse_x, last_mouse_y) = (x, y);
+                        }
+                        WaylandEvent::PointerButton(button, state) => {
+                            if state {
+                                event_handler.mouse_button_down_event(button, last_mouse_x, last_mouse_y);
+                            } else {
+                                event_handler.mouse_button_up_event(button, last_mouse_x, last_mouse_y);
+                            }
+                        }
+                        WaylandEvent::PointerAxis(x, y) => event_handler.mouse_wheel_event(x, y),
                     }
                 }
 
