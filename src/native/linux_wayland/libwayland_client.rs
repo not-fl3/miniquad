@@ -472,6 +472,99 @@ pub struct wl_keyboard_listener {
     >,
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct wl_pointer_listener {
+    pub enter: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_pointer: *mut wl_pointer,
+            serial: u32,
+            surface: *mut wl_surface,
+            surface_x: i32,
+            surface_y: i32,
+        ),
+    >,
+    pub leave: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_pointer: *mut wl_pointer,
+            serial: u32,
+            surface: *mut wl_surface,
+        ),
+    >,
+    pub motion: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_pointer: *mut wl_pointer,
+            time: u32,
+            surface_x: i32,
+            surface_y: i32,
+        ),
+    >,
+    pub button: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_pointer: *mut wl_pointer,
+            serial: u32,
+            time: u32,
+            button: u32,
+            state: u32,
+        ),
+    >,
+    pub axis: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_pointer: *mut wl_pointer,
+            time: u32,
+            axis: u32,
+            value: i32,
+        ),
+    >,
+    pub frame: ::std::option::Option<
+        unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer),
+    >,
+    pub axis_source: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_pointer: *mut wl_pointer,
+            axis_source: u32,
+        ),
+    >,
+    pub axis_stop: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_pointer: *mut wl_pointer,
+            time: u32,
+            axis: u32,
+        ),
+    >,
+    pub axis_discrete: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_pointer: *mut wl_pointer,
+            axis: u32,
+            discrete: i32,
+        ),
+    >,
+    pub axis_value120: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_pointer: *mut wl_pointer,
+            axis: u32,
+            value120: i32,
+        ),
+    >,
+    pub axis_relative_direction: ::std::option::Option<
+        unsafe extern "C" fn(
+            data: *mut ::std::os::raw::c_void,
+            wl_pointer: *mut wl_pointer,
+            axis: u32,
+            direction: u32,
+        ),
+    >,
+}
+
 pub type wl_display_connect =
     unsafe extern "C" fn(name: *const ::std::os::raw::c_char) -> *mut wl_display;
 pub type wl_proxy_destroy = unsafe extern "C" fn(proxy: *mut wl_proxy);
@@ -521,6 +614,7 @@ pub struct LibWaylandClient {
     pub wl_shm_interface: *mut wl_interface,
     pub wl_shm_pool_interface: *mut wl_interface,
     pub wl_keyboard_interface: *mut wl_interface,
+    pub wl_pointer_interface: *mut wl_interface,
 }
 
 impl LibWaylandClient {
@@ -556,6 +650,7 @@ impl LibWaylandClient {
                 wl_shm_interface: module.get_symbol("wl_shm_interface").unwrap(),
                 wl_shm_pool_interface: module.get_symbol("wl_shm_pool_interface").unwrap(),
                 wl_keyboard_interface: module.get_symbol("wl_keyboard_interface").unwrap(),
+                wl_pointer_interface: module.get_symbol("wl_pointer_interface").unwrap(),
 
                 _module: std::rc::Rc::new(module),
             })
