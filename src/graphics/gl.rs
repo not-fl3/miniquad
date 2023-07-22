@@ -391,6 +391,8 @@ impl Textures {
                 raw: texture,
                 params: Default::default(),
             },
+            #[cfg(target_vendor = "apple")]
+            TextureIdInner::Raw(RawId::Metal(..)) => panic!("Metal texture in OpenGL context!"),
             TextureIdInner::Managed(texture) => self.0[texture],
         }
     }

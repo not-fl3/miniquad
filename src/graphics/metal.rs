@@ -240,17 +240,36 @@ struct PipelineInternal {
     //params: PipelineParams,
 }
 
+#[derive(Clone, Copy)]
 struct Texture {
     texture: ObjcId,
     sampler: ObjcId,
     params: TextureParams,
 }
+struct Textures(Vec<Texture>);
 
+impl Textures {
+    fn get(&self, texture: TextureId) -> Texture {
+        match texture.0 {
+            TextureIdInner::Raw(RawId::Metal(texture)) => unimplemented!(),
+            TextureIdInner::Raw(RawId::OpenGl(_)) => panic!("Gl texture in Metal context!"),
+            TextureIdInner::Managed(texture) => self.0[texture],
+        }
+    }
+
+    fn get_mut(&mut self, texture: TextureId) -> &mut Texture {
+        match texture.0 {
+            TextureIdInner::Raw(RawId::Metal(texture)) => unimplemented!(),
+            TextureIdInner::Raw(RawId::OpenGl(_)) => panic!("Gl texture in Metal context!"),
+            TextureIdInner::Managed(texture) => &mut self.0[texture],
+        }
+    }
+}
 pub struct MetalContext {
     buffers: Vec<Buffer>,
     shaders: Vec<ShaderInternal>,
     pipelines: Vec<PipelineInternal>,
-    textures: Vec<Texture>,
+    textures: Textures,
     passes: Vec<RenderPassInternal>,
     command_queue: ObjcId,
     command_buffer: Option<ObjcId>,
@@ -334,7 +353,7 @@ impl MetalContext {
                 buffers: vec![],
                 shaders: vec![],
                 pipelines: vec![],
-                textures: vec![],
+                textures: Textures(Vec::new()),
                 passes: vec![],
                 index_buffer: None,
                 current_pipeline: None,
@@ -360,7 +379,7 @@ impl RenderingBackend for MetalContext {
         }
     }
     fn delete_texture(&mut self, texture: TextureId) {
-        let texture = &self.textures[texture.0];
+        let texture = self.textures.get(texture);
         unsafe {
             msg_send_![texture.texture, release];
         }
@@ -379,7 +398,7 @@ impl RenderingBackend for MetalContext {
         unsafe { msg_send_![self.render_encoder.unwrap(), setScissorRect: r] };
     }
     fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {
-        let mut texture = &mut self.textures[texture.0];
+        let texture = self.textures.get_mut(texture);
 
         let filter = match filter {
             FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
@@ -411,11 +430,11 @@ impl RenderingBackend for MetalContext {
         unimplemented!()
     }
     fn texture_params(&self, texture: TextureId) -> TextureParams {
-        let texture = &self.textures[texture.0];
+        let texture = self.textures.get(texture);
         texture.params
     }
     unsafe fn texture_raw_id(&self, texture: TextureId) -> RawId {
-        let texture = &self.textures[texture.0];
+        let texture = self.textures.get(texture);
         RawId::Metal(texture.texture)
     }
 
@@ -444,14 +463,14 @@ impl RenderingBackend for MetalContext {
                 msg_send_![class!(MTLRenderPassDescriptor), renderPassDescriptor];
             msg_send_![render_pass_desc, retain];
             assert!(!render_pass_desc.is_null());
-            let color_texture = self.textures[color_img.0].texture;
+            let color_texture = self.textures.get(color_img).texture;
             let color_attachment = msg_send_![msg_send_![render_pass_desc, colorAttachments], objectAtIndexedSubscript:0];
             msg_send_![color_attachment, setTexture: color_texture];
             msg_send_![color_attachment, setLoadAction: MTLLoadAction::Clear];
             msg_send_![color_attachment, setStoreAction: MTLStoreAction::Store];
 
             if let Some(depth_img) = depth_img {
-                let depth_texture = self.textures[depth_img.0].texture;
+                let depth_texture = self.textures.get(depth_img).texture;
 
                 let depth_attachment = msg_send_![render_pass_desc, depthAttachment];
                 msg_send_![depth_attachment, setTexture: depth_texture];
@@ -636,12 +655,12 @@ impl RenderingBackend for MetalContext {
             let sampler_state = msg_send_![self.device, newSamplerStateWithDescriptor: sampler_dsc];
             let raw_texture = msg_send_![self.device, newTextureWithDescriptor: descriptor];
             msg_send_![raw_texture, retain];
-            self.textures.push(Texture {
+            self.textures.0.push(Texture {
                 sampler: sampler_state,
                 texture: raw_texture,
                 params,
             });
-            TextureId(self.textures.len() - 1)
+            TextureId(TextureIdInner::Managed(self.textures.0.len() - 1))
         };
 
         if let Some(bytes) = bytes {
@@ -654,9 +673,6 @@ impl RenderingBackend for MetalContext {
         }
         texture
     }
-    fn new_texture_from_raw_id(&mut self, raw_id: RawId) -> TextureId {
-        unimplemented!()
-    }
 
     fn texture_update_part(
         &mut self,
@@ -667,7 +683,7 @@ impl RenderingBackend for MetalContext {
         height: i32,
         bytes: &[u8],
     ) {
-        let raw_texture = self.textures[texture.0].texture;
+        let raw_texture = self.textures.get(texture).texture;
         let region = MTLRegion {
             origin: MTLOrigin {
                 x: x_offset as u64,
@@ -918,7 +934,7 @@ impl RenderingBackend for MetalContext {
                 for (n, img) in bindings.images.iter().enumerate() {
                     let Texture {
                         sampler, texture, ..
-                    } = self.textures[img.0];
+                    } = self.textures.get(*img);
                     msg_send_![render_encoder, setFragmentSamplerState:sampler
                                atIndex:n
                     ];
@@ -999,8 +1015,8 @@ impl RenderingBackend for MetalContext {
                     let pass_internal = &self.passes[pass.0];
                     (
                         pass_internal.render_pass_desc,
-                        self.textures[pass_internal.texture.0].params.width as f64,
-                        self.textures[pass_internal.texture.0].params.height as f64,
+                        self.textures.get(pass_internal.texture).params.width as f64,
+                        self.textures.get(pass_internal.texture).params.height as f64,
                     )
                 }
             };
