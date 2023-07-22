@@ -18,6 +18,10 @@ fn main() {
             window_width: 1024,
             window_height: 768,
             fullscreen: true,
+            platform: conf::Platform {
+                linux_backend: conf::LinuxBackend::WaylandOnly,
+                ..Default::default()
+            },
             ..Default::default()
         },
         || {

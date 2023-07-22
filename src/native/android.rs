@@ -2,7 +2,7 @@ use crate::{
     event::{EventHandler, KeyCode, TouchPhase},
     native::{
         egl::{self, LibEgl},
-        NativeDisplay,
+        NativeDisplayData,
     },
 };
 
@@ -86,83 +86,6 @@ fn send_message(message: Message) {
 static mut ACTIVITY: ndk_sys::jobject = std::ptr::null_mut();
 static mut VM: *mut ndk_sys::JavaVM = std::ptr::null_mut();
 
-struct AndroidDisplay {
-    screen_width: f32,
-    screen_height: f32,
-    fullscreen: bool,
-}
-
-mod tl_display {
-    use super::*;
-    use crate::{native::NativeDisplay, NATIVE_DISPLAY};
-
-    use std::cell::RefCell;
-
-    thread_local! {
-        static DISPLAY: RefCell<Option<AndroidDisplay>> = RefCell::new(None);
-    }
-
-    fn with_native_display(f: &mut dyn FnMut(&mut dyn NativeDisplay)) {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d);
-        })
-    }
-
-    pub(super) fn with<T>(mut f: impl FnMut(&mut AndroidDisplay) -> T) -> T {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d)
-        })
-    }
-
-    pub(super) fn set_display(display: AndroidDisplay) {
-        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
-        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
-    }
-}
-
-impl NativeDisplay for AndroidDisplay {
-    fn screen_size(&self) -> (f32, f32) {
-        (self.screen_width as _, self.screen_height as _)
-    }
-    fn dpi_scale(&self) -> f32 {
-        1.
-    }
-    fn high_dpi(&self) -> bool {
-        true
-    }
-    fn order_quit(&mut self) {}
-    fn request_quit(&mut self) {}
-    fn cancel_quit(&mut self) {}
-    fn set_cursor_grab(&mut self, _grab: bool) {}
-    fn show_mouse(&mut self, _shown: bool) {}
-    fn set_mouse_cursor(&mut self, _cursor: crate::CursorIcon) {}
-    fn set_window_size(&mut self, _new_width: u32, _new_height: u32) {}
-    fn set_fullscreen(&mut self, fullscreen: bool) {
-        unsafe {
-            let env = attach_jni_env();
-            set_full_screen(env, fullscreen);
-        }
-        self.fullscreen = fullscreen;
-    }
-    fn clipboard_get(&mut self) -> Option<String> {
-        None
-    }
-    fn clipboard_set(&mut self, _data: &str) {}
-    fn show_keyboard(&mut self, show: bool) {
-        unsafe {
-            let env = attach_jni_env();
-            ndk_utils::call_void_method!(env, ACTIVITY, "showKeyboard", "(Z)V", show as i32);
-        }
-    }
-    fn as_any(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
-
 pub unsafe fn console_debug(msg: *const ::std::os::raw::c_char) {
     ndk_sys::__android_log_write(
         ndk_sys::android_LogPriority_ANDROID_LOG_DEBUG as _,
@@ -212,6 +135,7 @@ struct MainThreadState {
     window: *mut ndk_sys::ANativeWindow,
     event_handler: Box<dyn EventHandler>,
     quit: bool,
+    fullscreen: bool,
 }
 
 impl MainThreadState {
@@ -271,10 +195,11 @@ impl MainThreadState {
                     self.update_surface(window);
                 }
 
-                tl_display::with(|d| {
+                {
+                    let mut d = crate::native_display().lock().unwrap();
                     d.screen_width = width as _;
                     d.screen_height = height as _;
-                });
+                }
                 self.event_handler.resize_event(width as _, height as _);
             }
             Message::Touch {
@@ -300,7 +225,7 @@ impl MainThreadState {
             }
             Message::Pause => self.event_handler.window_minimized_event(),
             Message::Resume => {
-                if tl_display::with(|d| d.fullscreen) {
+                if self.fullscreen {
                     unsafe {
                         let env = attach_jni_env();
                         set_full_screen(env, true);
@@ -323,6 +248,32 @@ impl MainThreadState {
 
             unsafe {
                 (self.libegl.eglSwapBuffers.unwrap())(self.egl_display, self.surface);
+            }
+        }
+    }
+
+    fn process_request(&mut self, request: crate::native::Request) {
+        use crate::native::Request::*;
+        unsafe {
+            match request {
+                SetFullscreen(fullscreen) => {
+                    unsafe {
+                        let env = attach_jni_env();
+                        set_full_screen(env, fullscreen);
+                    }
+                    self.fullscreen = fullscreen;
+                }
+                ShowKeyboard(show) => unsafe {
+                    let env = attach_jni_env();
+                    ndk_utils::call_void_method!(
+                        env,
+                        ACTIVITY,
+                        "showKeyboard",
+                        "(Z)V",
+                        show as i32
+                    );
+                },
+                _ => {}
             }
         }
     }
@@ -357,6 +308,20 @@ pub unsafe fn attach_jni_env() -> *mut ndk_sys::JNIEnv {
     assert!(res == 0);
 
     env
+}
+
+pub struct AndroidClipboard {}
+impl AndroidClipboard {
+    pub fn new() -> AndroidClipboard {
+        AndroidClipboard {}
+    }
+}
+impl crate::native::Clipboard for AndroidClipboard {
+    fn get(&mut self) -> Option<String> {
+        None
+    }
+
+    fn set(&mut self, data: &str) {}
 }
 
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
@@ -437,12 +402,13 @@ where
             panic!();
         }
 
-        let display = AndroidDisplay {
-            screen_width,
-            screen_height,
-            fullscreen: conf.fullscreen,
-        };
-        tl_display::set_display(display);
+        let (tx, requests_rx) = std::sync::mpsc::channel();
+        let clipboard = Box::new(AndroidClipboard::new());
+        crate::set_display(NativeDisplayData {
+            high_dpi: conf.high_dpi,
+            ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
+        });
+
         let event_handler = f.0();
         let mut s = MainThreadState {
             libegl,
@@ -453,9 +419,14 @@ where
             window,
             event_handler,
             quit: false,
+            fullscreen: conf.fullscreen,
         };
 
         while !s.quit {
+            while let Ok(request) = requests_rx.try_recv() {
+                s.process_request(request);
+            }
+
             // process all the messages from the main thread
             while let Ok(msg) = rx.try_recv() {
                 s.process_message(msg);

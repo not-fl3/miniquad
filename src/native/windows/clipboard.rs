@@ -82,11 +82,21 @@ unsafe fn set_raw_clipboard(data: *const u8, len: usize) {
     SetClipboardData(CF_UNICODETEXT, alloc_handle);
 }
 
-pub unsafe fn set_clipboard_text(text: &str) {
-    let text_w = format!("{}\0", text).encode_utf16().collect::<Vec<u16>>();
-    set_raw_clipboard(text_w.as_ptr() as _, text_w.len() * 2);
+pub struct WindowsClipboard {}
+impl WindowsClipboard {
+    pub fn new() -> WindowsClipboard {
+        WindowsClipboard {}
+    }
 }
+impl crate::native::Clipboard for WindowsClipboard {
+    fn get(&mut self) -> Option<String> {
+        unsafe { get_raw_clipboard().map(|data| String::from_utf16_lossy(&data)) }
+    }
 
-pub unsafe fn get_clipboard_text() -> Option<String> {
-    get_raw_clipboard().map(|data| String::from_utf16_lossy(&data))
+    fn set(&mut self, data: &str) {
+        unsafe {
+            let text_w = format!("{}\0", data).encode_utf16().collect::<Vec<u16>>();
+            set_raw_clipboard(text_w.as_ptr() as _, text_w.len() * 2);
+        }
+    }
 }

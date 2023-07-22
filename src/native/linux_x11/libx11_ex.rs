@@ -61,7 +61,12 @@ impl LibX11 {
         (attribs.width, attribs.height)
     }
 
-    pub unsafe fn update_window_title(&mut self, display: *mut Display, window: Window, title: &str) {
+    pub unsafe fn update_window_title(
+        &mut self,
+        display: *mut Display,
+        window: Window,
+        title: &str,
+    ) {
         let c_title = std::ffi::CString::new(title).unwrap();
 
         (self.Xutf8SetWMProperties)(
