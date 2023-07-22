@@ -1,6 +1,6 @@
 #![allow(dead_code, non_snake_case)]
 
-use super::{libx11::*};
+use super::libx11::*;
 
 use crate::native::module;
 

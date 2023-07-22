@@ -1,7 +1,7 @@
 use crate::{
     conf::{Conf, Icon},
     event::{KeyMods, MouseButton},
-    native::NativeDisplayData,
+    native::{NativeDisplayData, Request},
     CursorIcon, EventHandler,
 };
 
@@ -34,7 +34,6 @@ pub(crate) struct WindowsDisplay {
     window_resizable: bool,
     cursor_grabbed: bool,
     iconified: bool,
-    display_data: NativeDisplayData,
     content_scale: f32,
     window_scale: f32,
     mouse_scale: f32,
@@ -48,63 +47,10 @@ pub(crate) struct WindowsDisplay {
     msg_dc: HDC,
     wnd: HWND,
     dc: HDC,
+    event_handler: Option<Box<dyn EventHandler>>,
 }
 
-mod tl_display {
-    use super::*;
-    use crate::{native::NativeDisplay, NATIVE_DISPLAY};
-
-    use std::cell::RefCell;
-
-    thread_local! {
-        static DISPLAY: RefCell<Option<WindowsDisplay>> = RefCell::new(None);
-    }
-
-    fn with_native_display(f: &mut dyn FnMut(&mut dyn NativeDisplay)) {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d);
-        })
-    }
-
-    pub(super) fn with<T>(mut f: impl FnMut(&mut WindowsDisplay) -> T) -> T {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d)
-        })
-    }
-
-    pub(super) fn set_display(display: WindowsDisplay) {
-        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
-        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
-    }
-}
-
-impl crate::native::NativeDisplay for WindowsDisplay {
-    fn screen_size(&self) -> (f32, f32) {
-        (
-            self.display_data.screen_width as _,
-            self.display_data.screen_height as _,
-        )
-    }
-    fn dpi_scale(&self) -> f32 {
-        self.content_scale
-    }
-    fn high_dpi(&self) -> bool {
-        self.content_scale != 1.
-    }
-    fn order_quit(&mut self) {
-        self.display_data.quit_ordered = true;
-    }
-    fn request_quit(&mut self) {
-        self.display_data.quit_requested = true;
-    }
-    fn cancel_quit(&mut self) {
-        self.display_data.quit_requested = false;
-    }
-
+impl WindowsDisplay {
     fn set_cursor_grab(&mut self, grab: bool) {
         self.cursor_grabbed = grab;
         unsafe {
@@ -171,35 +117,17 @@ impl crate::native::NativeDisplay for WindowsDisplay {
             final_new_height = (rect.bottom - rect.top) as _;
         }
 
-        // TODO: find a better solution!
-        // miniquad assumes that wndproc is only triggered from main loop, from
-        // DispatchMessage
-        // which makes it safe to borrow NativeDisplay in the wndproc.
-        // Well.. this assumption was wrong.
-        // When new message is coming to a window, WinAPI check the thread. If the
-        // messages comes from the same thread - it calls the handler directly, without
-        // waiting for a queue processing.
-        // This makes impossible to call basically any winapi function directly
-        // from miniquad's event handlers.
-        // This was a miniquad's architecture mistake, something should be changed,
-        // but to makes things works - here is this fix.
-        struct SendHack<T>(*mut T);
-        unsafe impl<T> Send for SendHack<T> {}
-        unsafe impl<T> Sync for SendHack<T> {}
-        let wnd = SendHack(self.wnd);
-        std::thread::spawn(move || {
-            unsafe {
-                SetWindowPos(
-                    wnd.0,
-                    HWND_TOP,
-                    x,
-                    y,
-                    final_new_width as i32,
-                    final_new_height as i32,
-                    SWP_NOMOVE,
-                )
-            };
-        });
+        unsafe {
+            SetWindowPos(
+                self.wnd,
+                HWND_TOP,
+                x,
+                y,
+                final_new_width as i32,
+                final_new_height as i32,
+                SWP_NOMOVE,
+            )
+        };
     }
 
     fn set_fullscreen(&mut self, fullscreen: bool) {
@@ -214,60 +142,36 @@ impl crate::native::NativeDisplay for WindowsDisplay {
             SetWindowLong(self.wnd, GWL_STYLE, win_style as _);
 
             if self.fullscreen {
-                struct SendHack<T>(*mut T);
-                unsafe impl<T> Send for SendHack<T> {}
-                unsafe impl<T> Sync for SendHack<T> {}
-                let wnd = SendHack(self.wnd);
-                // check set_window_size for "why threads"
-                std::thread::spawn(move || {
-                    SetWindowPos(
-                        wnd.0,
-                        HWND_TOP,
-                        0,
-                        0,
-                        GetSystemMetrics(SM_CXSCREEN),
-                        GetSystemMetrics(SM_CYSCREEN),
-                        SWP_FRAMECHANGED ,
-                    );
-                });
+                SetWindowPos(
+                    self.wnd,
+                    HWND_TOP,
+                    0,
+                    0,
+                    GetSystemMetrics(SM_CXSCREEN),
+                    GetSystemMetrics(SM_CYSCREEN),
+                    SWP_FRAMECHANGED,
+                );
             } else {
-                let w = self.display_data.screen_width;
-                let h = self.display_data.screen_height;
-                struct SendHack<T>(*mut T);
-                unsafe impl<T> Send for SendHack<T> {}
-                unsafe impl<T> Sync for SendHack<T> {}
-                let wnd = SendHack(self.wnd);
-                // check set_window_size for "why threads"
-                std::thread::spawn(move || {
-                    SetWindowPos(
-                        wnd.0,
-                        HWND_TOP,
-                        0,
-                        0,
-                        // this is probably not correct: with high dpi content_width and window_width are actually different..
-                        w,
-                        h,
-                        SWP_FRAMECHANGED,
-                    );
-                });
+                let (w, h) = {
+                    let d = crate::native_display().lock().unwrap();
+                    (d.screen_width, d.screen_height)
+                };
+
+                SetWindowPos(
+                    self.wnd,
+                    HWND_TOP,
+                    0,
+                    0,
+                    // this is probably not correct: with high dpi content_width and window_width are actually different..
+                    w,
+                    h,
+                    SWP_FRAMECHANGED,
+                );
             }
 
             ShowWindow(self.wnd, SW_SHOW);
         };
     }
-    fn clipboard_get(&mut self) -> Option<String> {
-        unsafe { clipboard::get_clipboard_text() }
-    }
-    fn clipboard_set(&mut self, data: &str) {
-        unsafe { clipboard::set_clipboard_text(data) }
-    }
-    fn as_any(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
-
-struct WindowPayload {
-    event_handler: Box<dyn EventHandler>,
 }
 
 fn get_win_style(is_fullscreen: bool, is_resizable: bool) -> DWORD {
@@ -353,31 +257,31 @@ unsafe extern "system" fn win32_wndproc(
     if display_ptr == 0 {
         return DefWindowProcW(hwnd, umsg, wparam, lparam);
     }
-    let &mut WindowPayload {
-        ref mut event_handler,
-    } = &mut *(display_ptr as *mut WindowPayload);
+    let payload = &mut *(display_ptr as *mut WindowsDisplay);
+    let event_handler = payload.event_handler.as_mut().unwrap();
 
     match umsg {
         WM_CLOSE => {
             let mut quit_requested = false;
 
-            tl_display::with(|display| {
-                // only give user a chance to intervene when sapp_quit() wasn't already called
-                if !display.display_data.quit_ordered {
-                    // if window should be closed and event handling is enabled, give user code
-                    // a change to intervene via sapp_cancel_quit()
-                    display.display_data.quit_requested = true;
-                    quit_requested = true;
-                    // if user code hasn't intervened, quit the app
-                    if display.display_data.quit_requested {
-                        display.display_data.quit_ordered = true;
-                    }
+            let mut d = crate::native_display().lock().unwrap();
+            // only give user a chance to intervene when sapp_quit() wasn't already called
+            if !d.quit_ordered {
+                // if window should be closed and event handling is enabled, give user code
+                // a change to intervene via sapp_cancel_quit()
+                d.quit_requested = true;
+                quit_requested = true;
+                // if user code hasn't intervened, quit the app
+                if d.quit_requested {
+                    d.quit_ordered = true;
                 }
-                if display.display_data.quit_ordered {
-                    PostQuitMessage(0);
-                }
-            });
+            }
+            if d.quit_ordered {
+                PostQuitMessage(0);
+            }
+
             if quit_requested {
+                drop(d);
                 event_handler.quit_requested_event();
             }
             return 0;
@@ -385,7 +289,7 @@ unsafe extern "system" fn win32_wndproc(
         WM_SYSCOMMAND => {
             match wparam & 0xFFF0 {
                 SC_SCREENSAVE | SC_MONITORPOWER => {
-                    if tl_display::with(|d| d.fullscreen) {
+                    if payload.fullscreen {
                         // disable screen saver and blanking in fullscreen mode
                         return 0;
                     }
@@ -401,13 +305,13 @@ unsafe extern "system" fn win32_wndproc(
             return 1;
         }
         WM_SIZE => {
-            if tl_display::with(|d| d.cursor_grabbed) {
+            if payload.cursor_grabbed {
                 update_clip_rect(hwnd);
             }
 
             let iconified = wparam == SIZE_MINIMIZED;
-            if iconified != tl_display::with(|d| d.iconified) {
-                tl_display::with(|d| d.iconified = iconified);
+            if iconified != payload.iconified {
+                payload.iconified = iconified;
                 if iconified {
                     event_handler.window_minimized_event();
                 } else {
@@ -416,54 +320,51 @@ unsafe extern "system" fn win32_wndproc(
             }
         }
         WM_SETCURSOR => {
-            if tl_display::with(|d| d.user_cursor) && LOWORD(lparam as _) == HTCLIENT as _ {
-                SetCursor(tl_display::with(|d| d.cursor));
+            if payload.user_cursor && LOWORD(lparam as _) == HTCLIENT as _ {
+                SetCursor(payload.cursor);
 
                 return 1;
             }
         }
         WM_LBUTTONDOWN => {
-            let mouse_x = tl_display::with(|d| d.mouse_x);
-            let mouse_y = tl_display::with(|d| d.mouse_y);
+            let mouse_x = payload.mouse_x;
+            let mouse_y = payload.mouse_y;
             event_handler.mouse_button_down_event(MouseButton::Left, mouse_x, mouse_y);
         }
         WM_RBUTTONDOWN => {
-            let mouse_x = tl_display::with(|d| d.mouse_x);
-            let mouse_y = tl_display::with(|d| d.mouse_y);
+            let mouse_x = payload.mouse_x;
+            let mouse_y = payload.mouse_y;
 
             event_handler.mouse_button_down_event(MouseButton::Right, mouse_x, mouse_y);
         }
         WM_MBUTTONDOWN => {
-            let mouse_x = tl_display::with(|d| d.mouse_x);
-            let mouse_y = tl_display::with(|d| d.mouse_y);
+            let mouse_x = payload.mouse_x;
+            let mouse_y = payload.mouse_y;
 
             event_handler.mouse_button_down_event(MouseButton::Middle, mouse_x, mouse_y);
         }
         WM_LBUTTONUP => {
-            let mouse_x = tl_display::with(|d| d.mouse_x);
-            let mouse_y = tl_display::with(|d| d.mouse_y);
+            let mouse_x = payload.mouse_x;
+            let mouse_y = payload.mouse_y;
 
             event_handler.mouse_button_up_event(MouseButton::Left, mouse_x, mouse_y);
         }
         WM_RBUTTONUP => {
-            let mouse_x = tl_display::with(|d| d.mouse_x);
-            let mouse_y = tl_display::with(|d| d.mouse_y);
+            let mouse_x = payload.mouse_x;
+            let mouse_y = payload.mouse_y;
 
             event_handler.mouse_button_up_event(MouseButton::Right, mouse_x, mouse_y);
         }
         WM_MBUTTONUP => {
-            let mouse_x = tl_display::with(|d| d.mouse_x);
-            let mouse_y = tl_display::with(|d| d.mouse_y);
+            let mouse_x = payload.mouse_x;
+            let mouse_y = payload.mouse_y;
 
             event_handler.mouse_button_up_event(MouseButton::Middle, mouse_x, mouse_y);
         }
 
         WM_MOUSEMOVE => {
-            tl_display::with(|d| {
-                d.mouse_x = GET_X_LPARAM(lparam) as f32 * d.mouse_scale;
-                d.mouse_y = GET_Y_LPARAM(lparam) as f32 * d.mouse_scale;
-            });
-
+            payload.mouse_x = GET_X_LPARAM(lparam) as f32 * payload.mouse_scale;
+            payload.mouse_y = GET_Y_LPARAM(lparam) as f32 * payload.mouse_scale;
             // mouse enter was not handled by miniquad anyway
             // if !_sapp.win32_mouse_tracked {
             //     _sapp.win32_mouse_tracked = true;
@@ -480,13 +381,13 @@ unsafe extern "system" fn win32_wndproc(
             //     );
             // }
 
-            let mouse_x = tl_display::with(|d| d.mouse_x);
-            let mouse_y = tl_display::with(|d| d.mouse_y);
+            let mouse_x = payload.mouse_x;
+            let mouse_y = payload.mouse_y;
 
             event_handler.mouse_motion_event(mouse_x, mouse_y);
         }
 
-        WM_MOVE if tl_display::with(|d| d.cursor_grabbed) => {
+        WM_MOVE if payload.cursor_grabbed => {
             update_clip_rect(hwnd);
         }
 
@@ -504,18 +405,16 @@ unsafe extern "system" fn win32_wndproc(
                 panic!("failed to retrieve raw input data");
             }
 
-            let mouse_scale = tl_display::with(|d| d.mouse_scale);
+            let mouse_scale = payload.mouse_scale;
             let mut dx = data.data.mouse().lLastX as f32 * mouse_scale;
             let mut dy = data.data.mouse().lLastY as f32 * mouse_scale;
 
             // convert from normalised absolute coordinates
             if (data.data.mouse().usFlags & MOUSE_MOVE_ABSOLUTE) == MOUSE_MOVE_ABSOLUTE {
-                let (width, height) = tl_display::with(|d| {
-                    (
-                        d.display_data.screen_width as f32,
-                        d.display_data.screen_height as f32,
-                    )
-                });
+                let (width, height) = {
+                    let d = crate::native_display().lock().unwrap();
+                    (d.screen_width as f32, d.screen_height as f32)
+                };
 
                 dx = dx / 65535.0 * width;
                 dy = dy / 65535.0 * height;
@@ -802,6 +701,7 @@ impl WindowsDisplay {
     /// updates current window and framebuffer size from the window's client rect,
     /// returns true if size has changed
     unsafe fn update_dimensions(&mut self, hwnd: HWND) -> bool {
+        let mut d = crate::native_display().lock().unwrap();
         let mut rect: RECT = std::mem::zeroed();
 
         if GetClientRect(hwnd, &mut rect as *mut _ as _) != 0 {
@@ -811,16 +711,14 @@ impl WindowsDisplay {
             // prevent a framebuffer size of 0 when window is minimized
             let fb_width = ((window_width as f32 * self.content_scale) as i32).max(1);
             let fb_height = ((window_height as f32 * self.content_scale) as i32).max(1);
-            if fb_width != self.display_data.screen_width
-                || fb_height != self.display_data.screen_height
-            {
-                self.display_data.screen_width = fb_width;
-                self.display_data.screen_height = fb_height;
+            if fb_width != d.screen_width || fb_height != d.screen_height {
+                d.screen_width = fb_width;
+                d.screen_height = fb_height;
                 return true;
             }
         } else {
-            self.display_data.screen_width = 1;
-            self.display_data.screen_height = 1;
+            d.screen_width = 1;
+            d.screen_height = 1;
         }
         return false;
     }
@@ -849,6 +747,25 @@ impl WindowsDisplay {
         } else {
             self.content_scale = 1.0;
             self.mouse_scale = 1.0 / self.window_scale;
+        }
+    }
+
+    fn process_request(&mut self, request: Request) {
+        use Request::*;
+        unsafe {
+            match request {
+                SetCursorGrab(grab) => self.set_cursor_grab(grab),
+                ShowMouse(show) => self.show_mouse(show),
+                SetMouseCursor(icon) => self.set_mouse_cursor(icon),
+                SetWindowSize {
+                    new_width,
+                    new_height,
+                } => self.set_window_size(new_width as _, new_height as _),
+                SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
+                ShowKeyboard(show) => {
+                    eprintln!("Not implemented for windows")
+                }
+            }
         }
     }
 }
@@ -889,13 +806,21 @@ where
             show_cursor: true,
             user_cursor: false,
             cursor: std::ptr::null_mut(),
-            display_data: Default::default(),
             libopengl32,
             _msg_wnd: msg_wnd,
             msg_dc,
             wnd,
             dc,
+            event_handler: None,
         };
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let clipboard = Box::new(clipboard::WindowsClipboard::new());
+        crate::set_display(NativeDisplayData {
+            high_dpi: conf.high_dpi,
+            dpi_scale: display.window_scale,
+            ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
+        });
 
         display.update_dimensions(wnd);
         display.init_dpi(conf.high_dpi);
@@ -909,20 +834,19 @@ where
 
         super::gl::load_gl_funcs(|proc| display.get_proc_address(proc));
 
-        tl_display::set_display(display);
+        display.event_handler = Some(f());
 
-        let event_handler = f();
-
-        let mut p = WindowPayload { event_handler };
-        // well, technically this is UB and we are suppose to use *mut WindowPayload instead of &mut WindowPayload forever from now on...
-        // so if there going to be some weird bugs someday in the future - check this out!
         #[cfg(target_arch = "x86_64")]
-        SetWindowLongPtrA(wnd, GWLP_USERDATA, &mut p as *mut _ as isize);
+        SetWindowLongPtrA(wnd, GWLP_USERDATA, &mut display as *mut _ as isize);
         #[cfg(target_arch = "i686")]
-        SetWindowLong(wnd, GWLP_USERDATA, &mut p as *mut _ as isize);
+        SetWindowLong(wnd, GWLP_USERDATA, &mut display as *mut _ as isize);
 
         let mut done = false;
-        while !(done || tl_display::with(|d| d.display_data.quit_ordered)) {
+        while !(done || crate::native_display().lock().unwrap().quit_ordered) {
+            while let Ok(request) = rx.try_recv() {
+                display.process_request(request);
+            }
+
             let mut msg: MSG = std::mem::zeroed();
             while PeekMessageW(&mut msg as *mut _ as _, NULL as _, 0, 0, PM_REMOVE) != 0 {
                 if WM_QUIT == msg.message {
@@ -934,26 +858,28 @@ where
                 }
             }
 
-            p.event_handler.update();
-            p.event_handler.draw();
+            display.event_handler.as_mut().unwrap().update();
+            display.event_handler.as_mut().unwrap().draw();
 
-            SwapBuffers(tl_display::with(|d| d.dc));
+            SwapBuffers(display.dc);
 
-            if tl_display::with(|d| d.update_dimensions(wnd)) {
-                let width = tl_display::with(|d| d.display_data.screen_width as f32);
-                let height = tl_display::with(|d| d.display_data.screen_height as f32);
-                p.event_handler.resize_event(width, height);
+            if display.update_dimensions(wnd) {
+                let d = crate::native_display().lock().unwrap();
+                let width = d.screen_width as f32;
+                let height = d.screen_height as f32;
+                drop(d);
+                display
+                    .event_handler
+                    .as_mut()
+                    .unwrap()
+                    .resize_event(width, height);
             }
-            tl_display::with(|d| {
-                if d.display_data.quit_requested {
-                    PostMessageW(d.wnd, WM_CLOSE, 0, 0);
-                }
-            });
+            if crate::native_display().lock().unwrap().quit_requested {
+                PostMessageW(display.wnd, WM_CLOSE, 0, 0);
+            }
         }
 
-        tl_display::with(|d| {
-            (d.libopengl32.wglDeleteContext)(gl_ctx);
-        });
+        (display.libopengl32.wglDeleteContext)(gl_ctx);
         DestroyWindow(wnd);
     }
 }

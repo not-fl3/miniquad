@@ -10,7 +10,7 @@ use crate::{
     native::linux_wayland::{
         extensions::viewporter::{wp_viewport, wp_viewport_interface, wp_viewporter},
         libwayland_client::*,
-        shm, WaylandDisplay,
+        shm, WaylandPayload,
     },
     wl_request, wl_request_constructor,
 };
@@ -30,7 +30,7 @@ pub(crate) struct Decorations {
 }
 
 unsafe fn create_decoration(
-    display: &mut WaylandDisplay,
+    display: &mut WaylandPayload,
     compositor: *mut wl_compositor,
     subcompositor: *mut wl_subcompositor,
     parent: *mut wl_surface,
@@ -81,7 +81,7 @@ impl Decorations {
     pub const WIDTH: i32 = 2;
     pub const BAR_HEIGHT: i32 = 15;
 
-    pub unsafe fn new(display: &mut WaylandDisplay, width: i32, height: i32) -> Decorations {
+    pub(super) unsafe fn new(display: &mut WaylandPayload, width: i32, height: i32) -> Decorations {
         let buffer = shm::create_shm_buffer(
             &mut display.client,
             display.shm,

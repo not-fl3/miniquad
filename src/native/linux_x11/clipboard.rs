@@ -13,7 +13,7 @@ const AnyPropertyType: libc::c_long = 0 as libc::c_long;
 
 type Time = libc::c_ulong;
 
-pub unsafe fn get_clipboard(
+unsafe fn get_clipboard(
     libx11: &mut LibX11,
     display: *mut Display,
     window: Window,
@@ -103,7 +103,7 @@ static mut MESSAGE: Option<String> = None;
 
 /// Claim that our app is X11 clipboard owner
 /// Now when some other linux app will ask X11 for clipboard content - it will be redirected to our app
-pub unsafe fn claim_clipboard_ownership(
+unsafe fn claim_clipboard_ownership(
     libx11: &mut LibX11,
     display: *mut Display,
     window: Window,
@@ -183,5 +183,57 @@ pub(crate) unsafe fn respond_to_clipboard_request(
             0 as libc::c_int as libc::c_long,
             &mut ev as *mut XSelectionEvent as *mut XEvent,
         );
+    }
+}
+
+pub struct X11Clipboard {
+    libx11: LibX11,
+    display: *mut Display,
+    window: Window,
+}
+unsafe impl Send for X11Clipboard {}
+unsafe impl Sync for X11Clipboard {}
+
+impl X11Clipboard {
+    pub fn new(libx11: LibX11, display: *mut Display, window: Window) -> X11Clipboard {
+        X11Clipboard {
+            libx11,
+            display,
+            window,
+        }
+    }
+}
+impl crate::native::Clipboard for X11Clipboard {
+    fn get(&mut self) -> Option<String> {
+        use std::ffi::CString;
+
+        let bufname = CString::new("CLIPBOARD").unwrap();
+        let fmtname = CString::new("UTF8_STRING").unwrap();
+
+        unsafe {
+            get_clipboard(
+                &mut self.libx11,
+                self.display,
+                self.window,
+                bufname.as_ptr(),
+                fmtname.as_ptr(),
+            )
+        }
+    }
+
+    fn set(&mut self, data: &str) {
+        use std::ffi::CString;
+
+        let bufname = CString::new("CLIPBOARD").unwrap();
+
+        unsafe {
+            claim_clipboard_ownership(
+                &mut self.libx11,
+                self.display,
+                self.window,
+                bufname.as_ptr(),
+                data.to_owned(),
+            );
+        };
     }
 }

@@ -269,7 +269,7 @@ pub struct MetalContext {
 impl MetalContext {
     pub fn new() -> MetalContext {
         unsafe {
-            let view = crate::window::apple_view().unwrap();
+            let view = crate::window::apple_view();
             assert!(!view.is_null());
             let device: ObjcId = msg_send![view, device];
             assert!(!device.is_null());

@@ -1,6 +1,10 @@
-/// Most backends happened to have exactly the same fields in their *Display struct
-/// Maybe something like this may in some public API some day?
-/// (important data from this struct is available through function like Context::screen_size)
+use std::sync::mpsc;
+
+#[derive(Default)]
+pub(crate) struct DroppedFiles {
+    pub paths: Vec<std::path::PathBuf>,
+    pub bytes: Vec<Vec<u8>>,
+}
 pub(crate) struct NativeDisplayData {
     pub screen_width: i32,
     pub screen_height: i32,
@@ -8,54 +12,62 @@ pub(crate) struct NativeDisplayData {
     pub high_dpi: bool,
     pub quit_requested: bool,
     pub quit_ordered: bool,
-}
+    pub native_requests: mpsc::Sender<Request>,
+    pub clipboard: Box<dyn Clipboard>,
+    pub dropped_files: DroppedFiles,
 
-impl Default for NativeDisplayData {
-    fn default() -> NativeDisplayData {
+    #[cfg(target_vendor = "apple")]
+    pub view: crate::native::apple::frameworks::ObjcId,
+    #[cfg(target_os = "ios")]
+    pub view_ctrl: crate::native::apple::frameworks::ObjcId,
+    #[cfg(target_vendor = "apple")]
+    pub gfx_api: crate::conf::AppleGfxApi,
+}
+#[cfg(target_vendor = "apple")]
+unsafe impl Send for NativeDisplayData {}
+#[cfg(target_vendor = "apple")]
+unsafe impl Sync for NativeDisplayData {}
+
+impl NativeDisplayData {
+    pub fn new(
+        screen_width: i32,
+        screen_height: i32,
+        native_requests: mpsc::Sender<Request>,
+        clipboard: Box<dyn Clipboard>,
+    ) -> NativeDisplayData {
         NativeDisplayData {
-            screen_width: 1,
-            screen_height: 1,
+            screen_width,
+            screen_height,
             dpi_scale: 1.,
             high_dpi: false,
             quit_requested: false,
             quit_ordered: false,
+            native_requests,
+            clipboard,
+            dropped_files: Default::default(),
+            #[cfg(target_vendor = "apple")]
+            gfx_api: crate::conf::AppleGfxApi::OpenGl,
+            #[cfg(target_vendor = "apple")]
+            view: std::ptr::null_mut(),
+            #[cfg(target_os = "ios")]
+            view_ctrl: std::ptr::null_mut(),
         }
     }
 }
 
-pub trait NativeDisplay: std::any::Any {
-    fn screen_size(&self) -> (f32, f32);
-    fn dpi_scale(&self) -> f32;
-    fn high_dpi(&self) -> bool;
-    fn order_quit(&mut self);
-    fn request_quit(&mut self);
-    fn cancel_quit(&mut self);
+#[derive(Debug)]
+pub(crate) enum Request {
+    SetCursorGrab(bool),
+    ShowMouse(bool),
+    SetMouseCursor(crate::CursorIcon),
+    SetWindowSize { new_width: u32, new_height: u32 },
+    SetFullscreen(bool),
+    ShowKeyboard(bool),
+}
 
-    fn set_cursor_grab(&mut self, _grab: bool);
-    fn show_mouse(&mut self, _shown: bool);
-    fn set_mouse_cursor(&mut self, _cursor_icon: crate::CursorIcon);
-    fn set_window_size(&mut self, _new_width: u32, _new_height: u32);
-    fn set_fullscreen(&mut self, _fullscreen: bool);
-    fn clipboard_get(&mut self) -> Option<String>;
-    fn clipboard_set(&mut self, _data: &str);
-    fn dropped_file_count(&mut self) -> usize {
-        0
-    }
-    fn dropped_file_bytes(&mut self, _index: usize) -> Option<Vec<u8>> {
-        None
-    }
-    fn dropped_file_path(&mut self, _index: usize) -> Option<std::path::PathBuf> {
-        None
-    }
-    fn show_keyboard(&mut self, _show: bool) {}
-    #[cfg(target_vendor = "apple")]
-    fn apple_gfx_api(&self) -> crate::conf::AppleGfxApi;
-    #[cfg(target_vendor = "apple")]
-    fn apple_view(&mut self) -> Option<crate::native::apple::frameworks::ObjcId>;
-    #[cfg(target_os = "ios")]
-    fn apple_view_ctrl(&mut self) -> Option<crate::native::apple::frameworks::ObjcId>;
-
-    fn as_any(&mut self) -> &mut dyn std::any::Any;
+pub trait Clipboard: Send + Sync {
+    fn get(&mut self) -> Option<String>;
+    fn set(&mut self, string: &str);
 }
 
 pub mod module;

@@ -5,81 +5,31 @@ mod keycodes;
 
 pub use webgl::*;
 
-use std::{cell::RefCell, path::PathBuf, thread_local};
+use std::{
+    cell::RefCell,
+    path::PathBuf,
+    sync::{mpsc::Receiver, Mutex, OnceLock},
+    thread_local,
+};
 
-use crate::{event::EventHandler, native::NativeDisplay};
+use crate::{
+    event::EventHandler,
+    native::{NativeDisplayData, Request},
+};
 
-#[derive(Default)]
-struct DroppedFiles {
-    paths: Vec<PathBuf>,
-    bytes: Vec<Vec<u8>>,
-}
-
-struct WasmDisplay {
-    clipboard: Option<String>,
-    screen_width: f32,
-    screen_height: f32,
-    dropped_files: DroppedFiles,
-}
-
-impl NativeDisplay for WasmDisplay {
-    fn screen_size(&self) -> (f32, f32) {
-        (self.screen_width as _, self.screen_height as _)
-    }
-    fn dpi_scale(&self) -> f32 {
-        1.
-    }
-    fn high_dpi(&self) -> bool {
-        true
-    }
-    fn order_quit(&mut self) {
-        // there is no escape from wasm
-    }
-    fn request_quit(&mut self) {
-        // there is no escape from wasm
-    }
-    fn cancel_quit(&mut self) {
-        // there is no escape from wasm
-    }
-    fn set_cursor_grab(&mut self, grab: bool) {
-        unsafe { sapp_set_cursor_grab(grab) };
-    }
-    fn show_mouse(&mut self, shown: bool) {
-        unsafe { show_mouse(shown) };
-    }
-    fn set_mouse_cursor(&mut self, cursor: crate::CursorIcon) {
-        unsafe {
-            set_mouse_cursor(cursor);
-        }
-    }
-    fn set_window_size(&mut self, _new_width: u32, _new_height: u32) {}
-    fn set_fullscreen(&mut self, fullscreen: bool) {
-        unsafe {
-            sapp_set_fullscreen(fullscreen);
-        }
-    }
-    fn clipboard_get(&mut self) -> Option<String> {
-        clipboard_get()
-    }
-    fn clipboard_set(&mut self, data: &str) {
-        clipboard_set(data)
-    }
-    fn as_any(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-    fn dropped_file_count(&mut self) -> usize {
-        self.dropped_files.bytes.len()
-    }
-    fn dropped_file_bytes(&mut self, index: usize) -> Option<Vec<u8>> {
-        self.dropped_files.bytes.get(index).cloned()
-    }
-    fn dropped_file_path(&mut self, index: usize) -> Option<PathBuf> {
-        self.dropped_files.paths.get(index).cloned()
-    }
-}
+// fn dropped_file_count(&mut self) -> usize {
+//     self.dropped_files.bytes.len()
+// }
+// fn dropped_file_bytes(&mut self, index: usize) -> Option<Vec<u8>> {
+//     self.dropped_files.bytes.get(index).cloned()
+// }
+// fn dropped_file_path(&mut self, index: usize) -> Option<PathBuf> {
+//     self.dropped_files.paths.get(index).cloned()
+// }
 
 thread_local! {
     static EVENT_HANDLER: RefCell<Option<Box<dyn EventHandler>>> = RefCell::new(None);
+    static REQUESTS: RefCell<Option<Receiver<Request>>> = RefCell::new(None);
 }
 fn tl_event_handler<T, F: FnOnce(&mut dyn EventHandler) -> T>(f: F) -> T {
     EVENT_HANDLER.with(|globals| {
@@ -87,38 +37,6 @@ fn tl_event_handler<T, F: FnOnce(&mut dyn EventHandler) -> T>(f: F) -> T {
         let globals: &mut Box<dyn EventHandler> = globals.as_mut().unwrap();
         f(&mut **globals)
     })
-}
-
-mod tl_display {
-    use super::*;
-    use crate::{native::NativeDisplay, NATIVE_DISPLAY};
-
-    use std::cell::RefCell;
-
-    thread_local! {
-        static DISPLAY: RefCell<Option<WasmDisplay>> = RefCell::new(None);
-    }
-
-    fn with_native_display(f: &mut dyn FnMut(&mut dyn NativeDisplay)) {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d);
-        })
-    }
-
-    pub(super) fn with<T>(f: impl FnOnce(&mut WasmDisplay) -> T) -> T {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d)
-        })
-    }
-
-    pub(super) fn set_display(display: WasmDisplay) {
-        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
-        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
-    }
 }
 
 static mut CURSOR_ICON: crate::CursorIcon = crate::CursorIcon::Default;
@@ -154,11 +72,13 @@ where
         setup_canvas_size(conf.high_dpi);
     }
 
-    tl_display::set_display(WasmDisplay {
-        clipboard: None,
-        screen_width: unsafe { canvas_width() as _ },
-        screen_height: unsafe { canvas_height() as _ },
-        dropped_files: Default::default(),
+    let (tx, rx) = std::sync::mpsc::channel();
+    REQUESTS.with(|r| *r.borrow_mut() = Some(rx));
+    let w = unsafe { canvas_width() as _ };
+    let h = unsafe { canvas_height() as _ };
+    let clipboard = Box::new(Clipboard);
+    crate::set_display(NativeDisplayData {
+        ..NativeDisplayData::new(w, h, tx, clipboard)
     });
     EVENT_HANDLER.with(|g| {
         *g.borrow_mut() = Some(f());
@@ -265,25 +185,49 @@ pub extern "C" fn allocate_vec_u8(len: usize) -> *mut u8 {
     ptr
 }
 
+static CLIPBOARD: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+struct Clipboard;
+impl crate::native::Clipboard for Clipboard {
+    fn get(&mut self) -> Option<String> {
+        CLIPBOARD
+            .get_or_init(|| Mutex::new(None))
+            .lock()
+            .unwrap()
+            .clone()
+    }
+
+    fn set(&mut self, data: &str) {
+        let len = data.len();
+        let data = std::ffi::CString::new(data).unwrap();
+        unsafe { sapp_set_clipboard(data.as_ptr(), len) };
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn on_clipboard_paste(msg: *mut u8, len: usize) {
     let msg = unsafe { String::from_raw_parts(msg, len, len) };
 
-    tl_display::with(move |display| display.clipboard = Some(msg));
-}
-
-pub fn clipboard_get() -> Option<String> {
-    tl_display::with(|display| display.clipboard.clone())
-}
-
-pub fn clipboard_set(data: &str) {
-    let len = data.len();
-    let data = std::ffi::CString::new(data).unwrap();
-    unsafe { sapp_set_clipboard(data.as_ptr(), len) };
+    *CLIPBOARD.get_or_init(|| Mutex::new(None)).lock().unwrap() = Some(msg);
 }
 
 #[no_mangle]
 pub extern "C" fn frame() {
+    REQUESTS.with(|r| {
+        while let Ok(request) = r.borrow_mut().as_mut().unwrap().try_recv() {
+            use Request::*;
+            match request {
+                Request::SetCursorGrab(grab) => unsafe { sapp_set_cursor_grab(grab) },
+                Request::ShowMouse(show) => unsafe { show_mouse(show) },
+                Request::SetMouseCursor(cursor) => unsafe {
+                    set_mouse_cursor(cursor);
+                },
+                Request::SetFullscreen(fullscreen) => unsafe {
+                    sapp_set_fullscreen(fullscreen);
+                },
+                _ => {}
+            }
+        }
+    });
     tl_event_handler(|event_handler| {
         event_handler.update();
         event_handler.draw();
@@ -360,10 +304,11 @@ pub extern "C" fn key_up(key: u32, modifiers: u32) {
 
 #[no_mangle]
 pub extern "C" fn resize(width: i32, height: i32) {
-    tl_display::with(|display| {
-        display.screen_width = width as _;
-        display.screen_height = height as _;
-    });
+    {
+        let mut d = crate::native_display().lock().unwrap();
+        d.screen_width = width as _;
+        d.screen_height = height as _;
+    }
     tl_event_handler(|event_handler| {
         event_handler.resize_event(width as _, height as _);
     });
@@ -390,9 +335,8 @@ pub extern "C" fn focus(has_focus: bool) {
 
 #[no_mangle]
 pub extern "C" fn on_files_dropped_start() {
-    tl_display::with(|display| {
-        display.dropped_files = Default::default();
-    });
+    let mut d = crate::native_display().lock().unwrap();
+    d.dropped_files = Default::default();
 }
 
 #[no_mangle]
@@ -407,11 +351,10 @@ pub extern "C" fn on_file_dropped(
     bytes: *mut u8,
     bytes_len: usize,
 ) {
-    tl_display::with(|display| {
-        let path = PathBuf::from(unsafe { String::from_raw_parts(path, path_len, path_len) });
-        let bytes = unsafe { Vec::from_raw_parts(bytes, bytes_len, bytes_len) };
+    let mut d = crate::native_display().lock().unwrap();
+    let path = PathBuf::from(unsafe { String::from_raw_parts(path, path_len, path_len) });
+    let bytes = unsafe { Vec::from_raw_parts(bytes, bytes_len, bytes_len) };
 
-        display.dropped_files.paths.push(path);
-        display.dropped_files.bytes.push(bytes);
-    });
+    d.dropped_files.paths.push(path);
+    d.dropped_files.bytes.push(bytes);
 }

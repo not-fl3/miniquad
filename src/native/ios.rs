@@ -14,48 +14,24 @@ use {
             },
             NativeDisplayData,
         },
+        native_display,
     },
     std::os::raw::c_void,
 };
 
 struct IosDisplay {
-    data: NativeDisplayData,
     view: ObjcId,
     view_ctrl: ObjcId,
     _textfield_dlg: ObjcId,
     textfield: ObjcId,
     gfx_api: conf::AppleGfxApi,
+
+    event_handler: Option<Box<dyn EventHandler>>,
+    _gles2: bool,
+    f: Option<Box<dyn 'static + FnOnce() -> Box<dyn EventHandler>>>,
 }
 
-impl crate::native::NativeDisplay for IosDisplay {
-    fn screen_size(&self) -> (f32, f32) {
-        (self.data.screen_width as _, self.data.screen_height as _)
-    }
-    fn dpi_scale(&self) -> f32 {
-        self.data.dpi_scale
-    }
-    fn high_dpi(&self) -> bool {
-        self.data.high_dpi
-    }
-    fn order_quit(&mut self) {
-        self.data.quit_ordered = true;
-    }
-    fn request_quit(&mut self) {
-        self.data.quit_requested = true;
-    }
-    fn cancel_quit(&mut self) {
-        self.data.quit_requested = false;
-    }
-
-    fn set_cursor_grab(&mut self, _grab: bool) {}
-    fn show_mouse(&mut self, _show: bool) {}
-    fn set_mouse_cursor(&mut self, _cursor: crate::CursorIcon) {}
-    fn set_window_size(&mut self, _new_width: u32, _new_height: u32) {}
-    fn set_fullscreen(&mut self, _fullscreen: bool) {}
-    fn clipboard_get(&mut self) -> Option<String> {
-        None
-    }
-    fn clipboard_set(&mut self, _data: &str) {}
+impl IosDisplay {
     fn show_keyboard(&mut self, show: bool) {
         unsafe {
             if show {
@@ -65,66 +41,12 @@ impl crate::native::NativeDisplay for IosDisplay {
             }
         }
     }
-    #[cfg(target_vendor = "apple")]
-    fn apple_gfx_api(&self) -> crate::conf::AppleGfxApi {
-        self.gfx_api
-    }
-    #[cfg(target_vendor = "apple")]
-    fn apple_view(&mut self) -> Option<crate::native::apple::frameworks::ObjcId> {
-        Some(self.view)
-    }
-
-    #[cfg(target_vendor = "apple")]
-    fn apple_view_ctrl(&mut self) -> Option<crate::native::apple::frameworks::ObjcId> {
-        Some(self.view_ctrl)
-    }
-
-    fn as_any(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
-mod tl_display {
-    use super::*;
-    use crate::{native::NativeDisplay, NATIVE_DISPLAY};
-
-    use std::cell::RefCell;
-
-    thread_local! {
-        static DISPLAY: RefCell<Option<IosDisplay>> = RefCell::new(None);
-    }
-
-    fn with_native_display(f: &mut dyn FnMut(&mut dyn NativeDisplay)) {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d);
-        })
-    }
-
-    pub(super) fn with<T>(mut f: impl FnMut(&mut IosDisplay) -> T) -> T {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d)
-        })
-    }
-
-    pub(super) fn set_display(display: IosDisplay) {
-        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
-        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
-    }
 }
 
-struct WindowPayload {
-    event_handler: Option<Box<dyn EventHandler>>,
-    _gles2: bool,
-    f: Option<Box<dyn 'static + FnOnce() -> Box<dyn EventHandler>>>,
-}
-
-fn get_window_payload(this: &Object) -> &mut WindowPayload {
+fn get_window_payload(this: &Object) -> &mut IosDisplay {
     unsafe {
         let ptr: *mut c_void = *this.get_ivar("display_ptr");
-        &mut *(ptr as *mut WindowPayload)
+        &mut *(ptr as *mut IosDisplay)
     }
 }
 
@@ -141,12 +63,10 @@ pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
                 let ios_touch: ObjcId = msg_send![enumerator, nextObject];
                 let mut ios_pos: NSPoint = msg_send![ios_touch, locationInView: this];
 
-                tl_display::with(|d| {
-                    if d.data.high_dpi {
-                        ios_pos.x *= 2.;
-                        ios_pos.y *= 2.;
-                    }
-                });
+                if native_display().lock().unwrap().high_dpi {
+                    ios_pos.x *= 2.;
+                    ios_pos.y *= 2.;
+                }
 
                 callback(touch_id, ios_pos.x as _, ios_pos.y as _);
             }
@@ -244,7 +164,7 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
         if payload.event_handler.is_none() {
             let f = payload.f.take().unwrap();
 
-            if tl_display::with(|d| d.gfx_api == AppleGfxApi::OpenGl) {
+            if payload.gfx_api == AppleGfxApi::OpenGl {
                 crate::native::gl::load_gl_funcs(|proc| {
                     let name = std::ffi::CString::new(proc).unwrap();
 
@@ -257,7 +177,7 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
 
         let main_screen: ObjcId = unsafe { msg_send![class!(UIScreen), mainScreen] };
         let screen_rect: NSRect = unsafe { msg_send![main_screen, bounds] };
-        let high_dpi = tl_display::with(|d| d.data.high_dpi);
+        let high_dpi = native_display().lock().unwrap().high_dpi;
 
         let (screen_width, screen_height) = if high_dpi {
             (
@@ -271,13 +191,14 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
             )
         };
 
-        if tl_display::with(|d| d.data.screen_width != screen_width)
-            || tl_display::with(|d| d.data.screen_height != screen_height)
+        if native_display().lock().unwrap().screen_width != screen_width
+            || native_display().lock().unwrap().screen_height != screen_height
         {
-            tl_display::with(|d| {
-                d.data.screen_width = screen_width;
-                d.data.screen_height = screen_height;
-            });
+            {
+                let mut d = native_display().lock().unwrap();
+                d.screen_width = screen_width;
+                d.screen_height = screen_height;
+            }
             if let Some(ref mut event_handler) = payload.event_handler {
                 event_handler.resize_event(screen_width as _, screen_height as _);
             }
@@ -398,6 +319,14 @@ unsafe fn create_metal_view(screen_rect: NSRect, _sample_count: i32, _high_dpi: 
     }
 }
 
+struct IosClipboard;
+impl crate::native::Clipboard for IosClipboard {
+    fn get(&mut self) -> Option<String> {
+        None
+    }
+    fn set(&mut self, _data: &str) {}
+}
+
 pub fn define_app_delegate() -> *const Class {
     let superclass = class!(NSObject);
     let mut decl = ClassDecl::new("NSAppDelegate", superclass).unwrap();
@@ -465,20 +394,21 @@ pub fn define_app_delegate() -> *const Class {
                 (textfield_dlg, textfield)
             };
 
-            tl_display::set_display(IosDisplay {
-                data: NativeDisplayData {
-                    screen_width,
-                    screen_height,
-                    high_dpi: conf.high_dpi,
-                    ..Default::default()
-                },
+            let (tx, rx) = std::sync::mpsc::channel();
+            let clipboard = Box::new(IosClipboard);
+            crate::set_display(NativeDisplayData {
+                high_dpi: conf.high_dpi,
+                gfx_api: conf.platform.apple_gfx_api,
+                ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
+            });
+
+            let payload = Box::new(IosDisplay {
                 view: view.view,
                 view_ctrl: view.view_ctrl,
                 textfield,
                 _textfield_dlg: textfield_dlg,
                 gfx_api: conf.platform.apple_gfx_api,
-            });
-            let payload = Box::new(WindowPayload {
+
                 f: Some(Box::new(f)),
                 event_handler: None,
                 _gles2: view._gles2,

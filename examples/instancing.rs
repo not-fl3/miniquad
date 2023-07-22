@@ -167,7 +167,31 @@ impl EventHandler for Stage {
 }
 
 fn main() {
-    let mut conf = conf::Conf::default();
+    // std::thread::spawn(|| {
+    //     let mut conf = conf::Conf::default();
+    //     let metal = std::env::args().nth(1).as_deref() == Some("metal");
+    //     conf.platform.apple_gfx_api = if metal {
+    //         conf::AppleGfxApi::Metal
+    //     } else {
+    //         conf::AppleGfxApi::OpenGl
+    //     };
+
+    //     miniquad::start(conf, move || Box::new(Stage::new()));
+    // });
+
+    //let mut conf = conf::Conf::default();
+    let mut conf = conf::Conf {
+        window_title: "Miniquad".to_string(),
+        window_width: 1024,
+        window_height: 768,
+        fullscreen: true,
+        platform: conf::Platform {
+            linux_backend: conf::LinuxBackend::WaylandOnly,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
     let metal = std::env::args().nth(1).as_deref() == Some("metal");
     conf.platform.apple_gfx_api = if metal {
         conf::AppleGfxApi::Metal

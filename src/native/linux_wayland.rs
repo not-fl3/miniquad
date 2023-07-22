@@ -24,7 +24,8 @@ fn wl_fixed_to_double(f: i32) -> f32 {
     (f as f32) / 256.0
 }
 
-pub struct WaylandDisplay {
+/// A thing to pass around within *void pointer of wayland's event handler
+struct WaylandPayload {
     client: LibWaylandClient,
     // this is libwayland-egl.so, a library with ~4 functions
     // not the libEGL.so(which will be loaded, but not here)
@@ -49,84 +50,9 @@ pub struct WaylandDisplay {
     focused_window: *mut wl_surface,
     //xkb_state: xkb::XkbState,
     decorations: Option<decorations::Decorations>,
-    closed: bool,
 
-    data: NativeDisplayData,
-}
-
-impl crate::native::NativeDisplay for WaylandDisplay {
-    fn screen_size(&self) -> (f32, f32) {
-        (self.data.screen_width as _, self.data.screen_height as _)
-    }
-    fn dpi_scale(&self) -> f32 {
-        self.data.dpi_scale
-    }
-    fn high_dpi(&self) -> bool {
-        self.data.high_dpi
-    }
-    fn order_quit(&mut self) {
-        self.data.quit_ordered = true;
-    }
-    fn request_quit(&mut self) {
-        self.data.quit_requested = true;
-    }
-    fn cancel_quit(&mut self) {
-        self.data.quit_requested = false;
-    }
-
-    fn set_cursor_grab(&mut self, _grab: bool) {}
-    fn show_mouse(&mut self, _shown: bool) {}
-    fn set_mouse_cursor(&mut self, _cursor_icon: crate::CursorIcon) {}
-    fn set_window_size(&mut self, _new_width: u32, _new_height: u32) {}
-    fn set_fullscreen(&mut self, _fullscreen: bool) {}
-    fn clipboard_get(&mut self) -> Option<String> {
-        None
-    }
-    fn clipboard_set(&mut self, _data: &str) {}
-    fn as_any(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
-pub mod tl_display {
-    use super::*;
-    use crate::{native::NativeDisplay, NATIVE_DISPLAY};
-    use std::cell::RefCell;
-
-    thread_local! {
-        static DISPLAY: RefCell<Option<WaylandDisplay>> = RefCell::new(None);
-    }
-
-    fn with_native_display(f: &mut dyn FnMut(&mut dyn NativeDisplay)) {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d);
-        })
-    }
-
-    pub fn with<T>(mut f: impl FnMut(&mut WaylandDisplay) -> T) -> T {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d)
-        })
-    }
-
-    pub fn is_display_set() -> bool {
-        DISPLAY.with(|d| d.borrow().is_some())
-    }
-
-    pub fn set_display(display: WaylandDisplay) {
-        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
-        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
-    }
-}
-
-/// A thing to pass around within *void pointer of wayland's event handler
-struct WaylandPayload {
     event_handler: Option<Box<dyn EventHandler>>,
-    client: LibWaylandClient,
-    surface: *mut wl_surface,
+    closed: bool,
 }
 
 #[macro_export]
@@ -175,7 +101,7 @@ unsafe extern "C" fn seat_handle_capabilities(
     seat: *mut wl_seat,
     caps: wl_seat_capability,
 ) {
-    let display: &mut WaylandDisplay = &mut *(data as *mut _);
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
 
     if caps & wl_seat_capability_WL_SEAT_CAPABILITY_POINTER != 0 {
         // struct wl_pointer *pointer = wl_seat_get_pointer (seat);
@@ -229,7 +155,7 @@ unsafe extern "C" fn keyboard_handle_keymap(
     fd: i32,
     size: u32,
 ) {
-    let display: &mut WaylandDisplay = &mut *(data as *mut _);
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
     let map_shm = libc::mmap(
         std::ptr::null_mut::<std::ffi::c_void>(),
         size as usize,
@@ -274,7 +200,7 @@ unsafe extern "C" fn keyboard_handle_key(
     key: u32,
     state: u32,
 ) {
-    let display: &mut WaylandDisplay = &mut *(data as *mut _);
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
     // https://wayland-book.com/seat/keyboard.html
     // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
     let keysym = (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
@@ -290,7 +216,7 @@ unsafe extern "C" fn keyboard_handle_modifiers(
     mods_locked: u32,
     group: u32,
 ) {
-    let display: &mut WaylandDisplay = &mut *(data as *mut _);
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
     (display.xkb.xkb_state_update_mask)(
         display.xkb_state,
         mods_depressed,
@@ -443,12 +369,7 @@ unsafe extern "C" fn registry_add_object(
     interface: *const ::std::os::raw::c_char,
     version: u32,
 ) {
-    assert!(
-        !tl_display::is_display_set(),
-        "registry_add_object assume display was not moved into a thread local yet"
-    );
-
-    let display: &mut WaylandDisplay = &mut *(data as *mut _);
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
 
     let interface = std::ffi::CStr::from_ptr(interface).to_str().unwrap();
     match interface {
@@ -547,9 +468,8 @@ unsafe extern "C" fn xdg_toplevel_handle_close(
     _xdg_toplevel: *mut extensions::xdg_shell::xdg_toplevel,
 ) {
     assert!(!data.is_null());
-    tl_display::with(|d| {
-        d.closed = true;
-    });
+    let payload: &mut WaylandPayload = &mut *(data as *mut _);
+    payload.closed = true;
 }
 
 unsafe extern "C" fn xdg_toplevel_handle_configure(
@@ -561,32 +481,41 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
 ) -> () {
     assert!(!data.is_null());
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
+    let mut d = crate::native_display().lock().unwrap();
 
     if width != 0 && height != 0 {
-        tl_display::with(|display| {
-            let (egl_w, egl_h) = if display.decorations.is_some() {
-                // Otherwise window will resize iteself on sway
-                // I have no idea why
-                (
-                    width - decorations::Decorations::WIDTH * 2,
-                    height - decorations::Decorations::BAR_HEIGHT - decorations::Decorations::WIDTH,
-                )
-            } else {
-                (width, height)
-            };
-            (display.egl.wl_egl_window_resize)(display.egl_window, egl_w, egl_h, 0, 0);
+        let (egl_w, egl_h) = if payload.decorations.is_some() {
+            // Otherwise window will resize iteself on sway
+            // I have no idea why
+            (
+                width - decorations::Decorations::WIDTH * 2,
+                height - decorations::Decorations::BAR_HEIGHT - decorations::Decorations::WIDTH,
+            )
+        } else {
+            (width, height)
+        };
+        (payload.egl.wl_egl_window_resize)(payload.egl_window, egl_w, egl_h, 0, 0);
 
-            display.data.screen_width = width;
-            display.data.screen_height = height;
+        d.screen_width = width;
+        d.screen_height = height;
 
-            if let Some(ref decorations) = display.decorations {
-                decorations.resize(&mut display.client, width, height);
-            }
-        });
+        if let Some(ref decorations) = payload.decorations {
+            drop(d);
+            decorations.resize(&mut payload.client, width, height);
+        }
+
         if let Some(ref mut event_handler) = payload.event_handler {
             event_handler.resize_event(width as _, height as _);
         }
     }
+}
+
+struct WaylandClipboard;
+impl crate::native::Clipboard for WaylandClipboard {
+    fn get(&mut self) -> Option<String> {
+        None
+    }
+    fn set(&mut self, _data: &str) {}
 }
 
 pub fn run<F>(conf: &crate::conf::Conf, f: &mut Option<F>) -> Option<()>
@@ -619,7 +548,7 @@ where
 
         let xkb_context = (xkb.xkb_context_new)(0);
 
-        let mut display = WaylandDisplay {
+        let mut display = WaylandPayload {
             client: client.clone(),
             egl,
             xkb,
@@ -639,11 +568,17 @@ where
             pointer: std::ptr::null_mut(),
             keyboard: std::ptr::null_mut(),
             focused_window: std::ptr::null_mut(),
-            //xkb_state: xkb::XkbState::new(),
             decorations: None,
+            event_handler: None,
             closed: false,
-            data: Default::default(),
         };
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let clipboard = Box::new(WaylandClipboard);
+        crate::set_display(NativeDisplayData {
+            ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
+        });
+
         (display.client.wl_proxy_add_listener)(
             registry,
             &registry_listener as *const _ as _,
@@ -691,16 +626,10 @@ where
             configure: Some(xdg_surface_handle_configure),
         };
 
-        let mut payload = WaylandPayload {
-            event_handler: None,
-            client: client.clone(),
-            surface: display.surface,
-        };
-
         (display.client.wl_proxy_add_listener)(
             xdg_surface as _,
             &xdg_surface_listener as *const _ as _,
-            &mut payload as *mut _ as _,
+            &mut display as *mut _ as _,
         );
 
         display.xdg_toplevel = wl_request_constructor!(
@@ -719,7 +648,7 @@ where
         (display.client.wl_proxy_add_listener)(
             display.xdg_toplevel as _,
             &xdg_toplevel_listener as *const _ as _,
-            &mut payload as *mut _ as _,
+            &mut display as *mut _ as _,
         );
 
         wl_request!(display.client, display.surface, WL_SURFACE_COMMIT);
@@ -773,13 +702,9 @@ where
                 conf.window_height,
             ));
         }
-        display.data.screen_width = conf.window_width;
-        display.data.screen_height = conf.window_height;
-
-        tl_display::set_display(display);
 
         let event_handler = (f.take().unwrap())();
-        payload.event_handler = Some(event_handler);
+        display.event_handler = Some(event_handler);
 
         let mut keymods = KeyMods {
             shift: false,
@@ -790,10 +715,10 @@ where
         let mut repeated_keys: HashSet<KeyCode> = HashSet::new();
         let (mut last_mouse_x, mut last_mouse_y) = (0.0, 0.0);
 
-        while tl_display::with(|d| d.closed == false) {
+        while display.closed == false {
             (client.wl_display_dispatch_pending)(wdisplay);
 
-            if let Some(ref mut event_handler) = payload.event_handler {
+            if let Some(ref mut event_handler) = display.event_handler {
                 for keycode in &repeated_keys {
                     event_handler.key_down_event(keycode.clone(), keymods, true);
                 }

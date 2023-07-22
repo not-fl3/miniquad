@@ -8,17 +8,16 @@ use {
         event::{EventHandler, MouseButton},
         native::{
             apple::{apple_util::*, frameworks::*},
-            gl, NativeDisplay, NativeDisplayData,
+            gl, NativeDisplayData, Request,
         },
-        CursorIcon,
+        native_display, CursorIcon,
     },
-    std::{collections::HashMap, os::raw::c_void},
+    std::{collections::HashMap, os::raw::c_void, sync::mpsc::Receiver},
 };
 
 pub struct MacosDisplay {
     window: ObjcId,
     view: ObjcId,
-    data: NativeDisplayData,
     fullscreen: bool,
     // [NSCursor hide]/unhide calls should be balanced
     // hide/hide/unhide will keep cursor hidden
@@ -28,61 +27,14 @@ pub struct MacosDisplay {
     current_cursor: CursorIcon,
     cursors: HashMap<CursorIcon, ObjcId>,
     gfx_api: crate::conf::AppleGfxApi,
+
+    event_handler: Option<Box<dyn EventHandler>>,
+    f: Option<Box<dyn 'static + FnOnce() -> Box<dyn EventHandler>>>,
+    modifiers: Modifiers,
+    native_requests: Receiver<Request>,
 }
 
-mod tl_display {
-    use super::*;
-    use crate::NATIVE_DISPLAY;
-
-    use std::cell::RefCell;
-
-    thread_local! {
-        static DISPLAY: RefCell<Option<MacosDisplay>> = RefCell::new(None);
-    }
-
-    fn with_native_display(f: &mut dyn FnMut(&mut dyn crate::native::NativeDisplay)) {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d);
-        })
-    }
-
-    pub(super) fn with<T>(mut f: impl FnMut(&mut MacosDisplay) -> T) -> T {
-        DISPLAY.with(|d| {
-            let mut d = d.borrow_mut();
-            let d = d.as_mut().unwrap();
-            f(&mut *d)
-        })
-    }
-
-    pub(super) fn set_display(display: MacosDisplay) {
-        DISPLAY.with(|d| *d.borrow_mut() = Some(display));
-        NATIVE_DISPLAY.with(|d| *d.borrow_mut() = Some(with_native_display));
-    }
-}
-
-impl NativeDisplay for MacosDisplay {
-    fn screen_size(&self) -> (f32, f32) {
-        (self.data.screen_width as _, self.data.screen_height as _)
-    }
-    fn dpi_scale(&self) -> f32 {
-        self.data.dpi_scale
-    }
-    fn high_dpi(&self) -> bool {
-        self.data.high_dpi
-    }
-    fn order_quit(&mut self) {
-        self.data.quit_ordered = true;
-    }
-    fn request_quit(&mut self) {
-        self.data.quit_requested = true;
-    }
-    fn cancel_quit(&mut self) {
-        self.data.quit_requested = false;
-    }
-
-    fn set_cursor_grab(&mut self, _grab: bool) {}
+impl MacosDisplay {
     fn show_mouse(&mut self, show: bool) {
         if show && !self.cursor_shown {
             unsafe {
@@ -145,54 +97,62 @@ impl NativeDisplay for MacosDisplay {
             let () = msg_send![pasteboard, writeObjects: arr];
         }
     }
-    #[cfg(target_vendor = "apple")]
-    fn apple_gfx_api(&self) -> crate::conf::AppleGfxApi {
-        self.gfx_api
-    }
-    #[cfg(target_vendor = "apple")]
-    fn apple_view(&mut self) -> Option<crate::native::apple::frameworks::ObjcId> {
-        Some(self.view)
-    }
-    #[cfg(target_ios = "ios")]
-    fn apple_view_ctrl(&mut self) -> Option<crate::native::apple::frameworks::ObjcId> {
-        Some(self.view_ctrl)
-    }
-    fn as_any(&mut self) -> &mut dyn std::any::Any {
-        self
+
+    pub fn context(&mut self) -> Option<&mut dyn EventHandler> {
+        let event_handler = self.event_handler.as_deref_mut()?;
+
+        Some(event_handler)
     }
 }
 
 impl MacosDisplay {
     fn transform_mouse_point(&self, point: &NSPoint) -> (f32, f32) {
-        let new_x = point.x as f32 * self.data.dpi_scale;
-        let new_y = self.data.screen_height as f32 - (point.y as f32 * self.data.dpi_scale) - 1.;
+        let d = native_display().lock().unwrap();
+        let new_x = point.x as f32 * d.dpi_scale;
+        let new_y = d.screen_height as f32 - (point.y as f32 * d.dpi_scale) - 1.;
 
         (new_x, new_y)
     }
 
     unsafe fn update_dimensions(&mut self) -> Option<(i32, i32)> {
-        if self.data.high_dpi {
+        let mut d = native_display().lock().unwrap();
+        if d.high_dpi {
             let screen: ObjcId = msg_send![self.window, screen];
             let dpi_scale: f64 = msg_send![screen, backingScaleFactor];
-            self.data.dpi_scale = dpi_scale as f32;
+            d.dpi_scale = dpi_scale as f32;
         } else {
-            self.data.dpi_scale = 1.0;
+            d.dpi_scale = 1.0;
         }
 
         let bounds: NSRect = msg_send![self.view, bounds];
-        let screen_width = (bounds.size.width as f32 * self.data.dpi_scale) as i32;
-        let screen_height = (bounds.size.height as f32 * self.data.dpi_scale) as i32;
+        let screen_width = (bounds.size.width as f32 * d.dpi_scale) as i32;
+        let screen_height = (bounds.size.height as f32 * d.dpi_scale) as i32;
 
-        let dim_changed =
-            screen_width != self.data.screen_width || screen_height != self.data.screen_height;
+        let dim_changed = screen_width != d.screen_width || screen_height != d.screen_height;
 
-        self.data.screen_width = screen_width;
-        self.data.screen_height = screen_height;
+        d.screen_width = screen_width;
+        d.screen_height = screen_height;
 
         if dim_changed {
             Some((screen_width, screen_height))
         } else {
             None
+        }
+    }
+
+    fn process_request(&mut self, request: Request) {
+        use Request::*;
+        unsafe {
+            match request {
+                ShowMouse(show) => self.show_mouse(show),
+                SetMouseCursor(icon) => self.set_mouse_cursor(icon),
+                SetWindowSize {
+                    new_width,
+                    new_height,
+                } => self.set_window_size(new_width as _, new_height as _),
+                SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
+                _ => {}
+            }
         }
     }
 }
@@ -235,20 +195,6 @@ impl Modifiers {
         }
     }
 }
-
-struct WindowPayload {
-    event_handler: Option<Box<dyn EventHandler>>,
-    f: Option<Box<dyn 'static + FnOnce() -> Box<dyn EventHandler>>>,
-    modifiers: Modifiers,
-}
-
-impl WindowPayload {
-    pub fn context(&mut self) -> Option<&mut dyn EventHandler> {
-        let event_handler = self.event_handler.as_deref_mut()?;
-
-        Some(event_handler)
-    }
-}
 pub fn define_app_delegate() -> *const Class {
     let superclass = class!(NSObject);
     let mut decl = ClassDecl::new("NSAppDelegate", superclass).unwrap();
@@ -272,20 +218,20 @@ pub fn define_cocoa_window_delegate() -> *const Class {
         }
 
         // only give user-code a chance to intervene when sapp_quit() wasn't already called
-        if !tl_display::with(|d| d.data.quit_ordered) {
+        if !native_display().lock().unwrap().quit_ordered {
             // if window should be closed and event handling is enabled, give user code
             // a chance to intervene via sapp_cancel_quit()
-            tl_display::with(|d| d.data.quit_requested = true);
+            native_display().lock().unwrap().quit_requested = true;
             if let Some(event_handler) = payload.context() {
                 event_handler.quit_requested_event();
             }
 
             // user code hasn't intervened, quit the app
-            if tl_display::with(|d| d.data.quit_requested) {
-                tl_display::with(|d| d.data.quit_ordered = true);
+            if native_display().lock().unwrap().quit_requested {
+                native_display().lock().unwrap().quit_ordered = true;
             }
         }
-        if tl_display::with(|d| d.data.quit_ordered) {
+        if native_display().lock().unwrap().quit_ordered {
             return YES;
         } else {
             return NO;
@@ -294,7 +240,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
 
     extern "C" fn window_did_resize(this: &Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
-        if let Some((w, h)) = unsafe { tl_display::with(|d| d.update_dimensions()) } {
+        if let Some((w, h)) = unsafe { payload.update_dimensions() } {
             if let Some(event_handler) = payload.context() {
                 event_handler.resize_event(w as _, h as _);
             }
@@ -303,17 +249,19 @@ pub fn define_cocoa_window_delegate() -> *const Class {
 
     extern "C" fn window_did_change_screen(this: &Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
-        if let Some((w, h)) = unsafe { tl_display::with(|d| d.update_dimensions()) } {
+        if let Some((w, h)) = unsafe { payload.update_dimensions() } {
             if let Some(event_handler) = payload.context() {
                 event_handler.resize_event(w as _, h as _);
             }
         }
     }
-    extern "C" fn window_did_enter_fullscreen(_: &Object, _: Sel, _: ObjcId) {
-        tl_display::with(|d| d.fullscreen = true);
+    extern "C" fn window_did_enter_fullscreen(this: &Object, _: Sel, _: ObjcId) {
+        let payload = get_window_payload(this);
+        payload.fullscreen = true;
     }
-    extern "C" fn window_did_exit_fullscreen(_: &Object, _: Sel, _: ObjcId) {
-        tl_display::with(|d| d.fullscreen = false);
+    extern "C" fn window_did_exit_fullscreen(this: &Object, _: Sel, _: ObjcId) {
+        let payload = get_window_payload(this);
+        payload.fullscreen = false;
     }
     let superclass = class!(NSObject);
     let mut decl = ClassDecl::new("RenderWindowDelegate", superclass).unwrap();
@@ -383,7 +331,7 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
 
         unsafe {
             let point: NSPoint = msg_send!(event, locationInWindow);
-            let point = tl_display::with(|d| d.transform_mouse_point(&point));
+            let point = payload.transform_mouse_point(&point);
             if let Some(event_handler) = payload.context() {
                 event_handler.mouse_motion_event(point.0, point.1);
             }
@@ -395,7 +343,7 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
 
         unsafe {
             let point: NSPoint = msg_send!(event, locationInWindow);
-            let point = tl_display::with(|d| d.transform_mouse_point(&point));
+            let point = payload.transform_mouse_point(&point);
             if let Some(event_handler) = payload.context() {
                 if down {
                     event_handler.mouse_button_down_event(btn, point.0, point.1);
@@ -439,16 +387,18 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         }
     }
     extern "C" fn reset_cursor_rects(this: &Object, _sel: Sel) {
+        let payload = get_window_payload(this);
+
         unsafe {
-            let cursor_id = tl_display::with(|d| {
-                let current_cursor = d.current_cursor;
-                let cursor_id = *d
+            let cursor_id = {
+                let current_cursor = payload.current_cursor;
+                let cursor_id = *payload
                     .cursors
                     .entry(current_cursor)
                     .or_insert_with(|| load_mouse_cursor(current_cursor.clone()));
                 assert!(!cursor_id.is_null());
                 cursor_id
-            });
+            };
 
             let bounds: NSRect = msg_send![this, bounds];
             let _: () = msg_send![
@@ -488,7 +438,7 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
 
     extern "C" fn flags_changed(this: &Object, _sel: Sel, event: ObjcId) {
         fn produce_event(
-            payload: &mut WindowPayload,
+            payload: &mut MacosDisplay,
             keycode: crate::KeyCode,
             mods: crate::KeyMods,
             old_pressed: bool,
@@ -649,7 +599,7 @@ pub fn define_opengl_view_class() -> *const Class {
             let superclass = superclass(this);
             let () = msg_send![super(this, superclass), reshape];
 
-            if let Some((w, h)) = tl_display::with(|d| d.update_dimensions()) {
+            if let Some((w, h)) = payload.update_dimensions() {
                 if let Some(event_handler) = payload.context() {
                     event_handler.resize_event(w as _, h as _);
                 }
@@ -659,6 +609,11 @@ pub fn define_opengl_view_class() -> *const Class {
 
     extern "C" fn draw_rect(this: &Object, _sel: Sel, _rect: NSRect) {
         let payload = get_window_payload(this);
+
+        while let Ok(request) = payload.native_requests.try_recv() {
+            payload.process_request(request);
+        }
+
         if let Some(event_handler) = payload.context() {
             event_handler.update();
             event_handler.draw();
@@ -669,9 +624,10 @@ pub fn define_opengl_view_class() -> *const Class {
             assert!(!ctx.is_null());
             let () = msg_send![ctx, flushBuffer];
 
-            if tl_display::with(|d| d.data.quit_requested || d.data.quit_ordered) {
-                let window = tl_display::with(|d| d.window);
-                let () = msg_send![window, performClose: nil];
+            let d = native_display().lock().unwrap();
+            if d.quit_requested || d.quit_ordered {
+                drop(d);
+                let () = msg_send![payload.window, performClose: nil];
             }
         }
     }
@@ -750,15 +706,20 @@ pub fn define_metal_view_class() -> *const Class {
             payload.event_handler = Some(f());
         }
 
+        while let Ok(request) = payload.native_requests.try_recv() {
+            payload.process_request(request);
+        }
+
         if let Some(event_handler) = payload.context() {
             event_handler.update();
             event_handler.draw();
         }
 
         unsafe {
-            if tl_display::with(|d| d.data.quit_requested || d.data.quit_ordered) {
-                let window = tl_display::with(|d| d.window);
-                let () = msg_send![window, performClose: nil];
+            let d = native_display().lock().unwrap();
+            if d.quit_requested || d.quit_ordered {
+                drop(d);
+                let () = msg_send![payload.window, performClose: nil];
             }
         }
     }
@@ -780,10 +741,10 @@ pub fn define_metal_view_class() -> *const Class {
     return decl.register();
 }
 
-fn get_window_payload(this: &Object) -> &mut WindowPayload {
+fn get_window_payload(this: &Object) -> &mut MacosDisplay {
     unsafe {
         let ptr: *mut c_void = *this.get_ivar("display_ptr");
-        &mut *(ptr as *mut WindowPayload)
+        &mut *(ptr as *mut MacosDisplay)
     }
 }
 
@@ -855,28 +816,38 @@ unsafe fn create_opengl_view(window_frame: NSRect, sample_count: i32, high_dpi: 
     view
 }
 
+struct MacosClipboard;
+impl crate::native::Clipboard for MacosClipboard {
+    fn get(&mut self) -> Option<String> {
+        None
+    }
+    fn set(&mut self, _data: &str) {}
+}
+
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    let mut payload = WindowPayload {
-        f: Some(Box::new(f)),
-        event_handler: None,
-        modifiers: Modifiers::default(),
-    };
+    let (tx, rx) = std::sync::mpsc::channel();
+    let clipboard = Box::new(MacosClipboard);
+    crate::set_display(NativeDisplayData {
+        high_dpi: conf.high_dpi,
+        gfx_api: conf.platform.apple_gfx_api,
+        ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
+    });
 
     let mut display = MacosDisplay {
         view: std::ptr::null_mut(),
         window: std::ptr::null_mut(),
-        data: NativeDisplayData {
-            high_dpi: conf.high_dpi,
-            ..Default::default()
-        },
         fullscreen: false,
         cursor_shown: true,
         current_cursor: CursorIcon::Default,
         cursors: HashMap::new(),
         gfx_api: conf.platform.apple_gfx_api,
+        f: Some(Box::new(f)),
+        event_handler: None,
+        native_requests: rx,
+        modifiers: Modifiers::default(),
     };
 
     let app_delegate_class = define_app_delegate();
@@ -919,7 +890,7 @@ where
     let window_delegate: ObjcId = msg_send![window_delegate_class, new];
     let () = msg_send![window, setDelegate: window_delegate];
 
-    (*window_delegate).set_ivar("display_ptr", &mut payload as *mut _ as *mut c_void);
+    (*window_delegate).set_ivar("display_ptr", &mut display as *mut _ as *mut c_void);
 
     let title = str_to_nsstring(&conf.window_title);
     //let () = msg_send![window, setReleasedWhenClosed: NO];
@@ -931,7 +902,11 @@ where
         AppleGfxApi::OpenGl => create_opengl_view(window_frame, conf.sample_count, conf.high_dpi),
         AppleGfxApi::Metal => create_metal_view(window_frame, conf.sample_count, conf.high_dpi),
     };
-    (*view).set_ivar("display_ptr", &mut payload as *mut _ as *mut c_void);
+    {
+        let mut d = native_display().lock().unwrap();
+        d.view = view;
+    }
+    (*view).set_ivar("display_ptr", &mut display as *mut _ as *mut c_void);
 
     display.window = window;
     display.view = view;
@@ -939,8 +914,6 @@ where
     let () = msg_send![window, setContentView: view];
 
     let _ = display.update_dimensions();
-
-    tl_display::set_display(display);
 
     let nstimer: ObjcId = msg_send![
         class!(NSTimer),
