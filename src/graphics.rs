@@ -368,8 +368,24 @@ impl Default for TextureParams {
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub struct ShaderId(usize);
 
+// Inner hence we can't have private data in enum fields
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
-pub struct TextureId(usize);
+pub(crate) enum TextureIdInner {
+    Managed(usize),
+    Raw(RawId),
+}
+
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+pub struct TextureId(TextureIdInner);
+
+impl TextureId {
+    /// Wrap raw platform texture into a TextureId acceptable for miniquad
+    /// Without allocating any miniquad memory and without letting miniquad
+    /// manage the texture.
+    pub fn from_raw_id(raw_id: RawId) -> TextureId {
+        TextureId(TextureIdInner::Raw(raw_id))
+    }
+}
 
 /// Pixel arithmetic description for blending operations.
 /// Will be used in an equation:
@@ -953,7 +969,7 @@ pub struct ShaderSource<'a> {
     pub metal_shader: Option<&'a str>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum RawId {
     OpenGl(crate::native::gl::GLuint),
     #[cfg(target_vendor = "apple")]

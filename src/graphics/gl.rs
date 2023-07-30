@@ -383,12 +383,24 @@ pub(crate) struct RenderPassInternal {
     depth_texture: Option<TextureId>,
 }
 
+struct Textures(Vec<Texture>);
+impl Textures {
+    fn get(&self, texture: TextureId) -> Texture {
+        match texture.0 {
+            TextureIdInner::Raw(RawId::OpenGl(texture)) => Texture {
+                raw: texture,
+                params: Default::default(),
+            },
+            TextureIdInner::Managed(texture) => self.0[texture],
+        }
+    }
+}
 pub struct GlContext {
     shaders: Vec<ShaderInternal>,
     pipelines: Vec<PipelineInternal>,
     passes: Vec<RenderPassInternal>,
     buffers: Vec<Buffer>,
-    textures: Vec<Texture>,
+    textures: Textures,
     default_framebuffer: GLuint,
     pub(crate) cache: GlCache,
 
@@ -413,7 +425,7 @@ impl GlContext {
                 pipelines: vec![],
                 passes: vec![],
                 buffers: vec![],
-                textures: vec![],
+                textures: Textures(vec![]),
                 features: Features {
                     instancing: !crate::native::gl::is_gl2(),
                     ..Default::default()
@@ -698,19 +710,19 @@ impl RenderingBackend for GlContext {
         params: TextureParams,
     ) -> TextureId {
         let texture = Texture::new(self, access, bytes, params);
-        self.textures.push(texture);
-        TextureId(self.textures.len() - 1)
+        self.textures.0.push(texture);
+        TextureId(TextureIdInner::Managed(self.textures.0.len() - 1))
     }
     fn delete_texture(&mut self, texture: TextureId) {
-        let t = self.textures[texture.0];
+        let t = self.textures.get(texture);
         t.delete();
     }
     fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {
-        let t = self.textures[texture.0];
+        let t = self.textures.get(texture);
         t.set_filter(self, filter);
     }
     fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap) {
-        let t = self.textures[texture.0];
+        let t = self.textures.get(texture);
         t.set_wrap(self, wrap);
     }
     fn texture_resize(
@@ -720,11 +732,11 @@ impl RenderingBackend for GlContext {
         height: u32,
         bytes: Option<&[u8]>,
     ) {
-        let mut t = self.textures[texture.0];
+        let mut t = self.textures.get(texture);
         t.resize(self, width, height, bytes);
     }
     fn texture_read_pixels(&mut self, texture: TextureId, bytes: &mut [u8]) {
-        let t = self.textures[texture.0];
+        let t = self.textures.get(texture);
         t.read_pixels(bytes);
     }
     fn texture_update_part(
@@ -736,15 +748,15 @@ impl RenderingBackend for GlContext {
         height: i32,
         bytes: &[u8],
     ) {
-        let t = self.textures[texture.0];
+        let t = self.textures.get(texture);
         t.update_texture_part(self, x_offset, y_offset, width, height, bytes);
     }
     fn texture_params(&self, texture: TextureId) -> TextureParams {
-        let texture = self.textures[texture.0];
+        let texture = self.textures.get(texture);
         texture.params
     }
     unsafe fn texture_raw_id(&self, texture: TextureId) -> RawId {
-        let texture = self.textures[texture.0];
+        let texture = self.textures.get(texture);
         RawId::OpenGl(texture.raw)
     }
 
@@ -762,7 +774,7 @@ impl RenderingBackend for GlContext {
                 GL_FRAMEBUFFER,
                 GL_COLOR_ATTACHMENT0,
                 GL_TEXTURE_2D,
-                self.textures[color_img.0].raw,
+                self.textures.get(color_img).raw,
                 0,
             );
             if let Some(depth_img) = depth_img {
@@ -770,7 +782,7 @@ impl RenderingBackend for GlContext {
                     GL_FRAMEBUFFER,
                     GL_DEPTH_ATTACHMENT,
                     GL_TEXTURE_2D,
-                    self.textures[depth_img.0].raw,
+                    self.textures.get(depth_img).raw,
                     0,
                 );
             }
@@ -794,9 +806,9 @@ impl RenderingBackend for GlContext {
 
         unsafe { glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _) }
 
-        self.textures[render_pass.texture.0].delete();
+        self.textures.get(render_pass.texture).delete();
         if let Some(depth_texture) = render_pass.depth_texture {
-            self.textures[depth_texture.0].delete();
+            self.textures.get(depth_texture).delete();
         }
     }
 
@@ -1082,7 +1094,7 @@ impl RenderingBackend for GlContext {
             if let Some(gl_loc) = shader_image.gl_loc {
                 unsafe {
                     self.cache
-                        .bind_texture(n, self.textures[bindings_image.0].raw);
+                        .bind_texture(n, self.textures.get(*bindings_image).raw);
                     glUniform1i(gl_loc, n as i32);
                 }
             }
@@ -1251,8 +1263,8 @@ impl RenderingBackend for GlContext {
                 let pass = &self.passes[pass.0];
                 (
                     pass.gl_fb,
-                    self.textures[pass.texture.0].params.width as i32,
-                    self.textures[pass.texture.0].params.height as i32,
+                    self.textures.get(pass.texture).params.width as i32,
+                    self.textures.get(pass.texture).params.height as i32,
                 )
             }
         };
