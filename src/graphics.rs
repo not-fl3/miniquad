@@ -1029,6 +1029,7 @@ pub trait RenderingBackend {
     }
     fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode);
     fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap);
+    fn texture_set_wrap_xy(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap);
     fn texture_resize(&mut self, texture: TextureId, width: u32, height: u32, bytes: Option<&[u8]>);
     fn texture_read_pixels(&mut self, texture: TextureId, bytes: &mut [u8]);
     fn texture_update_part(

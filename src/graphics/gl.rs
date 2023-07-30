@@ -220,6 +220,27 @@ impl Texture {
         }
         ctx.cache.restore_texture_binding(0);
     }
+    pub fn set_wrap_xy(&self, ctx: &mut GlContext, wrap_x: TextureWrap, wrap_y: TextureWrap) {
+        ctx.cache.store_texture_binding(0);
+        ctx.cache.bind_texture(0, self.raw);
+        let wrap_x = match wrap_x {
+            TextureWrap::Repeat => GL_REPEAT,
+            TextureWrap::Mirror => GL_MIRRORED_REPEAT,
+            TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
+        };
+
+        let wrap_y = match wrap_y {
+            TextureWrap::Repeat => GL_REPEAT,
+            TextureWrap::Mirror => GL_MIRRORED_REPEAT,
+            TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
+        };
+
+        unsafe {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_x as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_x as i32);
+        }
+        ctx.cache.restore_texture_binding(0);
+    }
 
     pub fn set_wrap(&self, ctx: &mut GlContext, wrap: TextureWrap) {
         ctx.cache.store_texture_binding(0);
@@ -726,6 +747,15 @@ impl RenderingBackend for GlContext {
     fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap) {
         let t = self.textures.get(texture);
         t.set_wrap(self, wrap);
+    }
+    fn texture_set_wrap_xy(
+        &mut self,
+        texture: TextureId,
+        wrap_x: TextureWrap,
+        wrap_y: TextureWrap,
+    ) {
+        let t = self.textures[texture.0];
+        t.set_wrap_xy(self, wrap_x, wrap_y);
     }
     fn texture_resize(
         &mut self,

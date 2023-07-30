@@ -417,6 +417,14 @@ impl RenderingBackend for MetalContext {
     fn texture_set_wrap(&mut self, _texture: TextureId, _wrap: TextureWrap) {
         unimplemented!()
     }
+    fn texture_set_wrap_xy(
+        &mut self,
+        texture: TextureId,
+        wrap_x: TextureWrap,
+        wrap_y: TextureWrap,
+    ) {
+        unimplemented!();
+    }
     fn texture_resize(
         &mut self,
         _texture: TextureId,
