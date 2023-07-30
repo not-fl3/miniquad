@@ -654,6 +654,9 @@ impl RenderingBackend for MetalContext {
         }
         texture
     }
+    fn new_texture_from_raw_id(&mut self, raw_id: RawId) -> TextureId {
+        unimplemented!()
+    }
 
     fn texture_update_part(
         &mut self,
