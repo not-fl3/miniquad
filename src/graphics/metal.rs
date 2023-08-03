@@ -397,6 +397,32 @@ impl RenderingBackend for MetalContext {
         };
         unsafe { msg_send_![self.render_encoder.unwrap(), setScissorRect: r] };
     }
+    fn texture_set_filter_min_mag(
+        &mut self,
+        texture: TextureId,
+        filter_min: FilterMode,
+        filter_max: FilterMode,
+    ) {
+        let mut texture = &mut self.textures[texture.0];
+
+        let filter_min = match filter_min {
+            FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
+            FilterMode::Linear => MTLSamplerMinMagFilter::Linear,
+        };
+        let filter_max = match filter_max {
+            FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
+            FilterMode::Linear => MTLSamplerMinMagFilter::Linear,
+        };
+
+        texture.sampler = unsafe {
+            let sampler_dsc = msg_send_![class!(MTLSamplerDescriptor), new];
+
+            msg_send_![sampler_dsc, setMinFilter: filter_min];
+            msg_send_![sampler_dsc, setMagFilter: filter_max];
+
+            msg_send_![self.device, newSamplerStateWithDescriptor: sampler_dsc]
+        };
+    }
     fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {
         let texture = self.textures.get_mut(texture);
 

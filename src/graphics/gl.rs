@@ -220,6 +220,29 @@ impl Texture {
         }
         ctx.cache.restore_texture_binding(0);
     }
+    pub fn set_filter_min_mag(
+        &self,
+        ctx: &mut GlContext,
+        min_filter: FilterMode,
+        max_filter: FilterMode,
+    ) {
+        ctx.cache.store_texture_binding(0);
+        ctx.cache.bind_texture(0, self.raw);
+
+        let min_filter = match min_filter {
+            FilterMode::Nearest => GL_NEAREST,
+            FilterMode::Linear => GL_LINEAR,
+        };
+        let max_filter = match max_filter {
+            FilterMode::Nearest => GL_NEAREST,
+            FilterMode::Linear => GL_LINEAR,
+        };
+        unsafe {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, max_filter as i32);
+        }
+        ctx.cache.restore_texture_binding(0);
+    }
     pub fn set_wrap_xy(&self, ctx: &mut GlContext, wrap_x: TextureWrap, wrap_y: TextureWrap) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.raw);
@@ -743,6 +766,15 @@ impl RenderingBackend for GlContext {
     fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {
         let t = self.textures.get(texture);
         t.set_filter(self, filter);
+    }
+    fn texture_set_filter_min_mag(
+        &mut self,
+        texture: TextureId,
+        filter_min: FilterMode,
+        filter_max: FilterMode,
+    ) {
+        let t = self.textures[texture.0];
+        t.set_filter_min_mag(self, filter_min, filter_max);
     }
     fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap) {
         let t = self.textures.get(texture);
