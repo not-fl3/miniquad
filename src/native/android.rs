@@ -406,7 +406,7 @@ where
         let clipboard = Box::new(AndroidClipboard::new());
         crate::set_display(NativeDisplayData {
             high_dpi: conf.high_dpi,
-            ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
+            ..NativeDisplayData::new(screen_width as _, screen_height as _, tx, clipboard)
         });
 
         let event_handler = f.0();
