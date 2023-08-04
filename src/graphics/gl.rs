@@ -773,7 +773,7 @@ impl RenderingBackend for GlContext {
         filter_min: FilterMode,
         filter_max: FilterMode,
     ) {
-        let t = self.textures[texture.0];
+        let t = self.textures.get(texture);
         t.set_filter_min_mag(self, filter_min, filter_max);
     }
     fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap) {
@@ -786,7 +786,7 @@ impl RenderingBackend for GlContext {
         wrap_x: TextureWrap,
         wrap_y: TextureWrap,
     ) {
-        let t = self.textures[texture.0];
+        let t = self.textures.get(texture);
         t.set_wrap_xy(self, wrap_x, wrap_y);
     }
     fn texture_resize(
