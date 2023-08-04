@@ -403,7 +403,7 @@ impl RenderingBackend for MetalContext {
         filter_min: FilterMode,
         filter_max: FilterMode,
     ) {
-        let mut texture = &mut self.textures[texture.0];
+        let mut texture = &mut self.textures.get(texture);
 
         let filter_min = match filter_min {
             FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
