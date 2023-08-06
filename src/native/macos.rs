@@ -25,6 +25,7 @@ pub struct MacosDisplay {
     // unbalanced show_mouse() calls
     cursor_shown: bool,
     current_cursor: CursorIcon,
+    cursor_grabbed: bool,
     cursors: HashMap<CursorIcon, ObjcId>,
     gfx_api: crate::conf::AppleGfxApi,
 
@@ -35,6 +36,24 @@ pub struct MacosDisplay {
 }
 
 impl MacosDisplay {
+    fn set_cursor_grab(&mut self, window: *mut Object, grab: bool) {
+        if grab == self.cursor_grabbed {
+            return;
+        }
+
+        self.cursor_grabbed = grab;
+
+        unsafe {
+            if grab {
+                self.move_mouse_inside_window(window);
+                CGAssociateMouseAndMouseCursorPosition(NO);
+                let () = msg_send![class!(NSCursor), hide];
+            } else {
+                let () = msg_send![class!(NSCursor), unhide];
+                CGAssociateMouseAndMouseCursorPosition(YES);
+            }
+        }
+    }
     fn show_mouse(&mut self, show: bool) {
         if show && !self.cursor_shown {
             unsafe {
@@ -114,6 +133,18 @@ impl MacosDisplay {
         (new_x, new_y)
     }
 
+    fn move_mouse_inside_window(&self, window: *mut Object) {
+        unsafe {
+            let frame: NSRect = msg_send![self.window, frame];
+            let origin = self.transform_mouse_point(&frame.origin);
+            let point = NSPoint {
+                x: (origin.0 as f64) + (frame.size.width / 2.0),
+                y: (origin.1 as f64) + (frame.size.height / 2.0),
+            };
+            CGWarpMouseCursorPosition(point);
+        }
+    }
+
     unsafe fn update_dimensions(&mut self) -> Option<(i32, i32)> {
         let mut d = native_display().lock().unwrap();
         if d.high_dpi {
@@ -144,6 +175,7 @@ impl MacosDisplay {
         use Request::*;
         unsafe {
             match request {
+                SetCursorGrab(grab) => self.set_cursor_grab(self.window, grab),
                 ShowMouse(show) => self.show_mouse(show),
                 SetMouseCursor(icon) => self.set_mouse_cursor(icon),
                 SetWindowSize {
@@ -330,10 +362,18 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         let payload = get_window_payload(this);
 
         unsafe {
-            let point: NSPoint = msg_send!(event, locationInWindow);
-            let point = payload.transform_mouse_point(&point);
-            if let Some(event_handler) = payload.context() {
-                event_handler.mouse_motion_event(point.0, point.1);
+            if payload.cursor_grabbed {
+                let dx: f64 = msg_send!(event, deltaX);
+                let dy: f64 = msg_send!(event, deltaY);
+                if let Some(event_handler) = payload.context() {
+                    event_handler.raw_mouse_motion(dx as f32, dy as f32);
+                }
+            } else {
+                let point: NSPoint = msg_send!(event, locationInWindow);
+                let point = payload.transform_mouse_point(&point);
+                if let Some(event_handler) = payload.context() {
+                    event_handler.mouse_motion_event(point.0, point.1);
+                }
             }
         }
     }
@@ -842,6 +882,7 @@ where
         fullscreen: false,
         cursor_shown: true,
         current_cursor: CursorIcon::Default,
+        cursor_grabbed: false,
         cursors: HashMap::new(),
         gfx_api: conf.platform.apple_gfx_api,
         f: Some(Box::new(f)),
