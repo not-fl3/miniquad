@@ -11,6 +11,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.Surface;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.view.WindowManager.LayoutParams;
 import android.view.SurfaceView;
 import android.view.SurfaceHolder;
@@ -21,6 +22,11 @@ import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
 import android.content.Intent;
 
+import android.graphics.Color;
+import android.graphics.Insets;
+import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.EditorInfo;
+import android.widget.LinearLayout;
 
 import quad_native.QuadNative;
 
@@ -166,8 +172,42 @@ class QuadSurface
         return true;
     }
 
+    // There is an Android bug when screen is in landscape,
+    // the keyboard inset height is reported as 0.
+    // This code is a workaround which fixes the bug.
+    // See https://groups.google.com/g/android-developers/c/50XcWooqk7I
+    // For some reason it only works if placed here and not in the parent layout.
+    @Override
+    public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        InputConnection connection = super.onCreateInputConnection(outAttrs);
+        outAttrs.imeOptions |= EditorInfo.IME_FLAG_NO_FULLSCREEN;
+        return connection;
+    }
+
     public Surface getNativeSurface() {
         return getHolder().getSurface();
+    }
+}
+
+class ResizingLayout
+    extends
+        LinearLayout
+    implements
+        View.OnApplyWindowInsetsListener {
+
+    public ResizingLayout(Context context){
+        super(context);
+        // When viewing in landscape mode with keyboard shown, there are
+        // gaps on both sides so we fill the negative space with black.
+        setBackgroundColor(Color.BLACK);
+        setOnApplyWindowInsetsListener(this);
+    }
+
+    @Override
+    public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+        Insets imeInsets = insets.getInsets(WindowInsets.Type.ime());
+        v.setPadding(0, 0, 0, imeInsets.bottom);
+        return insets;
     }
 }
 
@@ -187,7 +227,10 @@ public class MainActivity extends Activity {
         this.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
         view = new QuadSurface(this);
-        setContentView(view);
+        // Put it inside a parent layout which can resize it using padding
+        ResizingLayout layout = new ResizingLayout(this);
+        layout.addView(view);
+        setContentView(layout);
 
         QuadNative.activityOnCreate(this);
 
