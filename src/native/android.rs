@@ -1,5 +1,5 @@
 use crate::{
-    event::{EventHandler, KeyCode, TouchPhase},
+    event::{EventHandler, KeyCode, KeyMods, TouchPhase},
     native::{
         egl::{self, LibEgl},
         NativeDisplayData,
@@ -136,6 +136,7 @@ struct MainThreadState {
     event_handler: Box<dyn EventHandler>,
     quit: bool,
     fullscreen: bool,
+    keymods: KeyMods,
 }
 
 impl MainThreadState {
@@ -217,11 +218,25 @@ impl MainThreadState {
                 }
             }
             Message::KeyDown { keycode } => {
+                match keycode {
+                    KeyCode::LeftShift | KeyCode::RightShift => self.keymods.shift = true,
+                    KeyCode::LeftControl | KeyCode::RightControl => self.keymods.ctrl = true,
+                    KeyCode::LeftAlt | KeyCode::RightAlt => self.keymods.alt = true,
+                    KeyCode::LeftSuper | KeyCode::RightSuper => self.keymods.logo = true,
+                    _ => {}
+                }
                 self.event_handler
-                    .key_down_event(keycode, Default::default(), false);
+                    .key_down_event(keycode, self.keymods, false);
             }
             Message::KeyUp { keycode } => {
-                self.event_handler.key_up_event(keycode, Default::default());
+                match keycode {
+                    KeyCode::LeftShift | KeyCode::RightShift => self.keymods.shift = false,
+                    KeyCode::LeftControl | KeyCode::RightControl => self.keymods.ctrl = false,
+                    KeyCode::LeftAlt | KeyCode::RightAlt => self.keymods.alt = false,
+                    KeyCode::LeftSuper | KeyCode::RightSuper => self.keymods.logo = false,
+                    _ => {}
+                }
+                self.event_handler.key_up_event(keycode, self.keymods);
             }
             Message::Pause => self.event_handler.window_minimized_event(),
             Message::Resume => {
@@ -420,6 +435,12 @@ where
             event_handler,
             quit: false,
             fullscreen: conf.fullscreen,
+            keymods: KeyMods {
+                shift: false,
+                ctrl: false,
+                alt: false,
+                logo: false,
+            },
         };
 
         while !s.quit {
