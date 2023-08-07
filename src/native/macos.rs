@@ -46,11 +46,11 @@ impl MacosDisplay {
         unsafe {
             if grab {
                 self.move_mouse_inside_window(window);
-                CGAssociateMouseAndMouseCursorPosition(NO);
+                CGAssociateMouseAndMouseCursorPosition(false);
                 let () = msg_send![class!(NSCursor), hide];
             } else {
                 let () = msg_send![class!(NSCursor), unhide];
-                CGAssociateMouseAndMouseCursorPosition(YES);
+                CGAssociateMouseAndMouseCursorPosition(true);
             }
         }
     }
