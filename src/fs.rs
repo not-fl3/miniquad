@@ -29,7 +29,7 @@ impl From<std::io::Error> for Error {
 pub type Response = Result<Vec<u8>, Error>;
 
 /// Filesystem path on desktops or HTTP URL in WASM
-pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
+pub fn load_file<F: Fn(Response) + 'static + Send>(path: &str, on_loaded: F) {
     #[cfg(target_arch = "wasm32")]
     wasm::load_file(path, on_loaded);
 
@@ -116,18 +116,17 @@ mod wasm {
 }
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
-fn load_file_desktop<F: Fn(Response)>(path: &str, on_loaded: F) {
-    fn load_file_sync(path: &str) -> Response {
-        use std::fs::File;
-        use std::io::Read;
-
-        let mut response = vec![];
-        let mut file = File::open(path)?;
-        file.read_to_end(&mut response)?;
-        Ok(response)
-    }
-
-    let response = load_file_sync(path);
-
-    on_loaded(response);
+fn load_file_desktop<F: Fn(Response) + Send + 'static>(path: &str, on_loaded: F) {
+    use std::fs::File;
+    use std::io::Read;
+    let file = File::open(path);
+    std::thread::spawn(move || {
+        let res = file.map_err(Error::from).and_then(|mut file| {
+            let mut response = vec![];
+            file.read_to_end(&mut response)
+                .map_err(Error::from)
+                .map(|_| response)
+        });
+        on_loaded(res);
+    });
 }
