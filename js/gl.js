@@ -11,7 +11,7 @@
 const version = "0.3.12";
 
 const canvas = document.querySelector("#glcanvas");
-const gl = canvas.getContext("webgl2");
+const gl = canvas.getContext("webgl");
 if (gl === null) {
     alert("Unable to initialize WebGL. Your browser or machine may not support it.");
 }
