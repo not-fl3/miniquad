@@ -47,7 +47,7 @@ fn set_display(display: native::NativeDisplayData) {
 fn native_display() -> &'static Mutex<native::NativeDisplayData> {
     NATIVE_DISPLAY
         .get()
-        .expect("Backend did not initialized NATIVE_DISPLAY yet.") //|| Mutex::new(Default::default()))
+        .expect("Backend has not initialized NATIVE_DISPLAY yet.") //|| Mutex::new(Default::default()))
 }
 
 /// Window and associated to window rendering context related functions.
