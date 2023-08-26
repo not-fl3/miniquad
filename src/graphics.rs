@@ -304,6 +304,7 @@ impl Error for ShaderError {
 pub enum TextureFormat {
     RGB8,
     RGBA8,
+    RGBA16,
     Depth,
     Alpha,
 }
@@ -314,6 +315,7 @@ impl TextureFormat {
         match self {
             TextureFormat::RGB8 => 3 * square,
             TextureFormat::RGBA8 => 4 * square,
+            TextureFormat::RGBA16 => 4 * square,
             TextureFormat::Depth => 2 * square,
             TextureFormat::Alpha => 1 * square,
         }
