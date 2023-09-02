@@ -946,6 +946,16 @@ impl<'a> BufferSource<'a> {
             _phantom: std::marker::PhantomData,
         })
     }
+
+    pub unsafe fn pointer(ptr: *const u8, size: usize, element_size: usize) -> BufferSource<'a> {
+        BufferSource::Slice(Arg {
+            ptr: ptr as _,
+            size,
+            element_size,
+            is_slice: true,
+            _phantom: std::marker::PhantomData,
+        })
+    }
 }
 
 pub struct UniformsSource<'a>(Arg<'a>);
