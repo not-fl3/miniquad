@@ -37,6 +37,8 @@ pub mod date {
     }
 }
 
+pub type Context = dyn RenderingBackend;
+
 use std::sync::{Mutex, OnceLock};
 
 static NATIVE_DISPLAY: OnceLock<Mutex<native::NativeDisplayData>> = OnceLock::new();
