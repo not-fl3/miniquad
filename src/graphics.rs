@@ -928,8 +928,7 @@ impl<'a> BufferSource<'a> {
     /// but for IndexBuffers T should be either u8, u16 or u32, other
     /// types are not supported.
     ///
-    /// For vertex buffers ff the type is not yet known, only total byte size,
-    /// it is OK to use `empty::<u8>(byte_size);`
+    /// For vertex buffers it is OK to use `empty::<u8>(byte_size);`
     pub fn empty<T>(size: usize) -> BufferSource<'a> {
         let element_size = std::mem::size_of::<T>();
         BufferSource::Empty {
@@ -962,11 +961,10 @@ impl<'a> UniformsSource<'a> {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct ShaderSource<'a> {
-    pub glsl_vertex: Option<&'a str>,
-    pub glsl_fragment: Option<&'a str>,
-    pub metal_shader: Option<&'a str>,
+#[derive(Debug)]
+pub enum ShaderSource<'a> {
+    Glsl { vertex: &'a str, fragment: &'a str },
+    Msl { program: &'a str },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
@@ -976,7 +974,59 @@ pub enum RawId {
     Metal(*mut objc::runtime::Object),
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct GlslSupport {
+    pub v130: bool,
+    pub v330: bool,
+    pub v300es: bool,
+    pub v100_ext: bool,
+    pub v100: bool,
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum Backend {
+    Metal,
+    OpenGl,
+}
+
+#[derive(Clone, Debug)]
+pub struct ContextInfo {
+    pub backend: Backend,
+    /// GL_VERSION_STRING from OpenGL. Would be empty on metal.
+    pub gl_version_string: String,
+    /// OpenGL provides an enumeration over GL_SHADING_LANGUAGE_VERSION,
+    /// allowing to see which glsl versions are actually supported.
+    /// Unfortunately, it only works on GL4.3+... and even there it is not quite correct.
+    ///
+    /// miniquad will take a guess based on GL_VERSION_STRING, current platform and implementation details.
+    /// Would be all false on metal.
+    pub glsl_support: GlslSupport,
+}
+
 pub trait RenderingBackend {
+    fn info(&self) -> ContextInfo;
+    /// For metal context's ShaderSource should contain MSL source string, for GL - glsl.
+    /// If in doubt, _most_ OpenGL contexts support "#version 100" glsl shaders.
+    /// So far miniquad never encountered where it can create a rendering context, but `version 100` shaders are not supported.
+    ///
+    /// Typical `new_shader` invocation for an MSL and `glsl version 100` sources:
+    /// ```ignore
+    /// let source = match ctx.info().backend {
+    ///    Backend::OpenGl => ShaderSource::Glsl {
+    ///        vertex: display_shader::VERTEX,
+    ///        fragment: display_shader::FRAGMENT,
+    ///    },
+    ///    Backend::Metal => ShaderSource::Msl {
+    ///        program: display_shader::METAL
+    ///    },
+    /// };
+    /// let shader = ctx.new_shader(source, display_shader::meta()).unwrap();
+    /// ```
+    /// Or just
+    /// ```ignore
+    /// let shader = ctx.new_shader(ShaderSource::Glsl {...}, ...);
+    /// ```
+    /// for GL-only.
     fn new_shader(
         &mut self,
         shader: ShaderSource,

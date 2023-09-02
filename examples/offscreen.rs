@@ -100,16 +100,16 @@ impl Stage {
             images: vec![color_img],
         };
 
-        let default_shader = ctx
-            .new_shader(
-                ShaderSource {
-                    glsl_vertex: Some(display_shader::VERTEX),
-                    glsl_fragment: Some(display_shader::FRAGMENT),
-                    metal_shader: Some(display_shader::METAL),
-                },
-                display_shader::meta(),
-            )
-            .unwrap();
+        let source = match ctx.info().backend {
+            Backend::OpenGl => ShaderSource::Glsl {
+                vertex: display_shader::VERTEX,
+                fragment: display_shader::FRAGMENT,
+            },
+            Backend::Metal => ShaderSource::Msl {
+                program: display_shader::METAL,
+            },
+        };
+        let default_shader = ctx.new_shader(source, display_shader::meta()).unwrap();
 
         let display_pipeline = ctx.new_pipeline_with_params(
             &[BufferLayout::default()],
@@ -126,16 +126,16 @@ impl Stage {
             },
         );
 
-        let offscreen_shader = ctx
-            .new_shader(
-                ShaderSource {
-                    glsl_vertex: Some(offscreen_shader::VERTEX),
-                    glsl_fragment: Some(offscreen_shader::FRAGMENT),
-                    metal_shader: Some(offscreen_shader::METAL),
-                },
-                offscreen_shader::meta(),
-            )
-            .unwrap();
+        let source = match ctx.info().backend {
+            Backend::OpenGl => ShaderSource::Glsl {
+                vertex: offscreen_shader::VERTEX,
+                fragment: offscreen_shader::FRAGMENT,
+            },
+            Backend::Metal => ShaderSource::Msl {
+                program: offscreen_shader::METAL,
+            },
+        };
+        let offscreen_shader = ctx.new_shader(source, offscreen_shader::meta()).unwrap();
 
         let offscreen_pipeline = ctx.new_pipeline_with_params(
             &[BufferLayout {

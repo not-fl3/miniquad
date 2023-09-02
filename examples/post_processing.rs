@@ -126,10 +126,12 @@ impl Stage {
 
         let default_shader = ctx
             .new_shader(
-                ShaderSource {
-                    glsl_vertex: Some(post_processing_shader::VERTEX),
-                    glsl_fragment: Some(post_processing_shader::FRAGMENT),
-                    metal_shader: None,
+                match ctx.info().backend {
+                    Backend::OpenGl => ShaderSource::Glsl {
+                        vertex: post_processing_shader::VERTEX,
+                        fragment: post_processing_shader::FRAGMENT,
+                    },
+                    Backend::Metal => unimplemented!(),
                 },
                 post_processing_shader::meta(),
             )
@@ -146,10 +148,9 @@ impl Stage {
 
         let offscreen_shader = ctx
             .new_shader(
-                ShaderSource {
-                    glsl_vertex: Some(offscreen_shader::VERTEX),
-                    glsl_fragment: Some(offscreen_shader::FRAGMENT),
-                    metal_shader: None,
+                ShaderSource::Glsl {
+                    vertex: offscreen_shader::VERTEX,
+                    fragment: offscreen_shader::FRAGMENT,
                 },
                 offscreen_shader::meta(),
             )

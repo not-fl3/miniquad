@@ -43,10 +43,14 @@ impl Stage {
 
         let shader = ctx
             .new_shader(
-                ShaderSource {
-                    glsl_vertex: Some(shader::GL_VERTEX),
-                    glsl_fragment: Some(shader::GL_FRAGMENT),
-                    metal_shader: Some(shader::METAL),
+                match ctx.info().backend {
+                    Backend::OpenGl => ShaderSource::Glsl {
+                        vertex: shader::VERTEX,
+                        fragment: shader::FRAGMENT,
+                    },
+                    Backend::Metal => ShaderSource::Msl {
+                        program: shader::METAL,
+                    },
                 },
                 shader::meta(),
             )
@@ -99,7 +103,7 @@ fn main() {
 mod shader {
     use miniquad::*;
 
-    pub const GL_VERTEX: &str = r#"#version 100
+    pub const VERTEX: &str = r#"#version 100
     attribute vec2 in_pos;
     attribute vec4 in_color;
 
@@ -110,7 +114,7 @@ mod shader {
         color = in_color;
     }"#;
 
-    pub const GL_FRAGMENT: &str = r#"#version 100
+    pub const FRAGMENT: &str = r#"#version 100
     varying lowp vec4 color;
 
     void main() {

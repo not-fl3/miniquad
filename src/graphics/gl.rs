@@ -735,16 +735,61 @@ impl GlContext {
 }
 
 impl RenderingBackend for GlContext {
+    fn info(&self) -> ContextInfo {
+        let version_string = unsafe { glGetString(super::gl::GL_VERSION) };
+        let gl_version_string = unsafe { std::ffi::CStr::from_ptr(version_string as _) }
+            .to_str()
+            .unwrap()
+            .to_string();
+        let gles3 = gl_version_string.contains("OpenGL ES 3");
+        let gles2 = !gles3 && gl_version_string.contains("OpenGL ES");
+
+        let mut glsl_support = GlslSupport::default();
+
+        // this is not quite documented,
+        // but somehow even GL2.1 usually have all the compatibility extensions to support glsl100
+        // It was tested on really old windows machines, virtual machines etc. glsl100 always works!
+        glsl_support.v100 = true;
+
+        // on wasm miniquad always creates webgl1 context, with the only glsl available being version 100
+        #[cfg(target_arch = "wasm32")]
+        {
+            // on web, miniquad always loads EXT_shader_texture_lod and OES_standard_derivatives
+            glsl_support.v100_ext = true;
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if gles3 {
+                glsl_support.v300es = true;
+            }
+        }
+
+        // there is no gl3.4, so 4+ and 3.3 covers all modern OpenGL
+        if gl_version_string.starts_with("4") || gl_version_string.starts_with("3.3") {
+            glsl_support.v330 = true;
+        } else
+        // gl 3.0, 3.1, 3.2 maps to 1.30, 1.40, 1.50 glsl versions
+        if gl_version_string.starts_with("3") {
+            glsl_support.v130 = true;
+        }
+
+        ContextInfo {
+            backend: Backend::OpenGl,
+            gl_version_string,
+            glsl_support,
+        }
+    }
     fn new_shader(
         &mut self,
         shader: ShaderSource,
         meta: ShaderMeta,
     ) -> Result<ShaderId, ShaderError> {
-        let shader = load_shader_internal(
-            shader.glsl_vertex.unwrap(),
-            shader.glsl_fragment.unwrap(),
-            meta,
-        )?;
+        let (fragment, vertex) = match shader {
+            ShaderSource::Glsl { fragment, vertex } => (fragment, vertex),
+            _ => panic!("Metal source on OpenGl context"),
+        };
+        let shader = load_shader_internal(vertex, fragment, meta)?;
         self.shaders.push(shader);
         Ok(ShaderId(self.shaders.len() - 1))
     }

@@ -606,7 +606,11 @@ impl RenderingBackend for MetalContext {
         _meta: ShaderMeta,
     ) -> Result<ShaderId, ShaderError> {
         unsafe {
-            let shader = apple_util::str_to_nsstring(shader.metal_shader.unwrap());
+            let program = match shader {
+                ShaderSource::Msl { program } => program,
+                _ => panic!("OpenGl source on Metal context"),
+            };
+            let shader = apple_util::str_to_nsstring(program);
             let mut error: ObjcId = nil;
             let library: ObjcId = msg_send![
                 self.device,
