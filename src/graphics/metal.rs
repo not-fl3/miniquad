@@ -378,6 +378,12 @@ impl MetalContext {
 }
 
 impl RenderingBackend for MetalContext {
+    fn info(&self) -> ContextInfo {
+        backend: Backend::Metal,
+        gl_version_string: Default::default(),
+        glsl_support: Default::default(),
+
+    }
     fn buffer_size(&mut self, buffer: BufferId) -> usize {
         let buffer = &self.buffers[buffer.0];
         buffer.size
@@ -454,13 +460,13 @@ impl RenderingBackend for MetalContext {
     fn texture_set_wrap(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap) {
         let texture = self.textures.get_mut(texture);
 
-        let wrap_s = match wrap {
+        let wrap_s = match wrap_x {
             TextureWrap::Repeat => MTLSamplerAddressMode::Repeat,
             TextureWrap::Mirror => MTLSamplerAddressMode::MirrorRepeat,
             TextureWrap::Clamp => MTLSamplerAddressMode::ClampToEdge,
         };
 
-        let wrap_t = match wrap {
+        let wrap_t = match wrap_y {
             TextureWrap::Repeat => MTLSamplerAddressMode::Repeat,
             TextureWrap::Mirror => MTLSamplerAddressMode::MirrorRepeat,
             TextureWrap::Clamp => MTLSamplerAddressMode::ClampToEdge,
