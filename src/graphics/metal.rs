@@ -244,6 +244,7 @@ struct PipelineInternal {
 struct Texture {
     texture: ObjcId,
     sampler: ObjcId,
+    sampler_descriptor: ObjcId,
     params: TextureParams,
 }
 struct Textures(Vec<Texture>);
@@ -408,33 +409,36 @@ impl RenderingBackend for MetalContext {
         };
         unsafe { msg_send_![self.render_encoder.unwrap(), setScissorRect: r] };
     }
-    fn texture_set_filter_min_mag(
+    fn texture_set_min_filter(
         &mut self,
         texture: TextureId,
-        filter_min: FilterMode,
-        filter_max: FilterMode,
+        filter: FilterMode,
+        mipmap_filter: MipmapFilterMode,
     ) {
-        let mut texture = &mut self.textures.get(texture);
+        let texture = self.textures.get_mut(texture);
 
-        let filter_min = match filter_min {
+        let filter = match filter {
             FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
             FilterMode::Linear => MTLSamplerMinMagFilter::Linear,
         };
-        let filter_max = match filter_max {
-            FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
-            FilterMode::Linear => MTLSamplerMinMagFilter::Linear,
+
+        let mipmap_filter = match mipmap_filter {
+            MipmapFilterMode::None => MTLSamplerMipFilter::NotMipmapped,
+            MipmapFilterMode::Nearest => MTLSamplerMipFilter::Nearest,
+            MipmapFilterMode::Linear => MTLSamplerMipFilter::Linear,
         };
 
         texture.sampler = unsafe {
-            let sampler_dsc = msg_send_![class!(MTLSamplerDescriptor), new];
-
-            msg_send_![sampler_dsc, setMinFilter: filter_min];
-            msg_send_![sampler_dsc, setMagFilter: filter_max];
-
-            msg_send_![self.device, newSamplerStateWithDescriptor: sampler_dsc]
+            let sampler_descriptor = msg_send_![class!(MTLSamplerDescriptor), new];
+            msg_send_![sampler_descriptor, setMinFilter: filter];
+            msg_send_![sampler_descriptor, setMipFilter: mipmap_filter];
+            msg_send_![
+                self.device,
+                newSamplerStateWithDescriptor: sampler_descriptor
+            ]
         };
     }
-    fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {
+    fn texture_set_mag_filter(&mut self, texture: TextureId, filter: FilterMode) {
         let texture = self.textures.get_mut(texture);
 
         let filter = match filter {
@@ -443,24 +447,31 @@ impl RenderingBackend for MetalContext {
         };
 
         texture.sampler = unsafe {
-            let sampler_dsc = msg_send_![class!(MTLSamplerDescriptor), new];
-
-            msg_send_![sampler_dsc, setMinFilter: filter];
-            msg_send_![sampler_dsc, setMagFilter: filter];
-
-            msg_send_![self.device, newSamplerStateWithDescriptor: sampler_dsc]
+            msg_send_![texture.sampler_descriptor, setMagFilter: filter];
+            msg_send_![self.device, newSamplerStateWithDescriptor: texture.sampler_descriptor]
         };
     }
-    fn texture_set_wrap(&mut self, _texture: TextureId, _wrap: TextureWrap) {
-        unimplemented!()
-    }
-    fn texture_set_wrap_xy(
-        &mut self,
-        texture: TextureId,
-        wrap_x: TextureWrap,
-        wrap_y: TextureWrap,
-    ) {
-        unimplemented!();
+    fn texture_set_wrap(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap) {
+        let texture = self.textures.get_mut(texture);
+
+        let wrap_s = match wrap {
+            TextureWrap::Repeat => MTLSamplerAddressMode::Repeat,
+            TextureWrap::Mirror => MTLSamplerAddressMode::MirrorRepeat,
+            TextureWrap::Clamp => MTLSamplerAddressMode::ClampToEdge,
+        };
+
+        let wrap_t = match wrap {
+            TextureWrap::Repeat => MTLSamplerAddressMode::Repeat,
+            TextureWrap::Mirror => MTLSamplerAddressMode::MirrorRepeat,
+            TextureWrap::Clamp => MTLSamplerAddressMode::ClampToEdge,
+        };
+
+        texture.sampler = unsafe {
+            //msg_send_![texture.sampler_descriptor, setRAddressMode: wrap];
+            msg_send_![texture.sampler_descriptor, setSAddressMode: wrap_s];
+            msg_send_![texture.sampler_descriptor, setTAddressMode: wrap_t];
+            msg_send_![self.device, newSamplerStateWithDescriptor: texture.sampler_descriptor]
+        };
     }
     fn texture_resize(
         &mut self,
@@ -473,6 +484,18 @@ impl RenderingBackend for MetalContext {
     }
     fn texture_read_pixels(&mut self, _texture: TextureId, _bytes: &mut [u8]) {
         unimplemented!()
+    }
+    fn texture_generate_mipmaps(&mut self, texture: TextureId) {
+        unsafe {
+            if self.command_buffer.is_none() {
+                self.command_buffer = Some(msg_send![self.command_queue, commandBuffer]);
+            }
+            let command_buffer = self.command_buffer.unwrap();
+            let encoder = msg_send_![command_buffer, blitCommandEncoder];
+            let texture = self.textures.get(texture);
+            msg_send_![encoder, generateMipmapsForTexture: texture.texture];
+            msg_send_![encoder, endEncoding];
+        }
     }
     fn texture_params(&self, texture: TextureId) -> TextureParams {
         let texture = self.textures.get(texture);
@@ -651,18 +674,22 @@ impl RenderingBackend for MetalContext {
     fn new_texture(
         &mut self,
         access: TextureAccess,
-        bytes: Option<&[u8]>,
+        bytes: TextureSource,
         params: TextureParams,
     ) -> TextureId {
-        let descriptor = unsafe { msg_send_![class!(MTLTextureDescriptor), new] };
+        let descriptor = unsafe {
+            msg_send_![class!(MTLTextureDescriptor),
+                       texture2DDescriptorWithPixelFormat:MTLPixelFormat::from(params.format)
+                       width: params.width as u64
+                       height: params.height as u64
+                       mipmapped: params.allocate_mipmaps as BOOL]
+        };
+
         // unsafe {
         //     msg_send_![descriptor, retain];
         // }
         unsafe {
-            msg_send_![descriptor, setWidth:params.width as u64];
-            msg_send_![descriptor, setHeight:params.height as u64];
             msg_send_![descriptor, setCpuCacheMode: MTLCPUCacheMode::DefaultCache];
-            msg_send_![descriptor, setPixelFormat: MTLPixelFormat::from(params.format)];
 
             if access == TextureAccess::RenderTarget {
                 if params.format != TextureFormat::Depth {
@@ -696,29 +723,88 @@ impl RenderingBackend for MetalContext {
             }
         };
 
-        let texture = unsafe {
-            let sampler_dsc = msg_send_![class!(MTLSamplerDescriptor), new];
-            msg_send_![sampler_dsc, setMinFilter: MTLSamplerMinMagFilter::Linear];
-            msg_send_![sampler_dsc, setMagFilter: MTLSamplerMinMagFilter::Linear];
+        match params.kind {
+            TextureKind::Texture2D => {
+                // on metal textyreType2D is the default, nothing to do here
+            }
+            TextureKind::CubeMap => unsafe {
+                msg_send_![descriptor, setTextureType: MTLTextureType::CubeArray];
+            },
+        }
 
-            let sampler_state = msg_send_![self.device, newSamplerStateWithDescriptor: sampler_dsc];
+        let texture = unsafe {
+            let sampler_descriptor = msg_send_![class!(MTLSamplerDescriptor), new];
+            msg_send_![sampler_descriptor, retain];
+            msg_send_![
+                sampler_descriptor,
+                setMinFilter: MTLSamplerMinMagFilter::Linear
+            ];
+            msg_send_![
+                sampler_descriptor,
+                setMagFilter: MTLSamplerMinMagFilter::Linear
+            ];
+
+            let sampler_state = msg_send_![
+                self.device,
+                newSamplerStateWithDescriptor: sampler_descriptor
+            ];
             let raw_texture = msg_send_![self.device, newTextureWithDescriptor: descriptor];
             msg_send_![raw_texture, retain];
             self.textures.0.push(Texture {
                 sampler: sampler_state,
                 texture: raw_texture,
+                sampler_descriptor,
                 params,
             });
             TextureId(TextureIdInner::Managed(self.textures.0.len() - 1))
         };
 
-        if let Some(bytes) = bytes {
-            assert_eq!(
-                params.format.size(params.width, params.height) as usize,
-                bytes.len()
-            );
+        match bytes {
+            TextureSource::Empty => {}
+            TextureSource::Bytes(bytes) => {
+                assert_eq!(
+                    params.format.size(params.width, params.height) as usize,
+                    bytes.len()
+                );
 
-            self.texture_update_part(texture, 0, 0, params.width as _, params.height as _, bytes);
+                self.texture_update_part(
+                    texture,
+                    0,
+                    0,
+                    params.width as _,
+                    params.height as _,
+                    bytes,
+                );
+            }
+            TextureSource::Array(array) => {
+                for (n, face) in array.iter().enumerate() {
+                    for (mipmap_level, bytes) in face.iter().enumerate() {
+                        let raw_texture = self.textures.get(texture).texture;
+                        let region = MTLRegion {
+                            origin: MTLOrigin {
+                                x: 0 as u64,
+                                y: 0 as u64,
+                                z: 0,
+                            },
+                            size: MTLSize {
+                                width: params.width as u64,
+                                height: params.height as u64,
+                                depth: 1,
+                            },
+                        };
+                        assert!(bytes.len() as u32 == params.width * params.height * 4);
+                        unsafe {
+                            msg_send_![raw_texture, replaceRegion:region
+                                  mipmapLevel:mipmap_level
+                                  slice: n
+                                  withBytes:bytes.as_ptr()
+                                  bytesPerRow:(params.width * 4) as u64
+                                  bytesPerImage:0
+                            ];
+                        }
+                    }
+                }
+            }
         }
         texture
     }
@@ -958,7 +1044,12 @@ impl RenderingBackend for MetalContext {
         }
     }
 
-    fn apply_bindings(&mut self, bindings: &Bindings) {
+    fn apply_bindings_from_slice(
+        &mut self,
+        vertex_buffers: &[BufferId],
+        index_buffer: BufferId,
+        textures: &[TextureId],
+    ) {
         assert!(
             self.render_encoder.is_some(),
             "apply_bindings before begin_pass"
@@ -966,7 +1057,7 @@ impl RenderingBackend for MetalContext {
 
         unsafe {
             let render_encoder = self.render_encoder.unwrap();
-            for (index, vertex_buffer) in bindings.vertex_buffers.iter().enumerate() {
+            for (index, vertex_buffer) in vertex_buffers.iter().enumerate() {
                 let buffer = &mut self.buffers[vertex_buffer.0];
                 let () = msg_send![render_encoder,
                                    setVertexBuffer:buffer.raw[buffer.value]
@@ -974,13 +1065,13 @@ impl RenderingBackend for MetalContext {
                                    atIndex:(index + 1) as u64];
                 buffer.next_value = buffer.value + 1;
             }
-            let mut index_buffer = &mut self.buffers[bindings.index_buffer.0];
+            let mut index_buffer = &mut self.buffers[index_buffer.0];
             self.index_buffer = Some(index_buffer.raw[index_buffer.value]);
             index_buffer.next_value = index_buffer.value + 1;
 
-            let img_count = bindings.images.len();
+            let img_count = textures.len();
             if img_count > 0 {
-                for (n, img) in bindings.images.iter().enumerate() {
+                for (n, img) in textures.iter().enumerate() {
                     let Texture {
                         sampler, texture, ..
                     } = self.textures.get(*img);

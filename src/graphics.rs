@@ -337,6 +337,13 @@ pub enum FilterMode {
     Nearest,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Hash)]
+pub enum MipmapFilterMode {
+    None,
+    Linear,
+    Nearest,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TextureAccess {
     /// Used as read-only from GPU
@@ -345,22 +352,41 @@ pub enum TextureAccess {
     RenderTarget,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum TextureKind {
+    Texture2D,
+    CubeMap,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct TextureParams {
+    pub kind: TextureKind,
     pub format: TextureFormat,
     pub wrap: TextureWrap,
-    pub filter: FilterMode,
+    pub min_filter: FilterMode,
+    pub mag_filter: FilterMode,
+    pub mipmap_filter: MipmapFilterMode,
     pub width: u32,
     pub height: u32,
+    // All miniquad API could work without this flag being explicit.
+    // We can decide if mipmaps are required by the data provided
+    // And reallocate non-mipmapped texture(on metal) on generateMipmaps call
+    // But! Reallocating cubemaps is too much struggle, so leave it for later.
+    pub allocate_mipmaps: bool,
 }
+
 impl Default for TextureParams {
     fn default() -> Self {
         TextureParams {
+            kind: TextureKind::Texture2D,
             format: TextureFormat::RGBA8,
             wrap: TextureWrap::Clamp,
-            filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            mag_filter: FilterMode::Linear,
+            mipmap_filter: MipmapFilterMode::None,
             width: 0,
             height: 0,
+            allocate_mipmaps: false,
         }
     }
 }
@@ -916,6 +942,13 @@ pub struct Arg<'a> {
     _phantom: std::marker::PhantomData<&'a ()>,
 }
 
+pub enum TextureSource<'a> {
+    Empty,
+    Bytes(&'a [u8]),
+    /// Array of `[cubemap_face][mipmap_level][bytes]`
+    Array(&'a [&'a [&'a [u8]]]),
+}
+
 pub enum BufferSource<'a> {
     Slice(Arg<'a>),
     Empty { size: usize, element_size: usize },
@@ -1045,18 +1078,18 @@ pub trait RenderingBackend {
     fn new_texture(
         &mut self,
         access: TextureAccess,
-        bytes: Option<&[u8]>,
+        data: TextureSource,
         params: TextureParams,
     ) -> TextureId;
     fn new_render_texture(&mut self, params: TextureParams) -> TextureId {
-        self.new_texture(TextureAccess::RenderTarget, None, params)
+        self.new_texture(TextureAccess::RenderTarget, TextureSource::Empty, params)
     }
     fn new_texture_from_data_and_format(
         &mut self,
         bytes: &[u8],
         params: TextureParams,
     ) -> TextureId {
-        self.new_texture(TextureAccess::Static, Some(bytes), params)
+        self.new_texture(TextureAccess::Static, TextureSource::Bytes(bytes), params)
     }
     fn new_texture_from_rgba8(&mut self, width: u16, height: u16, bytes: &[u8]) -> TextureId {
         assert_eq!(width as usize * height as usize * 4, bytes.len());
@@ -1064,11 +1097,15 @@ pub trait RenderingBackend {
         self.new_texture_from_data_and_format(
             bytes,
             TextureParams {
+                kind: TextureKind::Texture2D,
                 width: width as _,
                 height: height as _,
                 format: TextureFormat::RGBA8,
                 wrap: TextureWrap::Clamp,
-                filter: FilterMode::Linear,
+                min_filter: FilterMode::Linear,
+                mag_filter: FilterMode::Linear,
+                mipmap_filter: MipmapFilterMode::None,
+                allocate_mipmaps: false,
             },
         )
     }
@@ -1087,15 +1124,29 @@ pub trait RenderingBackend {
         let (width, height) = self.texture_size(texture);
         self.texture_update_part(texture, 0 as _, 0 as _, width as _, height as _, bytes)
     }
-    fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode);
-    fn texture_set_filter_min_mag(
+    fn texture_set_filter(
         &mut self,
         texture: TextureId,
-        filter_min: FilterMode,
-        filter_max: FilterMode,
+        filter: FilterMode,
+        mipmap_filter: MipmapFilterMode,
+    ) {
+        self.texture_set_min_filter(texture, filter, mipmap_filter);
+        self.texture_set_mag_filter(texture, filter);
+    }
+    fn texture_set_min_filter(
+        &mut self,
+        texture: TextureId,
+        filter: FilterMode,
+        mipmap_filter: MipmapFilterMode,
     );
-    fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap);
-    fn texture_set_wrap_xy(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap);
+    fn texture_set_mag_filter(&mut self, texture: TextureId, filter: FilterMode);
+    fn texture_set_wrap(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap);
+    /// Metal-specific note: if texture was created without `params.generate_mipmaps`
+    /// `generate_mipmaps` will do nothing.
+    ///
+    /// Also note that if MipmapFilter is set to None, mipmaps will not be visible, even if
+    /// generated.
+    fn texture_generate_mipmaps(&mut self, texture: TextureId);
     fn texture_resize(&mut self, texture: TextureId, width: u32, height: u32, bytes: Option<&[u8]>);
     fn texture_read_pixels(&mut self, texture: TextureId, bytes: &mut [u8]);
     fn texture_update_part(

@@ -66,6 +66,14 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
     }
 }
 
+impl From<TextureKind> for GLuint {
+    fn from(kind: TextureKind) -> GLuint {
+        match kind {
+            TextureKind::Texture2D => GL_TEXTURE_2D,
+            TextureKind::CubeMap => GL_TEXTURE_CUBE_MAP,
+        }
+    }
+}
 impl From<Equation> for GLenum {
     fn from(eq: Equation) -> Self {
         match eq {
@@ -128,10 +136,10 @@ impl Texture {
     pub fn new(
         ctx: &mut GlContext,
         _access: TextureAccess,
-        bytes: Option<&[u8]>,
+        source: TextureSource,
         params: TextureParams,
     ) -> Texture {
-        if let Some(bytes_data) = bytes {
+        if let TextureSource::Bytes(bytes_data) = source {
             assert_eq!(
                 params.format.size(params.width, params.height) as usize,
                 bytes_data.len()
@@ -146,7 +154,7 @@ impl Texture {
 
         unsafe {
             glGenTextures(1, &mut texture as *mut _);
-            ctx.cache.bind_texture(0, texture);
+            ctx.cache.bind_texture(0, params.kind.into(), texture);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
 
             if cfg!(not(target_arch = "wasm32")) {
@@ -154,27 +162,77 @@ impl Texture {
                 if params.format == TextureFormat::Alpha {
                     // if alpha miniquad texture, the value on non-WASM is stored in red channel
                     // swizzle red -> alpha
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
+                    glTexParameteri(params.kind.into(), GL_TEXTURE_SWIZZLE_A, GL_RED as _);
                 } else {
                     // keep alpha -> alpha
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
+                    glTexParameteri(params.kind.into(), GL_TEXTURE_SWIZZLE_A, GL_ALPHA as _);
                 }
             }
 
-            glTexImage2D(
-                GL_TEXTURE_2D,
-                0,
-                internal_format as i32,
-                params.width as i32,
-                params.height as i32,
-                0,
-                format,
-                pixel_type,
-                match bytes {
-                    Some(bytes) => bytes.as_ptr() as *const _,
-                    Option::None => std::ptr::null(),
-                },
-            );
+            match source {
+                TextureSource::Empty => {
+                    // not quite sure if glTexImage2D(null) is really a requirement
+                    // but it was like this for quite a while and apparantly it works?
+                    glTexImage2D(
+                        GL_TEXTURE_2D,
+                        0,
+                        internal_format as i32,
+                        params.width as i32,
+                        params.height as i32,
+                        0,
+                        format,
+                        pixel_type,
+                        std::ptr::null() as _,
+                    );
+                }
+                TextureSource::Bytes(source) => {
+                    assert!(params.kind == TextureKind::Texture2D, "incompatible TextureKind and TextureSource. Cubemaps require TextureSource::Array of 6 textures.");
+                    glTexImage2D(
+                        GL_TEXTURE_2D,
+                        0,
+                        internal_format as i32,
+                        params.width as i32,
+                        params.height as i32,
+                        0,
+                        format,
+                        pixel_type,
+                        source.as_ptr() as *const _,
+                    );
+                }
+                TextureSource::Array(array) => {
+                    if params.kind == TextureKind::CubeMap {
+                        assert!(
+                            array.len() == 6,
+                            "Cubemaps require TextureSource::Array of 6 textures."
+                        );
+                    }
+                    for (cubemap_face, mipmaps) in array.iter().enumerate() {
+                        if mipmaps.len() != 1 {
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, array.len() as _);
+                        }
+                        for (mipmap_level, bytes) in mipmaps.iter().enumerate() {
+                            let target = match params.kind {
+                                TextureKind::Texture2D => GL_TEXTURE_2D,
+                                TextureKind::CubeMap => {
+                                    GL_TEXTURE_CUBE_MAP_POSITIVE_X + cubemap_face as u32
+                                }
+                            };
+                            glTexImage2D(
+                                target,
+                                mipmap_level as _,
+                                internal_format as i32,
+                                params.width as i32,
+                                params.height as i32,
+                                0,
+                                format,
+                                pixel_type,
+                                bytes.as_ptr() as *const _,
+                            );
+                        }
+                    }
+                }
+            }
 
             let wrap = match params.wrap {
                 TextureWrap::Repeat => GL_REPEAT,
@@ -182,15 +240,16 @@ impl Texture {
                 TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
             };
 
-            let filter = match params.filter {
+            let min_filter = Self::gl_filter(params.min_filter, params.mipmap_filter);
+            let mag_filter = match params.mag_filter {
                 FilterMode::Nearest => GL_NEAREST,
                 FilterMode::Linear => GL_LINEAR,
             };
 
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter as i32);
+            glTexParameteri(params.kind.into(), GL_TEXTURE_WRAP_S, wrap as i32);
+            glTexParameteri(params.kind.into(), GL_TEXTURE_WRAP_T, wrap as i32);
+            glTexParameteri(params.kind.into(), GL_TEXTURE_MIN_FILTER, min_filter as i32);
+            glTexParameteri(params.kind.into(), GL_TEXTURE_MAG_FILTER, mag_filter as i32);
         }
         ctx.cache.restore_texture_binding(0);
 
@@ -206,84 +265,9 @@ impl Texture {
         }
     }
 
-    pub fn set_filter(&self, ctx: &mut GlContext, filter: FilterMode) {
+    pub fn resize(&mut self, ctx: &mut GlContext, width: u32, height: u32, source: Option<&[u8]>) {
         ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.raw);
-
-        let filter = match filter {
-            FilterMode::Nearest => GL_NEAREST,
-            FilterMode::Linear => GL_LINEAR,
-        };
-        unsafe {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter as i32);
-        }
-        ctx.cache.restore_texture_binding(0);
-    }
-    pub fn set_filter_min_mag(
-        &self,
-        ctx: &mut GlContext,
-        min_filter: FilterMode,
-        max_filter: FilterMode,
-    ) {
-        ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.raw);
-
-        let min_filter = match min_filter {
-            FilterMode::Nearest => GL_NEAREST,
-            FilterMode::Linear => GL_LINEAR,
-        };
-        let max_filter = match max_filter {
-            FilterMode::Nearest => GL_NEAREST,
-            FilterMode::Linear => GL_LINEAR,
-        };
-        unsafe {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, max_filter as i32);
-        }
-        ctx.cache.restore_texture_binding(0);
-    }
-    pub fn set_wrap_xy(&self, ctx: &mut GlContext, wrap_x: TextureWrap, wrap_y: TextureWrap) {
-        ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.raw);
-        let wrap_x = match wrap_x {
-            TextureWrap::Repeat => GL_REPEAT,
-            TextureWrap::Mirror => GL_MIRRORED_REPEAT,
-            TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
-        };
-
-        let wrap_y = match wrap_y {
-            TextureWrap::Repeat => GL_REPEAT,
-            TextureWrap::Mirror => GL_MIRRORED_REPEAT,
-            TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
-        };
-
-        unsafe {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_x as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_x as i32);
-        }
-        ctx.cache.restore_texture_binding(0);
-    }
-
-    pub fn set_wrap(&self, ctx: &mut GlContext, wrap: TextureWrap) {
-        ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.raw);
-        let wrap = match wrap {
-            TextureWrap::Repeat => GL_REPEAT,
-            TextureWrap::Mirror => GL_MIRRORED_REPEAT,
-            TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
-        };
-
-        unsafe {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap as i32);
-        }
-        ctx.cache.restore_texture_binding(0);
-    }
-
-    pub fn resize(&mut self, ctx: &mut GlContext, width: u32, height: u32, bytes: Option<&[u8]>) {
-        ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.raw);
+        ctx.cache.bind_texture(0, self.params.kind.into(), self.raw);
 
         let (internal_format, format, pixel_type) = self.params.format.into();
 
@@ -300,8 +284,8 @@ impl Texture {
                 0,
                 format,
                 pixel_type,
-                match bytes {
-                    Some(bytes) => bytes.as_ptr() as *const _,
+                match source {
+                    Some(source) => source.as_ptr() as *const _,
                     Option::None => std::ptr::null(),
                 },
             );
@@ -317,14 +301,14 @@ impl Texture {
         y_offset: i32,
         width: i32,
         height: i32,
-        bytes: &[u8],
+        source: &[u8],
     ) {
-        assert_eq!(self.size(width as _, height as _), bytes.len());
+        assert_eq!(self.size(width as _, height as _), source.len());
         assert!(x_offset + width <= self.params.width as _);
         assert!(y_offset + height <= self.params.height as _);
 
         ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.raw);
+        ctx.cache.bind_texture(0, self.params.kind.into(), self.raw);
 
         let (_, format, pixel_type) = self.params.format.into();
 
@@ -352,7 +336,7 @@ impl Texture {
                 height as _,
                 format,
                 pixel_type,
-                bytes.as_ptr() as *const _,
+                source.as_ptr() as *const _,
             );
         }
 
@@ -395,6 +379,21 @@ impl Texture {
     #[inline]
     fn size(&self, width: u32, height: u32) -> usize {
         self.params.format.size(width, height) as usize
+    }
+
+    fn gl_filter(filter: FilterMode, mipmap_filter: MipmapFilterMode) -> GLenum {
+        match filter {
+            FilterMode::Nearest => match mipmap_filter {
+                MipmapFilterMode::None => GL_NEAREST,
+                MipmapFilterMode::Nearest => GL_NEAREST_MIPMAP_NEAREST,
+                MipmapFilterMode::Linear => GL_NEAREST_MIPMAP_LINEAR,
+            },
+            FilterMode::Linear => match mipmap_filter {
+                MipmapFilterMode::None => GL_LINEAR,
+                MipmapFilterMode::Nearest => GL_LINEAR_MIPMAP_NEAREST,
+                MipmapFilterMode::Linear => GL_LINEAR_MIPMAP_LINEAR,
+            },
+        }
     }
 }
 
@@ -490,7 +489,11 @@ impl GlContext {
                     color_write: (true, true, true, true),
                     cull_face: CullFace::Nothing,
                     stored_texture: 0,
-                    textures: [0; MAX_SHADERSTAGE_IMAGES],
+                    stored_target: 0,
+                    textures: [CachedTexture {
+                        target: 0,
+                        texture: 0,
+                    }; MAX_SHADERSTAGE_IMAGES],
                     attributes: [None; MAX_VERTEX_ATTRIBUTES],
                 },
             }
@@ -797,10 +800,10 @@ impl RenderingBackend for GlContext {
     fn new_texture(
         &mut self,
         access: TextureAccess,
-        bytes: Option<&[u8]>,
+        source: TextureSource,
         params: TextureParams,
     ) -> TextureId {
-        let texture = Texture::new(self, access, bytes, params);
+        let texture = Texture::new(self, access, source, params);
         self.textures.0.push(texture);
         TextureId(TextureIdInner::Managed(self.textures.0.len() - 1))
     }
@@ -808,45 +811,82 @@ impl RenderingBackend for GlContext {
         let t = self.textures.get(texture);
         t.delete();
     }
-    fn texture_set_filter(&mut self, texture: TextureId, filter: FilterMode) {
+    fn texture_set_wrap(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap) {
         let t = self.textures.get(texture);
-        t.set_filter(self, filter);
+
+        self.cache.store_texture_binding(0);
+        self.cache.bind_texture(0, t.params.kind.into(), t.raw);
+        let wrap_x = match wrap_x {
+            TextureWrap::Repeat => GL_REPEAT,
+            TextureWrap::Mirror => GL_MIRRORED_REPEAT,
+            TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
+        };
+
+        let wrap_y = match wrap_y {
+            TextureWrap::Repeat => GL_REPEAT,
+            TextureWrap::Mirror => GL_MIRRORED_REPEAT,
+            TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
+        };
+
+        unsafe {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_x as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_x as i32);
+        }
+        self.cache.restore_texture_binding(0);
     }
-    fn texture_set_filter_min_mag(
+
+    fn texture_set_min_filter(
         &mut self,
         texture: TextureId,
-        filter_min: FilterMode,
-        filter_max: FilterMode,
+        filter: FilterMode,
+        mipmap_filter: MipmapFilterMode,
     ) {
         let t = self.textures.get(texture);
-        t.set_filter_min_mag(self, filter_min, filter_max);
+        self.cache.store_texture_binding(0);
+        self.cache.bind_texture(0, t.params.kind.into(), t.raw);
+
+        let filter = Texture::gl_filter(filter, mipmap_filter);
+        unsafe {
+            glTexParameteri(t.params.kind.into(), GL_TEXTURE_MIN_FILTER, filter as i32);
+        }
+        self.cache.restore_texture_binding(0);
     }
-    fn texture_set_wrap(&mut self, texture: TextureId, wrap: TextureWrap) {
+    fn texture_set_mag_filter(&mut self, texture: TextureId, filter: FilterMode) {
         let t = self.textures.get(texture);
-        t.set_wrap(self, wrap);
-    }
-    fn texture_set_wrap_xy(
-        &mut self,
-        texture: TextureId,
-        wrap_x: TextureWrap,
-        wrap_y: TextureWrap,
-    ) {
-        let t = self.textures.get(texture);
-        t.set_wrap_xy(self, wrap_x, wrap_y);
+        self.cache.store_texture_binding(0);
+        self.cache.bind_texture(0, t.params.kind.into(), t.raw);
+
+        let filter = match filter {
+            FilterMode::Nearest => GL_NEAREST,
+            FilterMode::Linear => GL_LINEAR,
+        };
+        unsafe {
+            glTexParameteri(t.params.kind.into(), GL_TEXTURE_MAG_FILTER, filter as i32);
+        }
+        self.cache.restore_texture_binding(0);
     }
     fn texture_resize(
         &mut self,
         texture: TextureId,
         width: u32,
         height: u32,
-        bytes: Option<&[u8]>,
+        source: Option<&[u8]>,
     ) {
         let mut t = self.textures.get(texture);
-        t.resize(self, width, height, bytes);
+        t.resize(self, width, height, source);
     }
-    fn texture_read_pixels(&mut self, texture: TextureId, bytes: &mut [u8]) {
+    fn texture_read_pixels(&mut self, texture: TextureId, source: &mut [u8]) {
         let t = self.textures.get(texture);
-        t.read_pixels(bytes);
+        t.read_pixels(source);
+    }
+    fn texture_generate_mipmaps(&mut self, texture: TextureId) {
+        let t = self.textures.get(texture);
+        self.cache.store_texture_binding(0);
+        self.cache.bind_texture(0, t.params.kind.into(), t.raw);
+        unsafe {
+            glGenerateMipmap(t.params.kind.into());
+        }
+        self.cache.restore_texture_binding(0);
     }
     fn texture_update_part(
         &mut self,
@@ -855,10 +895,10 @@ impl RenderingBackend for GlContext {
         y_offset: i32,
         width: i32,
         height: i32,
-        bytes: &[u8],
+        source: &[u8],
     ) {
         let t = self.textures.get(texture);
-        t.update_texture_part(self, x_offset, y_offset, width, height, bytes);
+        t.update_texture_part(self, x_offset, y_offset, width, height, source);
     }
     fn texture_params(&self, texture: TextureId) -> TextureParams {
         let texture = self.textures.get(texture);
@@ -1191,19 +1231,24 @@ impl RenderingBackend for GlContext {
         }
     }
 
-    fn apply_bindings(&mut self, bindings: &Bindings) {
+    fn apply_bindings_from_slice(
+        &mut self,
+        vertex_buffers: &[BufferId],
+        index_buffer: BufferId,
+        textures: &[TextureId],
+    ) {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let shader = &self.shaders[pip.shader.0];
 
         for (n, shader_image) in shader.images.iter().enumerate() {
-            let bindings_image = bindings
-                .images
+            let bindings_image = textures
                 .get(n)
                 .unwrap_or_else(|| panic!("Image count in bindings and shader did not match!"));
             if let Some(gl_loc) = shader_image.gl_loc {
+                let texture = self.textures.get(*bindings_image);
                 unsafe {
                     self.cache
-                        .bind_texture(n, self.textures.get(*bindings_image).raw);
+                        .bind_texture(n, texture.params.kind.into(), texture.raw);
                     glUniform1i(gl_loc, n as i32);
                 }
             }
@@ -1211,8 +1256,8 @@ impl RenderingBackend for GlContext {
 
         self.cache.bind_buffer(
             GL_ELEMENT_ARRAY_BUFFER,
-            self.buffers[bindings.index_buffer.0].gl_buf,
-            self.buffers[bindings.index_buffer.0].index_type,
+            self.buffers[index_buffer.0].gl_buf,
+            self.buffers[index_buffer.0].index_type,
         );
 
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
@@ -1223,7 +1268,7 @@ impl RenderingBackend for GlContext {
             let pip_attribute = pip.layout.get(attr_index).copied();
 
             if let Some(Some(attribute)) = pip_attribute {
-                let vb = bindings.vertex_buffers[attribute.buffer_index];
+                let vb = vertex_buffers[attribute.buffer_index];
                 let vb = self.buffers[vb.0];
 
                 if cached_attr.map_or(true, |cached_attr| {

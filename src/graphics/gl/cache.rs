@@ -17,15 +17,23 @@ pub struct CachedAttribute {
     pub gl_vbuf: GLuint,
 }
 
+#[derive(Clone, Copy)]
+pub struct CachedTexture {
+    // GL_TEXTURE_2D or GL_TEXTURE_CUBEMAP
+    pub target: GLuint,
+    pub texture: GLuint,
+}
+
 pub struct GlCache {
     pub stored_index_buffer: GLuint,
     pub stored_index_type: Option<u32>,
     pub stored_vertex_buffer: GLuint,
+    pub stored_target: GLuint,
     pub stored_texture: GLuint,
     pub index_buffer: GLuint,
     pub index_type: Option<u32>,
     pub vertex_buffer: GLuint,
-    pub textures: [GLuint; MAX_SHADERSTAGE_IMAGES],
+    pub textures: [CachedTexture; MAX_SHADERSTAGE_IMAGES],
     pub cur_pipeline: Option<Pipeline>,
     pub color_blend: Option<BlendState>,
     pub alpha_blend: Option<BlendState>,
@@ -78,22 +86,26 @@ impl GlCache {
         }
     }
 
-    pub fn bind_texture(&mut self, slot_index: usize, texture: GLuint) {
+    pub fn bind_texture(&mut self, slot_index: usize, target: GLuint, texture: GLuint) {
         unsafe {
             glActiveTexture(GL_TEXTURE0 + slot_index as GLuint);
-            if self.textures[slot_index] != texture {
-                glBindTexture(GL_TEXTURE_2D, texture);
-                self.textures[slot_index] = texture;
+            if self.textures[slot_index].target != target
+                || self.textures[slot_index].texture != texture
+            {
+                let target = if target == 0 { GL_TEXTURE_2D } else { target };
+                glBindTexture(target, texture);
+                self.textures[slot_index] = CachedTexture { target, texture };
             }
         }
     }
 
     pub fn store_texture_binding(&mut self, slot_index: usize) {
-        self.stored_texture = self.textures[slot_index];
+        self.stored_target = self.textures[slot_index].target;
+        self.stored_texture = self.textures[slot_index].texture;
     }
 
     pub fn restore_texture_binding(&mut self, slot_index: usize) {
-        self.bind_texture(slot_index, self.stored_texture);
+        self.bind_texture(slot_index, self.stored_target, self.stored_texture);
     }
 
     pub fn clear_buffer_bindings(&mut self) {
@@ -106,9 +118,12 @@ impl GlCache {
 
     pub fn clear_texture_bindings(&mut self) {
         for ix in 0..MAX_SHADERSTAGE_IMAGES {
-            if self.textures[ix] != 0 {
-                self.bind_texture(ix, 0);
-                self.textures[ix] = 0;
+            if self.textures[ix].texture != 0 {
+                self.bind_texture(ix, self.textures[ix].target, 0);
+                self.textures[ix] = CachedTexture {
+                    target: 0,
+                    texture: 0,
+                };
             }
         }
     }
