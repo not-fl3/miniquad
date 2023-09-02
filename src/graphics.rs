@@ -59,9 +59,9 @@ impl UniformType {
 
 #[derive(Clone)]
 pub struct UniformDesc {
-    name: String,
-    uniform_type: UniformType,
-    array_count: usize,
+    pub name: String,
+    pub uniform_type: UniformType,
+    pub array_count: usize,
 }
 
 #[derive(Clone)]
