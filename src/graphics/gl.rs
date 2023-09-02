@@ -57,7 +57,7 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
         match format {
             TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
             TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
-            TextureFormat::RGBA16 => (GL_RGBA16F,GL_RGBA, GL_UNSIGNED_BYTE),
+            TextureFormat::RGBA16(_) => (GL_RGBA16F, GL_RGBA, GL_UNSIGNED_BYTE),
             TextureFormat::Depth => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT),
             #[cfg(target_arch = "wasm32")]
             TextureFormat::Alpha => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
@@ -1331,5 +1331,16 @@ impl RenderingBackend for GlContext {
                 num_instances,
             );
         }
+    }
+
+    fn is_opengl3(&self) -> bool {
+        ///SAFETY:
+        /// the creation of this context already calls is_gl2
+        /// So, presumably calling it here is fine as well?
+        !unsafe { is_gl2() }
+    }
+
+    fn is_metal(&self) -> bool {
+        false
     }
 }
