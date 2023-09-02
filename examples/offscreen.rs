@@ -182,7 +182,7 @@ impl EventHandler for Stage {
 
         self.rx += 0.01;
         self.ry += 0.03;
-        let model = Mat4::from_rotation_ypr(self.rx, self.ry, 0.);
+        let model = Mat4::from_rotation_y(self.ry) * Mat4::from_rotation_x(self.rx);
 
         let vs_params = display_shader::Uniforms {
             mvp: view_proj * model,

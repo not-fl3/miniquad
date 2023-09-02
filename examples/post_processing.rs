@@ -221,7 +221,7 @@ impl EventHandler for Stage {
 
         self.rx += 0.01;
         self.ry += 0.03;
-        let model = Mat4::from_rotation_ypr(self.rx, self.ry, 0.);
+        let model = Mat4::from_rotation_y(self.ry) * Mat4::from_rotation_y(self.rx);
 
         let (w, h) = window::screen_size();
         // the offscreen pass, rendering an rotating, untextured cube into a render target image
