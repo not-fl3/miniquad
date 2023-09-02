@@ -1179,7 +1179,20 @@ pub trait RenderingBackend {
     /// Should be applied after begin_pass.
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32);
 
-    fn apply_bindings(&mut self, bindings: &Bindings);
+    fn apply_bindings_from_slice(
+        &mut self,
+        vertex_buffers: &[BufferId],
+        index_buffer: BufferId,
+        textures: &[TextureId],
+    );
+
+    fn apply_bindings(&mut self, bindings: &Bindings) {
+        self.apply_bindings_from_slice(
+            &bindings.vertex_buffers,
+            bindings.index_buffer,
+            &bindings.images,
+        );
+    }
 
     fn apply_uniforms(&mut self, uniforms: UniformsSource) {
         self.apply_uniforms_from_bytes(uniforms.0.ptr as _, uniforms.0.size)
