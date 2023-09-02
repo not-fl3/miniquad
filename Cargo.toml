@@ -10,6 +10,7 @@ description = """
 Cross-platform window context and rendering library.
 """
 readme="README.md"
+exclude = ["examples/"]
 keywords = ["graphics", "3D", "opengl", "gamedev", "windowing"]
 categories = ["rendering::graphics-api"]
 
