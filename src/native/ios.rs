@@ -460,7 +460,6 @@ fn define_textfield_dlg() -> *const Class {
 
         unsafe {
             let len: u64 = msg_send![string, length];
-            log(&format!("WTF {len}"));
             if len > 0 {
                 for i in 0..len {
                     let c: u16 = msg_send![string, characterAtIndex: i];

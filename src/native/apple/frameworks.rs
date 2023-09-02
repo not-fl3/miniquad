@@ -547,6 +547,27 @@ pub enum MTLSamplerMinMagFilter {
     Linear = 1,
 }
 
+/// See <https://developer.apple.com/documentation/metal/mtlsamplermipfilter>
+#[repr(u64)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum MTLSamplerMipFilter {
+    NotMipmapped = 0,
+    Nearest = 1,
+    Linear = 2,
+}
+
+/// See <https://developer.apple.com/documentation/metal/mtlsampleraddressmode>
+#[repr(u64)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum MTLSamplerAddressMode {
+    ClampToEdge = 0,
+    MirrorClampToEdge = 1,
+    Repeat = 2,
+    MirrorRepeat = 3,
+    ClampToZero = 4,
+    ClampToBorderColor = 5,
+}
+
 #[repr(u64)]
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]

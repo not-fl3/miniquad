@@ -303,7 +303,18 @@ impl MetalContext {
                     capture_manager,
                     supportsDestination: MTLCaptureDestinationGPUTraceDocument
                 ] {
-                    panic!("capture failed");
+                    // put this into Info.plist near the binary (in target/debug/whatever/whatever, not in the working directory)
+                    /*
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+                    <plist version="1.0">
+                    <dict>
+                        <key>MetalCaptureEnabled</key>
+                        <true/>
+                    </dict>
+                    </plist>
+                    */
+                    panic!("capture failed (probably missing Info.plist, read the comment near this panic)");
                 }
 
                 let capture_descriptor =

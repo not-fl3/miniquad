@@ -246,6 +246,13 @@ pub const GL_QUERY_RESULT: u32 = 34918;
 pub const GL_QUERY_RESULT_AVAILABLE: u32 = 34919;
 pub const GL_VENDOR: u32 = 0x1F00;
 pub const GL_VERSION: u32 = 0x1F02;
+pub const GL_SHADING_LANGUAGE_VERSION: GLenum = 0x8B8C;
+pub const GL_FRONT_AND_BACK: GLenum = 0x0408;
+pub const GL_FILL: GLenum = 0x1B02;
+pub const GL_LINE: GLenum = 0x1B01;
+pub const GL_TEXTURE_BASE_LEVEL: GLenum = 0x813C;
+pub const GL_TEXTURE_MAX_LEVEL: GLenum = 0x813D;
+pub const GL_TEXTURE_CUBE_MAP_SEAMLESS: GLenum = 0x884F;
 
 pub const WGL_NUMBER_PIXEL_FORMATS_ARB: u32 = 0x2000;
 pub const WGL_SUPPORT_OPENGL_ARB: u32 = 0x2010;
@@ -561,6 +568,7 @@ gl_loader!(
         sfactorAlpha: GLenum,
         dfactorAlpha: GLenum
     ) -> (),
+    fn glGenerateMipmap(target: GLenum) -> (),
     fn glTexParameteri(target: GLenum, pname: GLenum, param: GLint) -> (),
     fn glGetIntegerv(pname: GLenum, params: *mut GLint) -> (),
     fn glEnable(cap: GLenum) -> (),
@@ -628,7 +636,8 @@ gl_loader!(
     fn glGetQueryObjectiv(id: GLuint, pname: GLenum, params: *mut GLint) -> (),
     fn glGetQueryObjectui64v(id: GLuint, pname: GLenum, params: *mut GLuint64) -> (),
     fn glFlush() -> (),
-    fn glFinish() -> ()
+    fn glFinish() -> (),
+    fn glPolygonMode(face: GLenum, mode: GLenum) -> ()
 );
 
 // note that glGetString only works after first glSwapBuffer,
