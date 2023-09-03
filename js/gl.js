@@ -77,6 +77,13 @@ function acquireDisjointTimerQueryExtension(ctx) {
     }
 }
 
+try {
+    gl.getExtension("EXT_shader_texture_lod");
+    gl.getExtension("OES_standard_derivatives");
+} catch (e) {
+    console.warn(e);
+}
+
 acquireVertexArrayObjectExtension(gl);
 acquireInstancedArraysExtension(gl);
 acquireDisjointTimerQueryExtension(gl);
@@ -949,6 +956,17 @@ var importObject = {
                 array[i] = log.charCodeAt(i);
             }
         },
+        glGetString: function(id) {
+            // getParameter returns "any": it could be GLenum, String or whatever,
+            // depending on the id.
+            var parameter = gl.getParameter(id).toString();
+            var len = parameter.length + 1;
+            var msg = wasm_exports.allocate_vec_u8(len);
+            var array = new Uint8Array(wasm_memory.buffer, msg, len);
+            array[parameter.length] = 0;
+            stringToUTF8(parameter, array, 0, len);
+            return msg;
+        },
         glCompileShader: function (shader, count, string, length) {
             GL.validateGLObjectID(GL.shaders, shader, 'glCompileShader', 'shader');
             gl.compileShader(GL.shaders[shader]);
@@ -1061,6 +1079,10 @@ var importObject = {
 			heap[0] = result;
 			heap[1] = (result - heap[0])/4294967296;
 		},
+        glGenerateMipmap: function (index) {
+            gl.generateMipmap(index);
+        },
+
         setup_canvas_size: function(high_dpi) {
             window.high_dpi = high_dpi;
             resize(canvas);
