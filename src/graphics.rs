@@ -326,10 +326,13 @@ impl TextureFormat {
         }
     }
     /// SAFETY:
-    /// Using this method on openGL versions that does not support RGBA16 textures can cause
-    /// UB
+    /// This method gives you access to a texture format that not every version of openGL supports
+    /// without checking if the current version of openGL does.
     ///
-    /// Make sure to check first before creating (render) textures with this format
+    /// Trying to use this format to create textures on an openGL version that does not support it is UB
+    ///
+    /// So, make sure to only call this function after checking for support or use [TextureFormat::rgba16] instead
+    /// which does this check for you
     pub unsafe fn rgba16_unchecked() -> Self {
         Self::RGBA16(PrivateConstruct(()))
     }
