@@ -379,10 +379,12 @@ impl MetalContext {
 
 impl RenderingBackend for MetalContext {
     fn info(&self) -> ContextInfo {
-        backend: Backend::Metal,
-        gl_version_string: Default::default(),
-        glsl_support: Default::default(),
-
+        ContextInfo {
+            backend: Backend::Metal,
+            gl_version_string: Default::default(),
+            glsl_support: Default::default(),
+            features: Features { instancing: true },
+        }
     }
     fn buffer_size(&mut self, buffer: BufferId) -> usize {
         let buffer = &self.buffers[buffer.0];

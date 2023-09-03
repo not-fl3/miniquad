@@ -541,17 +541,10 @@ impl Default for PassAction {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderPass(usize);
 
-impl RenderPass {
-    // pub fn texture(&self, ctx: &mut Gl) -> Texture {
-    //     let render_pass = &mut ctx.passes[self.0];
-
-    //     render_pass.texture
-    // }
-}
-
 pub const MAX_VERTEX_ATTRIBUTES: usize = 16;
 pub const MAX_SHADERSTAGE_IMAGES: usize = 12;
 
+#[derive(Clone, Debug)]
 pub struct Features {
     pub instancing: bool,
 }
@@ -1044,6 +1037,9 @@ pub struct ContextInfo {
     /// miniquad will take a guess based on GL_VERSION_STRING, current platform and implementation details.
     /// Would be all false on metal.
     pub glsl_support: GlslSupport,
+    /// List of platform-dependent features that miniquad failed to make cross-platforms
+    /// and therefore they might be missing.
+    pub features: Features,
 }
 
 pub trait RenderingBackend {

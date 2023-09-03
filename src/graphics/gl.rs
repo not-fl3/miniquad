@@ -781,6 +781,7 @@ impl RenderingBackend for GlContext {
             backend: Backend::OpenGl,
             gl_version_string,
             glsl_support,
+            features: self.features.clone(),
         }
     }
     fn new_shader(
