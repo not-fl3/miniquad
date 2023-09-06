@@ -1009,6 +1009,8 @@ pub enum RawId {
     #[cfg(target_vendor = "apple")]
     Metal(*mut objc::runtime::Object),
 }
+unsafe impl Send for RawId {}
+unsafe impl Sync for RawId {}
 
 #[derive(Clone, Debug, Default)]
 pub struct GlslSupport {
