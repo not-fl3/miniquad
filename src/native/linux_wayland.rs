@@ -510,6 +510,22 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
     }
 }
 
+unsafe extern "C" fn xdg_wm_base_handle_ping(
+    data: *mut std::ffi::c_void,
+    toplevel: *mut extensions::xdg_shell::xdg_wm_base,
+    serial: u32,
+) -> () {
+    assert!(!data.is_null());
+    let payload: &mut WaylandPayload = &mut *(data as *mut _);
+
+    wl_request!(
+        payload.client,
+        toplevel,
+        extensions::xdg_shell::xdg_wm_base::pong,
+        serial
+    );
+}
+
 struct WaylandClipboard;
 impl crate::native::Clipboard for WaylandClipboard {
     fn get(&mut self) -> Option<String> {
@@ -592,6 +608,16 @@ where
         assert!(display.seat.is_null() == false);
         //assert!(display.keymap.is_null() == false);
         //assert!(display.xkb_state.is_null() == false);
+
+        let xdg_wm_base_listener = extensions::xdg_shell::xdg_wm_base_listener {
+            ping: Some(xdg_wm_base_handle_ping),
+        };
+
+        (display.client.wl_proxy_add_listener)(
+            display.xdg_wm_base as _,
+            &xdg_wm_base_listener as *const _ as _,
+            &mut display as *mut _ as _,
+        );
 
         if display.decoration_manager.is_null() && conf.platform.wayland_use_fallback_decorations {
             eprintln!("Decoration manager not found, will draw fallback decorations");
