@@ -49,7 +49,7 @@ wayland_interface!(
         (set_min_size, "ii", ()),
         (set_maximized, "", ()),
         (unset_maximized, "", ()),
-        (set_fullscreen, "", (wl_output_interface)),
+        (set_fullscreen, "?o", (wl_output_interface)),
         (unset_fullscreen, "", ()),
         (set_minimized, "", ())
     ],
