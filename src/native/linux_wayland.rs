@@ -15,7 +15,7 @@ use libxkbcommon::*;
 
 use crate::{
     event::{EventHandler, KeyCode, KeyMods, MouseButton},
-    native::{egl, NativeDisplayData},
+    native::{egl, NativeDisplayData, Request},
 };
 
 use std::collections::HashSet;
@@ -710,6 +710,17 @@ where
             panic!("eglMakeCurrent failed");
         }
 
+        // For some reason, setting fullscreen before egl_window is created leads
+        // to segfault because wl_egl_window_create returns NULL.
+        if conf.fullscreen {
+            wl_request!(
+                display.client,
+                display.xdg_toplevel,
+                extensions::xdg_shell::xdg_toplevel::set_fullscreen,
+                std::ptr::null_mut::<*mut wl_output>()
+            )
+        }
+
         crate::native::gl::load_gl_funcs(|proc| {
             let name = std::ffi::CString::new(proc).unwrap();
             libegl.eglGetProcAddress.expect("non-null function pointer")(name.as_ptr() as _)
@@ -757,6 +768,28 @@ where
             if let Some(ref mut event_handler) = display.event_handler {
                 for keycode in &repeated_keys {
                     event_handler.key_down_event(keycode.clone(), keymods, true);
+                }
+
+                while let Ok(request) = rx.try_recv() {
+                    match request {
+                        Request::SetFullscreen(full) => if full {
+                            wl_request!(
+                                display.client,
+                                display.xdg_toplevel,
+                                extensions::xdg_shell::xdg_toplevel::set_fullscreen,
+                                std::ptr::null_mut::<*mut wl_output>()
+                            );
+                        } else {
+                            wl_request!(
+                                display.client,
+                                display.xdg_toplevel,
+                                extensions::xdg_shell::xdg_toplevel::unset_fullscreen
+                            );
+                        },
+
+                        // TODO: implement the other events
+                        _ => (),
+                    }
                 }
 
                 for event in EVENTS.drain(..) {
