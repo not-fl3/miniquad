@@ -397,7 +397,8 @@ unsafe extern "C" fn registry_add_object(
                 1,
             ) as _;
         }
-        "zxdg_decoration_manager" => {
+        "zxdg_decoration_manager" |
+        "zxdg_decoration_manager_v1" => {
             display.decoration_manager = display.client.wl_registry_bind(
                 registry,
                 name,
