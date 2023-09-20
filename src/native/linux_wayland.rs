@@ -678,6 +678,15 @@ where
             &mut display as *mut _ as _,
         );
 
+        let title = std::ffi::CString::new(conf.window_title.as_str()).unwrap();
+
+        wl_request!(
+            display.client,
+            display.xdg_toplevel,
+            extensions::xdg_shell::xdg_toplevel::set_title,
+            title.as_ptr()
+        );
+
         wl_request!(display.client, display.surface, WL_SURFACE_COMMIT);
         (display.client.wl_display_roundtrip)(wdisplay);
 
