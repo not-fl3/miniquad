@@ -1156,9 +1156,13 @@ pub trait RenderingBackend {
         height: i32,
         bytes: &[u8],
     );
-    fn new_render_pass(&mut self, color_img: TextureId, depth_img: Option<TextureId>)
-        -> RenderPass;
-    fn render_pass_texture(&self, render_pass: RenderPass) -> TextureId;
+    fn new_render_pass(
+        &mut self,
+        color_img: Option<TextureId>,
+        depth_img: Option<TextureId>,
+    ) -> RenderPass;
+    /// for depth-only render pass returns None
+    fn render_pass_texture(&self, render_pass: RenderPass) -> Option<TextureId>;
     fn delete_render_pass(&mut self, render_pass: RenderPass);
     fn new_pipeline(
         &mut self,

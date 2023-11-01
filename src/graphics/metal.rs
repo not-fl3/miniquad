@@ -531,9 +531,11 @@ impl RenderingBackend for MetalContext {
 
     fn new_render_pass(
         &mut self,
-        color_img: TextureId,
+        color_img: Option<TextureId>,
         depth_img: Option<TextureId>,
     ) -> RenderPass {
+        let color_img = color_img.expect("color_img: None not yet implemented");
+
         unsafe {
             let render_pass_desc =
                 msg_send_![class!(MTLRenderPassDescriptor), renderPassDescriptor];
@@ -576,8 +578,8 @@ impl RenderingBackend for MetalContext {
         }
     }
 
-    fn render_pass_texture(&self, render_pass: RenderPass) -> TextureId {
-        self.passes[render_pass.0].texture
+    fn render_pass_texture(&self, render_pass: RenderPass) -> Option<TextureId> {
+        Some(self.passes[render_pass.0].texture)
     }
 
     fn new_buffer(&mut self, _: BufferType, _usage: BufferUsage, data: BufferSource) -> BufferId {

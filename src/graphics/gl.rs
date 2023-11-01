@@ -422,7 +422,7 @@ fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
 
 pub(crate) struct RenderPassInternal {
     gl_fb: GLuint,
-    texture: TextureId,
+    texture: Option<TextureId>,
     depth_texture: Option<TextureId>,
 }
 
@@ -912,21 +912,26 @@ impl RenderingBackend for GlContext {
 
     fn new_render_pass(
         &mut self,
-        color_img: TextureId,
+        color_img: Option<TextureId>,
         depth_img: Option<TextureId>,
     ) -> RenderPass {
+        if color_img.is_none() && depth_img.is_none() {
+            panic!("Render pass should have at least one non-none target");
+        }
         let mut gl_fb = 0;
 
         unsafe {
             glGenFramebuffers(1, &mut gl_fb as *mut _);
             glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
-            glFramebufferTexture2D(
-                GL_FRAMEBUFFER,
-                GL_COLOR_ATTACHMENT0,
-                GL_TEXTURE_2D,
-                self.textures.get(color_img).raw,
-                0,
-            );
+            if let Some(color_img) = color_img {
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0,
+                    GL_TEXTURE_2D,
+                    self.textures.get(color_img).raw,
+                    0,
+                );
+            }
             if let Some(depth_img) = depth_img {
                 glFramebufferTexture2D(
                     GL_FRAMEBUFFER,
@@ -948,7 +953,8 @@ impl RenderingBackend for GlContext {
 
         RenderPass(self.passes.len() - 1)
     }
-    fn render_pass_texture(&self, render_pass: RenderPass) -> TextureId {
+    // for depth-only render pass will return None
+    fn render_pass_texture(&self, render_pass: RenderPass) -> Option<TextureId> {
         self.passes[render_pass.0].texture
     }
     fn delete_render_pass(&mut self, render_pass: RenderPass) {
@@ -956,7 +962,9 @@ impl RenderingBackend for GlContext {
 
         unsafe { glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _) }
 
-        self.textures.get(render_pass.texture).delete();
+        if let Some(color_texture) = render_pass.texture {
+            self.textures.get(color_texture).delete();
+        }
         if let Some(depth_texture) = render_pass.depth_texture {
             self.textures.get(depth_texture).delete();
         }
@@ -1416,10 +1424,13 @@ impl RenderingBackend for GlContext {
             }
             Some(pass) => {
                 let pass = &self.passes[pass.0];
+                // new_render_pass will panic with both color and depth components none
+                // so unwrap is safe here
+                let texture = pass.texture.or(pass.depth_texture).unwrap();
                 (
                     pass.gl_fb,
-                    self.textures.get(pass.texture).params.width as i32,
-                    self.textures.get(pass.texture).params.height as i32,
+                    self.textures.get(texture).params.width as i32,
+                    self.textures.get(texture).params.height as i32,
                 )
             }
         };
