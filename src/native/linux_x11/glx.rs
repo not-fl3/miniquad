@@ -212,7 +212,7 @@ pub struct Glx {
 }
 
 impl Glx {
-    pub unsafe fn init(libx11: &mut LibX11, display: *mut Display, screen: i32) -> Option<Glx> {
+    pub unsafe fn init(libx11: &mut LibX11, display: *mut Display, screen: i32, conf: &crate::conf::Conf) -> Option<Glx> {
         let mut libgl = LibGlx::try_load()?;
 
         let mut errorbase = 0;
@@ -251,7 +251,7 @@ impl Glx {
         // _sapp_glx_ARB_create_context_profile =
         //     _sapp_glx_extsupported(b"GLX_ARB_create_context_profile\x00", exts);
 
-        let fbconfig = choose_fbconfig(&mut libgl, libx11, display, screen, multisample);
+        let fbconfig = choose_fbconfig(&mut libgl, libx11, display, screen, multisample, conf.sample_count);
         assert!(
             !fbconfig.is_null(),
             "GLX: Failed to find a suitable GLXFBConfig"
@@ -389,8 +389,8 @@ unsafe fn choose_fbconfig(
     display: *mut Display,
     screen: i32,
     multisample: bool,
+    desired_sample_count: i32
 ) -> GLXFBConfig {
-    let desired_sample_count = 0;
 
     let native_configs: *mut GLXFBConfig;
     let closest: *const GLFBConfig;

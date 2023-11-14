@@ -342,7 +342,7 @@ unsafe fn glx_main_loop<F>(
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    let mut glx = match glx::Glx::init(&mut display.libx11, display.display, screen) {
+    let mut glx = match glx::Glx::init(&mut display.libx11, display.display, screen, conf) {
         Some(glx) => glx,
         _ => return Err(display),
     };
