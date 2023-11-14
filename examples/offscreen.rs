@@ -30,7 +30,7 @@ impl Stage {
             ..Default::default()
         });
 
-        let offscreen_pass = ctx.new_render_pass(color_img, Some(depth_img));
+        let offscreen_pass = ctx.new_render_pass(Some(color_img), Some(depth_img));
 
         #[rustfmt::skip]
         let vertices: &[f32] = &[
