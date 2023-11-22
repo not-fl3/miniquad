@@ -30,7 +30,7 @@ impl Stage {
             ..Default::default()
         });
 
-        let offscreen_pass = ctx.new_render_pass(color_img, Some(depth_img));
+        let offscreen_pass = ctx.new_render_pass(Some(color_img), Some(depth_img));
 
         #[rustfmt::skip]
         let vertices: &[f32] = &[
@@ -313,7 +313,7 @@ mod offscreen_shader {
     use miniquad::*;
 
     pub const VERTEX: &str = r#"#version 100
-    attribute vec4 in_pos;
+    attribute vec3 in_pos;
     attribute vec4 in_color;
 
     varying lowp vec4 color;
@@ -321,7 +321,7 @@ mod offscreen_shader {
     uniform mat4 mvp;
 
     void main() {
-        gl_Position = mvp * in_pos;
+        gl_Position = mvp * vec4(in_pos, 1.0);
         color = in_color;
     }
     "#;

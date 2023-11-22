@@ -57,7 +57,9 @@ impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
         match format {
             TextureFormat::RGB8 => (GL_RGB, GL_RGB, GL_UNSIGNED_BYTE),
             TextureFormat::RGBA8 => (GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE),
+            TextureFormat::RGBA16F => (GL_RGBA16F, GL_RGBA, GL_FLOAT),
             TextureFormat::Depth => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT),
+            TextureFormat::Depth32 => (GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_FLOAT),
             #[cfg(target_arch = "wasm32")]
             TextureFormat::Alpha => (GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE),
             #[cfg(not(target_arch = "wasm32"))]
@@ -422,7 +424,7 @@ fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
 
 pub(crate) struct RenderPassInternal {
     gl_fb: GLuint,
-    texture: Option<TextureId>,
+    texture: Vec<TextureId>,
     depth_texture: Option<TextureId>,
 }
 
@@ -912,10 +914,10 @@ impl RenderingBackend for GlContext {
 
     fn new_render_pass(
         &mut self,
-        color_img: Option<TextureId>,
+        color_img: Vec<TextureId>,
         depth_img: Option<TextureId>,
     ) -> RenderPass {
-        if color_img.is_none() && depth_img.is_none() {
+        if color_img.is_empty() && depth_img.is_none() {
             panic!("Render pass should have at least one non-none target");
         }
         let mut gl_fb = 0;
@@ -923,12 +925,12 @@ impl RenderingBackend for GlContext {
         unsafe {
             glGenFramebuffers(1, &mut gl_fb as *mut _);
             glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
-            if let Some(color_img) = color_img {
+            for (i, color_img) in color_img.iter().enumerate() {
                 glFramebufferTexture2D(
                     GL_FRAMEBUFFER,
-                    GL_COLOR_ATTACHMENT0,
+                    GL_COLOR_ATTACHMENT0 + i as u32,
                     GL_TEXTURE_2D,
-                    self.textures.get(color_img).raw,
+                    self.textures.get(*color_img).raw,
                     0,
                 );
             }
@@ -941,6 +943,14 @@ impl RenderingBackend for GlContext {
                     0,
                 );
             }
+            if color_img.len() > 1 {
+                let mut attachments = vec![];
+                for i in 0..color_img.len() {
+                    attachments.push(GL_COLOR_ATTACHMENT0 + i as u32);
+                }
+                glDrawBuffers(2, attachments.as_ptr() as _);
+            }
+
             glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
         }
         let pass = RenderPassInternal {
@@ -953,17 +963,16 @@ impl RenderingBackend for GlContext {
 
         RenderPass(self.passes.len() - 1)
     }
-    // for depth-only render pass will return None
-    fn render_pass_texture(&self, render_pass: RenderPass) -> Option<TextureId> {
-        self.passes[render_pass.0].texture
+    fn render_pass_texture(&self, render_pass: RenderPass) -> Vec<TextureId> {
+        self.passes[render_pass.0].texture.clone()
     }
     fn delete_render_pass(&mut self, render_pass: RenderPass) {
         let render_pass = &mut self.passes[render_pass.0];
 
         unsafe { glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _) }
 
-        if let Some(color_texture) = render_pass.texture {
-            self.textures.get(color_texture).delete();
+        for color_texture in &render_pass.texture {
+            self.textures.get(*color_texture).delete();
         }
         if let Some(depth_texture) = render_pass.depth_texture {
             self.textures.get(depth_texture).delete();
@@ -971,15 +980,6 @@ impl RenderingBackend for GlContext {
     }
 
     fn new_pipeline(
-        &mut self,
-        buffer_layout: &[BufferLayout],
-        attributes: &[VertexAttribute],
-        shader: ShaderId,
-    ) -> Pipeline {
-        self.new_pipeline_with_params(buffer_layout, attributes, shader, Default::default())
-    }
-
-    fn new_pipeline_with_params(
         &mut self,
         buffer_layout: &[BufferLayout],
         attributes: &[VertexAttribute],
@@ -1277,6 +1277,10 @@ impl RenderingBackend for GlContext {
             let pip_attribute = pip.layout.get(attr_index).copied();
 
             if let Some(Some(attribute)) = pip_attribute {
+                assert!(
+                    attribute.buffer_index < vertex_buffers.len(),
+                    "Attribute index outside of vertex_buffers length"
+                );
                 let vb = vertex_buffers[attribute.buffer_index];
                 let vb = self.buffers[vb.0];
 
@@ -1328,7 +1332,7 @@ impl RenderingBackend for GlContext {
             use UniformType::*;
 
             assert!(
-                offset <= size - uniform.uniform_type.size() / 4,
+                offset as i32 <= size as i32 - uniform.uniform_type.size() as i32 / 4,
                 "Uniforms struct does not match shader uniforms layout"
             );
 
@@ -1426,7 +1430,12 @@ impl RenderingBackend for GlContext {
                 let pass = &self.passes[pass.0];
                 // new_render_pass will panic with both color and depth components none
                 // so unwrap is safe here
-                let texture = pass.texture.or(pass.depth_texture).unwrap();
+                let texture = pass
+                    .texture
+                    .first()
+                    .copied()
+                    .or(pass.depth_texture)
+                    .unwrap();
                 (
                     pass.gl_fb,
                     self.textures.get(texture).params.width as i32,

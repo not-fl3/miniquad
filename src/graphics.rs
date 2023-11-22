@@ -304,7 +304,9 @@ impl Error for ShaderError {
 pub enum TextureFormat {
     RGB8,
     RGBA8,
+    RGBA16F,
     Depth,
+    Depth32,
     Alpha,
 }
 impl TextureFormat {
@@ -314,7 +316,9 @@ impl TextureFormat {
         match self {
             TextureFormat::RGB8 => 3 * square,
             TextureFormat::RGBA8 => 4 * square,
+            TextureFormat::RGBA16F => 8 * square,
             TextureFormat::Depth => 2 * square,
+            TextureFormat::Depth32 => 4 * square,
             TextureFormat::Alpha => 1 * square,
         }
     }
@@ -1158,19 +1162,13 @@ pub trait RenderingBackend {
     );
     fn new_render_pass(
         &mut self,
-        color_img: Option<TextureId>,
+        color_img: Vec<TextureId>,
         depth_img: Option<TextureId>,
     ) -> RenderPass;
     /// for depth-only render pass returns None
-    fn render_pass_texture(&self, render_pass: RenderPass) -> Option<TextureId>;
+    fn render_pass_texture(&self, render_pass: RenderPass) -> Vec<TextureId>;
     fn delete_render_pass(&mut self, render_pass: RenderPass);
     fn new_pipeline(
-        &mut self,
-        buffer_layout: &[BufferLayout],
-        attributes: &[VertexAttribute],
-        shader: ShaderId,
-    ) -> Pipeline;
-    fn new_pipeline_with_params(
         &mut self,
         buffer_layout: &[BufferLayout],
         attributes: &[VertexAttribute],
