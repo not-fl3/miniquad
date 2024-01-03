@@ -30,7 +30,7 @@ impl Stage {
             ..Default::default()
         });
 
-        let offscreen_pass = ctx.new_render_pass(Some(color_img), Some(depth_img));
+        let offscreen_pass = ctx.new_render_pass(vec![color_img], Some(depth_img));
 
         #[rustfmt::skip]
         let vertices: &[f32] = &[
@@ -111,7 +111,7 @@ impl Stage {
         };
         let default_shader = ctx.new_shader(source, display_shader::meta()).unwrap();
 
-        let display_pipeline = ctx.new_pipeline_with_params(
+        let display_pipeline = ctx.new_pipeline(
             &[BufferLayout::default()],
             &[
                 VertexAttribute::new("in_pos", VertexFormat::Float3),
@@ -137,7 +137,7 @@ impl Stage {
         };
         let offscreen_shader = ctx.new_shader(source, offscreen_shader::meta()).unwrap();
 
-        let offscreen_pipeline = ctx.new_pipeline_with_params(
+        let offscreen_pipeline = ctx.new_pipeline(
             &[BufferLayout {
                 stride: 36,
                 ..Default::default()
@@ -188,7 +188,7 @@ impl EventHandler for Stage {
             mvp: view_proj * model,
         };
 
-        // the offscreen pass, rendering an rotating, untextured cube into a render target image
+        // the offscreen pass, rendering a rotating, untextured cube into a render target image
         self.ctx.begin_pass(
             Some(self.offscreen_pass),
             PassAction::clear_color(1.0, 1.0, 1.0, 1.0),
@@ -359,7 +359,7 @@ mod offscreen_shader {
     {
         RasterizerData out;
 
-        out.position = uniforms.mvp * float4(v.in_pos, 1.0);
+        out.position = uniforms.mvp * float4(v.in_pos, 1.0) * float4(1.0, -1.0, 1.0, 1.0);
         out.color = v.in_color;
 
         return out;

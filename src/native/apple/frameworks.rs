@@ -537,6 +537,7 @@ pub enum MTLPixelFormat {
     Depth24Unorm_Stencil8 = 255,
     Depth32Float_Stencil8 = 260,
     RGBA8Unorm = 70,
+    RGBA16Float = 115,
 }
 
 /// See <https://developer.apple.com/documentation/metal/mtlsamplerminmagfilter>

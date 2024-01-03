@@ -160,6 +160,7 @@ impl From<TextureFormat> for MTLPixelFormat {
             TextureFormat::RGBA8 => MTLPixelFormat::RGBA8Unorm,
             //TODO: Depth16Unorm ?
             TextureFormat::Depth => MTLPixelFormat::Depth32Float_Stencil8,
+            TextureFormat::RGBA16F => MTLPixelFormat::RGBA16Float,
             _ => todo!(),
         }
     }
@@ -226,7 +227,7 @@ struct ShaderInternal {
 
 struct RenderPassInternal {
     render_pass_desc: ObjcId,
-    texture: TextureId,
+    texture: Vec<TextureId>,
     _depth_texture: Option<TextureId>,
 }
 
@@ -531,22 +532,21 @@ impl RenderingBackend for MetalContext {
 
     fn new_render_pass(
         &mut self,
-        color_img: Option<TextureId>,
+        color_img: Vec<TextureId>,
         depth_img: Option<TextureId>,
     ) -> RenderPass {
-        let color_img = color_img.expect("color_img: None not yet implemented");
-
         unsafe {
             let render_pass_desc =
                 msg_send_![class!(MTLRenderPassDescriptor), renderPassDescriptor];
             msg_send_![render_pass_desc, retain];
             assert!(!render_pass_desc.is_null());
-            let color_texture = self.textures.get(color_img).texture;
-            let color_attachment = msg_send_![msg_send_![render_pass_desc, colorAttachments], objectAtIndexedSubscript:0];
-            msg_send_![color_attachment, setTexture: color_texture];
-            msg_send_![color_attachment, setLoadAction: MTLLoadAction::Clear];
-            msg_send_![color_attachment, setStoreAction: MTLStoreAction::Store];
-
+            for (i, color_img) in color_img.iter().enumerate() {
+                let color_texture = self.textures.get(*color_img).texture;
+                let color_attachment = msg_send_![msg_send_![render_pass_desc, colorAttachments], objectAtIndexedSubscript:i];
+                msg_send_![color_attachment, setTexture: color_texture];
+                msg_send_![color_attachment, setLoadAction: MTLLoadAction::Clear];
+                msg_send_![color_attachment, setStoreAction: MTLStoreAction::Store];
+            }
             if let Some(depth_img) = depth_img {
                 let depth_texture = self.textures.get(depth_img).texture;
 
@@ -578,8 +578,8 @@ impl RenderingBackend for MetalContext {
         }
     }
 
-    fn render_pass_texture(&self, render_pass: RenderPass) -> Option<TextureId> {
-        Some(self.passes[render_pass.0].texture)
+    fn render_pass_texture(&self, render_pass: RenderPass) -> Vec<TextureId> {
+        self.passes[render_pass.0].texture.clone()
     }
 
     fn new_buffer(&mut self, _: BufferType, _usage: BufferUsage, data: BufferSource) -> BufferId {
@@ -703,7 +703,8 @@ impl RenderingBackend for MetalContext {
 
             if access == TextureAccess::RenderTarget {
                 if params.format != TextureFormat::Depth {
-                    msg_send_![descriptor, setPixelFormat: MTLPixelFormat::RGBA8Unorm];
+                    let pixel_format: MTLPixelFormat = params.format.into();
+                    msg_send_![descriptor, setPixelFormat: pixel_format];
                 }
                 msg_send_![descriptor, setStorageMode: MTLStorageMode::Private];
                 msg_send_![
@@ -735,7 +736,7 @@ impl RenderingBackend for MetalContext {
 
         match params.kind {
             TextureKind::Texture2D => {
-                // on metal textyreType2D is the default, nothing to do here
+                // on metal textureType2D is the default, nothing to do here
             }
             TextureKind::CubeMap => unsafe {
                 msg_send_![descriptor, setTextureType: MTLTextureType::CubeArray];
@@ -854,15 +855,6 @@ impl RenderingBackend for MetalContext {
         buffer_layout: &[BufferLayout],
         attributes: &[VertexAttribute],
         shader: ShaderId,
-    ) -> Pipeline {
-        self.new_pipeline_with_params(buffer_layout, attributes, shader, Default::default())
-    }
-
-    fn new_pipeline_with_params(
-        &mut self,
-        buffer_layout: &[BufferLayout],
-        attributes: &[VertexAttribute],
-        shader: ShaderId,
         params: PipelineParams,
     ) -> Pipeline {
         unsafe {
@@ -920,53 +912,53 @@ impl RenderingBackend for MetalContext {
             msg_send_![descriptor, setFragmentFunction:shader_internal.fragment_function];
             msg_send_![descriptor, setVertexDescriptor: vertex_descriptor];
             let color_attachments = msg_send_![descriptor, colorAttachments];
-            let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: 0];
+            for i in 0..2 {
+                let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: i];
+                let view_pixel_format: MTLPixelFormat = msg_send![self.view, colorPixelFormat];
+                msg_send_![color_attachment, setPixelFormat: view_pixel_format];
+                if let Some(color_blend) = params.color_blend {
+                    msg_send_![color_attachment, setBlendingEnabled: true];
 
-            let view_pixel_format: MTLPixelFormat = msg_send![self.view, colorPixelFormat];
-            msg_send_![color_attachment, setPixelFormat: view_pixel_format];
-            if let Some(color_blend) = params.color_blend {
-                msg_send_![color_attachment, setBlendingEnabled: true];
-
-                let BlendState {
-                    equation: eq_rgb,
-                    sfactor: src_rgb,
-                    dfactor: dst_rgb,
-                } = color_blend;
-                let BlendState {
-                    equation: eq_alpha,
-                    sfactor: src_alpha,
-                    dfactor: dst_alpha,
-                } = color_blend;
-                msg_send_![
-                    color_attachment,
-                    setRgbBlendOperation: MTLBlendOperation::from(eq_rgb)
-                ];
-                msg_send_![
-                    color_attachment,
-                    setAlphaBlendOperation: MTLBlendOperation::from(eq_alpha)
-                ];
-                msg_send_![
-                    color_attachment,
-                    setSourceRGBBlendFactor: MTLBlendFactor::from(src_rgb)
-                ];
-                msg_send_![
-                    color_attachment,
-                    setSourceRGBBlendFactor: MTLBlendFactor::from(src_rgb)
-                ];
-                msg_send_![
-                    color_attachment,
-                    setSourceAlphaBlendFactor: MTLBlendFactor::from(src_alpha)
-                ];
-                msg_send_![
-                    color_attachment,
-                    setDestinationRGBBlendFactor: MTLBlendFactor::from(dst_rgb)
-                ];
-                msg_send_![
-                    color_attachment,
-                    setDestinationAlphaBlendFactor: MTLBlendFactor::from(dst_alpha)
-                ];
+                    let BlendState {
+                        equation: eq_rgb,
+                        sfactor: src_rgb,
+                        dfactor: dst_rgb,
+                    } = color_blend;
+                    let BlendState {
+                        equation: eq_alpha,
+                        sfactor: src_alpha,
+                        dfactor: dst_alpha,
+                    } = color_blend;
+                    msg_send_![
+                        color_attachment,
+                        setRgbBlendOperation: MTLBlendOperation::from(eq_rgb)
+                    ];
+                    msg_send_![
+                        color_attachment,
+                        setAlphaBlendOperation: MTLBlendOperation::from(eq_alpha)
+                    ];
+                    msg_send_![
+                        color_attachment,
+                        setSourceRGBBlendFactor: MTLBlendFactor::from(src_rgb)
+                    ];
+                    msg_send_![
+                        color_attachment,
+                        setSourceRGBBlendFactor: MTLBlendFactor::from(src_rgb)
+                    ];
+                    msg_send_![
+                        color_attachment,
+                        setSourceAlphaBlendFactor: MTLBlendFactor::from(src_alpha)
+                    ];
+                    msg_send_![
+                        color_attachment,
+                        setDestinationRGBBlendFactor: MTLBlendFactor::from(dst_rgb)
+                    ];
+                    msg_send_![
+                        color_attachment,
+                        setDestinationAlphaBlendFactor: MTLBlendFactor::from(dst_alpha)
+                    ];
+                }
             }
-
             msg_send_![
                 descriptor,
                 setDepthAttachmentPixelFormat: MTLPixelFormat::Depth32Float_Stencil8
@@ -1162,11 +1154,20 @@ impl RenderingBackend for MetalContext {
                     )
                 }
                 Some(pass) => {
-                    let pass_internal = &self.passes[pass.0];
+                    let pass = &self.passes[pass.0];
+                    // new_render_pass will panic with both color and depth components none
+                    // so unwrap is safe here
+                    let texture = pass
+                        .texture
+                        .first()
+                        .copied()
+                        //.or(pass.depth_texture)
+                        .unwrap();
+
                     (
-                        pass_internal.render_pass_desc,
-                        self.textures.get(pass_internal.texture).params.width as f64,
-                        self.textures.get(pass_internal.texture).params.height as f64,
+                        pass.render_pass_desc,
+                        self.textures.get(texture).params.width as f64,
+                        self.textures.get(texture).params.height as f64,
                     )
                 }
             };
