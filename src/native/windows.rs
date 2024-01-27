@@ -48,6 +48,7 @@ pub(crate) struct WindowsDisplay {
     wnd: HWND,
     dc: HDC,
     event_handler: Option<Box<dyn EventHandler>>,
+    modal_resizing_timer: usize,
 }
 
 impl WindowsDisplay {
@@ -461,7 +462,37 @@ unsafe extern "system" fn win32_wndproc(
             let mods = key_mods();
             event_handler.key_up_event(keycode, mods);
         }
+        WM_ENTERSIZEMOVE | WM_ENTERMENULOOP => {
+            SetTimer(
+                hwnd,
+                &mut payload.modal_resizing_timer as *mut _ as usize,
+                10,
+                None,
+            );
+        }
+        WM_TIMER => {
+            if wparam == &mut payload.modal_resizing_timer as *mut _ as usize {
+                payload.event_handler.as_mut().unwrap().update();
+                payload.event_handler.as_mut().unwrap().draw();
 
+                SwapBuffers(payload.dc);
+
+                if payload.update_dimensions(hwnd) {
+                    let d = crate::native_display().lock().unwrap();
+                    let width = d.screen_width as f32;
+                    let height = d.screen_height as f32;
+                    drop(d);
+                    payload
+                        .event_handler
+                        .as_mut()
+                        .unwrap()
+                        .resize_event(width, height);
+                }
+            }
+        }
+        WM_EXITSIZEMOVE | WM_EXITMENULOOP => {
+            KillTimer(hwnd, &mut payload.modal_resizing_timer as *mut _ as usize);
+        }
         _ => {}
     }
 
@@ -812,6 +843,7 @@ where
             wnd,
             dc,
             event_handler: None,
+            modal_resizing_timer: 0,
         };
 
         let (tx, rx) = std::sync::mpsc::channel();
