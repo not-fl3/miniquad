@@ -1266,4 +1266,10 @@ impl RenderingBackend for MetalContext {
             self.current_frame_index = 0;
         }
     }
+    fn is_metal(&self) -> bool {
+        true
+    }
+    fn is_opengl3(&self) -> bool {
+        false
+    }
 }

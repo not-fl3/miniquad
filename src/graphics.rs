@@ -297,6 +297,10 @@ impl Error for ShaderError {
     }
 }
 
+#[derive(Clone, PartialEq, Debug, Eq, Copy, Hash)]
+/// A marker to prevent the creation of texture formats that aren't always safe to use in safe code without checks
+pub struct PrivateConstruct(());
+
 /// List of all the possible formats of input data when uploading to texture.
 /// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
 #[repr(u8)]
@@ -304,6 +308,8 @@ impl Error for ShaderError {
 pub enum TextureFormat {
     RGB8,
     RGBA8,
+    /// Not every openGL version supported by Macroquad supports this texture format.
+    RGBA16(PrivateConstruct),
     Depth,
     Alpha,
 }
@@ -314,9 +320,29 @@ impl TextureFormat {
         match self {
             TextureFormat::RGB8 => 3 * square,
             TextureFormat::RGBA8 => 4 * square,
+            TextureFormat::RGBA16(_) => 4 * square,
             TextureFormat::Depth => 2 * square,
             TextureFormat::Alpha => 1 * square,
         }
+    }
+    /// SAFETY:
+    /// This method gives you access to a texture format that not every version of openGL supports
+    /// without checking if the current version of openGL does.
+    ///
+    /// Trying to use this format to create textures on an openGL version that does not support it is UB
+    ///
+    /// So, make sure to only call this function after checking for support or use [TextureFormat::rgba16] instead
+    /// which does this check for you
+    pub unsafe fn rgba16_unchecked() -> Self {
+        Self::RGBA16(PrivateConstruct(()))
+    }
+    pub fn rgba16(context: &dyn RenderingBackend) -> Option<Self> {
+        if (!context.is_metal()) && !context.is_opengl3() {
+            return None;
+        }
+        ///SAFETY: We checked before if the rendering backend supports rgba16 textures
+        let format = unsafe { Self::rgba16_unchecked() };
+        Some(format)
     }
 }
 
@@ -1276,4 +1302,7 @@ pub trait RenderingBackend {
     /// NOTE: num_instances > 1 might be not supported by the GPU (gl2.1 and gles2).
     /// `features.instancing` check is required.
     fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32);
+
+    fn is_opengl3(&self) -> bool;
+    fn is_metal(&self) -> bool;
 }
