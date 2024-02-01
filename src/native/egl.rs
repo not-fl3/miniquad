@@ -28,6 +28,7 @@ pub const EGL_GREEN_SIZE: u32 = 12323;
 pub const EGL_RED_SIZE: u32 = 12324;
 pub const EGL_DEPTH_SIZE: u32 = 12325;
 pub const EGL_STENCIL_SIZE: u32 = 12326;
+pub const EGL_SAMPLES: u32 = 12337;
 pub const EGL_NATIVE_VISUAL_ID: u32 = 12334;
 pub const EGL_WIDTH: u32 = 12375;
 pub const EGL_HEIGHT: u32 = 12374;
@@ -261,6 +262,7 @@ pub unsafe fn create_egl_context(
     egl: &mut LibEgl,
     display: *mut std::ffi::c_void,
     alpha: bool,
+    sample_count: i32,
 ) -> Result<(EGLContext, EGLConfig, EGLDisplay), EglError> {
     let display = (egl.eglGetDisplay.unwrap())(display as _);
     if display == /* EGL_NO_DISPLAY */ null_mut() {
@@ -281,6 +283,7 @@ pub unsafe fn create_egl_context(
         EGL_ALPHA_SIZE, alpha_size,
         EGL_DEPTH_SIZE, 16,
         EGL_STENCIL_SIZE, 0,
+        EGL_SAMPLES, sample_count as u32,
         EGL_NONE,
     ];
     let mut available_cfgs: Vec<EGLConfig> = vec![null_mut(); 32];
