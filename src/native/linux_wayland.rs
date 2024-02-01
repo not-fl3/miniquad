@@ -629,6 +629,7 @@ where
             &mut libegl,
             wdisplay as *mut _,
             conf.platform.framebuffer_alpha,
+            conf.sample_count,
         )
         .unwrap();
 

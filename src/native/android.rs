@@ -395,6 +395,7 @@ where
             &mut libegl,
             std::ptr::null_mut(), /* EGL_DEFAULT_DISPLAY */
             conf.platform.framebuffer_alpha,
+            conf.sample_count,
         )
         .expect("Cant create EGL context");
 

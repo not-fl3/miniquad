@@ -437,6 +437,7 @@ where
         &mut egl_lib,
         display.display as *mut _,
         conf.platform.framebuffer_alpha,
+        conf.sample_count,
     )
     .unwrap();
 
