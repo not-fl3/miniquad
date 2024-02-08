@@ -626,7 +626,7 @@ impl RenderingBackend for MetalContext {
         BufferId(self.buffers.len() - 1)
     }
 
-    fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
+    fn buffer_update_at(&mut self, buffer: BufferId, data: BufferSource, at: usize) {
         let data = match data {
             BufferSource::Slice(data) => data,
             _ => panic!("buffer_update expects BufferSource::slice"),
@@ -639,9 +639,13 @@ impl RenderingBackend for MetalContext {
             std::ptr::copy(data.ptr, dest, data.size);
 
             #[cfg(target_os = "macos")]
-            msg_send_![buffer.raw[buffer.next_value], didModifyRange:NSRange::new(0, data.size as u64)];
+            msg_send_![buffer.raw[buffer.next_value], didModifyRange:NSRange::new((at * data.size) as u64, data.size as u64)];
         }
         buffer.value = buffer.next_value;
+    }
+
+    fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
+        self.buffer_update_at(buffer, data, 0);
     }
 
     fn new_shader(
