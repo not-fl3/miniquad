@@ -1201,7 +1201,7 @@ impl RenderingBackend for GlContext {
         let gl_target = gl_buffer_target(&buffer.buffer_type);
         self.cache.store_buffer_binding(gl_target);
         self.cache
-            .bind_buffer(gl_target, buffer.gl_buf, buffer.index_type); unsafe { glBufferSubData(gl_target, (at * size) as i64, size as _, data.ptr as _) };
+            .bind_buffer(gl_target, buffer.gl_buf, buffer.index_type); unsafe { glBufferSubData(gl_target, (at * size) as _, size as _, data.ptr as _) };
         self.cache.restore_buffer_binding(gl_target);
     }
 
