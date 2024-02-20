@@ -144,6 +144,7 @@ impl Stage {
                 VertexAttribute::new("uv", VertexFormat::Float2),
             ],
             default_shader,
+            PipelineParams::default()
         );
 
         let offscreen_shader = ctx
@@ -156,7 +157,7 @@ impl Stage {
             )
             .unwrap();
 
-        let offscreen_pipeline = ctx.new_pipeline_with_params(
+        let offscreen_pipeline = ctx.new_pipeline(
             &[BufferLayout {
                 stride: 36,
                 ..Default::default()

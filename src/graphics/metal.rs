@@ -530,9 +530,9 @@ impl RenderingBackend for MetalContext {
         self.end_render_pass();
     }
 
-    fn new_render_pass(
+    fn new_render_pass_mrt(
         &mut self,
-        color_img: Vec<TextureId>,
+        color_img: &[TextureId],
         depth_img: Option<TextureId>,
     ) -> RenderPass {
         unsafe {
@@ -561,7 +561,7 @@ impl RenderingBackend for MetalContext {
             }
             let pass = RenderPassInternal {
                 render_pass_desc,
-                texture: color_img,
+                texture: color_img.to_vec(),
                 _depth_texture: depth_img,
             };
 
@@ -578,8 +578,8 @@ impl RenderingBackend for MetalContext {
         }
     }
 
-    fn render_pass_texture(&self, render_pass: RenderPass) -> Vec<TextureId> {
-        self.passes[render_pass.0].texture.clone()
+    fn render_pass_color_attachments(&self, render_pass: RenderPass) -> &[TextureId] {
+        &self.passes[render_pass.0].texture
     }
 
     fn new_buffer(&mut self, _: BufferType, _usage: BufferUsage, data: BufferSource) -> BufferId {

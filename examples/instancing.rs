@@ -91,6 +91,7 @@ impl Stage {
                 VertexAttribute::with_buffer("in_inst_pos", VertexFormat::Float3, 1),
             ],
             shader,
+            PipelineParams::default(),
         );
 
         Stage {

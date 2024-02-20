@@ -63,6 +63,7 @@ impl Stage {
                 VertexAttribute::new("in_color", VertexFormat::Float4),
             ],
             shader,
+            PipelineParams::default(),
         );
 
         Stage {
