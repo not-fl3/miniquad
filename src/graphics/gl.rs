@@ -424,7 +424,7 @@ fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
 
 pub(crate) struct RenderPassInternal {
     gl_fb: GLuint,
-    texture: Vec<TextureId>,
+    color_textures: Vec<TextureId>,
     depth_texture: Option<TextureId>,
 }
 
@@ -912,9 +912,9 @@ impl RenderingBackend for GlContext {
         RawId::OpenGl(texture.raw)
     }
 
-    fn new_render_pass(
+    fn new_render_pass_mrt(
         &mut self,
-        color_img: Vec<TextureId>,
+        color_img: &[TextureId],
         depth_img: Option<TextureId>,
     ) -> RenderPass {
         if color_img.is_empty() && depth_img.is_none() {
@@ -955,7 +955,7 @@ impl RenderingBackend for GlContext {
         }
         let pass = RenderPassInternal {
             gl_fb,
-            texture: color_img,
+            color_textures: color_img.to_vec(),
             depth_texture: depth_img,
         };
 
@@ -963,15 +963,15 @@ impl RenderingBackend for GlContext {
 
         RenderPass(self.passes.len() - 1)
     }
-    fn render_pass_texture(&self, render_pass: RenderPass) -> Vec<TextureId> {
-        self.passes[render_pass.0].texture.clone()
+    fn render_pass_color_attachments(&self, render_pass: RenderPass) -> &[TextureId] {
+        &self.passes[render_pass.0].color_textures
     }
     fn delete_render_pass(&mut self, render_pass: RenderPass) {
         let render_pass = &mut self.passes[render_pass.0];
 
         unsafe { glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _) }
 
-        for color_texture in &render_pass.texture {
+        for color_texture in &render_pass.color_textures {
             self.textures.get(*color_texture).delete();
         }
         if let Some(depth_texture) = render_pass.depth_texture {
@@ -1431,7 +1431,7 @@ impl RenderingBackend for GlContext {
                 // new_render_pass will panic with both color and depth components none
                 // so unwrap is safe here
                 let texture = pass
-                    .texture
+                    .color_textures
                     .first()
                     .copied()
                     .or(pass.depth_texture)
