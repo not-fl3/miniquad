@@ -433,11 +433,11 @@ unsafe extern "system" fn win32_wndproc(
             // );
         }
         WM_MOUSEWHEEL => {
-            event_handler.mouse_wheel_event(0.0, (HIWORD(wparam as _) as i16) as f32);
+            event_handler.mouse_wheel_event(0.0, (HIWORD(wparam as _) as i16).signum() as f32);
         }
 
         WM_MOUSEHWHEEL => {
-            event_handler.mouse_wheel_event((HIWORD(wparam as _) as i16) as f32, 0.0);
+            event_handler.mouse_wheel_event((HIWORD(wparam as _) as i16).signum() as f32, 0.0);
         }
         WM_CHAR => {
             let chr = wparam as u32;
