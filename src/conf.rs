@@ -161,6 +161,11 @@ pub struct Conf {
     /// Platform specific settings. Hints to OS for context creation, driver-specific
     /// settings etc.
     pub platform: Platform,
+
+    /// Determines if the application will clear the background each frame.
+    /// If set to false, the application will have to clear the background manually.
+    /// Default is true.
+    pub clear_background: bool,
 }
 
 /// Icon image in three levels of detail.
@@ -205,6 +210,7 @@ impl Default for Conf {
             window_resizable: true,
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
+            clear_background: true,
         }
     }
 }
@@ -222,6 +228,7 @@ impl Default for Conf {
             window_resizable: false,
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
+            clear_background: true,
         }
     }
 }

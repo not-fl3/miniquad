@@ -15,6 +15,7 @@ pub(crate) struct NativeDisplayData {
     pub native_requests: mpsc::Sender<Request>,
     pub clipboard: Box<dyn Clipboard>,
     pub dropped_files: DroppedFiles,
+    pub clear_background: bool,
 
     #[cfg(target_vendor = "apple")]
     pub view: crate::native::apple::frameworks::ObjcId,
@@ -45,6 +46,7 @@ impl NativeDisplayData {
             native_requests,
             clipboard,
             dropped_files: Default::default(),
+            clear_background: true,
             #[cfg(target_vendor = "apple")]
             gfx_api: crate::conf::AppleGfxApi::OpenGl,
             #[cfg(target_vendor = "apple")]
