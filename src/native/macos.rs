@@ -4,7 +4,7 @@
 //!
 use {
     crate::{
-        conf::AppleGfxApi,
+        conf::{AppleGfxApi, Icon},
         event::{EventHandler, MouseButton},
         native::{
             apple::{apple_util::*, frameworks::*},
@@ -864,6 +864,51 @@ impl crate::native::Clipboard for MacosClipboard {
     fn set(&mut self, _data: &str) {}
 }
 
+unsafe extern "C" fn release_data(info: *mut &[u8], _: *const c_void, _: usize) {
+    Box::from_raw(info);
+}
+
+unsafe fn set_icon(ns_app: ObjcId, icon: &Icon) {
+    let width = 64 as usize;
+    let height = 64 as usize;
+    let colors = &icon.big[..];
+    let rgb = CGColorSpaceCreateDeviceRGB();
+    let bits_per_component: usize = 8; // number of bits in UInt8
+    let bits_per_pixel = 4 * bits_per_component; // ARGB uses 4 components
+    let bytes_per_row = width * 4; // bitsPerRow / 8
+
+    let data = colors.as_ptr();
+    let size = colors.len();
+    let boxed = Box::new(colors);
+    let info = Box::into_raw(boxed);
+    let provider = CGDataProviderCreateWithData(info, data, size, release_data);
+    let image = CGImageCreate(
+        width,
+        height,
+        bits_per_component,
+        bits_per_pixel,
+        bytes_per_row,
+        rgb,
+        kCGBitmapByteOrderDefault | kCGImageAlphaLast,
+        provider,
+        std::ptr::null(),
+        false,
+        kCGRenderingIntentDefault,
+    );
+
+    let size = NSSize {
+        width: width as f64,
+        height: height as f64,
+    };
+    let ns_image: ObjcId = msg_send![class!(NSImage), alloc];
+    let () = msg_send![ns_image, initWithCGImage: image size: size];
+
+    let () = msg_send![ns_app, setApplicationIconImage: ns_image];
+    CGDataProviderRelease(provider);
+    CGColorSpaceRelease(rgb);
+    CGImageRelease(image);
+}
+
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
@@ -902,6 +947,10 @@ where
             as i64
     ];
     let () = msg_send![ns_app, activateIgnoringOtherApps: YES];
+
+    if let Some(icon) = &conf.icon {
+        set_icon(ns_app, icon);
+    }
 
     let window_masks = NSWindowStyleMask::NSTitledWindowMask as u64
         | NSWindowStyleMask::NSClosableWindowMask as u64
