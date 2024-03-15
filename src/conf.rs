@@ -153,9 +153,9 @@ pub struct Conf {
     /// Miniquad allows to change the window icon programmatically.
     /// The icon will be used as
     /// - taskbar and titlebar icons on Windows.
+    /// - dock and titlebar icon on  MacOs.
     /// - TODO: favicon on HTML5
     /// - TODO: taskbar and titlebar(highly dependent on the WM) icons on Linux
-    /// - TODO: dock and titlebar icon on  MacOs
     pub icon: Option<Icon>,
 
     /// Platform specific settings. Hints to OS for context creation, driver-specific
