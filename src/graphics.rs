@@ -646,6 +646,7 @@ impl Default for Equation {
 pub enum PrimitiveType {
     Triangles,
     Lines,
+    Points,
 }
 
 impl From<PrimitiveType> for GLenum {
@@ -653,6 +654,7 @@ impl From<PrimitiveType> for GLenum {
         match primitive_type {
             PrimitiveType::Triangles => GL_TRIANGLES,
             PrimitiveType::Lines => GL_LINES,
+            PrimitiveType::Points => GL_POINTS,
         }
     }
 }
