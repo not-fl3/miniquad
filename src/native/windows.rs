@@ -845,6 +845,7 @@ where
             event_handler: None,
             modal_resizing_timer: 0,
         };
+        display.init_dpi(conf.high_dpi);
 
         let (tx, rx) = std::sync::mpsc::channel();
         let clipboard = Box::new(clipboard::WindowsClipboard::new());
@@ -855,7 +856,6 @@ where
         });
 
         display.update_dimensions(wnd);
-        display.init_dpi(conf.high_dpi);
 
         let mut wgl = wgl::Wgl::new(&mut display);
         let gl_ctx = wgl.create_context(
