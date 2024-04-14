@@ -877,6 +877,12 @@ impl RenderingBackend for GlContext {
     ) {
         let mut t = self.textures.get(texture);
         t.resize(self, width, height, source);
+        match texture.0 {
+            TextureIdInner::Managed(tex_id) => {
+                self.textures.0[tex_id].params = t.params;
+            }
+            _ => {}
+        };
     }
     fn texture_read_pixels(&mut self, texture: TextureId, source: &mut [u8]) {
         let t = self.textures.get(texture);
