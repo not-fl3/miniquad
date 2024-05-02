@@ -46,3 +46,14 @@ objc = "0.2"
 [dev-dependencies]
 glam = { version = "0.24", features = ["scalar-math"] }
 quad-rand = "0.1"
+
+[profile.release]
+lto = true
+panic = 'abort'
+opt-level = "s"
+overflow-checks = false
+debug-assertions = false
+incremental = false
+rpath = false
+codegen-units = 1
+strip = true
