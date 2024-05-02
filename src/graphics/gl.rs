@@ -1,6 +1,6 @@
-use std::{collections::HashMap, ffi::CString, hash::Hash};
+use std::ffi::CString;
 
-use crate::window;
+use crate::{window, ResourceManager};
 
 mod cache;
 
@@ -443,17 +443,10 @@ impl Textures {
     }
 }
 pub struct GlContext {
-    shader_id: usize,
-    shaders: HashMap<usize, ShaderInternal>,
-
-    pipeline_id: usize,
-    pipelines: HashMap<usize, PipelineInternal>,
-
-    pass_id: usize,
-    passes: HashMap<usize, RenderPassInternal>,
-
-    buffer_id: usize,
-    buffers: HashMap<usize, Buffer>,
+    shaders: ResourceManager<ShaderInternal>,
+    pipelines: ResourceManager<PipelineInternal>,
+    passes: ResourceManager<RenderPassInternal>,
+    buffers: ResourceManager<Buffer>,
     textures: Textures,
     default_framebuffer: GLuint,
     pub(crate) cache: GlCache,
@@ -475,14 +468,10 @@ impl GlContext {
             glBindVertexArray(vao);
             GlContext {
                 default_framebuffer,
-                shader_id: 0,
-                shaders: HashMap::default(),
-                pipeline_id: 0,
-                pipelines: HashMap::default(),
-                pass_id: 0,
-                passes: HashMap::default(),
-                buffer_id: 0,
-                buffers: HashMap::default(),
+                shaders: ResourceManager::default(),
+                pipelines: ResourceManager::default(),
+                passes: ResourceManager::default(),
+                buffers: ResourceManager::default(),
                 textures: Textures(vec![]),
                 features: Features {
                     instancing: !crate::native::gl::is_gl2(),
@@ -812,9 +801,7 @@ impl RenderingBackend for GlContext {
             _ => panic!("Metal source on OpenGl context"),
         };
         let shader = load_shader_internal(vertex, fragment, meta)?;
-        self.shaders.insert(self.shader_id, shader);
-        self.shader_id += 1;
-        Ok(ShaderId(self.shader_id - 1))
+        Ok(ShaderId(self.shaders.add(shader)))
     }
 
     fn new_texture(
@@ -833,13 +820,13 @@ impl RenderingBackend for GlContext {
     }
 
     fn delete_program(&mut self, program: ShaderId) {
-        unsafe { glDeleteProgram(self.shaders[&program.0].program) };
-        self.shaders.remove(&program.0);
+        unsafe { glDeleteProgram(self.shaders[program.0].program) };
+        self.shaders.remove(program.0);
         self.cache.cur_pipeline = None;
     }
 
     fn delete_pipeline(&mut self, pipeline: Pipeline) {
-        self.pipelines.remove(&pipeline.0);
+        self.pipelines.remove(pipeline.0);
     }
 
     fn texture_set_wrap(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap) {
@@ -993,18 +980,17 @@ impl RenderingBackend for GlContext {
             depth_texture: depth_img,
         };
 
-        self.passes.insert(self.pass_id, pass);
-        self.pass_id += 1;
-        RenderPass(self.pass_id - 1)
+        RenderPass(self.passes.add(pass))
     }
     fn render_pass_color_attachments(&self, render_pass: RenderPass) -> &[TextureId] {
-        &self.passes[&render_pass.0].color_textures
+        &self.passes[render_pass.0].color_textures
     }
     fn delete_render_pass(&mut self, render_pass: RenderPass) {
         let pass_id = render_pass.0;
-        let render_pass = self.passes.get_mut(&pass_id).unwrap();
 
-        unsafe { glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _) }
+        let render_pass = &self.passes[pass_id];
+
+        unsafe { glDeleteFramebuffers(1, &render_pass.gl_fb as *const _) }
 
         for color_texture in &render_pass.color_textures {
             self.textures.get(*color_texture).delete();
@@ -1012,7 +998,7 @@ impl RenderingBackend for GlContext {
         if let Some(depth_texture) = render_pass.depth_texture {
             self.textures.get(depth_texture).delete();
         }
-        self.passes.remove(&pass_id);
+        self.passes.remove(pass_id);
     }
 
     fn new_pipeline(
@@ -1051,7 +1037,7 @@ impl RenderingBackend for GlContext {
             assert!(cache.stride <= 255);
         }
 
-        let program = self.shaders[&shader.0].program;
+        let program = self.shaders[shader.0].program;
 
         let attributes_len = attributes
             .iter()
@@ -1122,17 +1108,15 @@ impl RenderingBackend for GlContext {
             params,
         };
 
-        self.pipelines.insert(self.pipeline_id, pipeline);
-        self.pipeline_id += 1;
-        Pipeline(self.pipeline_id - 1)
+        Pipeline(self.pipelines.add(pipeline))
     }
 
     fn apply_pipeline(&mut self, pipeline: &Pipeline) {
         self.cache.cur_pipeline = Some(*pipeline);
 
         {
-            let pipeline = &self.pipelines[&pipeline.0];
-            let shader = self.shaders.get_mut(&pipeline.shader.0).unwrap();
+            let pipeline = &self.pipelines[pipeline.0];
+            let shader = &self.shaders[pipeline.shader.0];
             unsafe {
                 glUseProgram(shader.program);
             }
@@ -1162,14 +1146,14 @@ impl RenderingBackend for GlContext {
             }
         }
 
-        self.set_cull_face(self.pipelines[&pipeline.0].params.cull_face);
+        self.set_cull_face(self.pipelines[pipeline.0].params.cull_face);
         self.set_blend(
-            self.pipelines[&pipeline.0].params.color_blend,
-            self.pipelines[&pipeline.0].params.alpha_blend,
+            self.pipelines[pipeline.0].params.color_blend,
+            self.pipelines[pipeline.0].params.alpha_blend,
         );
 
-        self.set_stencil(self.pipelines[&pipeline.0].params.stencil_test);
-        self.set_color_write(self.pipelines[&pipeline.0].params.color_write);
+        self.set_stencil(self.pipelines[pipeline.0].params.stencil_test);
+        self.set_color_write(self.pipelines[pipeline.0].params.color_write);
     }
 
     fn new_buffer(
@@ -1214,9 +1198,8 @@ impl RenderingBackend for GlContext {
             size,
             index_type,
         };
-        self.buffers.insert(self.buffer_id, buffer);
-        self.buffer_id += 1;
-        BufferId(self.buffer_id - 1)
+
+        BufferId(self.buffers.add(buffer))
     }
 
     fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
@@ -1225,7 +1208,7 @@ impl RenderingBackend for GlContext {
             _ => panic!("buffer_update expects BufferSource::slice"),
         };
         debug_assert!(data.is_slice);
-        let buffer = &self.buffers[&buffer.0];
+        let buffer = &self.buffers[buffer.0];
 
         if matches!(buffer.buffer_type, BufferType::IndexBuffer) {
             assert!(buffer.index_type.is_some());
@@ -1246,7 +1229,7 @@ impl RenderingBackend for GlContext {
 
     /// Size of buffer in bytes
     fn buffer_size(&mut self, buffer: BufferId) -> usize {
-        self.buffers[&buffer.0].size
+        self.buffers[buffer.0].size
     }
 
     /// Delete GPU buffer, leaving handle unmodified.
@@ -1257,10 +1240,10 @@ impl RenderingBackend for GlContext {
     /// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why
     /// this function is not marked as unsafe
     fn delete_buffer(&mut self, buffer: BufferId) {
-        unsafe { glDeleteBuffers(1, &self.buffers[&buffer.0].gl_buf as *const _) }
+        unsafe { glDeleteBuffers(1, &self.buffers[buffer.0].gl_buf as *const _) }
         self.cache.clear_buffer_bindings();
         self.cache.clear_vertex_attributes();
-        self.buffers.remove(&buffer.0);
+        self.buffers.remove(buffer.0);
     }
 
     /// Set a new viewport rectangle.
@@ -1285,8 +1268,8 @@ impl RenderingBackend for GlContext {
         index_buffer: BufferId,
         textures: &[TextureId],
     ) {
-        let pip = &self.pipelines[&self.cache.cur_pipeline.unwrap().0];
-        let shader = &self.shaders[&pip.shader.0];
+        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
+        let shader = &self.shaders[pip.shader.0];
 
         for (n, shader_image) in shader.images.iter().enumerate() {
             let bindings_image = textures
@@ -1304,11 +1287,11 @@ impl RenderingBackend for GlContext {
 
         self.cache.bind_buffer(
             GL_ELEMENT_ARRAY_BUFFER,
-            self.buffers[&index_buffer.0].gl_buf,
-            self.buffers[&index_buffer.0].index_type,
+            self.buffers[index_buffer.0].gl_buf,
+            self.buffers[index_buffer.0].index_type,
         );
 
-        let pip = &self.pipelines[&self.cache.cur_pipeline.unwrap().0];
+        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
 
         for attr_index in 0..MAX_VERTEX_ATTRIBUTES {
             let cached_attr = &mut self.cache.attributes[attr_index];
@@ -1321,7 +1304,7 @@ impl RenderingBackend for GlContext {
                     "Attribute index outside of vertex_buffers length"
                 );
                 let vb = vertex_buffers[attribute.buffer_index];
-                let vb = self.buffers[&vb.0];
+                let vb = self.buffers[vb.0];
 
                 if cached_attr.map_or(true, |cached_attr| {
                     attribute != cached_attr.attribute || cached_attr.gl_vbuf != vb.gl_buf
@@ -1362,8 +1345,8 @@ impl RenderingBackend for GlContext {
     }
 
     fn apply_uniforms_from_bytes(&mut self, uniform_ptr: *const u8, size: usize) {
-        let pip = &self.pipelines[&self.cache.cur_pipeline.unwrap().0];
-        let shader = &self.shaders[&pip.shader.0];
+        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
+        let shader = &self.shaders[pip.shader.0];
 
         let mut offset = 0;
 
@@ -1466,7 +1449,7 @@ impl RenderingBackend for GlContext {
                 )
             }
             Some(pass) => {
-                let pass = &self.passes[&pass.0];
+                let pass = &self.passes[pass.0];
                 // new_render_pass will panic with both color and depth components none
                 // so unwrap is safe here
                 let texture = pass
@@ -1524,7 +1507,7 @@ impl RenderingBackend for GlContext {
             return;
         }
 
-        let pip = &self.pipelines[&self.cache.cur_pipeline.unwrap().0];
+        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let primitive_type = pip.params.primitive_type.into();
         let index_type = self.cache.index_type.expect("Unset index buffer type");
 
