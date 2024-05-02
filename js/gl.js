@@ -29,11 +29,11 @@ canvas.requestPointerLock = canvas.requestPointerLock ||
     canvas.mozRequestPointerLock ||
     // pointer lock in any form is not supported on iOS safari 
     // https://developer.mozilla.org/en-US/docs/Web/API/Pointer_Lock_API#browser_compatibility
-    (function () {});
+    (function () { });
 document.exitPointerLock = document.exitPointerLock ||
     document.mozExitPointerLock ||
     // pointer lock in any form is not supported on iOS safari
-    (function () {});
+    (function () { });
 
 function assert(flag, message) {
     if (flag == false) {
@@ -562,7 +562,7 @@ function into_sapp_keycode(key_code) {
     console.log("Unsupported keyboard key: ", key_code)
 }
 
-function dpi_scale()  {
+function dpi_scale() {
     if (high_dpi) {
         return window.devicePixelRatio || 1.0;
     } else {
@@ -614,7 +614,7 @@ var importObject = {
         set_emscripten_shader_hack: function (flag) {
             emscripten_shaders_hack = flag;
         },
-        sapp_set_clipboard: function(ptr, len) {
+        sapp_set_clipboard: function (ptr, len) {
             clipboard = UTF8ToString(ptr, len);
         },
         dpi_scale,
@@ -666,7 +666,7 @@ var importObject = {
             gl.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type,
                 pixels ? getArray(pixels, Uint8Array, texture_size(format, width, height)) : null);
         },
-        glReadPixels: function(x, y, width, height, format, type, pixels) {
+        glReadPixels: function (x, y, width, height, format, type, pixels) {
             var pixelData = getArray(pixels, Uint8Array, texture_size(format, width, height));
             gl.readPixels(x, y, width, height, format, type, pixelData);
         },
@@ -845,6 +845,11 @@ var importObject = {
             GL.validateGLObjectID(GL.shaders, shader, 'glAttachShader', 'shader');
             gl.attachShader(GL.programs[program], GL.shaders[shader]);
         },
+        glDettachShader: function (program, shader) {
+            GL.validateGLObjectID(GL.programs, program, 'glDetachShader', 'program');
+            GL.validateGLObjectID(GL.shaders, shader, 'glDetachShader', 'shader');
+            gl.detachShader(GL.programs[program], GL.shaders[shader]);
+        },
         glLinkProgram: function (program) {
             GL.validateGLObjectID(GL.programs, program, 'glLinkProgram', 'program');
             gl.linkProgram(GL.programs[program]);
@@ -956,7 +961,7 @@ var importObject = {
                 array[i] = log.charCodeAt(i);
             }
         },
-        glGetString: function(id) {
+        glGetString: function (id) {
             // getParameter returns "any": it could be GLenum, String or whatever,
             // depending on the id.
             var parameter = gl.getParameter(id).toString();
@@ -1006,7 +1011,12 @@ var importObject = {
         glDrawElementsInstanced: function (mode, count, type, indices, primcount) {
             gl.drawElementsInstanced(mode, count, type, indices, primcount);
         },
-        glDeleteShader: function (shader) { gl.deleteShader(shader) },
+        glDeleteShader: function (shader) {
+            var id = GL.shaders[shader];
+            if (id == null) { return }
+            gl.deleteShader(id);
+            GL.shaders[shader] = null
+        },
         glDeleteBuffers: function (n, buffers) {
             for (var i = 0; i < n; i++) {
                 var id = getArray(buffers + i * 4, Uint32Array, 1)[0];
@@ -1045,45 +1055,45 @@ var importObject = {
                 GL.textures[id] = null;
             }
         },
-		glGenQueries: function (n, ids) {
-			_glGenObject(n, ids, 'createQuery', GL.timerQueries, 'glGenQueries');
-		},
-		glDeleteQueries: function (n, ids) {
+        glGenQueries: function (n, ids) {
+            _glGenObject(n, ids, 'createQuery', GL.timerQueries, 'glGenQueries');
+        },
+        glDeleteQueries: function (n, ids) {
             for (var i = 0; i < n; i++) {
                 var id = getArray(textures + i * 4, Uint32Array, 1)[0];
                 var query = GL.timerQueries[id];
                 if (!query) {
-					continue;
-				}
+                    continue;
+                }
                 gl.deleteQuery(query);
                 query.name = 0;
                 GL.timerQueries[id] = null;
             }
-		},
-		glBeginQuery: function (target, id) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glBeginQuery', 'id');
-			gl.beginQuery(target, GL.timerQueries[id]);
-		},
-		glEndQuery: function (target) {
-			gl.endQuery(target);
-		},
-		glGetQueryObjectiv: function (id, pname, ptr) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectiv', 'id');
-			let result = gl.getQueryObject(GL.timerQueries[id], pname);
-			getArray(ptr, Uint32Array, 1)[0] = result;
-		},
-		glGetQueryObjectui64v: function (id, pname, ptr) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectui64v', 'id');
-			let result = gl.getQueryObject(GL.timerQueries[id], pname);
-			let heap = getArray(ptr, Uint32Array, 2);
-			heap[0] = result;
-			heap[1] = (result - heap[0])/4294967296;
-		},
+        },
+        glBeginQuery: function (target, id) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glBeginQuery', 'id');
+            gl.beginQuery(target, GL.timerQueries[id]);
+        },
+        glEndQuery: function (target) {
+            gl.endQuery(target);
+        },
+        glGetQueryObjectiv: function (id, pname, ptr) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectiv', 'id');
+            let result = gl.getQueryObject(GL.timerQueries[id], pname);
+            getArray(ptr, Uint32Array, 1)[0] = result;
+        },
+        glGetQueryObjectui64v: function (id, pname, ptr) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectui64v', 'id');
+            let result = gl.getQueryObject(GL.timerQueries[id], pname);
+            let heap = getArray(ptr, Uint32Array, 2);
+            heap[0] = result;
+            heap[1] = (result - heap[0]) / 4294967296;
+        },
         glGenerateMipmap: function (index) {
             gl.generateMipmap(index);
         },
 
-        setup_canvas_size: function(high_dpi) {
+        setup_canvas_size: function (high_dpi) {
             window.high_dpi = high_dpi;
             resize(canvas);
         },
@@ -1220,20 +1230,20 @@ var importObject = {
             window.onresize = function () {
                 resize(canvas, wasm_exports.resize);
             };
-            window.addEventListener("copy", function(e) {
+            window.addEventListener("copy", function (e) {
                 if (clipboard != null) {
                     event.clipboardData.setData('text/plain', clipboard);
                     event.preventDefault();
                 }
             });
-            window.addEventListener("cut", function(e) {
+            window.addEventListener("cut", function (e) {
                 if (clipboard != null) {
                     event.clipboardData.setData('text/plain', clipboard);
                     event.preventDefault();
                 }
             });
 
-            window.addEventListener("paste", function(e) {
+            window.addEventListener("paste", function (e) {
                 e.stopPropagation();
                 e.preventDefault();
                 var clipboardData = e.clipboardData || window.clipboardData;
@@ -1248,11 +1258,11 @@ var importObject = {
                 }
             });
 
-            window.ondragover = function(e) {
+            window.ondragover = function (e) {
                 e.preventDefault();
             };
 
-            window.ondrop = async function(e) {
+            window.ondrop = async function (e) {
                 e.preventDefault();
 
                 wasm_exports.on_files_dropped_start();
@@ -1276,9 +1286,9 @@ var importObject = {
             };
 
             let lastFocus = document.hasFocus();
-            var checkFocus = function() {
+            var checkFocus = function () {
                 let hasFocus = document.hasFocus();
-                if(lastFocus == hasFocus){
+                if (lastFocus == hasFocus) {
                     wasm_exports.focus(hasFocus);
                     lastFocus = hasFocus;
                 }
@@ -1296,22 +1306,22 @@ var importObject = {
             FS.unique_id += 1;
             var xhr = new XMLHttpRequest();
             xhr.open('GET', url, true);
-            xhr.responseType = 'arraybuffer'; 
+            xhr.responseType = 'arraybuffer';
 
-            xhr.onreadystatechange = function() {
-	        // looks like readyState === 4 will be fired on either successful or unsuccessful load:
-		// https://stackoverflow.com/a/19247992
+            xhr.onreadystatechange = function () {
+                // looks like readyState === 4 will be fired on either successful or unsuccessful load:
+                // https://stackoverflow.com/a/19247992
                 if (this.readyState === 4) {
-                    if(this.status === 200) {  
+                    if (this.status === 200) {
                         var uInt8Array = new Uint8Array(this.response);
-    
+
                         FS.loaded_files[file_id] = uInt8Array;
                         wasm_exports.file_loaded(file_id);
                     } else {
                         FS.loaded_files[file_id] = null;
                         wasm_exports.file_loaded(file_id);
                     }
-                } 
+                }
             };
             xhr.send();
 
@@ -1341,22 +1351,22 @@ var importObject = {
                 document.exitPointerLock();
             }
         },
-        sapp_set_cursor: function(ptr, len) {
+        sapp_set_cursor: function (ptr, len) {
             canvas.style.cursor = UTF8ToString(ptr, len);
         },
-        sapp_is_fullscreen: function() {
+        sapp_is_fullscreen: function () {
             let fullscreenElement = document.fullscreenElement;
 
             return fullscreenElement != null && fullscreenElement.id == canvas.id;
         },
-        sapp_set_fullscreen: function(fullscreen) {
+        sapp_set_fullscreen: function (fullscreen) {
             if (!fullscreen) {
                 document.exitFullscreen();
             } else {
                 canvas.requestFullscreen();
             }
         },
-        sapp_set_window_size: function(new_width, new_height) {
+        sapp_set_window_size: function (new_width, new_height) {
             canvas.width = new_width;
             canvas.height = new_height;
             resize(canvas, wasm_exports.resize);
@@ -1406,11 +1416,11 @@ function init_plugins(plugins) {
 
                 if (plugins[i].version != crate_version) {
                     console.error("Plugin " + plugins[i].name + " version mismatch" +
-                                  "js version: " + plugins[i].version + ", crate version: " + crate_version)
+                        "js version: " + plugins[i].version + ", crate version: " + crate_version)
                 }
             }
         }
-     }
+    }
 }
 
 
@@ -1427,7 +1437,7 @@ function add_missing_functions_stabs(obj) {
     for (const i in imports) {
         if (importObject["env"][imports[i].name] == undefined) {
             console.warn("No " + imports[i].name + " function in gl.js");
-            importObject["env"][imports[i].name] = function() {
+            importObject["env"][imports[i].name] = function () {
                 console.warn("Missed function: " + imports[i].name);
             };
         }
@@ -1454,7 +1464,7 @@ function load(wasm_path) {
                     if (version != crate_version) {
                         console.error(
                             "Version mismatch: gl.js version is: " + version +
-                                ", miniquad crate version is: " + crate_version);
+                            ", miniquad crate version is: " + crate_version);
                     }
                     init_plugins(plugins);
                     obj.exports.main();
@@ -1479,7 +1489,7 @@ function load(wasm_path) {
                 if (version != crate_version) {
                     console.error(
                         "Version mismatch: gl.js version is: " + version +
-                            ", rust sapp-wasm crate version is: " + crate_version);
+                        ", rust sapp-wasm crate version is: " + crate_version);
                 }
                 init_plugins(plugins);
                 obj.exports.main();
