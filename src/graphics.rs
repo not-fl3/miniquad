@@ -1251,7 +1251,7 @@ pub trait RenderingBackend {
     ///
     /// There is no protection against using deleted programs later. However its not a CPU-level Porgram and thats why
     /// this function is not marked as unsafe
-    fn delete_program(&mut self, program: ShaderId);
+    fn delete_shader(&mut self, program: ShaderId);
 
     /// Set a new viewport rectangle.
     /// Should be applied after begin_pass.
