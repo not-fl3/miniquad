@@ -819,7 +819,7 @@ impl RenderingBackend for GlContext {
         t.delete();
     }
 
-    fn delete_program(&mut self, program: ShaderId) {
+    fn delete_shader(&mut self, program: ShaderId) {
         unsafe { glDeleteProgram(self.shaders[program.0].program) };
         self.shaders.remove(program.0);
         self.cache.cur_pipeline = None;
