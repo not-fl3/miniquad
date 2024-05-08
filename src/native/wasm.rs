@@ -256,65 +256,279 @@ fn init_mouse_down_events(canvas: &HtmlCanvasElement) {
     canvas.add_event_listener_with_callback("mousedown", fn_ref);
 }
 
-#[no_mangle]
-pub extern "C" fn mouse_down(x: i32, y: i32, btn: i32) {
-    get_event_handler().mouse_button_down_event(
-        keycodes::translate_mouse_button(btn),
-        x as _,
-        y as _,
-    );
+fn init_mouse_up_events(canvas: &HtmlCanvasElement) {
+    let closure: closure::Closure<dyn Fn(MouseEvent)> =
+        closure::Closure::new(move |ev: MouseEvent| {
+            let canvas = ev
+                .target()
+                .unwrap()
+                .dyn_into::<HtmlCanvasElement>()
+                .unwrap();
+            let rect = canvas.get_bounding_client_rect();
+            let event_handler = get_event_handler();
+
+            let x = ev.client_x() as f32 - rect.left() as f32;
+            let y = ev.client_y() as f32 - rect.top() as f32;
+
+            let button = match ev.button() {
+                0 => crate::MouseButton::Left,
+                1 => crate::MouseButton::Right,
+                2 => crate::MouseButton::Middle,
+                n => crate::MouseButton::Other(n as _),
+            };
+        });
+
+    let fn_ref = closure.as_ref().unchecked_ref();
+    canvas.add_event_listener_with_callback("mouseup", fn_ref);
 }
 
-#[no_mangle]
-pub extern "C" fn mouse_up(x: i32, y: i32, btn: i32) {
-    get_event_handler().mouse_button_up_event(
-        keycodes::translate_mouse_button(btn),
-        x as _,
-        y as _,
-    );
+fn init_mouse_wheel_events(canvas: &HtmlCanvasElement) {
+    let closure: closure::Closure<dyn Fn(WheelEvent)> =
+        closure::Closure::new(move |ev: WheelEvent| {
+            ev.prevent_default();
+
+            let x = -ev.delta_x() as f32;
+            let y = -ev.delta_y() as f32;
+
+            let event_handler = get_event_handler();
+            event_handler.mouse_wheel_event(x, y);
+        });
+
+    let fn_ref = closure.as_ref().unchecked_ref();
+    canvas.add_event_listener_with_callback("wheel", fn_ref);
 }
 
-#[no_mangle]
-pub extern "C" fn mouse_wheel(dx: i32, dy: i32) {
-    get_event_handler().mouse_wheel_event(dx as _, dy as _);
+fn get_keycode(key: &str) -> Option<i32> {
+    Some(match key {
+        "Space" => 32,
+        "Quote" => 222,
+        "Comma" => 44,
+        "Minus" => 45,
+        "Period" => 46,
+        "Slash" => 189,
+        "Digit0" => 48,
+        "Digit1" => 49,
+        "Digit2" => 50,
+        "Digit3" => 51,
+        "Digit4" => 52,
+        "Digit5" => 53,
+        "Digit6" => 54,
+        "Digit7" => 55,
+        "Digit8" => 56,
+        "Digit9" => 57,
+        "Semicolon" => 59,
+        "Equal" => 61,
+        "KeyA" => 65,
+        "KeyB" => 66,
+        "KeyC" => 67,
+        "KeyD" => 68,
+        "KeyE" => 69,
+        "KeyF" => 70,
+        "KeyG" => 71,
+        "KeyH" => 72,
+        "KeyI" => 73,
+        "KeyJ" => 74,
+        "KeyK" => 75,
+        "KeyL" => 76,
+        "KeyM" => 77,
+        "KeyN" => 78,
+        "KeyO" => 79,
+        "KeyP" => 80,
+        "KeyQ" => 81,
+        "KeyR" => 82,
+        "KeyS" => 83,
+        "KeyT" => 84,
+        "KeyU" => 85,
+        "KeyV" => 86,
+        "KeyW" => 87,
+        "KeyX" => 88,
+        "KeyY" => 89,
+        "KeyZ" => 90,
+        "BracketLeft" => 91,
+        "Backslash" => 92,
+        "BracketRight" => 93,
+        "Backquote" => 96,
+        "Escape" => 256,
+        "Enter" => 257,
+        "Tab" => 258,
+        "Backspace" => 259,
+        "Insert" => 260,
+        "Delete" => 261,
+        "ArrowRight" => 262,
+        "ArrowLeft" => 263,
+        "ArrowDown" => 264,
+        "ArrowUp" => 265,
+        "PageUp" => 266,
+        "PageDown" => 267,
+        "Home" => 268,
+        "End" => 269,
+        "CapsLock" => 280,
+        "ScrollLock" => 281,
+        "NumLock" => 282,
+        "PrintScreen" => 283,
+        "Pause" => 284,
+        "F1" => 290,
+        "F2" => 291,
+        "F3" => 292,
+        "F4" => 293,
+        "F5" => 294,
+        "F6" => 295,
+        "F7" => 296,
+        "F8" => 297,
+        "F9" => 298,
+        "F10" => 299,
+        "F11" => 300,
+        "F12" => 301,
+        "F13" => 302,
+        "F14" => 303,
+        "F15" => 304,
+        "F16" => 305,
+        "F17" => 306,
+        "F18" => 307,
+        "F19" => 308,
+        "F20" => 309,
+        "F21" => 310,
+        "F22" => 311,
+        "F23" => 312,
+        "F24" => 313,
+        "Numpad0" => 320,
+        "Numpad1" => 321,
+        "Numpad2" => 322,
+        "Numpad3" => 323,
+        "Numpad4" => 324,
+        "Numpad5" => 325,
+        "Numpad6" => 326,
+        "Numpad7" => 327,
+        "Numpad8" => 328,
+        "Numpad9" => 329,
+        "NumpadDecimal" => 330,
+        "NumpadDivide" => 331,
+        "NumpadMultiply" => 33,
+        "NumpadSubtract" => 33,
+        "NumpadAdd" => 334,
+        "NumpadEnter" => 335,
+        "NumpadEqual" => 336,
+        "ShiftLeft" => 340,
+        "ControlLeft" => 341,
+        "AltLeft" => 342,
+        "OSLeft" => 343,
+        "ShiftRight" => 344,
+        "ControlRight" => 345,
+        "AltRight" => 346,
+        "OSRight" => 347,
+        "ContextMenu" => 348,
+        _ => return None,
+    })
 }
 
-#[no_mangle]
-pub extern "C" fn key_down(key: u32, modifiers: u32, repeat: bool) {
-    let key = keycodes::translate_keycode(key as _);
-    let mods = keycodes::translate_mod(modifiers as _);
+fn init_keyboard_events(canvas: &HtmlCanvasElement) {
+    let key_up_closure: closure::Closure<dyn Fn(KeyboardEvent)> =
+        closure::Closure::new(move |ev: KeyboardEvent| {
+            let event_handler = get_event_handler();
 
-    get_event_handler().key_down_event(key, mods, repeat);
+            if let Some(key) = get_keycode(&ev.code()) {
+                let keycode = keycodes::translate_keycode(key);
+                let repeat = ev.repeat();
+                let modifiers = crate::KeyMods {
+                    shift: ev.shift_key(),
+                    ctrl: ev.ctrl_key(),
+                    alt: ev.alt_key(),
+                    logo: ev.meta_key(),
+                };
+
+                event_handler.key_down_event(keycode, modifiers, repeat);
+            };
+        });
+
+    let key_down_closure: closure::Closure<dyn Fn(KeyboardEvent)> =
+        closure::Closure::new(move |ev: KeyboardEvent| {
+            let event_handler = get_event_handler();
+            let repeat = ev.repeat();
+
+            if let Some(key) = get_keycode(&ev.code()) {
+                let keycode = keycodes::translate_keycode(key);
+
+                let modifiers = crate::KeyMods {
+                    shift: ev.shift_key(),
+                    ctrl: ev.ctrl_key(),
+                    alt: ev.alt_key(),
+                    logo: ev.meta_key(),
+                };
+
+                // prevent page interactions
+                // space, arrow keys, F1-F10, Tab, Backspace, /, PageUp, PageDown, Home, End
+                match key {
+                    32 | 39 | 47 => {
+                        // for "space", "quote", and "slash" preventDefault will prevent
+                        // key_press event, so send it here instead
+                        ev.prevent_default();
+                        if let Some(c) = char::from_u32(ev.char_code()) {
+                            event_handler.char_event(c, modifiers, repeat);
+                        }
+                    }
+                    n if (262..=265).contains(&n)
+                        | (290..=299).contains(&n)
+                        | (258..=259).contains(&n)
+                        | (266..=269).contains(&n) =>
+                    {
+                        ev.prevent_default()
+                    }
+                    _ => {}
+                }
+
+                event_handler.key_down_event(keycode, modifiers, repeat);
+            };
+        });
+
+    let keypress_closure: closure::Closure<dyn Fn(KeyboardEvent)> =
+        closure::Closure::new(move |ev: KeyboardEvent| {
+            let event_handler = get_event_handler();
+            let repeat = ev.repeat();
+            let key = ev.key();
+
+            let modifiers = crate::KeyMods {
+                shift: ev.shift_key(),
+                ctrl: ev.ctrl_key(),
+                alt: ev.alt_key(),
+                logo: ev.meta_key(),
+            };
+
+            if let Some(c) = key.chars().next() {
+                event_handler.char_event(c, modifiers, repeat);
+            }
+        });
+
+    let key_down_closure_ref = key_down_closure.as_ref().unchecked_ref();
+    let keypress_fn_ref = keypress_closure.as_ref().unchecked_ref();
+    let key_up_fn_ref = key_up_closure.as_ref().unchecked_ref();
+
+    canvas.add_event_listener_with_callback("keypress", keypress_fn_ref);
+    canvas.add_event_listener_with_callback("keydown", key_up_fn_ref);
+    canvas.add_event_listener_with_callback("keydown", key_down_closure_ref);
 }
 
-#[no_mangle]
-pub extern "C" fn key_press(key: u32) {
-    if let Some(key) = char::from_u32(key) {
-        get_event_handler().char_event(key, crate::KeyMods::default(), false);
-    }
-}
+fn init_focus_events(canvas: &HtmlCanvasElement) {
+    let focus_closure: closure::Closure<dyn Fn()> = closure::Closure::new(move || {
+        let event_handler = get_event_handler();
+        event_handler.window_restored_event()
+    });
 
-#[no_mangle]
-pub extern "C" fn key_up(key: u32, modifiers: u32) {
-    let key = keycodes::translate_keycode(key as _);
-    let mods = keycodes::translate_mod(modifiers as _);
+    let blur_closure: closure::Closure<dyn Fn()> = closure::Closure::new(move || {
+        let event_handler = get_event_handler();
+        event_handler.window_minimized_event()
+    });
 
-    get_event_handler().key_up_event(key, mods);
+    let focus_fn_ref = focus_closure.as_ref().unchecked_ref();
+    let blur_fn_ref = blur_closure.as_ref().unchecked_ref();
+
+    canvas.add_event_listener_with_callback("focus", focus_fn_ref);
+    canvas.add_event_listener_with_callback("blur", blur_fn_ref);
 }
 
 #[no_mangle]
 pub extern "C" fn touch(phase: u32, id: u32, x: f32, y: f32) {
     let phase = keycodes::translate_touch_phase(phase as _);
     get_event_handler().touch_event(phase, id as _, x as _, y as _);
-}
-
-#[no_mangle]
-pub extern "C" fn focus(has_focus: bool) {
-    if has_focus {
-        get_event_handler().window_restored_event();
-    } else {
-        get_event_handler().window_minimized_event();
-    }
 }
 
 #[no_mangle]

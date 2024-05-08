@@ -12,6 +12,7 @@ pub fn translate_mouse_button(button: i32) -> MouseButton {
         n => return MouseButton::Other(n as _),
     };
 }
+
 pub fn translate_mod(wasm_mods: i32) -> KeyMods {
     const SAPP_MODIFIER_SHIFT: i32 = 1;
     const SAPP_MODIFIER_CTRL: i32 = 2;
