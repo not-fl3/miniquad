@@ -289,7 +289,7 @@ unsafe extern "C" fn pointer_handle_button(
         272 => MouseButton::Left,
         273 => MouseButton::Right,
         274 => MouseButton::Middle,
-        _ => MouseButton::Unknown,
+        n => MouseButton::Other(n as _),
     };
     EVENTS.push(WaylandEvent::PointerButton(button, state == 1));
 }
@@ -397,8 +397,7 @@ unsafe extern "C" fn registry_add_object(
                 1,
             ) as _;
         }
-        "zxdg_decoration_manager" |
-        "zxdg_decoration_manager_v1" => {
+        "zxdg_decoration_manager" | "zxdg_decoration_manager_v1" => {
             display.decoration_manager = display.client.wl_registry_bind(
                 registry,
                 name,
@@ -773,20 +772,22 @@ where
 
                 while let Ok(request) = rx.try_recv() {
                     match request {
-                        Request::SetFullscreen(full) => if full {
-                            wl_request!(
-                                display.client,
-                                display.xdg_toplevel,
-                                extensions::xdg_shell::xdg_toplevel::set_fullscreen,
-                                std::ptr::null_mut::<*mut wl_output>()
-                            );
-                        } else {
-                            wl_request!(
-                                display.client,
-                                display.xdg_toplevel,
-                                extensions::xdg_shell::xdg_toplevel::unset_fullscreen
-                            );
-                        },
+                        Request::SetFullscreen(full) => {
+                            if full {
+                                wl_request!(
+                                    display.client,
+                                    display.xdg_toplevel,
+                                    extensions::xdg_shell::xdg_toplevel::set_fullscreen,
+                                    std::ptr::null_mut::<*mut wl_output>()
+                                );
+                            } else {
+                                wl_request!(
+                                    display.client,
+                                    display.xdg_toplevel,
+                                    extensions::xdg_shell::xdg_toplevel::unset_fullscreen
+                                );
+                            }
+                        }
 
                         // TODO: implement the other events
                         _ => (),

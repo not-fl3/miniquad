@@ -191,21 +191,48 @@ pub fn __private_api_log_lit(
 pub fn __private_api_log_lit(
     message: &str,
     level: Level,
-    &(_target, _module_path, _file, _line): &(&str, &'static str, &'static str, u32),
+    &(_, _, file, line): &(&str, &'static str, &'static str, u32),
 ) {
-    use crate::native::wasm;
-    use std::ffi::CString;
+    use wasm_bindgen::JsValue;
+    use web_sys::console;
 
-    let log_fn = match level {
-        Level::Debug => wasm::console_debug,
-        Level::Warn => wasm::console_warn,
-        Level::Info => wasm::console_info,
-        Level::Trace => wasm::console_debug,
-        Level::Error => wasm::console_error,
-    };
-    let msg = CString::new(message).unwrap_or_else(|_| panic!());
+    match level {
+        Level::Debug => {
+            let header = format!("%cDEBUG | %c{}[{}]", file, line).into();
+            let style = "color: blue; font-weight: bold".into();
+            let message = JsValue::from_str(message);
 
-    unsafe { log_fn(msg.as_ptr()) };
+            console::debug_3(&header, &style, &message);
+        }
+        Level::Warn => {
+            let header = format!("%cWARN | %c{}[{}]", file, line).into();
+            let style = "color: orange; font-weight: bold".into();
+            let message = JsValue::from_str(message);
+
+            console::warn_3(&header, &style, &message);
+        }
+        Level::Info => {
+            let header = format!("%cINFO | %c{}[{}]", file, line).into();
+            let style = "color: green; font-weight: bold".into();
+            let message = JsValue::from_str(message);
+
+            console::info_3(&header, &style, &message);
+        }
+        Level::Trace => {
+            let header = format!("%cTRACE | %c{}[{}]", file, line).into();
+            let style = "color: grey; font-weight: bold".into();
+            let message = JsValue::from_str(message);
+
+            console::debug_3(&header, &style, &message);
+        }
+        Level::Error => {
+            let header = format!("%cERROR | %c{}[{}]", file, line).into();
+            let style = "color: red; font-weight: bold".into();
+            let message = JsValue::from_str(message);
+
+            console::error_3(&header, &style, &message);
+        }
+    }
 }
 
 #[cfg(target_os = "android")]

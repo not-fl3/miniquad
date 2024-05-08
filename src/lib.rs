@@ -31,9 +31,7 @@ pub mod date {
 
     #[cfg(target_arch = "wasm32")]
     pub fn now() -> f64 {
-        use crate::native;
-
-        unsafe { native::wasm::now() }
+        web_sys::js_sys::Date::now()
     }
 }
 

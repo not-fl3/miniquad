@@ -27,13 +27,13 @@ canvas.focus();
 
 canvas.requestPointerLock = canvas.requestPointerLock ||
     canvas.mozRequestPointerLock ||
-    // pointer lock in any form is not supported on iOS safari 
+    // pointer lock in any form is not supported on iOS safari
     // https://developer.mozilla.org/en-US/docs/Web/API/Pointer_Lock_API#browser_compatibility
-    (function () {});
+    (function () { });
 document.exitPointerLock = document.exitPointerLock ||
     document.mozExitPointerLock ||
     // pointer lock in any form is not supported on iOS safari
-    (function () {});
+    (function () { });
 
 function assert(flag, message) {
     if (flag == false) {
@@ -97,46 +97,10 @@ function getArray(ptr, arr, n) {
     return new arr(wasm_memory.buffer, ptr, n);
 }
 
-function UTF8ToString(ptr, maxBytesToRead) {
-    let u8Array = new Uint8Array(wasm_memory.buffer, ptr);
-
-    var idx = 0;
-    var endIdx = idx + maxBytesToRead;
-
-    var str = '';
-    while (!(idx >= endIdx)) {
-        // For UTF8 byte structure, see:
-        // http://en.wikipedia.org/wiki/UTF-8#Description
-        // https://www.ietf.org/rfc/rfc2279.txt
-        // https://tools.ietf.org/html/rfc3629
-        var u0 = u8Array[idx++];
-
-        // If not building with TextDecoder enabled, we don't know the string length, so scan for \0 byte.
-        // If building with TextDecoder, we know exactly at what byte index the string ends, so checking for nulls here would be redundant.
-        if (!u0) return str;
-
-        if (!(u0 & 0x80)) { str += String.fromCharCode(u0); continue; }
-        var u1 = u8Array[idx++] & 63;
-        if ((u0 & 0xE0) == 0xC0) { str += String.fromCharCode(((u0 & 31) << 6) | u1); continue; }
-        var u2 = u8Array[idx++] & 63;
-        if ((u0 & 0xF0) == 0xE0) {
-            u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
-        } else {
-
-            if ((u0 & 0xF8) != 0xF0) console.warn('Invalid UTF-8 leading byte 0x' + u0.toString(16) + ' encountered when deserializing a UTF-8 string on the asm.js/wasm heap to a JS string!');
-
-            u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (u8Array[idx++] & 63);
-        }
-
-        if (u0 < 0x10000) {
-            str += String.fromCharCode(u0);
-        } else {
-            var ch = u0 - 0x10000;
-            str += String.fromCharCode(0xD800 | (ch >> 10), 0xDC00 | (ch & 0x3FF));
-        }
-    }
-
-    return str;
+function UTF8ToString(ptr, len) {
+    let u8Array = new Uint8Array(wasm_memory.buffer, ptr, len);
+    let decoder = new TextDecoder('utf-8');
+    return decoder.decode(u8Array);
 }
 
 function stringToUTF8(str, heap, outIdx, maxBytesToWrite) {
@@ -400,6 +364,7 @@ function _webglGet(name_, p, type) {
 var Module;
 var wasm_exports;
 
+// resizes the canvas window, and calls on_resize if it is defined
 function resize(canvas, on_resize) {
     var dpr = dpi_scale();
     var displayWidth = canvas.clientWidth * dpr;
@@ -562,7 +527,8 @@ function into_sapp_keycode(key_code) {
     console.log("Unsupported keyboard key: ", key_code)
 }
 
-function dpi_scale()  {
+// Returns window.devicePixelRatio if high_dpi is true, otherwise 1.0
+function dpi_scale() {
     if (high_dpi) {
         return window.devicePixelRatio || 1.0;
     } else {
@@ -614,21 +580,14 @@ var importObject = {
         set_emscripten_shader_hack: function (flag) {
             emscripten_shaders_hack = flag;
         },
-        sapp_set_clipboard: function(ptr, len) {
+        sapp_clipboard_write: function (ptr, len) {
             clipboard = UTF8ToString(ptr, len);
         },
-        dpi_scale,
         rand: function () {
             return Math.floor(Math.random() * 2147483647);
         },
         now: function () {
             return Date.now() / 1000.0;
-        },
-        canvas_width: function () {
-            return Math.floor(canvas.width);
-        },
-        canvas_height: function () {
-            return Math.floor(canvas.height);
         },
         glClearDepthf: function (depth) {
             gl.clearDepth(depth);
@@ -666,7 +625,7 @@ var importObject = {
             gl.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type,
                 pixels ? getArray(pixels, Uint8Array, texture_size(format, width, height)) : null);
         },
-        glReadPixels: function(x, y, width, height, format, type, pixels) {
+        glReadPixels: function (x, y, width, height, format, type, pixels) {
             var pixelData = getArray(pixels, Uint8Array, texture_size(format, width, height));
             gl.readPixels(x, y, width, height, format, type, pixelData);
         },
@@ -956,7 +915,7 @@ var importObject = {
                 array[i] = log.charCodeAt(i);
             }
         },
-        glGetString: function(id) {
+        glGetString: function (id) {
             // getParameter returns "any": it could be GLenum, String or whatever,
             // depending on the id.
             var parameter = gl.getParameter(id).toString();
@@ -1045,49 +1004,45 @@ var importObject = {
                 GL.textures[id] = null;
             }
         },
-		glGenQueries: function (n, ids) {
-			_glGenObject(n, ids, 'createQuery', GL.timerQueries, 'glGenQueries');
-		},
-		glDeleteQueries: function (n, ids) {
+        glGenQueries: function (n, ids) {
+            _glGenObject(n, ids, 'createQuery', GL.timerQueries, 'glGenQueries');
+        },
+        glDeleteQueries: function (n, ids) {
             for (var i = 0; i < n; i++) {
                 var id = getArray(textures + i * 4, Uint32Array, 1)[0];
                 var query = GL.timerQueries[id];
                 if (!query) {
-					continue;
-				}
+                    continue;
+                }
                 gl.deleteQuery(query);
                 query.name = 0;
                 GL.timerQueries[id] = null;
             }
-		},
-		glBeginQuery: function (target, id) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glBeginQuery', 'id');
-			gl.beginQuery(target, GL.timerQueries[id]);
-		},
-		glEndQuery: function (target) {
-			gl.endQuery(target);
-		},
-		glGetQueryObjectiv: function (id, pname, ptr) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectiv', 'id');
-			let result = gl.getQueryObject(GL.timerQueries[id], pname);
-			getArray(ptr, Uint32Array, 1)[0] = result;
-		},
-		glGetQueryObjectui64v: function (id, pname, ptr) {
-			GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectui64v', 'id');
-			let result = gl.getQueryObject(GL.timerQueries[id], pname);
-			let heap = getArray(ptr, Uint32Array, 2);
-			heap[0] = result;
-			heap[1] = (result - heap[0])/4294967296;
-		},
+        },
+        glBeginQuery: function (target, id) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glBeginQuery', 'id');
+            gl.beginQuery(target, GL.timerQueries[id]);
+        },
+        glEndQuery: function (target) {
+            gl.endQuery(target);
+        },
+        glGetQueryObjectiv: function (id, pname, ptr) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectiv', 'id');
+            let result = gl.getQueryObject(GL.timerQueries[id], pname);
+            getArray(ptr, Uint32Array, 1)[0] = result;
+        },
+        glGetQueryObjectui64v: function (id, pname, ptr) {
+            GL.validateGLObjectID(GL.timerQueries, id, 'glGetQueryObjectui64v', 'id');
+            let result = gl.getQueryObject(GL.timerQueries[id], pname);
+            let heap = getArray(ptr, Uint32Array, 2);
+            heap[0] = result;
+            heap[1] = (result - heap[0]) / 4294967296;
+        },
         glGenerateMipmap: function (index) {
             gl.generateMipmap(index);
         },
 
-        setup_canvas_size: function(high_dpi) {
-            window.high_dpi = high_dpi;
-            resize(canvas);
-        },
-        run_animation_loop: function (ptr) {
+        run_animation_loop: () => {
             canvas.onmousemove = function (event) {
                 var relative_position = mouse_relative_position(event.clientX, event.clientY);
                 var x = relative_position.x;
@@ -1220,20 +1175,20 @@ var importObject = {
             window.onresize = function () {
                 resize(canvas, wasm_exports.resize);
             };
-            window.addEventListener("copy", function(e) {
+            window.addEventListener("copy", function (e) {
                 if (clipboard != null) {
                     event.clipboardData.setData('text/plain', clipboard);
                     event.preventDefault();
                 }
             });
-            window.addEventListener("cut", function(e) {
+            window.addEventListener("cut", function (e) {
                 if (clipboard != null) {
                     event.clipboardData.setData('text/plain', clipboard);
                     event.preventDefault();
                 }
             });
 
-            window.addEventListener("paste", function(e) {
+            window.addEventListener("paste", function (e) {
                 e.stopPropagation();
                 e.preventDefault();
                 var clipboardData = e.clipboardData || window.clipboardData;
@@ -1248,11 +1203,11 @@ var importObject = {
                 }
             });
 
-            window.ondragover = function(e) {
+            window.ondragover = function (e) {
                 e.preventDefault();
             };
 
-            window.ondrop = async function(e) {
+            window.ondrop = async function (e) {
                 e.preventDefault();
 
                 wasm_exports.on_files_dropped_start();
@@ -1276,9 +1231,9 @@ var importObject = {
             };
 
             let lastFocus = document.hasFocus();
-            var checkFocus = function() {
+            var checkFocus = function () {
                 let hasFocus = document.hasFocus();
-                if(lastFocus == hasFocus){
+                if (lastFocus == hasFocus) {
                     wasm_exports.focus(hasFocus);
                     lastFocus = hasFocus;
                 }
@@ -1296,22 +1251,22 @@ var importObject = {
             FS.unique_id += 1;
             var xhr = new XMLHttpRequest();
             xhr.open('GET', url, true);
-            xhr.responseType = 'arraybuffer'; 
+            xhr.responseType = 'arraybuffer';
 
-            xhr.onreadystatechange = function() {
-	        // looks like readyState === 4 will be fired on either successful or unsuccessful load:
-		// https://stackoverflow.com/a/19247992
+            xhr.onreadystatechange = function () {
+                // looks like readyState === 4 will be fired on either successful or unsuccessful load:
+                // https://stackoverflow.com/a/19247992
                 if (this.readyState === 4) {
-                    if(this.status === 200) {  
+                    if (this.status === 200) {
                         var uInt8Array = new Uint8Array(this.response);
-    
+
                         FS.loaded_files[file_id] = uInt8Array;
                         wasm_exports.file_loaded(file_id);
                     } else {
                         FS.loaded_files[file_id] = null;
                         wasm_exports.file_loaded(file_id);
                     }
-                } 
+                }
             };
             xhr.send();
 
@@ -1334,32 +1289,10 @@ var importObject = {
             }
             delete FS.loaded_files[file_id];
         },
-        sapp_set_cursor_grab: function (grab) {
-            if (grab) {
-                canvas.requestPointerLock();
-            } else {
-                document.exitPointerLock();
-            }
-        },
-        sapp_set_cursor: function(ptr, len) {
-            canvas.style.cursor = UTF8ToString(ptr, len);
-        },
-        sapp_is_fullscreen: function() {
+        sapp_is_fullscreen: function () {
             let fullscreenElement = document.fullscreenElement;
 
             return fullscreenElement != null && fullscreenElement.id == canvas.id;
-        },
-        sapp_set_fullscreen: function(fullscreen) {
-            if (!fullscreen) {
-                document.exitFullscreen();
-            } else {
-                canvas.requestFullscreen();
-            }
-        },
-        sapp_set_window_size: function(new_width, new_height) {
-            canvas.width = new_width;
-            canvas.height = new_height;
-            resize(canvas, wasm_exports.resize);
         }
     }
 };
@@ -1406,11 +1339,11 @@ function init_plugins(plugins) {
 
                 if (plugins[i].version != crate_version) {
                     console.error("Plugin " + plugins[i].name + " version mismatch" +
-                                  "js version: " + plugins[i].version + ", crate version: " + crate_version)
+                        "js version: " + plugins[i].version + ", crate version: " + crate_version)
                 }
             }
         }
-     }
+    }
 }
 
 
@@ -1427,7 +1360,7 @@ function add_missing_functions_stabs(obj) {
     for (const i in imports) {
         if (importObject["env"][imports[i].name] == undefined) {
             console.warn("No " + imports[i].name + " function in gl.js");
-            importObject["env"][imports[i].name] = function() {
+            importObject["env"][imports[i].name] = function () {
                 console.warn("Missed function: " + imports[i].name);
             };
         }
@@ -1454,7 +1387,7 @@ function load(wasm_path) {
                     if (version != crate_version) {
                         console.error(
                             "Version mismatch: gl.js version is: " + version +
-                                ", miniquad crate version is: " + crate_version);
+                            ", miniquad crate version is: " + crate_version);
                     }
                     init_plugins(plugins);
                     obj.exports.main();
@@ -1479,7 +1412,7 @@ function load(wasm_path) {
                 if (version != crate_version) {
                     console.error(
                         "Version mismatch: gl.js version is: " + version +
-                            ", rust sapp-wasm crate version is: " + crate_version);
+                        ", rust sapp-wasm crate version is: " + crate_version);
                 }
                 init_plugins(plugins);
                 obj.exports.main();

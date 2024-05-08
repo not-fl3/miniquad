@@ -9,22 +9,29 @@ repository = "https://github.com/not-fl3/miniquad"
 description = """
 Cross-platform window context and rendering library.
 """
-readme="README.md"
+readme = "README.md"
 exclude = ["examples/"]
 keywords = ["graphics", "3D", "opengl", "gamedev", "windowing"]
 categories = ["rendering::graphics-api"]
 
 [features]
-
-# Optional log-rs like macros implementation
-# disabled by default
 log-impl = []
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["wingdi", "winuser", "libloaderapi", "windef", "shellscalingapi", "errhandlingapi", "windowsx", "winbase", "hidusage"] }
+winapi = { version = "0.3", features = [
+	"wingdi",
+	"winuser",
+	"libloaderapi",
+	"windef",
+	"shellscalingapi",
+	"errhandlingapi",
+	"windowsx",
+	"winbase",
+	"hidusage",
+] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 libc = "0.2"
@@ -33,6 +40,25 @@ ndk-sys = "0.2"
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 objc = "0.2"
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2" }
+web-sys = { version = "0.3", features = [
+	"Window",
+	"HtmlCanvasElement",
+	"Document",
+	"CssStyleDeclaration",
+	"Navigator",
+	"Clipboard",
+	"MouseEvent",
+	"DomRect"
+] }
+console_error_panic_hook = "0.1"
+pollster = "0.3.0"
+wasm-bindgen-futures = "0.4.42"
+
+[target.'cfg(feature = "log-impl")'.dependencies]
+web-sys = { version = "0.3", features = ["console"] }
+
 [dev-dependencies]
-glam = {version = "0.24", features = ["scalar-math"] }
-quad-rand = "0.1"
+glam = { version = "0.27.0", features = ["scalar-math"] }
+quad-rand = "0.2.1"

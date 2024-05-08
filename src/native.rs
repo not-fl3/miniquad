@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::sync::{mpsc, Mutex};
 
 #[derive(Default)]
 pub(crate) struct DroppedFiles {

@@ -3,11 +3,14 @@ pub mod webgl;
 
 mod keycodes;
 
+use wasm_bindgen::{closure, JsCast};
+use web_sys::*;
 pub use webgl::*;
 
 use std::{
-    cell::RefCell,
+    cell::{OnceCell, RefCell},
     path::PathBuf,
+    rc::Rc,
     sync::{mpsc::Receiver, Mutex, OnceLock},
     thread_local,
 };
@@ -17,164 +20,77 @@ use crate::{
     native::{NativeDisplayData, Request},
 };
 
-// fn dropped_file_count(&mut self) -> usize {
-//     self.dropped_files.bytes.len()
-// }
-// fn dropped_file_bytes(&mut self, index: usize) -> Option<Vec<u8>> {
-//     self.dropped_files.bytes.get(index).cloned()
-// }
-// fn dropped_file_path(&mut self, index: usize) -> Option<PathBuf> {
-//     self.dropped_files.paths.get(index).cloned()
-// }
-
-thread_local! {
-    static EVENT_HANDLER: RefCell<Option<Box<dyn EventHandler>>> = RefCell::new(None);
-    static REQUESTS: RefCell<Option<Receiver<Request>>> = RefCell::new(None);
-}
-fn tl_event_handler<T, F: FnOnce(&mut dyn EventHandler) -> T>(f: F) -> T {
-    EVENT_HANDLER.with(|globals| {
-        let mut globals = globals.borrow_mut();
-        let globals: &mut Box<dyn EventHandler> = globals.as_mut().unwrap();
-        f(&mut **globals)
-    })
+// get's an element using document.query_selector
+fn get_element<T: JsCast>(id: &'static str) -> T {
+    document()
+        .get_element_by_id(id)
+        .unwrap()
+        .dyn_into::<T>()
+        .unwrap()
 }
 
-static mut CURSOR_ICON: crate::CursorIcon = crate::CursorIcon::Default;
-static mut CURSOR_SHOW: bool = true;
+fn document() -> web_sys::Document {
+    web_sys::window().unwrap().document().unwrap()
+}
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct sapp_touchpoint {
-    pub identifier: usize,
-    pub pos_x: f32,
-    pub pos_y: f32,
-    pub changed: bool,
+fn get_dpi_scale(high_dpi: bool) -> f64 {
+    if high_dpi {
+        web_sys::window()
+            .map(|w| w.device_pixel_ratio())
+            .unwrap_or(1.0)
+    } else {
+        1.0
+    }
+}
+
+static mut EVENT_HANDLER: Option<*mut dyn EventHandler> = None;
+
+// SAFETY: Can't have a data race in a single threaded environment, wasm is single threaded
+fn get_event_handler() -> &'static mut dyn EventHandler {
+    unsafe { &mut *EVENT_HANDLER.unwrap() }
 }
 
 pub fn run<F>(conf: &crate::conf::Conf, f: F)
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    {
-        use std::ffi::CString;
-        use std::panic;
+    // setup panic hook
+    console_error_panic_hook::set_once();
 
-        panic::set_hook(Box::new(|info| {
-            let msg = CString::new(format!("{:?}", info)).unwrap_or_else(|_| {
-                CString::new(format!("MALFORMED ERROR MESSAGE {:?}", info.location())).unwrap()
-            });
-            unsafe { console_log(msg.as_ptr()) };
-        }));
-    }
+    // initialize main canvas
+    let main_canvas = get_element::<HtmlCanvasElement>(conf.platform.web_canvas_query_selector);
+    let high_dpi = conf.high_dpi;
+    let dpi = get_dpi_scale(high_dpi) as i32;
 
-    // setup initial canvas size
-    unsafe {
-        setup_canvas_size(conf.high_dpi);
-    }
+    let display_width = main_canvas.client_width() * dpi;
+    let display_height = main_canvas.client_height() * dpi;
 
+    main_canvas.set_width(display_width as u32);
+    main_canvas.set_height(display_height as u32);
+
+    // setup requests channel
     let (tx, rx) = std::sync::mpsc::channel();
-    REQUESTS.with(|r| *r.borrow_mut() = Some(rx));
-    let w = unsafe { canvas_width() as _ };
-    let h = unsafe { canvas_height() as _ };
-    let clipboard = Box::new(Clipboard);
-    crate::set_display(NativeDisplayData {
-        ..NativeDisplayData::new(w, h, tx, clipboard)
-    });
-    EVENT_HANDLER.with(|g| {
-        *g.borrow_mut() = Some(f());
-    });
 
-    // start requestAnimationFrame loop
+    // setup display
+    let mut display = NativeDisplayData::new(
+        main_canvas.width() as _,
+        main_canvas.height() as _,
+        tx,
+        Box::new(Clipboard),
+    );
+    crate::set_display(display);
+
+    // setup event handler
     unsafe {
-        run_animation_loop();
-    }
-}
-
-pub unsafe fn sapp_width() -> ::std::os::raw::c_int {
-    canvas_width()
-}
-
-pub unsafe fn sapp_height() -> ::std::os::raw::c_int {
-    canvas_height()
-}
-
-extern "C" {
-    pub fn setup_canvas_size(high_dpi: bool);
-    pub fn run_animation_loop();
-    pub fn canvas_width() -> i32;
-    pub fn canvas_height() -> i32;
-    pub fn dpi_scale() -> f32;
-    pub fn console_debug(msg: *const ::std::os::raw::c_char);
-    pub fn console_log(msg: *const ::std::os::raw::c_char);
-    pub fn console_info(msg: *const ::std::os::raw::c_char);
-    pub fn console_warn(msg: *const ::std::os::raw::c_char);
-    pub fn console_error(msg: *const ::std::os::raw::c_char);
-
-    pub fn sapp_set_clipboard(clipboard: *const i8, len: usize);
-
-    /// call "requestPointerLock" and "exitPointerLock" internally.
-    /// Will hide cursor and will disable mouse_move events, but instead will
-    /// will make inifinite mouse field for raw_device_input event.
-    /// Notice that this function will works only from "engaging" event callbacks - from
-    /// "mouse_down"/"key_down" event handler functions.
-    pub fn sapp_set_cursor_grab(grab: bool);
-
-    pub fn sapp_set_cursor(cursor: *const u8, len: usize);
-
-    pub fn sapp_is_elapsed_timer_supported() -> bool;
-
-    pub fn sapp_set_fullscreen(fullscreen: bool);
-    pub fn sapp_is_fullscreen() -> bool;
-    pub fn sapp_set_window_size(new_width: u32, new_height: u32);
-
-    pub fn now() -> f64;
-}
-
-unsafe fn show_mouse(shown: bool) {
-    if shown != CURSOR_SHOW {
-        CURSOR_SHOW = shown;
-        update_cursor();
-    }
-}
-
-unsafe fn set_mouse_cursor(icon: crate::CursorIcon) {
-    if CURSOR_ICON != icon {
-        CURSOR_ICON = icon;
-        if CURSOR_SHOW {
-            update_cursor();
-        }
-    }
-}
-
-pub unsafe fn update_cursor() {
-    let css_name = if !CURSOR_SHOW {
-        "none"
-    } else {
-        match CURSOR_ICON {
-            crate::CursorIcon::Default => "default",
-            crate::CursorIcon::Help => "help",
-            crate::CursorIcon::Pointer => "pointer",
-            crate::CursorIcon::Wait => "wait",
-            crate::CursorIcon::Crosshair => "crosshair",
-            crate::CursorIcon::Text => "text",
-            crate::CursorIcon::Move => "move",
-            crate::CursorIcon::NotAllowed => "not-allowed",
-            crate::CursorIcon::EWResize => "ew-resize",
-            crate::CursorIcon::NSResize => "ns-resize",
-            crate::CursorIcon::NESWResize => "nesw-resize",
-            crate::CursorIcon::NWSEResize => "nwse-resize",
-        }
+        let event_handler = Box::leak(f());
+        EVENT_HANDLER = Some(event_handler)
     };
-    sapp_set_cursor(css_name.as_ptr(), css_name.len());
-}
 
-#[no_mangle]
-pub extern "C" fn crate_version() -> u32 {
-    let major = env!("CARGO_PKG_VERSION_MAJOR").parse::<u32>().unwrap();
-    let minor = env!("CARGO_PKG_VERSION_MINOR").parse::<u32>().unwrap();
-    let patch = env!("CARGO_PKG_VERSION_PATCH").parse::<u32>().unwrap();
+    // setup event listeners
+    init_mouse_move_events(&main_canvas);
 
-    (major << 24) + (minor << 16) + patch
+    // run event loop
+    event_loop(main_canvas, rx);
 }
 
 #[no_mangle]
@@ -185,92 +101,182 @@ pub extern "C" fn allocate_vec_u8(len: usize) -> *mut u8 {
     ptr
 }
 
-static CLIPBOARD: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 struct Clipboard;
+
 impl crate::native::Clipboard for Clipboard {
     fn get(&mut self) -> Option<String> {
-        CLIPBOARD
-            .get_or_init(|| Mutex::new(None))
-            .lock()
-            .unwrap()
-            .clone()
+        let navigator = window()?.navigator();
+        let clipboard = navigator.clipboard()?;
+        let promise = clipboard.read_text();
+        let future = wasm_bindgen_futures::JsFuture::from(promise);
+        let result = pollster::block_on(future).unwrap();
+        result.as_string()
     }
 
     fn set(&mut self, data: &str) {
-        let len = data.len();
-        let data = std::ffi::CString::new(data).unwrap();
-        unsafe { sapp_set_clipboard(data.as_ptr(), len) };
+        let navigator = window().unwrap().navigator();
+        if let Some(clipboard) = navigator.clipboard() {
+            let promise = clipboard.write_text(data);
+            let future = wasm_bindgen_futures::JsFuture::from(promise);
+            let _ = pollster::block_on(future).unwrap();
+        }
     }
 }
 
-#[no_mangle]
-pub extern "C" fn on_clipboard_paste(msg: *mut u8, len: usize) {
-    let msg = unsafe { String::from_raw_parts(msg, len, len) };
+fn event_loop(main_canvas: web_sys::HtmlCanvasElement, rx: Receiver<Request>) {
+    static mut LAST_CURSOR_CSS: &'static str = "default";
+    let event_handler = get_event_handler();
 
-    *CLIPBOARD.get_or_init(|| Mutex::new(None)).lock().unwrap() = Some(msg);
-}
-
-#[no_mangle]
-pub extern "C" fn frame() {
-    REQUESTS.with(|r| {
-        while let Ok(request) = r.borrow_mut().as_mut().unwrap().try_recv() {
-            use Request::*;
-            match request {
-                Request::SetCursorGrab(grab) => unsafe { sapp_set_cursor_grab(grab) },
-                Request::ShowMouse(show) => unsafe { show_mouse(show) },
-                Request::SetMouseCursor(cursor) => unsafe {
-                    set_mouse_cursor(cursor);
-                },
-                Request::SetFullscreen(fullscreen) => unsafe {
-                    sapp_set_fullscreen(fullscreen);
-                },
-                _ => {}
+    // process requests
+    while let Ok(request) = rx.try_recv() {
+        match request {
+            Request::SetCursorGrab(grab) => {
+                if grab {
+                    main_canvas.request_pointer_lock();
+                } else {
+                    document().exit_pointer_lock();
+                }
             }
+            Request::ShowMouse(show) => unsafe {
+                if !show {
+                    main_canvas.style().set_property("cursor", "none").unwrap();
+                } else {
+                    main_canvas
+                        .style()
+                        .set_property("cursor", LAST_CURSOR_CSS)
+                        .unwrap();
+                }
+            },
+            Request::SetMouseCursor(cursor) => unsafe {
+                let css_text = match cursor {
+                    crate::CursorIcon::Default => "default",
+                    crate::CursorIcon::Help => "help",
+                    crate::CursorIcon::Pointer => "pointer",
+                    crate::CursorIcon::Wait => "wait",
+                    crate::CursorIcon::Crosshair => "crosshair",
+                    crate::CursorIcon::Text => "text",
+                    crate::CursorIcon::Move => "move",
+                    crate::CursorIcon::NotAllowed => "not-allowed",
+                    crate::CursorIcon::EWResize => "ew-resize",
+                    crate::CursorIcon::NSResize => "ns-resize",
+                    crate::CursorIcon::NESWResize => "nesw-resize",
+                    crate::CursorIcon::NWSEResize => "nwse-resize",
+                };
+
+                LAST_CURSOR_CSS = css_text;
+                main_canvas
+                    .style()
+                    .set_property("cursor", LAST_CURSOR_CSS)
+                    .unwrap();
+            },
+            Request::SetFullscreen(fullscreen) => {
+                if fullscreen {
+                    main_canvas.request_fullscreen();
+                } else {
+                    document().exit_fullscreen();
+                }
+            }
+            Request::SetWindowSize {
+                new_width,
+                new_height,
+            } => {
+                let dpi = get_dpi_scale(false) as i32;
+                main_canvas.set_width(new_width * dpi as u32);
+                main_canvas.set_height(new_height * dpi as u32);
+
+                {
+                    let mut d = crate::native_display().lock().unwrap();
+                    d.screen_width = new_width as _;
+                    d.screen_height = new_width as _;
+                }
+
+                // emit resize event
+                event_handler.resize_event(new_width as _, new_width as _);
+            }
+            _ => {}
         }
-    });
-    tl_event_handler(|event_handler| {
-        event_handler.update();
-        event_handler.draw();
-    });
+    }
+
+    // drive event handler implementation
+    event_handler.update();
+    event_handler.draw();
+
+    // in the words of Dj Khaled, another one!
+    let closure = Box::new(move || event_loop(main_canvas, rx));
+    let next = closure::Closure::once(closure);
+    let fn_ref = next.as_ref().unchecked_ref();
+    web_sys::window().unwrap().request_animation_frame(fn_ref);
 }
 
-#[no_mangle]
-pub extern "C" fn mouse_move(x: i32, y: i32) {
-    tl_event_handler(|event_handler| {
-        event_handler.mouse_motion_event(x as _, y as _);
-    });
+fn init_mouse_move_events(canvas: &HtmlCanvasElement) {
+    let closure: closure::Closure<dyn Fn(MouseEvent)> =
+        closure::Closure::new(move |ev: MouseEvent| {
+            let canvas = ev
+                .target()
+                .unwrap()
+                .dyn_into::<HtmlCanvasElement>()
+                .unwrap();
+            let rect = canvas.get_bounding_client_rect();
+            let event_handler = get_event_handler();
+
+            let x = ev.client_x() as f32 - rect.left() as f32;
+            let y = ev.client_y() as f32 - rect.top() as f32;
+
+            event_handler.mouse_motion_event(x, y);
+            event_handler.raw_mouse_motion(ev.movement_x() as _, ev.movement_y() as _);
+        });
+
+    let fn_ref = closure.as_ref().unchecked_ref();
+    canvas.add_event_listener_with_callback("mousemove", fn_ref);
 }
 
-#[no_mangle]
-pub extern "C" fn raw_mouse_move(dx: i32, dy: i32) {
-    tl_event_handler(|event_handler| {
-        event_handler.raw_mouse_motion(dx as _, dy as _);
-    });
+fn init_mouse_down_events(canvas: &HtmlCanvasElement) {
+    let closure: closure::Closure<dyn Fn(MouseEvent)> =
+        closure::Closure::new(move |ev: MouseEvent| {
+            let canvas = ev
+                .target()
+                .unwrap()
+                .dyn_into::<HtmlCanvasElement>()
+                .unwrap();
+            let rect = canvas.get_bounding_client_rect();
+            let event_handler = get_event_handler();
+
+            let x = ev.client_x() as f32 - rect.left() as f32;
+            let y = ev.client_y() as f32 - rect.top() as f32;
+
+            let button = match ev.button() {
+                0 => crate::MouseButton::Left,
+                1 => crate::MouseButton::Right,
+                2 => crate::MouseButton::Middle,
+                n => crate::MouseButton::Other(n as _),
+            };
+        });
+
+    let fn_ref = closure.as_ref().unchecked_ref();
+    canvas.add_event_listener_with_callback("mousedown", fn_ref);
 }
 
 #[no_mangle]
 pub extern "C" fn mouse_down(x: i32, y: i32, btn: i32) {
-    let btn = keycodes::translate_mouse_button(btn);
-
-    tl_event_handler(|event_handler| {
-        event_handler.mouse_button_down_event(btn, x as _, y as _);
-    });
+    get_event_handler().mouse_button_down_event(
+        keycodes::translate_mouse_button(btn),
+        x as _,
+        y as _,
+    );
 }
 
 #[no_mangle]
 pub extern "C" fn mouse_up(x: i32, y: i32, btn: i32) {
-    let btn = keycodes::translate_mouse_button(btn);
-
-    tl_event_handler(|event_handler| {
-        event_handler.mouse_button_up_event(btn, x as _, y as _);
-    });
+    get_event_handler().mouse_button_up_event(
+        keycodes::translate_mouse_button(btn),
+        x as _,
+        y as _,
+    );
 }
 
 #[no_mangle]
 pub extern "C" fn mouse_wheel(dx: i32, dy: i32) {
-    tl_event_handler(|event_handler| {
-        event_handler.mouse_wheel_event(dx as _, dy as _);
-    });
+    get_event_handler().mouse_wheel_event(dx as _, dy as _);
 }
 
 #[no_mangle]
@@ -278,17 +284,13 @@ pub extern "C" fn key_down(key: u32, modifiers: u32, repeat: bool) {
     let key = keycodes::translate_keycode(key as _);
     let mods = keycodes::translate_mod(modifiers as _);
 
-    tl_event_handler(|event_handler| {
-        event_handler.key_down_event(key, mods, repeat);
-    });
+    get_event_handler().key_down_event(key, mods, repeat);
 }
 
 #[no_mangle]
 pub extern "C" fn key_press(key: u32) {
     if let Some(key) = char::from_u32(key) {
-        tl_event_handler(|event_handler| {
-            event_handler.char_event(key, crate::KeyMods::default(), false);
-        });
+        get_event_handler().char_event(key, crate::KeyMods::default(), false);
     }
 }
 
@@ -297,40 +299,22 @@ pub extern "C" fn key_up(key: u32, modifiers: u32) {
     let key = keycodes::translate_keycode(key as _);
     let mods = keycodes::translate_mod(modifiers as _);
 
-    tl_event_handler(|event_handler| {
-        event_handler.key_up_event(key, mods);
-    });
-}
-
-#[no_mangle]
-pub extern "C" fn resize(width: i32, height: i32) {
-    {
-        let mut d = crate::native_display().lock().unwrap();
-        d.screen_width = width as _;
-        d.screen_height = height as _;
-    }
-    tl_event_handler(|event_handler| {
-        event_handler.resize_event(width as _, height as _);
-    });
+    get_event_handler().key_up_event(key, mods);
 }
 
 #[no_mangle]
 pub extern "C" fn touch(phase: u32, id: u32, x: f32, y: f32) {
     let phase = keycodes::translate_touch_phase(phase as _);
-    tl_event_handler(|event_handler| {
-        event_handler.touch_event(phase, id as _, x as _, y as _);
-    });
+    get_event_handler().touch_event(phase, id as _, x as _, y as _);
 }
 
 #[no_mangle]
 pub extern "C" fn focus(has_focus: bool) {
-    tl_event_handler(|event_handler| {
-        if has_focus {
-            event_handler.window_restored_event();
-        } else {
-            event_handler.window_minimized_event();
-        }
-    });
+    if has_focus {
+        get_event_handler().window_restored_event();
+    } else {
+        get_event_handler().window_minimized_event();
+    }
 }
 
 #[no_mangle]
@@ -341,7 +325,7 @@ pub extern "C" fn on_files_dropped_start() {
 
 #[no_mangle]
 pub extern "C" fn on_files_dropped_finish() {
-    tl_event_handler(|event_handler| event_handler.files_dropped_event());
+    get_event_handler().files_dropped_event()
 }
 
 #[no_mangle]

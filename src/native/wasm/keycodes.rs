@@ -9,7 +9,7 @@ pub fn translate_mouse_button(button: i32) -> MouseButton {
         0 => return MouseButton::Left,
         1 => return MouseButton::Right,
         2 => return MouseButton::Middle,
-        _ => return MouseButton::Unknown,
+        n => return MouseButton::Other(n as _),
     };
 }
 pub fn translate_mod(wasm_mods: i32) -> KeyMods {

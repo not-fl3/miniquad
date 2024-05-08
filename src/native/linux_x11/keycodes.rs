@@ -160,7 +160,7 @@ pub unsafe fn translate_mouse_button(button: i32) -> MouseButton {
         1 => return MouseButton::Left,
         2 => return MouseButton::Middle,
         3 => return MouseButton::Right,
-        _ => return MouseButton::Unknown,
+        n => return MouseButton::Other(n as _),
     };
 }
 

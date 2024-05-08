@@ -107,6 +107,9 @@ pub struct Platform {
     /// Whether to draw the default window decorations on Wayland.
     /// Only works when using the Wayland backend.
     pub wayland_use_fallback_decorations: bool,
+
+    /// Html Id for HtmlCanvasElement to attach to
+    pub web_canvas_query_selector: &'static str,
 }
 
 impl Default for Platform {
@@ -118,6 +121,7 @@ impl Default for Platform {
             apple_gfx_api: AppleGfxApi::OpenGl,
             framebuffer_alpha: false,
             wayland_use_fallback_decorations: true,
+            web_canvas_query_selector: "#glcanvas",
         }
     }
 }
