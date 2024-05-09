@@ -154,9 +154,9 @@ fn event_loop(main_canvas: web_sys::HtmlCanvasElement, last_cursor_css: &'static
 			}
 			Request::SetFullscreen(fullscreen) => {
 				if fullscreen {
-					if let Err(e) = main_canvas.request_fullscreen() {
+					if let Err(_e) = main_canvas.request_fullscreen() {
 						#[cfg(feature = "log-impl")]
-						crate::error!("Unable to enter fullscreen: {:?}", e);
+						crate::error!("Unable to enter fullscreen: {:?}", _e);
 					};
 				} else {
 					document().exit_fullscreen();

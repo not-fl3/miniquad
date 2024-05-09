@@ -94,9 +94,9 @@ mod wasm {
 								on_loaded(Ok(array));
 							}
 						}
-						Err(e) => {
+						Err(_e) => {
 							#[cfg(feature = "log-impl")]
-							crate::error!("XmlHttpRequest failed: {:?}", e);
+							crate::error!("XmlHttpRequest failed: {:?}", _e);
 							on_loaded(Err(Error::DownloadFailed));
 						}
 					};
