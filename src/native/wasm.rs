@@ -39,6 +39,9 @@ where
 	// setup panic hook
 	console_error_panic_hook::set_once();
 
+	// set window title
+	document().set_title(&conf.window_title);
+
 	// initialize main canvas
 	let main_canvas = document()
 		.query_selector(&conf.platform.web_canvas_query_selector)
@@ -49,7 +52,7 @@ where
 	let high_dpi = conf.high_dpi;
 	let dpi = get_dpi_scale(high_dpi) as i32;
 
-	// initialize canvas
+	// initialize canvas dimensions
 	main_canvas.set_width((conf.window_width * dpi) as u32);
 	main_canvas.set_height((conf.window_width * dpi) as u32);
 	main_canvas.style().set_property("width", &format!("{}px", conf.window_width)).unwrap();

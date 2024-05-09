@@ -73,8 +73,9 @@ pub mod window {
 		Box::new(GlContext::new())
 	}
 
-	/// The current framebuffer size in pixels
-	/// NOTE: [High DPI Rendering](../conf/index.html#high-dpi-rendering)
+	/// The current framebuffer size in pixels.
+	/// If [`Conf::high_dpi``](crate::conf::Conf::high_dpi) was set to false, canvas|window size == framebuffer size.
+	/// If set to true, the framebuffer is scaled by the dpi.
 	pub fn screen_size() -> (f32, f32) {
 		let d = native_display().lock().unwrap();
 		(d.screen_width as f32, d.screen_height as f32)
