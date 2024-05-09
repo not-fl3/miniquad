@@ -3,6 +3,8 @@ pub enum MouseButton {
 	Right,
 	Left,
 	Middle,
+	// 4 and 5 are extra buttons on some mice, commonly back and forward buttons on the side of the mouse
+	// The Web can't emit produce mouse 4 or 5 events.
 	Other(u32),
 }
 

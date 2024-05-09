@@ -188,7 +188,9 @@ unsafe extern "C" fn pointer_handle_button(_data: *mut ::std::os::raw::c_void, _
 		272 => MouseButton::Left,
 		273 => MouseButton::Right,
 		274 => MouseButton::Middle,
-		n => MouseButton::Other(n as _),
+		0x115 => MouseButton::Other(4),
+		0x116 => MouseButton::Other(5),
+		n => return,
 	};
 	EVENTS.push(WaylandEvent::PointerButton(button, state == 1));
 }

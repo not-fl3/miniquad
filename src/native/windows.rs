@@ -300,6 +300,16 @@ unsafe extern "system" fn win32_wndproc(hwnd: HWND, umsg: UINT, wparam: WPARAM, 
 
 			event_handler.mouse_button_down_event(MouseButton::Middle, mouse_x, mouse_y);
 		}
+		WM_XBUTTONDOWN => {
+			let mouse_x = payload.mouse_x;
+			let mouse_y = payload.mouse_y;
+
+			match HIWORD(wparam as _) {
+				XBUTTON1 => event_handler.mouse_button_down_event(MouseButton::Other(4), mouse_x, mouse_y),
+				XBUTTON2 => event_handler.mouse_button_down_event(MouseButton::Other(5), mouse_x, mouse_y),
+				_ => {}
+			};
+		}
 		WM_LBUTTONUP => {
 			let mouse_x = payload.mouse_x;
 			let mouse_y = payload.mouse_y;
@@ -318,25 +328,20 @@ unsafe extern "system" fn win32_wndproc(hwnd: HWND, umsg: UINT, wparam: WPARAM, 
 
 			event_handler.mouse_button_up_event(MouseButton::Middle, mouse_x, mouse_y);
 		}
+		WM_XBUTTONUP => {
+			let mouse_x = payload.mouse_x;
+			let mouse_y = payload.mouse_y;
+
+			match HIWORD(wparam as _) {
+				XBUTTON1 => event_handler.mouse_button_up_event(MouseButton::Other(4), mouse_x, mouse_y),
+				XBUTTON2 => event_handler.mouse_button_up_event(MouseButton::Other(5), mouse_x, mouse_y),
+				_ => {}
+			};
+		}
 
 		WM_MOUSEMOVE => {
 			payload.mouse_x = GET_X_LPARAM(lparam) as f32 * payload.mouse_scale;
 			payload.mouse_y = GET_Y_LPARAM(lparam) as f32 * payload.mouse_scale;
-			// mouse enter was not handled by miniquad_wasm_bindgen anyway
-			// if !_sapp.win32_mouse_tracked {
-			//     _sapp.win32_mouse_tracked = true;
-
-			//     let mut tme: TRACKMOUSEEVENT = std::mem::zeroed();
-
-			//     tme.cbSize = std::mem::size_of_val(&tme) as _;
-			//     tme.dwFlags = TME_LEAVE;
-			//     tme.hwndTrack = wnd;
-			//     TrackMouseEvent(&mut tme as *mut _);
-			//     _sapp_win32_mouse_event(
-			//         sapp_event_type_SAPP_EVENTTYPE_MOUSE_ENTER,
-			//         sapp_mousebutton_SAPP_MOUSEBUTTON_INVALID,
-			//     );
-			// }
 
 			let mouse_x = payload.mouse_x;
 			let mouse_y = payload.mouse_y;
@@ -351,14 +356,23 @@ unsafe extern "system" fn win32_wndproc(hwnd: HWND, umsg: UINT, wparam: WPARAM, 
 		WM_INPUT => {
 			let mut data: RAWINPUT = std::mem::zeroed();
 			let mut size = std::mem::size_of::<RAWINPUT>();
-			let get_succeed = GetRawInputData(lparam as _, RID_INPUT, &mut data as *mut _ as _, &mut size as *mut _ as _, std::mem::size_of::<RAWINPUTHEADER>() as _);
-			if get_succeed as i32 == -1 {
+
+			if GetRawInputData(
+				lparam as HRAWINPUT,
+				RID_INPUT,
+				&mut data as *mut _ as _,
+				&mut size as *mut _ as _,
+				std::mem::size_of::<RAWINPUTHEADER>() as UINT,
+			) as i32 == -1
+			{
 				panic!("failed to retrieve raw input data");
 			}
 
 			let mouse_scale = payload.mouse_scale;
-			let mut dx = data.data.mouse().lLastX as f32 * mouse_scale;
-			let mut dy = data.data.mouse().lLastY as f32 * mouse_scale;
+			let mouse = data.data.mouse();
+
+			let mut dx = mouse.lLastX as f32 * mouse_scale;
+			let mut dy = mouse.lLastY as f32 * mouse_scale;
 
 			// convert from normalised absolute coordinates
 			if (data.data.mouse().usFlags & MOUSE_MOVE_ABSOLUTE) == MOUSE_MOVE_ABSOLUTE {
@@ -567,12 +581,15 @@ unsafe fn create_window(window_title: &str, fullscreen: bool, resizable: bool, w
 		GetModuleHandleW(NULL as _), // hInstance
 		NULL as _,                   // lparam
 	);
+
 	assert!(hwnd.is_null() == false);
 
-	let mut rawinputdevice: RAWINPUTDEVICE = std::mem::zeroed();
-	rawinputdevice.usUsagePage = HID_USAGE_PAGE_GENERIC;
-	rawinputdevice.usUsage = HID_USAGE_GENERIC_MOUSE;
-	rawinputdevice.hwndTarget = NULL as _;
+	let rawinputdevice = RAWINPUTDEVICE {
+		usUsagePage: HID_USAGE_PAGE_GENERIC,
+		usUsage: HID_USAGE_GENERIC_MOUSE,
+		dwFlags: RIDEV_INPUTSINK,
+		hwndTarget: hwnd,
+	};
 
 	let register_succeed = RegisterRawInputDevices(&rawinputdevice as *const _, 1, std::mem::size_of::<RAWINPUTDEVICE>() as _);
 	assert!(register_succeed == 1, "Win32: failed to register for raw mouse input!");

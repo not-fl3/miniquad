@@ -57,23 +57,16 @@ impl X11Display {
 			}
 			4 => {
 				let btn = keycodes::translate_mouse_button((*event).xbutton.button as _);
+
 				let x = (*event).xmotion.x as libc::c_float;
 				let y = (*event).xmotion.y as libc::c_float;
 
 				match btn {
 					crate::event::MouseButton::Other(o) => match o {
-						4 => {
-							event_handler.mouse_wheel_event(0.0, 1.0);
-						}
-						5 => {
-							event_handler.mouse_wheel_event(0.0, -1.0);
-						}
-						6 => {
-							event_handler.mouse_wheel_event(1.0, 0.0);
-						}
-						7 => {
-							event_handler.mouse_wheel_event(-1.0, 0.0);
-						}
+						4 => event_handler.mouse_wheel_event(0.0, 1.0),
+						5 => event_handler.mouse_wheel_event(0.0, -1.0),
+						6 => event_handler.mouse_wheel_event(1.0, 0.0),
+						7 => event_handler.mouse_wheel_event(-1.0, 0.0),
 						_ => {}
 					},
 					b => event_handler.mouse_button_down_event(b, x, y),
