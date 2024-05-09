@@ -321,6 +321,7 @@ where
 
 		let wdisplay = (client.wl_display_connect)(std::ptr::null_mut());
 		if wdisplay.is_null() {
+			#[cfg(feature = "log-impl")]
 			crate::error!("Failed to connect to Wayland display.");
 			return None;
 		}
@@ -381,6 +382,7 @@ where
 		(display.client.wl_proxy_add_listener)(display.xdg_wm_base as _, &xdg_wm_base_listener as *const _ as _, &mut display as *mut _ as _);
 
 		if display.decoration_manager.is_null() && conf.platform.wayland_use_fallback_decorations {
+			#[cfg(feature = "log-impl")]
 			crate::error!("Decoration manager not found, will draw fallback decorations");
 		}
 

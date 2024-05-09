@@ -248,12 +248,14 @@ where
 			conf::LinuxBackend::WaylandOnly => native::linux_wayland::run(&conf, f).expect("Wayland backend failed"),
 			conf::LinuxBackend::X11WithWaylandFallback => {
 				if native::linux_x11::run(&conf, f).is_none() {
+					#[cfg(feature = "log-impl")]
 					crate::error!("Failed to initialize through X11! Trying wayland instead");
 					native::linux_wayland::run(&conf, f);
 				}
 			}
 			conf::LinuxBackend::WaylandWithX11Fallback => {
 				if native::linux_wayland::run(&conf, f).is_none() {
+					#[cfg(feature = "log-impl")]
 					crate::error!("Failed to initialize through wayland! Trying X11 instead");
 					native::linux_x11::run(&conf, f);
 				}

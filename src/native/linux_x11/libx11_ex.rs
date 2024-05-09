@@ -23,6 +23,7 @@ impl LibX11 {
 
 	pub unsafe fn grab_error_handler(&mut self) {
 		pub unsafe extern "C" fn _sapp_x11_error_handler(mut _display: *mut Display, event: *mut XErrorEvent) -> libc::c_int {
+			#[cfg(feature = "log-impl")]
 			crate::error!("Error: {}", (*event).error_code);
 			return 0 as libc::c_int;
 		}
