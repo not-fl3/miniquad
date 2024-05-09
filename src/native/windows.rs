@@ -621,7 +621,7 @@ impl WindowsDisplay {
 			proc_ptr = GetProcAddress(self.libopengl32.module.0, proc.as_ptr());
 		}
 		if proc_ptr.is_null() {
-			eprintln!("Load GL func {:?} failed.", proc);
+			crate::error!("Load GL func {:?} failed.", proc);
 			return None;
 		}
 		Some(std::mem::transmute(proc_ptr))
@@ -676,16 +676,14 @@ impl WindowsDisplay {
 
 	fn process_request(&mut self, request: Request) {
 		use Request::*;
-		unsafe {
-			match request {
-				SetCursorGrab(grab) => self.set_cursor_grab(grab),
-				ShowMouse(show) => self.show_mouse(show),
-				SetMouseCursor(icon) => self.set_mouse_cursor(icon),
-				SetWindowSize { new_width, new_height } => self.set_window_size(new_width as _, new_height as _),
-				SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
-				ShowKeyboard(show) => {
-					eprintln!("Not implemented for windows")
-				}
+		match request {
+			SetCursorGrab(grab) => self.set_cursor_grab(grab),
+			ShowMouse(show) => self.show_mouse(show),
+			SetMouseCursor(icon) => self.set_mouse_cursor(icon),
+			SetWindowSize { new_width, new_height } => self.set_window_size(new_width as _, new_height as _),
+			SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
+			ShowKeyboard(_) => {
+				crate::error!("ShowKeyboard is not implemented on Windows");
 			}
 		}
 	}

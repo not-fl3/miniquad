@@ -283,7 +283,7 @@ impl X11Display {
 				SetWindowSize { new_width, new_height } => self.set_window_size(self.window, new_width as _, new_height as _),
 				SetFullscreen(fullscreen) => self.set_fullscreen(self.window, fullscreen),
 				ShowKeyboard(show) => {
-					eprintln!("Not implemented for X11")
+					crate::error!("Not implemented for X11")
 				}
 			}
 		}

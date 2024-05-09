@@ -1242,8 +1242,8 @@ impl RenderingBackend for GlContext {
 		assert!(self.cache.cur_pipeline.is_some(), "Drawing without any binded pipeline");
 
 		if !self.features.instancing && num_instances != 1 {
-			eprintln!("Instanced rendering is not supported by the GPU");
-			eprintln!("Ignoring this draw call");
+			crate::error!("Instanced rendering is not supported by the GPU");
+			crate::error!("Ignoring this draw call");
 			return;
 		}
 
