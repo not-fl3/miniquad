@@ -108,7 +108,7 @@ pub struct Platform {
     /// Only works when using the Wayland backend.
     pub wayland_use_fallback_decorations: bool,
 
-    /// Html Id for HtmlCanvasElement to attach to
+    /// Html Query Selector for the canvas element to attach to.
     pub web_canvas_query_selector: &'static str,
 }
 
@@ -117,7 +117,7 @@ impl Default for Platform {
         Platform {
             linux_x11_gl: LinuxX11Gl::GLXWithEGLFallback,
             swap_interval: None,
-            linux_backend: LinuxBackend::X11Only,
+            linux_backend: LinuxBackend::WaylandWithX11Fallback,
             apple_gfx_api: AppleGfxApi::OpenGl,
             framebuffer_alpha: false,
             wayland_use_fallback_decorations: true,

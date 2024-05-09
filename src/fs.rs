@@ -71,47 +71,48 @@ fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
 
 #[cfg(target_arch = "wasm32")]
 mod wasm {
-    use super::Response;
-    use crate::native;
+    use super::{Error, Response};
 
-    use std::{cell::RefCell, collections::HashMap, thread_local};
-
-    thread_local! {
-        static FILES: RefCell<HashMap<u32, Box<dyn Fn(Response)>>> = RefCell::new(HashMap::new());
-    }
-
-    #[no_mangle]
-    pub extern "C" fn file_loaded(file_id: u32) {
-        use super::Error;
-        use native::wasm::fs;
-
-        FILES.with(|files| {
-            let mut files = files.borrow_mut();
-            let callback = files
-                .remove(&file_id)
-                .unwrap_or_else(|| panic!("Unknown file loaded!"));
-            let file_len = unsafe { fs::fs_get_buffer_size(file_id) };
-            if file_len == -1 {
-                callback(Err(Error::DownloadFailed));
-            } else {
-                let mut buffer = vec![0; file_len as usize];
-                unsafe { fs::fs_take_buffer(file_id, buffer.as_mut_ptr(), file_len as u32) };
-
-                callback(Ok(buffer));
-            }
-        })
-    }
+    use wasm_bindgen::{closure::Closure, JsCast};
+    use web_sys::{js_sys, XmlHttpRequest};
 
     pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
-        use native::wasm::fs;
-        use std::ffi::CString;
+        if let Ok(xhr) = XmlHttpRequest::new() {
+            if xhr.open("GET", path).is_ok() {
+                xhr.set_response_type(web_sys::XmlHttpRequestResponseType::Arraybuffer);
 
-        let url = CString::new(path).unwrap();
-        let file_id = unsafe { fs::fs_load_file(url.as_ptr(), url.as_bytes().len() as u32) };
-        FILES.with(|files| {
-            let mut files = files.borrow_mut();
-            files.insert(file_id, Box::new(on_loaded));
-        });
+                let xhr_clone = xhr.clone();
+                let callback: Closure<dyn Fn()> = Closure::new(move || {
+                    match xhr_clone.response() {
+                        Ok(d) => {
+                            if xhr_clone.status().unwrap() != 200 {
+                                #[cfg(feature = "log-impl")]
+                                crate::error!(
+                                    "XmlHttpRequest failed: {:?}",
+                                    xhr_clone.status_text().unwrap()
+                                );
+                                on_loaded(Err(Error::DownloadFailed));
+                            } else {
+                                let array = d.dyn_into::<js_sys::ArrayBuffer>().unwrap();
+                                let array = js_sys::Uint8Array::new(&array).to_vec();
+                                on_loaded(Ok(array));
+                            }
+                        }
+                        Err(e) => {
+                            #[cfg(feature = "log-impl")]
+                            crate::error!("XmlHttpRequest failed: {:?}", e);
+                            on_loaded(Err(Error::DownloadFailed));
+                        }
+                    };
+                });
+
+                xhr.set_onload(Some(callback.as_ref().unchecked_ref()));
+            } else {
+                #[cfg(feature = "log-impl")]
+                crate::error!("Unable to open XmlHttpRequest");
+                on_loaded(Err(Error::DownloadFailed));
+            };
+        }
     }
 }
 
