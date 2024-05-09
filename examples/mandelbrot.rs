@@ -141,6 +141,14 @@ impl EventHandler for Mandelbrot {
 		ctx.commit_frame();
 	}
 
+	fn key_down_event(&mut self, keycode: KeyCode, _: KeyMods, _: bool) {
+		match keycode {
+			KeyCode::R => self.center = (0.0, 0.0),
+			KeyCode::Escape => window::request_quit(),
+			_ => {}
+		}
+	}
+
 	fn mouse_button_down_event(&mut self, button: MouseButton, x: f32, y: f32) {
 		let pos = self.norm_mouse_pos(x, y);
 

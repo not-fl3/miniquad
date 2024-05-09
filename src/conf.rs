@@ -1,21 +1,22 @@
 //! Context creation configuration
 //!
-//! A [`Conf`](struct.Conf.html) struct is used to describe a hardware and platform specific setup,
+//! A [`Conf`] struct is used to describe a hardware and platform specific setup,
 //! mostly video display settings.
 //!
 //! ## High DPI rendering
 //!
-//! You can set the [`Conf::high_dpi`](struct.Conf.html#structfield.high_dpi) flag during initialization to request
+//! You can set the [`Conf::high_dpi`](Conf::high_dpi) flag during initialization to request
 //! a full-resolution framebuffer on HighDPI displays. The default behaviour
 //! is `high_dpi = false`, this means that the application will
 //! render to a lower-resolution framebuffer on HighDPI displays and the
 //! rendered content will be upscaled by the window system composer.
 //! In a HighDPI scenario, you still request the same window size during
-//! [`miniquad_wasm_bindgen::start`](../fn.start.html), but the framebuffer sizes returned by [`Context::screen_size`](../graphics/struct.Context.html#method.screen_size)
+//! [`miniquad_wasm_bindgen::start`](crate::start), but the framebuffer sizes returned by [`window::screen_size`](crate::window::screen_size)
 //! will be scaled up according to the DPI scaling ratio.
 //! You can also get a DPI scaling factor with the function
-//! [`Context::dpi_scale`](../graphics/struct.Context.html#method.dpi_scale).
+//! [`window::dpi_scale`](crate::window::screen_size).
 //! Here's an example on a Mac with Retina display:
+//!
 //! ```ignore
 //! Conf {
 //!   width = 640,
@@ -25,7 +26,7 @@
 //! };
 //! ```
 //!
-//! The functions [`screen_size`](../graphics/struct.Context.html#method.screen_size) and [`dpi_scale`](../graphics/struct.Context.html#method.dpi_scale) will
+//! The functions [`window::screen_size`](crate::window::screen_size) and [`window::dpi_scale`](crate::window::screen_size) will
 //! return the following values:
 //! ```bash
 //! screen_size -> (1280, 960)
