@@ -369,6 +369,7 @@ impl Wgl {
 		let mut gl_ctx = self.CreateContextAttribsARB.unwrap()(display.dc, std::ptr::null_mut(), attrs.as_ptr() as *const _);
 
 		if gl_ctx.is_null() {
+			#[cfg(feature = "log-impl")]
 			crate::error!("WGL: failed to create 3.2 context, trying 2.1");
 
 			let attrs = [

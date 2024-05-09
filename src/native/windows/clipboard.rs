@@ -5,6 +5,7 @@ use winapi::um::winuser::{CloseClipboard, EmptyClipboard, GetClipboardData, Open
 use std::ptr;
 
 struct ClipboardGuard;
+
 impl ClipboardGuard {
 	unsafe fn open() -> Option<Self> {
 		let result = OpenClipboard(ptr::null_mut());
@@ -29,12 +30,13 @@ unsafe fn get_raw_clipboard() -> Option<Vec<u16>> {
 	let guard = ClipboardGuard::open();
 
 	if guard.is_none() {
+		#[cfg(feature = "log-impl")]
 		crate::error!("Failed to open clipboard");
 		return None;
 	}
 
 	// Returns a handle to a clipboard object
-	let clipboard_data = GetClipboardData(CF_UNICODETEXT);
+	let clipboard_data: *mut winapi::ctypes::c_void = GetClipboardData(CF_UNICODETEXT);
 	if clipboard_data.is_null() {
 		return None;
 	}
@@ -60,6 +62,7 @@ unsafe fn set_raw_clipboard(data: *const u8, len: usize) {
 	let guard = ClipboardGuard::open();
 
 	if guard.is_none() {
+		#[cfg(feature = "log-impl")]
 		crate::error!("Failed to open clipboard");
 		return;
 	}
@@ -67,6 +70,7 @@ unsafe fn set_raw_clipboard(data: *const u8, len: usize) {
 	let alloc_handle = GlobalAlloc(GMEM_MOVEABLE, len);
 
 	if alloc_handle.is_null() {
+		#[cfg(feature = "log-impl")]
 		crate::error!("Failed to set clipboard: memory not allocated");
 		return;
 	}
@@ -80,12 +84,8 @@ unsafe fn set_raw_clipboard(data: *const u8, len: usize) {
 	SetClipboardData(CF_UNICODETEXT, alloc_handle);
 }
 
-pub struct WindowsClipboard {}
-impl WindowsClipboard {
-	pub fn new() -> WindowsClipboard {
-		WindowsClipboard {}
-	}
-}
+pub struct WindowsClipboard;
+
 impl crate::native::Clipboard for WindowsClipboard {
 	fn get(&mut self) -> Option<String> {
 		unsafe { get_raw_clipboard().map(|data| String::from_utf16_lossy(&data)) }

@@ -31,6 +31,10 @@ impl EventHandler for Stage {
 		};
 		window::set_mouse_cursor(icon);
 	}
+
+	fn mouse_button_down_event(&mut self, button: MouseButton, _: f32, _: f32) {
+		dbg!(button);
+	}
 }
 
 fn main() {

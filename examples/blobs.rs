@@ -5,6 +5,7 @@ struct Vec2 {
 	x: f32,
 	y: f32,
 }
+
 #[repr(C)]
 struct Vertex {
 	pos: Vec2,
@@ -23,7 +24,7 @@ struct Stage {
 
 impl Stage {
 	pub fn new() -> Stage {
-		let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
+		let mut ctx = window::new_rendering_backend();
 
 		#[rustfmt::skip]
         let vertices: [Vertex; 4] = [

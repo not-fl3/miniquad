@@ -200,7 +200,7 @@ impl std::fmt::Debug for Icon {
 impl Default for Conf {
 	fn default() -> Conf {
 		Conf {
-			window_title: "".to_owned(),
+			window_title: "Miniquad WBG Window".to_owned(),
 			window_width: 800,
 			window_height: 600,
 			high_dpi: false,
@@ -217,7 +217,7 @@ impl Default for Conf {
 impl Default for Conf {
 	fn default() -> Conf {
 		Conf {
-			window_title: "".to_owned(),
+			window_title: "Miniquad WBG Window".to_owned(),
 			window_width: 800,
 			window_height: 600,
 			high_dpi: true,

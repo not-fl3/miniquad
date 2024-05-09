@@ -573,6 +573,7 @@ unsafe fn create_window(window_title: &str, fullscreen: bool, resizable: bool, w
 	rawinputdevice.usUsagePage = HID_USAGE_PAGE_GENERIC;
 	rawinputdevice.usUsage = HID_USAGE_GENERIC_MOUSE;
 	rawinputdevice.hwndTarget = NULL as _;
+
 	let register_succeed = RegisterRawInputDevices(&rawinputdevice as *const _, 1, std::mem::size_of::<RAWINPUTDEVICE>() as _);
 	assert!(register_succeed == 1, "Win32: failed to register for raw mouse input!");
 
@@ -621,6 +622,7 @@ impl WindowsDisplay {
 			proc_ptr = GetProcAddress(self.libopengl32.module.0, proc.as_ptr());
 		}
 		if proc_ptr.is_null() {
+			#[cfg(feature = "log-impl")]
 			crate::error!("Load GL func {:?} failed.", proc);
 			return None;
 		}
@@ -683,6 +685,7 @@ impl WindowsDisplay {
 			SetWindowSize { new_width, new_height } => self.set_window_size(new_width as _, new_height as _),
 			SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
 			ShowKeyboard(_) => {
+				#[cfg(feature = "log-impl")]
 				crate::error!("ShowKeyboard is not implemented on Windows");
 			}
 		}
@@ -730,7 +733,7 @@ where
 		display.init_dpi(conf.high_dpi);
 
 		let (tx, rx) = std::sync::mpsc::channel();
-		let clipboard = Box::new(clipboard::WindowsClipboard::new());
+		let clipboard = Box::new(clipboard::WindowsClipboard);
 		crate::set_display(NativeDisplayData {
 			high_dpi: conf.high_dpi,
 			dpi_scale: display.window_scale,

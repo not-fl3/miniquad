@@ -161,8 +161,12 @@ fn event_loop(main_canvas: web_sys::HtmlCanvasElement, last_cursor_css: &'static
 			}
 			Request::SetWindowSize { new_width, new_height } => {
 				let dpi = get_dpi_scale(false) as i32;
+
 				main_canvas.set_width(new_width * dpi as u32);
 				main_canvas.set_height(new_height * dpi as u32);
+
+				main_canvas.style().set_property("width", &format!("{}px", new_width)).unwrap();
+				main_canvas.style().set_property("height", &format!("{}px", new_height)).unwrap();
 
 				{
 					let mut d = crate::native_display().lock().unwrap();
