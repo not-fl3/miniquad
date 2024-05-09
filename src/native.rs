@@ -1,4 +1,4 @@
-use std::sync::{mpsc, Mutex};
+use std::sync::mpsc;
 
 #[derive(Default)]
 pub(crate) struct DroppedFiles {
@@ -55,8 +55,12 @@ pub(crate) enum Request {
 	SetCursorGrab(bool),
 	ShowMouse(bool),
 	SetMouseCursor(crate::CursorIcon),
-	SetWindowSize { new_width: u32, new_height: u32 },
+	SetWindowSize {
+		new_width: u32,
+		new_height: u32,
+	},
 	SetFullscreen(bool),
+	#[allow(dead_code)]
 	ShowKeyboard(bool),
 }
 

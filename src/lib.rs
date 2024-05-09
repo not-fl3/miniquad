@@ -1,5 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![allow(warnings)]
 
 pub mod conf;
 mod event;
@@ -40,8 +39,9 @@ use std::sync::{Mutex, OnceLock};
 static NATIVE_DISPLAY: OnceLock<Mutex<native::NativeDisplayData>> = OnceLock::new();
 
 fn set_display(display: native::NativeDisplayData) {
-	NATIVE_DISPLAY.set(Mutex::new(display));
+	let _ = NATIVE_DISPLAY.set(Mutex::new(display));
 }
+
 fn native_display() -> &'static Mutex<native::NativeDisplayData> {
 	NATIVE_DISPLAY.get().expect("Backend has not initialized NATIVE_DISPLAY yet.") //|| Mutex::new(Default::default()))
 }
@@ -137,31 +137,31 @@ pub mod window {
 	///         so set_cursor_grab(false) on window's focus lost is recommended.
 	/// TODO: implement window focus events
 	pub fn set_cursor_grab(grab: bool) {
-		let mut d = native_display().lock().unwrap();
-		d.native_requests.send(native::Request::SetCursorGrab(grab));
+		let d = native_display().lock().unwrap();
+		d.native_requests.send(native::Request::SetCursorGrab(grab)).unwrap();
 	}
 
 	/// Show or hide the mouse cursor
 	pub fn show_mouse(shown: bool) {
-		let mut d = native_display().lock().unwrap();
-		d.native_requests.send(native::Request::ShowMouse(shown));
+		let d = native_display().lock().unwrap();
+		d.native_requests.send(native::Request::ShowMouse(shown)).unwrap();
 	}
 
 	/// Set the mouse cursor icon.
 	pub fn set_mouse_cursor(cursor_icon: CursorIcon) {
-		let mut d = native_display().lock().unwrap();
-		d.native_requests.send(native::Request::SetMouseCursor(cursor_icon));
+		let d = native_display().lock().unwrap();
+		d.native_requests.send(native::Request::SetMouseCursor(cursor_icon)).unwrap();
 	}
 
 	/// Set the application's window size.
 	pub fn set_window_size(new_width: u32, new_height: u32) {
-		let mut d = native_display().lock().unwrap();
-		d.native_requests.send(native::Request::SetWindowSize { new_width, new_height });
+		let d = native_display().lock().unwrap();
+		d.native_requests.send(native::Request::SetWindowSize { new_width, new_height }).unwrap();
 	}
 
 	pub fn set_fullscreen(fullscreen: bool) {
-		let mut d = native_display().lock().unwrap();
-		d.native_requests.send(native::Request::SetFullscreen(fullscreen));
+		let d = native_display().lock().unwrap();
+		d.native_requests.send(native::Request::SetFullscreen(fullscreen)).unwrap();
 	}
 
 	/// Get current OS clipboard value
@@ -175,14 +175,17 @@ pub mod window {
 		let mut d = native_display().lock().unwrap();
 		d.clipboard.set(data)
 	}
+
 	pub fn dropped_file_count() -> usize {
 		let d = native_display().lock().unwrap();
 		d.dropped_files.bytes.len()
 	}
+
 	pub fn dropped_file_bytes(index: usize) -> Option<Vec<u8>> {
 		let d = native_display().lock().unwrap();
 		d.dropped_files.bytes.get(index).cloned()
 	}
+
 	pub fn dropped_file_path(index: usize) -> Option<std::path::PathBuf> {
 		let d = native_display().lock().unwrap();
 		d.dropped_files.paths.get(index).cloned()
@@ -191,8 +194,8 @@ pub mod window {
 	/// Show/hide onscreen keyboard.
 	/// Only works on Android right now.
 	pub fn show_keyboard(show: bool) {
-		let mut d = native_display().lock().unwrap();
-		d.native_requests.send(native::Request::ShowKeyboard(show));
+		let d = native_display().lock().unwrap();
+		d.native_requests.send(native::Request::ShowKeyboard(show)).unwrap();
 	}
 
 	#[cfg(target_vendor = "apple")]
@@ -200,11 +203,13 @@ pub mod window {
 		let d = native_display().lock().unwrap();
 		d.gfx_api
 	}
+
 	#[cfg(target_vendor = "apple")]
 	pub fn apple_view() -> crate::native::apple::frameworks::ObjcId {
 		let d = native_display().lock().unwrap();
 		d.view
 	}
+
 	#[cfg(target_ios = "ios")]
 	pub fn apple_view_ctrl() -> crate::native::apple::frameworks::ObjcId {
 		let d = native_display().lock().unwrap();

@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Error {
 	DlOpenError,
@@ -6,7 +7,6 @@ pub enum Error {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod linux {
-	use super::Error;
 	use libc::{dlclose, dlopen, dlsym, RTLD_LAZY, RTLD_LOCAL};
 	use std::{
 		ffi::{c_void, CString},

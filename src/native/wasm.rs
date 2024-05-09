@@ -1,16 +1,10 @@
 mod keycodes;
 pub mod webgl;
 
-use wasm_bindgen::{closure::Closure, JsCast};
+use wasm_bindgen::{closure::Closure, JsCast, UnwrapThrowExt};
 use web_sys::*;
 
-use std::{
-	cell::{OnceCell, RefCell},
-	path::PathBuf,
-	rc::Rc,
-	sync::{mpsc::Receiver, Mutex, OnceLock},
-	thread_local,
-};
+use std::{path::PathBuf, sync::mpsc::Receiver};
 
 use crate::{
 	event::EventHandler,
@@ -60,13 +54,13 @@ where
 	main_canvas.set_height((conf.window_width * dpi) as u32);
 	main_canvas.style().set_property("width", &format!("{}px", conf.window_width)).unwrap();
 	main_canvas.style().set_property("height", &format!("{}px", conf.window_height)).unwrap();
-	main_canvas.focus();
+	main_canvas.focus().unwrap();
 
 	// setup requests channel
 	let (tx, rx) = std::sync::mpsc::channel();
 
 	// setup display
-	let mut display = NativeDisplayData::new(main_canvas.width() as _, main_canvas.height() as _, tx, Box::new(Clipboard));
+	let display = NativeDisplayData::new(main_canvas.width() as _, main_canvas.height() as _, tx, Box::new(Clipboard));
 	crate::set_display(display);
 
 	// setup event handler
@@ -157,7 +151,10 @@ fn event_loop(main_canvas: web_sys::HtmlCanvasElement, last_cursor_css: &'static
 			}
 			Request::SetFullscreen(fullscreen) => {
 				if fullscreen {
-					main_canvas.request_fullscreen();
+					if let Err(e) = main_canvas.request_fullscreen() {
+						#[cfg(feature = "log-impl")]
+						crate::error!("Unable to enter fullscreen: {:?}", e);
+					};
 				} else {
 					document().exit_fullscreen();
 				}
@@ -188,7 +185,7 @@ fn event_loop(main_canvas: web_sys::HtmlCanvasElement, last_cursor_css: &'static
 	let closure = Box::new(move || event_loop(main_canvas, next_cursor_css, rx));
 	let next = Closure::once(closure);
 	let fn_ref = next.as_ref().unchecked_ref();
-	web_sys::window().unwrap().request_animation_frame(fn_ref);
+	web_sys::window().unwrap().request_animation_frame(fn_ref).unwrap();
 }
 
 fn init_mouse_events(canvas: &HtmlCanvasElement) {
@@ -218,6 +215,8 @@ fn init_mouse_events(canvas: &HtmlCanvasElement) {
 			2 => crate::MouseButton::Middle,
 			n => crate::MouseButton::Other(n as _),
 		};
+
+		event_handler.mouse_button_down_event(button, x, y)
 	});
 
 	let mouse_up_closure: Closure<dyn Fn(_)> = Closure::new(|ev: MouseEvent| {
@@ -234,6 +233,8 @@ fn init_mouse_events(canvas: &HtmlCanvasElement) {
 			2 => crate::MouseButton::Middle,
 			n => crate::MouseButton::Other(n as _),
 		};
+
+		event_handler.mouse_button_up_event(button, x, y)
 	});
 
 	let mouse_wheel_closure: Closure<dyn Fn(_)> = Closure::new(|ev: WheelEvent| {
@@ -251,10 +252,10 @@ fn init_mouse_events(canvas: &HtmlCanvasElement) {
 	let mouse_up_fn_ref = mouse_up_closure.as_ref().unchecked_ref();
 	let mouse_wheel_fn_ref = mouse_wheel_closure.as_ref().unchecked_ref();
 
-	canvas.add_event_listener_with_callback("mousemove", mouse_move_ref);
-	canvas.add_event_listener_with_callback("mousedown", mouse_down_fn_ref);
-	canvas.add_event_listener_with_callback("mouseup", mouse_up_fn_ref);
-	canvas.add_event_listener_with_callback("wheel", mouse_wheel_fn_ref);
+	canvas.add_event_listener_with_callback("mousemove", mouse_move_ref).unwrap_throw();
+	canvas.add_event_listener_with_callback("mousedown", mouse_down_fn_ref).unwrap_throw();
+	canvas.add_event_listener_with_callback("mouseup", mouse_up_fn_ref).unwrap_throw();
+	canvas.add_event_listener_with_callback("wheel", mouse_wheel_fn_ref).unwrap_throw();
 }
 
 fn init_keyboard_events(canvas: &HtmlCanvasElement) {
@@ -329,9 +330,9 @@ fn init_keyboard_events(canvas: &HtmlCanvasElement) {
 	let keypress_fn_ref = keypress_closure.as_ref().unchecked_ref();
 	let key_up_fn_ref = key_up_closure.as_ref().unchecked_ref();
 
-	canvas.add_event_listener_with_callback("keypress", keypress_fn_ref);
-	canvas.add_event_listener_with_callback("keydown", key_up_fn_ref);
-	canvas.add_event_listener_with_callback("keydown", key_down_closure_ref);
+	canvas.add_event_listener_with_callback("keypress", keypress_fn_ref).unwrap_throw();
+	canvas.add_event_listener_with_callback("keydown", key_up_fn_ref).unwrap_throw();
+	canvas.add_event_listener_with_callback("keydown", key_down_closure_ref).unwrap_throw();
 }
 
 fn init_focus_events(canvas: &HtmlCanvasElement) {
@@ -361,9 +362,9 @@ fn init_focus_events(canvas: &HtmlCanvasElement) {
 	let blur_fn_ref = blur_closure.as_ref().unchecked_ref();
 	let visibility_change_fn_ref = visibility_change_closure.as_ref().unchecked_ref();
 
-	canvas.add_event_listener_with_callback("focus", focus_fn_ref);
-	canvas.add_event_listener_with_callback("blur", blur_fn_ref);
-	web_sys::window().unwrap().add_event_listener_with_callback("visibilitychange", visibility_change_fn_ref);
+	canvas.add_event_listener_with_callback("focus", focus_fn_ref).unwrap_throw();
+	canvas.add_event_listener_with_callback("blur", blur_fn_ref).unwrap_throw();
+	web_sys::window().unwrap().add_event_listener_with_callback("visibilitychange", visibility_change_fn_ref).unwrap_throw();
 }
 
 fn init_resize_events(canvas: &HtmlCanvasElement) {
@@ -449,10 +450,10 @@ fn init_touch_events(canvas: &HtmlCanvasElement) {
 	let touch_end_fn_ref = touch_end_closure.as_ref().unchecked_ref();
 	let touch_cancel_fn_ref = touch_cancel_closure.as_ref().unchecked_ref();
 
-	canvas.add_event_listener_with_callback("touchstart", touch_start_fn_ref);
-	canvas.add_event_listener_with_callback("touchmove", touch_move_fn_ref);
-	canvas.add_event_listener_with_callback("touchend", touch_end_fn_ref);
-	canvas.add_event_listener_with_callback("touchcancel", touch_cancel_fn_ref);
+	canvas.add_event_listener_with_callback("touchstart", touch_start_fn_ref).unwrap_throw();
+	canvas.add_event_listener_with_callback("touchmove", touch_move_fn_ref).unwrap_throw();
+	canvas.add_event_listener_with_callback("touchend", touch_end_fn_ref).unwrap_throw();
+	canvas.add_event_listener_with_callback("touchcancel", touch_cancel_fn_ref).unwrap_throw();
 }
 
 fn init_file_drop_events(canvas: &HtmlCanvasElement) {
@@ -499,6 +500,6 @@ fn init_file_drop_events(canvas: &HtmlCanvasElement) {
 	let drop_fn_ref = drop_closure.as_ref().unchecked_ref();
 	let drag_over_fn_ref = drag_over_closure.as_ref().unchecked_ref();
 
-	canvas.add_event_listener_with_callback("dragover", drag_over_fn_ref);
-	canvas.add_event_listener_with_callback("drop", drop_fn_ref);
+	canvas.add_event_listener_with_callback("dragover", drag_over_fn_ref).unwrap_throw();
+	canvas.add_event_listener_with_callback("drop", drop_fn_ref).unwrap_throw();
 }

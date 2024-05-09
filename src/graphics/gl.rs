@@ -646,8 +646,6 @@ impl RenderingBackend for GlContext {
 	fn info(&self) -> ContextInfo {
 		let version_string = unsafe { glGetString(super::gl::GL_VERSION) };
 		let gl_version_string = unsafe { std::ffi::CStr::from_ptr(version_string as _) }.to_str().unwrap().to_string();
-		let gles3 = gl_version_string.contains("OpenGL ES 3");
-		let gles2 = !gles3 && gl_version_string.contains("OpenGL ES");
 
 		let mut glsl_support = GlslSupport::default();
 
@@ -664,10 +662,8 @@ impl RenderingBackend for GlContext {
 		}
 
 		#[cfg(not(target_arch = "wasm32"))]
-		{
-			if gles3 {
-				glsl_support.v300es = true;
-			}
+		if gl_version_string.contains("OpenGL ES 3") {
+			glsl_support.v300es = true;
 		}
 
 		// there is no gl3.4, so 4+ and 3.3 covers all modern OpenGL
@@ -710,22 +706,24 @@ impl RenderingBackend for GlContext {
 
 		self.cache.store_texture_binding(0);
 		self.cache.bind_texture(0, t.params.kind.into(), t.raw);
+
 		let wrap_x = match wrap_x {
 			TextureWrap::Repeat => GL_REPEAT,
 			TextureWrap::Mirror => GL_MIRRORED_REPEAT,
 			TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
-		};
+		} as i32;
 
 		let wrap_y = match wrap_y {
 			TextureWrap::Repeat => GL_REPEAT,
 			TextureWrap::Mirror => GL_MIRRORED_REPEAT,
 			TextureWrap::Clamp => GL_CLAMP_TO_EDGE,
-		};
+		} as i32;
 
 		unsafe {
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_x as i32);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_x as i32);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_x);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_y);
 		}
+
 		self.cache.restore_texture_binding(0);
 	}
 
@@ -851,8 +849,8 @@ impl RenderingBackend for GlContext {
 		let mut buffer_cache: Vec<BufferCacheData> = vec![BufferCacheData::default(); buffer_layout.len()];
 
 		for VertexAttribute { format, buffer_index, .. } in attributes {
-			let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());
-			let mut cache = buffer_cache.get_mut(*buffer_index).unwrap_or_else(|| panic!());
+			let layout = buffer_layout.get(*buffer_index).unwrap();
+			let cache = buffer_cache.get_mut(*buffer_index).unwrap();
 
 			if layout.stride == 0 {
 				cache.stride += format.size_bytes();
@@ -876,8 +874,8 @@ impl RenderingBackend for GlContext {
 		let mut vertex_layout: Vec<Option<VertexAttributeInternal>> = vec![None; attributes_len];
 
 		for VertexAttribute { name, format, buffer_index } in attributes {
-			let mut buffer_data = &mut buffer_cache.get_mut(*buffer_index).unwrap_or_else(|| panic!());
-			let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());
+			let buffer_data = &mut buffer_cache.get_mut(*buffer_index).unwrap();
+			let layout = buffer_layout.get(*buffer_index).unwrap();
 
 			let cname = CString::new(*name).unwrap_or_else(|e| panic!("{}", e));
 			let attr_loc = unsafe { glGetAttribLocation(program, cname.as_ptr() as *const _) };
