@@ -3,7 +3,6 @@ pub mod webgl;
 
 use wasm_bindgen::{closure::Closure, JsCast};
 use web_sys::*;
-pub use webgl::*;
 
 use std::{
     cell::{OnceCell, RefCell},
@@ -17,15 +16,6 @@ use crate::{
     event::EventHandler,
     native::{NativeDisplayData, Request},
 };
-
-// get's an element using document.query_selector
-fn get_element<T: JsCast>(id: &'static str) -> T {
-    document()
-        .get_element_by_id(id)
-        .unwrap()
-        .dyn_into::<T>()
-        .unwrap()
-}
 
 fn document() -> web_sys::Document {
     web_sys::window().unwrap().document().unwrap()
@@ -58,7 +48,11 @@ where
     console_error_panic_hook::set_once();
 
     // initialize main canvas
-    let main_canvas = get_element::<HtmlCanvasElement>(conf.platform.web_canvas_query_selector);
+    let main_canvas = document()
+        .get_element_by_id(&conf.platform.web_canvas_query_selector)
+        .unwrap()
+        .dyn_into::<HtmlCanvasElement>()
+        .unwrap();
     let high_dpi = conf.high_dpi;
     let dpi = get_dpi_scale(high_dpi) as i32;
 
