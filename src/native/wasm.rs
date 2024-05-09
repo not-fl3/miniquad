@@ -5,553 +5,500 @@ use wasm_bindgen::{closure::Closure, JsCast};
 use web_sys::*;
 
 use std::{
-    cell::{OnceCell, RefCell},
-    path::PathBuf,
-    rc::Rc,
-    sync::{mpsc::Receiver, Mutex, OnceLock},
-    thread_local,
+	cell::{OnceCell, RefCell},
+	path::PathBuf,
+	rc::Rc,
+	sync::{mpsc::Receiver, Mutex, OnceLock},
+	thread_local,
 };
 
 use crate::{
-    event::EventHandler,
-    native::{NativeDisplayData, Request},
+	event::EventHandler,
+	native::{NativeDisplayData, Request},
 };
 
 fn document() -> web_sys::Document {
-    web_sys::window().unwrap().document().unwrap()
+	web_sys::window().unwrap().document().unwrap()
 }
 
 fn get_dpi_scale(high_dpi: bool) -> f64 {
-    if high_dpi {
-        web_sys::window()
-            .map(|w| w.device_pixel_ratio())
-            .unwrap_or(1.0)
-    } else {
-        1.0
-    }
+	if high_dpi {
+		web_sys::window().map(|w| w.device_pixel_ratio()).unwrap_or(1.0)
+	} else {
+		1.0
+	}
 }
 
 // SAFETY: Can't have a data race in a single threaded environment, wasm is single threaded
 fn get_event_handler(swap: Option<*mut dyn EventHandler>) -> &'static mut dyn EventHandler {
-    unsafe {
-        static mut EVENT_HANDLER: Option<*mut dyn EventHandler> = None;
-        EVENT_HANDLER = swap.or(EVENT_HANDLER);
-        &mut *EVENT_HANDLER.unwrap()
-    }
+	unsafe {
+		static mut EVENT_HANDLER: Option<*mut dyn EventHandler> = None;
+		EVENT_HANDLER = swap.or(EVENT_HANDLER);
+		&mut *EVENT_HANDLER.unwrap()
+	}
 }
 
 pub fn run<F>(conf: &crate::conf::Conf, f: F)
 where
-    F: 'static + FnOnce() -> Box<dyn EventHandler>,
+	F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    // setup panic hook
-    console_error_panic_hook::set_once();
+	// setup panic hook
+	console_error_panic_hook::set_once();
 
-    // initialize main canvas
-    let main_canvas = document()
-        .get_element_by_id(&conf.platform.web_canvas_query_selector)
-        .unwrap()
-        .dyn_into::<HtmlCanvasElement>()
-        .unwrap();
-    let high_dpi = conf.high_dpi;
-    let dpi = get_dpi_scale(high_dpi) as i32;
+	// initialize main canvas
+	let main_canvas = document()
+		.query_selector(&conf.platform.web_canvas_query_selector)
+		.unwrap()
+		.expect(format!("Unable to start miniquad: Canvas {} not found!", conf.platform.web_canvas_query_selector).as_str())
+		.dyn_into::<HtmlCanvasElement>()
+		.unwrap();
+	let high_dpi = conf.high_dpi;
+	let dpi = get_dpi_scale(high_dpi) as i32;
 
-    // initialize canvas
-    main_canvas.set_width((conf.window_width * dpi) as u32);
-    main_canvas.set_height((conf.window_width * dpi) as u32);
-    main_canvas
-        .style()
-        .set_property("width", &format!("{}px", conf.window_width))
-        .unwrap();
-    main_canvas
-        .style()
-        .set_property("height", &format!("{}px", conf.window_height))
-        .unwrap();
-    main_canvas.focus();
+	// initialize canvas
+	main_canvas.set_width((conf.window_width * dpi) as u32);
+	main_canvas.set_height((conf.window_width * dpi) as u32);
+	main_canvas.style().set_property("width", &format!("{}px", conf.window_width)).unwrap();
+	main_canvas.style().set_property("height", &format!("{}px", conf.window_height)).unwrap();
+	main_canvas.focus();
 
-    // setup requests channel
-    let (tx, rx) = std::sync::mpsc::channel();
+	// setup requests channel
+	let (tx, rx) = std::sync::mpsc::channel();
 
-    // setup display
-    let mut display = NativeDisplayData::new(
-        main_canvas.width() as _,
-        main_canvas.height() as _,
-        tx,
-        Box::new(Clipboard),
-    );
-    crate::set_display(display);
+	// setup display
+	let mut display = NativeDisplayData::new(main_canvas.width() as _, main_canvas.height() as _, tx, Box::new(Clipboard));
+	crate::set_display(display);
 
-    // setup event handler
-    let event_handler = Box::leak(f());
-    get_event_handler(Some(event_handler));
+	// setup event handler
+	let event_handler = Box::leak(f());
+	get_event_handler(Some(event_handler));
 
-    // setup event listeners
-    init_mouse_events(&main_canvas);
-    init_keyboard_events(&main_canvas);
-    init_focus_events(&main_canvas);
-    init_resize_events(&main_canvas);
-    init_touch_events(&main_canvas);
-    init_file_drop_events(&main_canvas);
+	// setup event listeners
+	init_mouse_events(&main_canvas);
+	init_keyboard_events(&main_canvas);
+	init_focus_events(&main_canvas);
+	init_resize_events(&main_canvas);
+	init_touch_events(&main_canvas);
+	init_file_drop_events(&main_canvas);
 
-    // run event loop
-    event_loop(main_canvas, "default", rx);
+	// run event loop
+	event_loop(main_canvas, "default", rx);
 }
 
 #[no_mangle]
 pub extern "C" fn allocate_vec_u8(len: usize) -> *mut u8 {
-    let mut string = vec![0u8; len];
-    let ptr = string.as_mut_ptr();
-    string.leak();
-    ptr
+	let mut string = vec![0u8; len];
+	let ptr = string.as_mut_ptr();
+	string.leak();
+	ptr
 }
 
 struct Clipboard;
 
 impl crate::native::Clipboard for Clipboard {
-    fn get(&mut self) -> Option<String> {
-        let navigator = window()?.navigator();
-        let clipboard = navigator.clipboard()?;
-        let promise = clipboard.read_text();
-        let future = wasm_bindgen_futures::JsFuture::from(promise);
-        let result = pollster::block_on(future).unwrap();
-        result.as_string()
-    }
+	fn get(&mut self) -> Option<String> {
+		let navigator = window()?.navigator();
+		let clipboard = navigator.clipboard()?;
+		let promise = clipboard.read_text();
+		let future = wasm_bindgen_futures::JsFuture::from(promise);
+		let result = pollster::block_on(future).unwrap();
+		result.as_string()
+	}
 
-    fn set(&mut self, data: &str) {
-        let navigator = window().unwrap().navigator();
-        if let Some(clipboard) = navigator.clipboard() {
-            let promise = clipboard.write_text(data);
-            let future = wasm_bindgen_futures::JsFuture::from(promise);
-            let _ = pollster::block_on(future).unwrap();
-        }
-    }
+	fn set(&mut self, data: &str) {
+		let navigator = window().unwrap().navigator();
+		if let Some(clipboard) = navigator.clipboard() {
+			let promise = clipboard.write_text(data);
+			let future = wasm_bindgen_futures::JsFuture::from(promise);
+			let _ = pollster::block_on(future).unwrap();
+		}
+	}
 }
 
-fn event_loop(
-    main_canvas: web_sys::HtmlCanvasElement,
-    last_cursor_css: &'static str,
-    rx: Receiver<Request>,
-) {
-    let event_handler = get_event_handler(None);
-    let mut next_cursor_css = last_cursor_css;
+fn event_loop(main_canvas: web_sys::HtmlCanvasElement, last_cursor_css: &'static str, rx: Receiver<Request>) {
+	let event_handler = get_event_handler(None);
+	let mut next_cursor_css = last_cursor_css;
 
-    // process requests
-    while let Ok(request) = rx.try_recv() {
-        match request {
-            Request::SetCursorGrab(grab) => {
-                if grab {
-                    main_canvas.request_pointer_lock();
-                } else {
-                    document().exit_pointer_lock();
-                }
-            }
-            Request::ShowMouse(show) => {
-                if !show {
-                    main_canvas.style().set_property("cursor", "none").unwrap();
-                } else {
-                    main_canvas
-                        .style()
-                        .set_property("cursor", next_cursor_css)
-                        .unwrap();
-                }
-            }
-            Request::SetMouseCursor(cursor) => {
-                let css_text = match cursor {
-                    crate::CursorIcon::Default => "default",
-                    crate::CursorIcon::Help => "help",
-                    crate::CursorIcon::Pointer => "pointer",
-                    crate::CursorIcon::Wait => "wait",
-                    crate::CursorIcon::Crosshair => "crosshair",
-                    crate::CursorIcon::Text => "text",
-                    crate::CursorIcon::Move => "move",
-                    crate::CursorIcon::NotAllowed => "not-allowed",
-                    crate::CursorIcon::EWResize => "ew-resize",
-                    crate::CursorIcon::NSResize => "ns-resize",
-                    crate::CursorIcon::NESWResize => "nesw-resize",
-                    crate::CursorIcon::NWSEResize => "nwse-resize",
-                };
+	// process requests
+	while let Ok(request) = rx.try_recv() {
+		match request {
+			Request::SetCursorGrab(grab) => {
+				if grab {
+					main_canvas.request_pointer_lock();
+				} else {
+					document().exit_pointer_lock();
+				}
+			}
+			Request::ShowMouse(show) => {
+				if !show {
+					main_canvas.style().set_property("cursor", "none").unwrap();
+				} else {
+					main_canvas.style().set_property("cursor", next_cursor_css).unwrap();
+				}
+			}
+			Request::SetMouseCursor(cursor) => {
+				let css_text = match cursor {
+					crate::CursorIcon::Default => "default",
+					crate::CursorIcon::Help => "help",
+					crate::CursorIcon::Pointer => "pointer",
+					crate::CursorIcon::Wait => "wait",
+					crate::CursorIcon::Crosshair => "crosshair",
+					crate::CursorIcon::Text => "text",
+					crate::CursorIcon::Move => "move",
+					crate::CursorIcon::NotAllowed => "not-allowed",
+					crate::CursorIcon::EWResize => "ew-resize",
+					crate::CursorIcon::NSResize => "ns-resize",
+					crate::CursorIcon::NESWResize => "nesw-resize",
+					crate::CursorIcon::NWSEResize => "nwse-resize",
+				};
 
-                next_cursor_css = css_text;
-                main_canvas
-                    .style()
-                    .set_property("cursor", next_cursor_css)
-                    .unwrap();
-            }
-            Request::SetFullscreen(fullscreen) => {
-                if fullscreen {
-                    main_canvas.request_fullscreen();
-                } else {
-                    document().exit_fullscreen();
-                }
-            }
-            Request::SetWindowSize {
-                new_width,
-                new_height,
-            } => {
-                let dpi = get_dpi_scale(false) as i32;
-                main_canvas.set_width(new_width * dpi as u32);
-                main_canvas.set_height(new_height * dpi as u32);
+				next_cursor_css = css_text;
+				main_canvas.style().set_property("cursor", next_cursor_css).unwrap();
+			}
+			Request::SetFullscreen(fullscreen) => {
+				if fullscreen {
+					main_canvas.request_fullscreen();
+				} else {
+					document().exit_fullscreen();
+				}
+			}
+			Request::SetWindowSize { new_width, new_height } => {
+				let dpi = get_dpi_scale(false) as i32;
+				main_canvas.set_width(new_width * dpi as u32);
+				main_canvas.set_height(new_height * dpi as u32);
 
-                {
-                    let mut d = crate::native_display().lock().unwrap();
-                    d.screen_width = new_width as _;
-                    d.screen_height = new_width as _;
-                }
+				{
+					let mut d = crate::native_display().lock().unwrap();
+					d.screen_width = new_width as _;
+					d.screen_height = new_width as _;
+				}
 
-                // emit resize event
-                event_handler.resize_event(new_width as _, new_width as _);
-            }
-            _ => {}
-        }
-    }
+				// emit resize event
+				event_handler.resize_event(new_width as _, new_width as _);
+			}
+			_ => {}
+		}
+	}
 
-    // drive event handler implementation
-    event_handler.update();
-    event_handler.draw();
+	// drive event handler implementation
+	event_handler.update();
+	event_handler.draw();
 
-    // in the words of Dj Khaled, another one!
-    let closure = Box::new(move || event_loop(main_canvas, next_cursor_css, rx));
-    let next = Closure::once(closure);
-    let fn_ref = next.as_ref().unchecked_ref();
-    web_sys::window().unwrap().request_animation_frame(fn_ref);
+	// in the words of Dj Khaled, another one!
+	let closure = Box::new(move || event_loop(main_canvas, next_cursor_css, rx));
+	let next = Closure::once(closure);
+	let fn_ref = next.as_ref().unchecked_ref();
+	web_sys::window().unwrap().request_animation_frame(fn_ref);
 }
 
 fn init_mouse_events(canvas: &HtmlCanvasElement) {
-    let mouse_move_closure: Closure<dyn Fn(_)> = Closure::new(|ev: MouseEvent| {
-        let canvas = ev
-            .target()
-            .unwrap()
-            .dyn_into::<HtmlCanvasElement>()
-            .unwrap();
-        let rect = canvas.get_bounding_client_rect();
-        let event_handler = get_event_handler(None);
+	let mouse_move_closure: Closure<dyn Fn(_)> = Closure::new(|ev: MouseEvent| {
+		let canvas = ev.target().unwrap().dyn_into::<HtmlCanvasElement>().unwrap();
+		let rect = canvas.get_bounding_client_rect();
+		let event_handler = get_event_handler(None);
 
-        let x = ev.client_x() as f32 - rect.left() as f32;
-        let y = ev.client_y() as f32 - rect.top() as f32;
+		let x = ev.client_x() as f32 - rect.left() as f32;
+		let y = ev.client_y() as f32 - rect.top() as f32;
 
-        event_handler.mouse_motion_event(x, y);
-        event_handler.raw_mouse_motion(ev.movement_x() as _, ev.movement_y() as _);
-    });
+		event_handler.mouse_motion_event(x, y);
+		event_handler.raw_mouse_motion(ev.movement_x() as _, ev.movement_y() as _);
+	});
 
-    let mouse_down_closure: Closure<dyn Fn(_)> = Closure::new(|ev: MouseEvent| {
-        let canvas = ev
-            .target()
-            .unwrap()
-            .dyn_into::<HtmlCanvasElement>()
-            .unwrap();
-        let rect = canvas.get_bounding_client_rect();
-        let event_handler = get_event_handler(None);
+	let mouse_down_closure: Closure<dyn Fn(_)> = Closure::new(|ev: MouseEvent| {
+		let canvas = ev.target().unwrap().dyn_into::<HtmlCanvasElement>().unwrap();
+		let rect = canvas.get_bounding_client_rect();
+		let event_handler = get_event_handler(None);
 
-        let x = ev.client_x() as f32 - rect.left() as f32;
-        let y = ev.client_y() as f32 - rect.top() as f32;
+		let x = ev.client_x() as f32 - rect.left() as f32;
+		let y = ev.client_y() as f32 - rect.top() as f32;
 
-        let button = match ev.button() {
-            0 => crate::MouseButton::Left,
-            1 => crate::MouseButton::Right,
-            2 => crate::MouseButton::Middle,
-            n => crate::MouseButton::Other(n as _),
-        };
-    });
+		let button = match ev.button() {
+			0 => crate::MouseButton::Left,
+			1 => crate::MouseButton::Right,
+			2 => crate::MouseButton::Middle,
+			n => crate::MouseButton::Other(n as _),
+		};
+	});
 
-    let mouse_up_closure: Closure<dyn Fn(_)> = Closure::new(|ev: MouseEvent| {
-        let canvas = ev
-            .target()
-            .unwrap()
-            .dyn_into::<HtmlCanvasElement>()
-            .unwrap();
-        let rect = canvas.get_bounding_client_rect();
-        let event_handler = get_event_handler(None);
+	let mouse_up_closure: Closure<dyn Fn(_)> = Closure::new(|ev: MouseEvent| {
+		let canvas = ev.target().unwrap().dyn_into::<HtmlCanvasElement>().unwrap();
+		let rect = canvas.get_bounding_client_rect();
+		let event_handler = get_event_handler(None);
 
-        let x = ev.client_x() as f32 - rect.left() as f32;
-        let y = ev.client_y() as f32 - rect.top() as f32;
+		let x = ev.client_x() as f32 - rect.left() as f32;
+		let y = ev.client_y() as f32 - rect.top() as f32;
 
-        let button = match ev.button() {
-            0 => crate::MouseButton::Left,
-            1 => crate::MouseButton::Right,
-            2 => crate::MouseButton::Middle,
-            n => crate::MouseButton::Other(n as _),
-        };
-    });
+		let button = match ev.button() {
+			0 => crate::MouseButton::Left,
+			1 => crate::MouseButton::Right,
+			2 => crate::MouseButton::Middle,
+			n => crate::MouseButton::Other(n as _),
+		};
+	});
 
-    let mouse_wheel_closure: Closure<dyn Fn(_)> = Closure::new(|ev: WheelEvent| {
-        ev.prevent_default();
+	let mouse_wheel_closure: Closure<dyn Fn(_)> = Closure::new(|ev: WheelEvent| {
+		ev.prevent_default();
 
-        let x = -ev.delta_x() as f32;
-        let y = -ev.delta_y() as f32;
+		let x = -ev.delta_x() as f32;
+		let y = -ev.delta_y() as f32;
 
-        let event_handler = get_event_handler(None);
-        event_handler.mouse_wheel_event(x, y);
-    });
+		let event_handler = get_event_handler(None);
+		event_handler.mouse_wheel_event(x, y);
+	});
 
-    let mouse_down_fn_ref = mouse_down_closure.as_ref().unchecked_ref();
-    let mouse_move_ref = mouse_move_closure.as_ref().unchecked_ref();
-    let mouse_up_fn_ref = mouse_up_closure.as_ref().unchecked_ref();
-    let mouse_wheel_fn_ref = mouse_wheel_closure.as_ref().unchecked_ref();
+	let mouse_down_fn_ref = mouse_down_closure.as_ref().unchecked_ref();
+	let mouse_move_ref = mouse_move_closure.as_ref().unchecked_ref();
+	let mouse_up_fn_ref = mouse_up_closure.as_ref().unchecked_ref();
+	let mouse_wheel_fn_ref = mouse_wheel_closure.as_ref().unchecked_ref();
 
-    canvas.add_event_listener_with_callback("mousemove", mouse_move_ref);
-    canvas.add_event_listener_with_callback("mousedown", mouse_down_fn_ref);
-    canvas.add_event_listener_with_callback("mouseup", mouse_up_fn_ref);
-    canvas.add_event_listener_with_callback("wheel", mouse_wheel_fn_ref);
+	canvas.add_event_listener_with_callback("mousemove", mouse_move_ref);
+	canvas.add_event_listener_with_callback("mousedown", mouse_down_fn_ref);
+	canvas.add_event_listener_with_callback("mouseup", mouse_up_fn_ref);
+	canvas.add_event_listener_with_callback("wheel", mouse_wheel_fn_ref);
 }
 
 fn init_keyboard_events(canvas: &HtmlCanvasElement) {
-    let key_up_closure: Closure<dyn Fn(_)> = Closure::new(|ev: KeyboardEvent| {
-        let event_handler = get_event_handler(None);
+	let key_up_closure: Closure<dyn Fn(_)> = Closure::new(|ev: KeyboardEvent| {
+		let event_handler = get_event_handler(None);
 
-        if let Some(key) = keycodes::get_keycode(&ev.code()) {
-            let keycode = keycodes::translate_keycode(key);
-            let repeat = ev.repeat();
-            let modifiers = crate::KeyMods {
-                shift: ev.shift_key(),
-                ctrl: ev.ctrl_key(),
-                alt: ev.alt_key(),
-                logo: ev.meta_key(),
-            };
+		if let Some(key) = keycodes::get_keycode(&ev.code()) {
+			let keycode = keycodes::translate_keycode(key);
+			let repeat = ev.repeat();
+			let modifiers = crate::KeyMods {
+				shift: ev.shift_key(),
+				ctrl: ev.ctrl_key(),
+				alt: ev.alt_key(),
+				logo: ev.meta_key(),
+			};
 
-            event_handler.key_down_event(keycode, modifiers, repeat);
-        };
-    });
+			event_handler.key_down_event(keycode, modifiers, repeat);
+		};
+	});
 
-    let key_down_closure: Closure<dyn Fn(_)> = Closure::new(|ev: KeyboardEvent| {
-        let event_handler = get_event_handler(None);
-        let repeat = ev.repeat();
+	let key_down_closure: Closure<dyn Fn(_)> = Closure::new(|ev: KeyboardEvent| {
+		let event_handler = get_event_handler(None);
+		let repeat = ev.repeat();
 
-        if let Some(key) = keycodes::get_keycode(&ev.code()) {
-            let keycode = keycodes::translate_keycode(key);
+		if let Some(key) = keycodes::get_keycode(&ev.code()) {
+			let keycode = keycodes::translate_keycode(key);
 
-            let modifiers = crate::KeyMods {
-                shift: ev.shift_key(),
-                ctrl: ev.ctrl_key(),
-                alt: ev.alt_key(),
-                logo: ev.meta_key(),
-            };
+			let modifiers = crate::KeyMods {
+				shift: ev.shift_key(),
+				ctrl: ev.ctrl_key(),
+				alt: ev.alt_key(),
+				logo: ev.meta_key(),
+			};
 
-            // prevent page interactions
-            // space, arrow keys, F1-F10, Tab, Backspace, /, PageUp, PageDown, Home, End
-            match key {
-                32 | 39 | 47 => {
-                    // for "space", "quote", and "slash" preventDefault will prevent
-                    // key_press event, so send it here instead
-                    ev.prevent_default();
-                    if let Some(c) = char::from_u32(ev.char_code()) {
-                        event_handler.char_event(c, modifiers, repeat);
-                    }
-                }
-                n if (262..=265).contains(&n)
-                    | (290..=299).contains(&n)
-                    | (258..=259).contains(&n)
-                    | (266..=269).contains(&n) =>
-                {
-                    ev.prevent_default()
-                }
-                _ => {}
-            }
+			// prevent page interactions
+			// space, arrow keys, F1-F10, Tab, Backspace, /, PageUp, PageDown, Home, End
+			match key {
+				32 | 39 | 47 => {
+					// for "space", "quote", and "slash" preventDefault will prevent
+					// key_press event, so send it here instead
+					ev.prevent_default();
+					if let Some(c) = char::from_u32(ev.char_code()) {
+						event_handler.char_event(c, modifiers, repeat);
+					}
+				}
+				n if (262..=265).contains(&n) | (290..=299).contains(&n) | (258..=259).contains(&n) | (266..=269).contains(&n) => ev.prevent_default(),
+				_ => {}
+			}
 
-            event_handler.key_down_event(keycode, modifiers, repeat);
-        };
-    });
+			event_handler.key_down_event(keycode, modifiers, repeat);
+		};
+	});
 
-    let keypress_closure: Closure<dyn Fn(_)> = Closure::new(|ev: KeyboardEvent| {
-        let event_handler = get_event_handler(None);
-        let repeat = ev.repeat();
-        let key = ev.key();
+	let keypress_closure: Closure<dyn Fn(_)> = Closure::new(|ev: KeyboardEvent| {
+		let event_handler = get_event_handler(None);
+		let repeat = ev.repeat();
+		let key = ev.key();
 
-        let modifiers = crate::KeyMods {
-            shift: ev.shift_key(),
-            ctrl: ev.ctrl_key(),
-            alt: ev.alt_key(),
-            logo: ev.meta_key(),
-        };
+		let modifiers = crate::KeyMods {
+			shift: ev.shift_key(),
+			ctrl: ev.ctrl_key(),
+			alt: ev.alt_key(),
+			logo: ev.meta_key(),
+		};
 
-        if let Some(c) = key.chars().next() {
-            event_handler.char_event(c, modifiers, repeat);
-        }
-    });
+		if let Some(c) = key.chars().next() {
+			event_handler.char_event(c, modifiers, repeat);
+		}
+	});
 
-    let key_down_closure_ref = key_down_closure.as_ref().unchecked_ref();
-    let keypress_fn_ref = keypress_closure.as_ref().unchecked_ref();
-    let key_up_fn_ref = key_up_closure.as_ref().unchecked_ref();
+	let key_down_closure_ref = key_down_closure.as_ref().unchecked_ref();
+	let keypress_fn_ref = keypress_closure.as_ref().unchecked_ref();
+	let key_up_fn_ref = key_up_closure.as_ref().unchecked_ref();
 
-    canvas.add_event_listener_with_callback("keypress", keypress_fn_ref);
-    canvas.add_event_listener_with_callback("keydown", key_up_fn_ref);
-    canvas.add_event_listener_with_callback("keydown", key_down_closure_ref);
+	canvas.add_event_listener_with_callback("keypress", keypress_fn_ref);
+	canvas.add_event_listener_with_callback("keydown", key_up_fn_ref);
+	canvas.add_event_listener_with_callback("keydown", key_down_closure_ref);
 }
 
 fn init_focus_events(canvas: &HtmlCanvasElement) {
-    let focus_closure: Closure<dyn Fn()> = Closure::new(|| {
-        let event_handler = get_event_handler(None);
-        event_handler.window_restored_event()
-    });
+	let focus_closure: Closure<dyn Fn()> = Closure::new(|| {
+		let event_handler = get_event_handler(None);
+		event_handler.window_restored_event()
+	});
 
-    let blur_closure: Closure<dyn Fn()> = Closure::new(|| {
-        let event_handler = get_event_handler(None);
-        event_handler.window_minimized_event()
-    });
+	let blur_closure: Closure<dyn Fn()> = Closure::new(|| {
+		let event_handler = get_event_handler(None);
+		event_handler.window_minimized_event()
+	});
 
-    let visibility_change_closure: Closure<dyn Fn()> = Closure::new(|| {
-        let event_handler = get_event_handler(None);
+	let visibility_change_closure: Closure<dyn Fn()> = Closure::new(|| {
+		let event_handler = get_event_handler(None);
 
-        if let Ok(hidden) = document().has_focus() {
-            if hidden {
-                event_handler.window_minimized_event()
-            } else {
-                event_handler.window_restored_event()
-            }
-        };
-    });
+		if let Ok(hidden) = document().has_focus() {
+			if hidden {
+				event_handler.window_minimized_event()
+			} else {
+				event_handler.window_restored_event()
+			}
+		};
+	});
 
-    let focus_fn_ref = focus_closure.as_ref().unchecked_ref();
-    let blur_fn_ref = blur_closure.as_ref().unchecked_ref();
-    let visibility_change_fn_ref = visibility_change_closure.as_ref().unchecked_ref();
+	let focus_fn_ref = focus_closure.as_ref().unchecked_ref();
+	let blur_fn_ref = blur_closure.as_ref().unchecked_ref();
+	let visibility_change_fn_ref = visibility_change_closure.as_ref().unchecked_ref();
 
-    canvas.add_event_listener_with_callback("focus", focus_fn_ref);
-    canvas.add_event_listener_with_callback("blur", blur_fn_ref);
-    web_sys::window()
-        .unwrap()
-        .add_event_listener_with_callback("visibilitychange", visibility_change_fn_ref);
+	canvas.add_event_listener_with_callback("focus", focus_fn_ref);
+	canvas.add_event_listener_with_callback("blur", blur_fn_ref);
+	web_sys::window().unwrap().add_event_listener_with_callback("visibilitychange", visibility_change_fn_ref);
 }
 
 fn init_resize_events(canvas: &HtmlCanvasElement) {
-    let handler: Closure<dyn Fn(_)> = Closure::new(|ev: ResizeObserverEntry| {
-        let event_handler = get_event_handler(None);
+	let handler: Closure<dyn Fn(_)> = Closure::new(|ev: ResizeObserverEntry| {
+		let event_handler = get_event_handler(None);
 
-        let rect = ev.content_rect();
-        let width = rect.width() as _;
-        let height = rect.height() as _;
+		let rect = ev.content_rect();
+		let width = rect.width() as _;
+		let height = rect.height() as _;
 
-        event_handler.resize_event(width, height)
-    });
+		event_handler.resize_event(width, height)
+	});
 
-    let fn_ref = handler.as_ref().unchecked_ref();
-    let resize_observer = ResizeObserver::new(fn_ref).unwrap();
+	let fn_ref = handler.as_ref().unchecked_ref();
+	let resize_observer = ResizeObserver::new(fn_ref).unwrap();
 
-    resize_observer.observe(canvas);
+	resize_observer.observe(canvas);
 }
 
 fn init_touch_events(canvas: &HtmlCanvasElement) {
-    let touch_start_closure: Closure<dyn Fn(_)> = Closure::new(|ev: TouchEvent| {
-        ev.prevent_default();
+	let touch_start_closure: Closure<dyn Fn(_)> = Closure::new(|ev: TouchEvent| {
+		ev.prevent_default();
 
-        let event_handler = get_event_handler(None);
-        let new_touches = ev.changed_touches();
+		let event_handler = get_event_handler(None);
+		let new_touches = ev.changed_touches();
 
-        (0..new_touches.length())
-            .flat_map(|idx| new_touches.item(idx))
-            .for_each(|touch| {
-                let id = touch.identifier();
-                let x = touch.client_x() as f32;
-                let y = touch.client_y() as f32;
+		(0..new_touches.length()).flat_map(|idx| new_touches.item(idx)).for_each(|touch| {
+			let id = touch.identifier();
+			let x = touch.client_x() as f32;
+			let y = touch.client_y() as f32;
 
-                event_handler.touch_event(crate::TouchPhase::Started, id as _, x, y);
-            });
-    });
+			event_handler.touch_event(crate::TouchPhase::Started, id as _, x, y);
+		});
+	});
 
-    let touch_move_closure: Closure<dyn Fn(_)> = Closure::new(|ev: TouchEvent| {
-        ev.prevent_default();
+	let touch_move_closure: Closure<dyn Fn(_)> = Closure::new(|ev: TouchEvent| {
+		ev.prevent_default();
 
-        let event_handler = get_event_handler(None);
-        let new_touches = ev.changed_touches();
+		let event_handler = get_event_handler(None);
+		let new_touches = ev.changed_touches();
 
-        (0..new_touches.length())
-            .flat_map(|idx| new_touches.item(idx))
-            .for_each(|touch| {
-                let id = touch.identifier();
-                let x = touch.client_x() as f32;
-                let y = touch.client_y() as f32;
+		(0..new_touches.length()).flat_map(|idx| new_touches.item(idx)).for_each(|touch| {
+			let id = touch.identifier();
+			let x = touch.client_x() as f32;
+			let y = touch.client_y() as f32;
 
-                event_handler.touch_event(crate::TouchPhase::Moved, id as _, x, y);
-            });
-    });
+			event_handler.touch_event(crate::TouchPhase::Moved, id as _, x, y);
+		});
+	});
 
-    let touch_end_closure: Closure<dyn Fn(_)> = Closure::new(|ev: TouchEvent| {
-        ev.prevent_default();
+	let touch_end_closure: Closure<dyn Fn(_)> = Closure::new(|ev: TouchEvent| {
+		ev.prevent_default();
 
-        let event_handler = get_event_handler(None);
-        let new_touches = ev.changed_touches();
+		let event_handler = get_event_handler(None);
+		let new_touches = ev.changed_touches();
 
-        (0..new_touches.length())
-            .flat_map(|idx| new_touches.item(idx))
-            .for_each(|touch| {
-                let id = touch.identifier();
-                let x = touch.client_x() as f32;
-                let y = touch.client_y() as f32;
+		(0..new_touches.length()).flat_map(|idx| new_touches.item(idx)).for_each(|touch| {
+			let id = touch.identifier();
+			let x = touch.client_x() as f32;
+			let y = touch.client_y() as f32;
 
-                event_handler.touch_event(crate::TouchPhase::Ended, id as _, x, y);
-            });
-    });
+			event_handler.touch_event(crate::TouchPhase::Ended, id as _, x, y);
+		});
+	});
 
-    let touch_cancel_closure: Closure<dyn Fn(_)> = Closure::new(|ev: TouchEvent| {
-        ev.prevent_default();
-        let event_handler = get_event_handler(None);
+	let touch_cancel_closure: Closure<dyn Fn(_)> = Closure::new(|ev: TouchEvent| {
+		ev.prevent_default();
+		let event_handler = get_event_handler(None);
 
-        let new_touches = ev.changed_touches();
+		let new_touches = ev.changed_touches();
 
-        (0..new_touches.length())
-            .flat_map(|idx| new_touches.item(idx))
-            .for_each(|touch| {
-                let id = touch.identifier();
-                let x = touch.client_x() as f32;
-                let y = touch.client_y() as f32;
+		(0..new_touches.length()).flat_map(|idx| new_touches.item(idx)).for_each(|touch| {
+			let id = touch.identifier();
+			let x = touch.client_x() as f32;
+			let y = touch.client_y() as f32;
 
-                event_handler.touch_event(crate::TouchPhase::Cancelled, id as _, x, y);
-            });
-    });
+			event_handler.touch_event(crate::TouchPhase::Cancelled, id as _, x, y);
+		});
+	});
 
-    let touch_start_fn_ref = touch_start_closure.as_ref().unchecked_ref();
-    let touch_move_fn_ref = touch_move_closure.as_ref().unchecked_ref();
-    let touch_end_fn_ref = touch_end_closure.as_ref().unchecked_ref();
-    let touch_cancel_fn_ref = touch_cancel_closure.as_ref().unchecked_ref();
+	let touch_start_fn_ref = touch_start_closure.as_ref().unchecked_ref();
+	let touch_move_fn_ref = touch_move_closure.as_ref().unchecked_ref();
+	let touch_end_fn_ref = touch_end_closure.as_ref().unchecked_ref();
+	let touch_cancel_fn_ref = touch_cancel_closure.as_ref().unchecked_ref();
 
-    canvas.add_event_listener_with_callback("touchstart", touch_start_fn_ref);
-    canvas.add_event_listener_with_callback("touchmove", touch_move_fn_ref);
-    canvas.add_event_listener_with_callback("touchend", touch_end_fn_ref);
-    canvas.add_event_listener_with_callback("touchcancel", touch_cancel_fn_ref);
+	canvas.add_event_listener_with_callback("touchstart", touch_start_fn_ref);
+	canvas.add_event_listener_with_callback("touchmove", touch_move_fn_ref);
+	canvas.add_event_listener_with_callback("touchend", touch_end_fn_ref);
+	canvas.add_event_listener_with_callback("touchcancel", touch_cancel_fn_ref);
 }
 
 fn init_file_drop_events(canvas: &HtmlCanvasElement) {
-    let drag_over_closure: Closure<dyn Fn(_)> = Closure::new(|ev: DragEvent| ev.prevent_default());
+	let drag_over_closure: Closure<dyn Fn(_)> = Closure::new(|ev: DragEvent| ev.prevent_default());
 
-    let drop_closure: Closure<dyn Fn(_)> = Closure::new(|ev: DragEvent| {
-        let event_handler = get_event_handler(None);
-        ev.prevent_default();
+	let drop_closure: Closure<dyn Fn(_)> = Closure::new(|ev: DragEvent| {
+		let event_handler = get_event_handler(None);
+		ev.prevent_default();
 
-        if let Some(dt) = ev.data_transfer() {
-            event_handler.files_dropped_event();
+		if let Some(dt) = ev.data_transfer() {
+			event_handler.files_dropped_event();
 
-            if let Some(files) = dt.files() {
-                let count = files.length();
+			if let Some(files) = dt.files() {
+				let count = files.length();
 
-                let mut paths = Vec::with_capacity(count as _);
-                let mut bytes = Vec::<Vec<u8>>::with_capacity(count as _);
+				let mut paths = Vec::with_capacity(count as _);
+				let mut bytes = Vec::<Vec<u8>>::with_capacity(count as _);
 
-                for i in 0..count {
-                    if let Some(file) = files.item(i) {
-                        let name = file.name();
-                        let array_buffer = file.array_buffer();
+				for i in 0..count {
+					if let Some(file) = files.item(i) {
+						let name = file.name();
+						let array_buffer = file.array_buffer();
 
-                        let data = wasm_bindgen_futures::JsFuture::from(array_buffer);
-                        let data = pollster::block_on(data).unwrap();
+						let data = wasm_bindgen_futures::JsFuture::from(array_buffer);
+						let data = pollster::block_on(data).unwrap();
 
-                        // collect
-                        paths.push(PathBuf::from(name));
-                        bytes.push(js_sys::Uint8Array::new(&data).to_vec());
-                    }
-                }
+						// collect
+						paths.push(PathBuf::from(name));
+						bytes.push(js_sys::Uint8Array::new(&data).to_vec());
+					}
+				}
 
-                // update
-                let mut d = crate::native_display().lock().unwrap();
-                d.dropped_files.paths = paths;
-                d.dropped_files.bytes = bytes;
+				// update
+				let mut d = crate::native_display().lock().unwrap();
+				d.dropped_files.paths = paths;
+				d.dropped_files.bytes = bytes;
 
-                // notify
-                event_handler.files_dropped_event();
-            }
-        }
-    });
+				// notify
+				event_handler.files_dropped_event();
+			}
+		}
+	});
 
-    let drop_fn_ref = drop_closure.as_ref().unchecked_ref();
-    let drag_over_fn_ref = drag_over_closure.as_ref().unchecked_ref();
+	let drop_fn_ref = drop_closure.as_ref().unchecked_ref();
+	let drag_over_fn_ref = drag_over_closure.as_ref().unchecked_ref();
 
-    canvas.add_event_listener_with_callback("dragover", drag_over_fn_ref);
-    canvas.add_event_listener_with_callback("drop", drop_fn_ref);
+	canvas.add_event_listener_with_callback("dragover", drag_over_fn_ref);
+	canvas.add_event_listener_with_callback("drop", drop_fn_ref);
 }

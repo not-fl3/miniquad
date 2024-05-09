@@ -72,28 +72,25 @@ macro_rules! call_bool_method {
 
 #[macro_export]
 macro_rules! get_utf_str {
-    ($env:expr, $obj:expr) => {{
-        let string = (**$env).GetStringUTFChars.unwrap()($env, $obj, std::ptr::null_mut());
-        let string = std::ffi::CStr::from_ptr(string);
-        string.to_str().unwrap()
-    }};
+	($env:expr, $obj:expr) => {{
+		let string = (**$env).GetStringUTFChars.unwrap()($env, $obj, std::ptr::null_mut());
+		let string = std::ffi::CStr::from_ptr(string);
+		string.to_str().unwrap()
+	}};
 }
 
 #[macro_export]
 macro_rules! new_global_ref {
-    ($env:expr, $obj:expr) => {{
-        (**$env).NewGlobalRef.unwrap()($env, $obj)
-    }};
+	($env:expr, $obj:expr) => {{
+		(**$env).NewGlobalRef.unwrap()($env, $obj)
+	}};
 }
 
 #[macro_export]
 macro_rules! new_local_ref {
-    ($env:expr, $obj:expr) => {{
-        (**$env).NewLocalRef.unwrap()($env, $obj)
-    }};
+	($env:expr, $obj:expr) => {{
+		(**$env).NewLocalRef.unwrap()($env, $obj)
+	}};
 }
 
-pub use {
-    call_bool_method, call_int_method, call_method, call_object_method, call_void_method,
-    get_utf_str, new_global_ref, new_local_ref, new_object,
-};
+pub use {call_bool_method, call_int_method, call_method, call_object_method, call_void_method, get_utf_str, new_global_ref, new_local_ref, new_object};

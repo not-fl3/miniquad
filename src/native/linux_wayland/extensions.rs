@@ -83,31 +83,21 @@ macro_rules! wayland_interface {
 /// Redifinition some interfaces from wayland-protocol.c, to have them available
 /// in compile time, to allow other interfaces use them as their arguments.
 pub mod wayland_protocol {
-    use super::super::{wl_interface, wl_message};
+	use super::super::{wl_interface, wl_message};
 
-    wayland_interface!(
-        wl_output_interface,
-        wl_output,
-        3,
-        [(release, "3", ())],
-        [
-            ("geometry", "iiiiissi"),
-            ("mode", "uiii"),
-            ("done", "2"),
-            ("scale", "2i")
-        ]
-    );
+	wayland_interface!(
+		wl_output_interface,
+		wl_output,
+		3,
+		[(release, "3", ())],
+		[("geometry", "iiiiissi"), ("mode", "uiii"), ("done", "2"), ("scale", "2i")]
+	);
 
-    wayland_interface!(
-        wl_seat_interface,
-        wl_seat,
-        7,
-        [
-            (get_pointer, "n", ()),
-            (get_keyboard, "n", ()),
-            (get_touch, "n", ()),
-            (release, "5", ())
-        ],
-        [("capabilities", "u"), ("name", "2s")]
-    );
+	wayland_interface!(
+		wl_seat_interface,
+		wl_seat,
+		7,
+		[(get_pointer, "n", ()), (get_keyboard, "n", ()), (get_touch, "n", ()), (release, "5", ())],
+		[("capabilities", "u"), ("name", "2s")]
+	);
 }

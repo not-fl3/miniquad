@@ -3,8 +3,8 @@
 use crate::wayland_interface;
 
 use super::{
-    super::libwayland_client::{wl_interface, wl_message},
-    xdg_shell::xdg_toplevel_interface,
+	super::libwayland_client::{wl_interface, wl_message},
+	xdg_shell::xdg_toplevel_interface,
 };
 
 pub const ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE: u32 = 1;

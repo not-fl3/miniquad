@@ -194,200 +194,180 @@ pub type wl_fixed_t = i32;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_object {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_array {
-    pub size: libc::size_t,
-    pub alloc: libc::size_t,
-    pub data: *mut ::std::os::raw::c_void,
+	pub size: libc::size_t,
+	pub alloc: libc::size_t,
+	pub data: *mut ::std::os::raw::c_void,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union wl_argument {
-    pub i: i32,
-    pub u: u32,
-    pub f: wl_fixed_t,
-    pub s: *const ::std::os::raw::c_char,
-    pub o: *mut wl_object,
-    pub n: u32,
-    pub a: *mut wl_array,
-    pub h: i32,
-    _union_align: u64,
+	pub i: i32,
+	pub u: u32,
+	pub f: wl_fixed_t,
+	pub s: *const ::std::os::raw::c_char,
+	pub o: *mut wl_object,
+	pub n: u32,
+	pub a: *mut wl_array,
+	pub h: i32,
+	_union_align: u64,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_proxy {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_display {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_event_queue {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_buffer {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_callback {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_compositor {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_data_device {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_data_device_manager {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_data_offer {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_data_source {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_keyboard {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_output {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_pointer {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_region {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_registry {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_seat {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_shell {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_shell_surface {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_shm {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_shm_pool {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_subcompositor {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_subsurface {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_surface {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_touch {
-    _unused: [u8; 0],
+	_unused: [u8; 0],
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_message {
-    pub name: *const ::std::os::raw::c_char,
-    pub signature: *const ::std::os::raw::c_char,
-    pub types: *mut *const wl_interface,
+	pub name: *const ::std::os::raw::c_char,
+	pub signature: *const ::std::os::raw::c_char,
+	pub types: *mut *const wl_interface,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_interface {
-    pub name: *const ::std::os::raw::c_char,
-    pub version: ::std::os::raw::c_int,
-    pub method_count: ::std::os::raw::c_int,
-    pub methods: *const wl_message,
-    pub event_count: ::std::os::raw::c_int,
-    pub events: *const wl_message,
+	pub name: *const ::std::os::raw::c_char,
+	pub version: ::std::os::raw::c_int,
+	pub method_count: ::std::os::raw::c_int,
+	pub methods: *const wl_message,
+	pub event_count: ::std::os::raw::c_int,
+	pub events: *const wl_message,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_registry_listener {
-    pub global: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_registry: *mut wl_registry,
-            name: u32,
-            interface: *const ::std::os::raw::c_char,
-            version: u32,
-        ),
-    >,
-    pub global_remove: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_registry: *mut wl_registry,
-            name: u32,
-        ),
-    >,
+	pub global: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_registry: *mut wl_registry, name: u32, interface: *const ::std::os::raw::c_char, version: u32)>,
+	pub global_remove: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_registry: *mut wl_registry, name: u32)>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_callback_listener {
-    pub done: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_callback: *mut wl_callback,
-            callback_data: u32,
-        ),
-    >,
+	pub done: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_callback: *mut wl_callback, callback_data: u32)>,
 }
 pub const wl_seat_capability_WL_SEAT_CAPABILITY_POINTER: wl_seat_capability = 1;
 pub const wl_seat_capability_WL_SEAT_CAPABILITY_KEYBOARD: wl_seat_capability = 2;
@@ -396,287 +376,118 @@ pub type wl_seat_capability = ::std::os::raw::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_seat_listener {
-    pub capabilities: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_seat: *mut wl_seat,
-            capabilities: u32,
-        ),
-    >,
-    pub name: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_seat: *mut wl_seat,
-            name: *const ::std::os::raw::c_char,
-        ),
-    >,
+	pub capabilities: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_seat: *mut wl_seat, capabilities: u32)>,
+	pub name: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_seat: *mut wl_seat, name: *const ::std::os::raw::c_char)>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_keyboard_listener {
-    pub keymap: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_keyboard: *mut wl_keyboard,
-            format: u32,
-            fd: i32,
-            size: u32,
-        ),
-    >,
-    pub enter: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_keyboard: *mut wl_keyboard,
-            serial: u32,
-            surface: *mut wl_surface,
-            keys: *mut wl_array,
-        ),
-    >,
-    pub leave: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_keyboard: *mut wl_keyboard,
-            serial: u32,
-            surface: *mut wl_surface,
-        ),
-    >,
-    pub key: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_keyboard: *mut wl_keyboard,
-            serial: u32,
-            time: u32,
-            key: u32,
-            state: u32,
-        ),
-    >,
-    pub modifiers: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_keyboard: *mut wl_keyboard,
-            serial: u32,
-            mods_depressed: u32,
-            mods_latched: u32,
-            mods_locked: u32,
-            group: u32,
-        ),
-    >,
-    pub repeat_info: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_keyboard: *mut wl_keyboard,
-            rate: i32,
-            delay: i32,
-        ),
-    >,
+	pub keymap: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_keyboard: *mut wl_keyboard, format: u32, fd: i32, size: u32)>,
+	pub enter: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_keyboard: *mut wl_keyboard, serial: u32, surface: *mut wl_surface, keys: *mut wl_array)>,
+	pub leave: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_keyboard: *mut wl_keyboard, serial: u32, surface: *mut wl_surface)>,
+	pub key: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_keyboard: *mut wl_keyboard, serial: u32, time: u32, key: u32, state: u32)>,
+	pub modifiers:
+		::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_keyboard: *mut wl_keyboard, serial: u32, mods_depressed: u32, mods_latched: u32, mods_locked: u32, group: u32)>,
+	pub repeat_info: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_keyboard: *mut wl_keyboard, rate: i32, delay: i32)>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_pointer_listener {
-    pub enter: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_pointer: *mut wl_pointer,
-            serial: u32,
-            surface: *mut wl_surface,
-            surface_x: i32,
-            surface_y: i32,
-        ),
-    >,
-    pub leave: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_pointer: *mut wl_pointer,
-            serial: u32,
-            surface: *mut wl_surface,
-        ),
-    >,
-    pub motion: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_pointer: *mut wl_pointer,
-            time: u32,
-            surface_x: i32,
-            surface_y: i32,
-        ),
-    >,
-    pub button: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_pointer: *mut wl_pointer,
-            serial: u32,
-            time: u32,
-            button: u32,
-            state: u32,
-        ),
-    >,
-    pub axis: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_pointer: *mut wl_pointer,
-            time: u32,
-            axis: u32,
-            value: i32,
-        ),
-    >,
-    pub frame: ::std::option::Option<
-        unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer),
-    >,
-    pub axis_source: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_pointer: *mut wl_pointer,
-            axis_source: u32,
-        ),
-    >,
-    pub axis_stop: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_pointer: *mut wl_pointer,
-            time: u32,
-            axis: u32,
-        ),
-    >,
-    pub axis_discrete: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_pointer: *mut wl_pointer,
-            axis: u32,
-            discrete: i32,
-        ),
-    >,
-    pub axis_value120: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_pointer: *mut wl_pointer,
-            axis: u32,
-            value120: i32,
-        ),
-    >,
-    pub axis_relative_direction: ::std::option::Option<
-        unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
-            wl_pointer: *mut wl_pointer,
-            axis: u32,
-            direction: u32,
-        ),
-    >,
+	pub enter: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer, serial: u32, surface: *mut wl_surface, surface_x: i32, surface_y: i32)>,
+	pub leave: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer, serial: u32, surface: *mut wl_surface)>,
+	pub motion: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer, time: u32, surface_x: i32, surface_y: i32)>,
+	pub button: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer, serial: u32, time: u32, button: u32, state: u32)>,
+	pub axis: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer, time: u32, axis: u32, value: i32)>,
+	pub frame: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer)>,
+	pub axis_source: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer, axis_source: u32)>,
+	pub axis_stop: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer, time: u32, axis: u32)>,
+	pub axis_discrete: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer, axis: u32, discrete: i32)>,
+	pub axis_value120: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer, axis: u32, value120: i32)>,
+	pub axis_relative_direction: ::std::option::Option<unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer, axis: u32, direction: u32)>,
 }
 
-pub type wl_display_connect =
-    unsafe extern "C" fn(name: *const ::std::os::raw::c_char) -> *mut wl_display;
+pub type wl_display_connect = unsafe extern "C" fn(name: *const ::std::os::raw::c_char) -> *mut wl_display;
 pub type wl_proxy_destroy = unsafe extern "C" fn(proxy: *mut wl_proxy);
 pub type wl_proxy_marshal = unsafe extern "C" fn(p: *mut wl_proxy, opcode: u32, ...);
-pub type wl_proxy_marshal_constructor = unsafe extern "C" fn(
-    proxy: *mut wl_proxy,
-    opcode: u32,
-    interface: *const wl_interface,
-    ...
-) -> *mut wl_proxy;
-pub type wl_proxy_marshal_constructor_versioned = unsafe extern "C" fn(
-    proxy: *mut wl_proxy,
-    opcode: u32,
-    interface: *const wl_interface,
-    version: u32,
-    ...
-) -> *mut wl_proxy;
-pub type wl_proxy_add_listener = unsafe extern "C" fn(
-    proxy: *mut wl_proxy,
-    implementation: *mut ::std::option::Option<unsafe extern "C" fn()>,
-    data: *mut ::std::os::raw::c_void,
-) -> ::std::os::raw::c_int;
+pub type wl_proxy_marshal_constructor = unsafe extern "C" fn(proxy: *mut wl_proxy, opcode: u32, interface: *const wl_interface, ...) -> *mut wl_proxy;
+pub type wl_proxy_marshal_constructor_versioned = unsafe extern "C" fn(proxy: *mut wl_proxy, opcode: u32, interface: *const wl_interface, version: u32, ...) -> *mut wl_proxy;
+pub type wl_proxy_add_listener = unsafe extern "C" fn(proxy: *mut wl_proxy, implementation: *mut ::std::option::Option<unsafe extern "C" fn()>, data: *mut ::std::os::raw::c_void) -> ::std::os::raw::c_int;
 
-pub type wl_display_roundtrip =
-    unsafe extern "C" fn(display: *mut wl_display) -> ::std::os::raw::c_int;
-pub type wl_display_dispatch_pending =
-    unsafe extern "C" fn(display: *mut wl_display) -> ::std::os::raw::c_int;
+pub type wl_display_roundtrip = unsafe extern "C" fn(display: *mut wl_display) -> ::std::os::raw::c_int;
+pub type wl_display_dispatch_pending = unsafe extern "C" fn(display: *mut wl_display) -> ::std::os::raw::c_int;
 
 #[derive(Clone)]
 pub struct LibWaylandClient {
-    _module: std::rc::Rc<crate::native::module::Module>,
-    pub wl_display_connect: wl_display_connect,
-    pub wl_proxy_destroy: wl_proxy_destroy,
-    pub wl_proxy_marshal: wl_proxy_marshal,
-    pub wl_proxy_marshal_constructor: wl_proxy_marshal_constructor,
-    pub wl_proxy_marshal_constructor_versioned: wl_proxy_marshal_constructor_versioned,
-    pub wl_display_dispatch_pending: wl_display_dispatch_pending,
-    pub wl_proxy_add_listener: wl_proxy_add_listener,
-    pub wl_display_roundtrip: wl_display_roundtrip,
-    pub wl_registry_interface: *mut wl_interface,
-    pub wl_compositor_interface: *mut wl_interface,
-    pub wl_subcompositor_interface: *mut wl_interface,
-    pub wl_surface_interface: *mut wl_interface,
-    pub wl_subsurface_interface: *mut wl_interface,
-    pub wl_buffer_interface: *mut wl_interface,
-    pub wl_seat_interface: *mut wl_interface,
-    pub wl_shm_interface: *mut wl_interface,
-    pub wl_shm_pool_interface: *mut wl_interface,
-    pub wl_keyboard_interface: *mut wl_interface,
-    pub wl_pointer_interface: *mut wl_interface,
+	_module: std::rc::Rc<crate::native::module::Module>,
+	pub wl_display_connect: wl_display_connect,
+	pub wl_proxy_destroy: wl_proxy_destroy,
+	pub wl_proxy_marshal: wl_proxy_marshal,
+	pub wl_proxy_marshal_constructor: wl_proxy_marshal_constructor,
+	pub wl_proxy_marshal_constructor_versioned: wl_proxy_marshal_constructor_versioned,
+	pub wl_display_dispatch_pending: wl_display_dispatch_pending,
+	pub wl_proxy_add_listener: wl_proxy_add_listener,
+	pub wl_display_roundtrip: wl_display_roundtrip,
+	pub wl_registry_interface: *mut wl_interface,
+	pub wl_compositor_interface: *mut wl_interface,
+	pub wl_subcompositor_interface: *mut wl_interface,
+	pub wl_surface_interface: *mut wl_interface,
+	pub wl_subsurface_interface: *mut wl_interface,
+	pub wl_buffer_interface: *mut wl_interface,
+	pub wl_seat_interface: *mut wl_interface,
+	pub wl_shm_interface: *mut wl_interface,
+	pub wl_shm_pool_interface: *mut wl_interface,
+	pub wl_keyboard_interface: *mut wl_interface,
+	pub wl_pointer_interface: *mut wl_interface,
 }
 
 impl LibWaylandClient {
-    pub fn try_load() -> Option<LibWaylandClient> {
-        crate::native::module::Module::load("libwayland-client.so")
-            .or_else(|_| crate::native::module::Module::load("libwayland-client.so.0"))
-            .map(|module| LibWaylandClient {
-                wl_display_connect: module.get_symbol("wl_display_connect").unwrap(),
-                wl_proxy_add_listener: module.get_symbol("wl_proxy_add_listener").unwrap(),
-                wl_display_dispatch_pending: module
-                    .get_symbol("wl_display_dispatch_pending")
-                    .unwrap(),
+	pub fn try_load() -> Option<LibWaylandClient> {
+		crate::native::module::Module::load("libwayland-client.so")
+			.or_else(|_| crate::native::module::Module::load("libwayland-client.so.0"))
+			.map(|module| LibWaylandClient {
+				wl_display_connect: module.get_symbol("wl_display_connect").unwrap(),
+				wl_proxy_add_listener: module.get_symbol("wl_proxy_add_listener").unwrap(),
+				wl_display_dispatch_pending: module.get_symbol("wl_display_dispatch_pending").unwrap(),
 
-                wl_proxy_destroy: module.get_symbol("wl_proxy_destroy").unwrap(),
-                wl_proxy_marshal: module.get_symbol("wl_proxy_marshal").unwrap(),
-                wl_proxy_marshal_constructor: module
-                    .get_symbol("wl_proxy_marshal_constructor")
-                    .unwrap(),
-                wl_proxy_marshal_constructor_versioned: module
-                    .get_symbol("wl_proxy_marshal_constructor_versioned")
-                    .unwrap(),
-                wl_display_roundtrip: module.get_symbol("wl_display_roundtrip").unwrap(),
+				wl_proxy_destroy: module.get_symbol("wl_proxy_destroy").unwrap(),
+				wl_proxy_marshal: module.get_symbol("wl_proxy_marshal").unwrap(),
+				wl_proxy_marshal_constructor: module.get_symbol("wl_proxy_marshal_constructor").unwrap(),
+				wl_proxy_marshal_constructor_versioned: module.get_symbol("wl_proxy_marshal_constructor_versioned").unwrap(),
+				wl_display_roundtrip: module.get_symbol("wl_display_roundtrip").unwrap(),
 
-                wl_registry_interface: module.get_symbol("wl_registry_interface").unwrap(),
-                wl_compositor_interface: module.get_symbol("wl_compositor_interface").unwrap(),
-                wl_subcompositor_interface: module
-                    .get_symbol("wl_subcompositor_interface")
-                    .unwrap(),
-                wl_surface_interface: module.get_symbol("wl_surface_interface").unwrap(),
-                wl_subsurface_interface: module.get_symbol("wl_subsurface_interface").unwrap(),
-                wl_buffer_interface: module.get_symbol("wl_buffer_interface").unwrap(),
-                wl_seat_interface: module.get_symbol("wl_seat_interface").unwrap(),
-                wl_shm_interface: module.get_symbol("wl_shm_interface").unwrap(),
-                wl_shm_pool_interface: module.get_symbol("wl_shm_pool_interface").unwrap(),
-                wl_keyboard_interface: module.get_symbol("wl_keyboard_interface").unwrap(),
-                wl_pointer_interface: module.get_symbol("wl_pointer_interface").unwrap(),
+				wl_registry_interface: module.get_symbol("wl_registry_interface").unwrap(),
+				wl_compositor_interface: module.get_symbol("wl_compositor_interface").unwrap(),
+				wl_subcompositor_interface: module.get_symbol("wl_subcompositor_interface").unwrap(),
+				wl_surface_interface: module.get_symbol("wl_surface_interface").unwrap(),
+				wl_subsurface_interface: module.get_symbol("wl_subsurface_interface").unwrap(),
+				wl_buffer_interface: module.get_symbol("wl_buffer_interface").unwrap(),
+				wl_seat_interface: module.get_symbol("wl_seat_interface").unwrap(),
+				wl_shm_interface: module.get_symbol("wl_shm_interface").unwrap(),
+				wl_shm_pool_interface: module.get_symbol("wl_shm_pool_interface").unwrap(),
+				wl_keyboard_interface: module.get_symbol("wl_keyboard_interface").unwrap(),
+				wl_pointer_interface: module.get_symbol("wl_pointer_interface").unwrap(),
 
-                _module: std::rc::Rc::new(module),
-            })
-            .ok()
-    }
+				_module: std::rc::Rc::new(module),
+			})
+			.ok()
+	}
 
-    pub unsafe fn wl_registry_bind(
-        &mut self,
-        wl_registry: *const wl_registry,
-        name: u32,
-        interface: *const wl_interface,
-        version: u32,
-    ) -> *mut std::ffi::c_void {
-        let id: *mut wl_proxy;
+	pub unsafe fn wl_registry_bind(&mut self, wl_registry: *const wl_registry, name: u32, interface: *const wl_interface, version: u32) -> *mut std::ffi::c_void {
+		let id: *mut wl_proxy;
 
-        id = (self.wl_proxy_marshal_constructor_versioned)(
-            wl_registry as _,
-            WL_REGISTRY_BIND,
-            interface as _,
-            version,
-            name,
-            (*interface).name,
-            version,
-            std::ptr::null_mut::<std::ffi::c_void>(),
-        );
+		id = (self.wl_proxy_marshal_constructor_versioned)(
+			wl_registry as _,
+			WL_REGISTRY_BIND,
+			interface as _,
+			version,
+			name,
+			(*interface).name,
+			version,
+			std::ptr::null_mut::<std::ffi::c_void>(),
+		);
 
-        id as *mut _
-    }
+		id as *mut _
+	}
 }

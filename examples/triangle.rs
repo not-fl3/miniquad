@@ -2,109 +2,88 @@ use miniquad::*;
 
 #[repr(C)]
 struct Vertex {
-    pos: [f32; 2],
-    color: [f32; 4],
+	pos: [f32; 2],
+	color: [f32; 4],
 }
 
 struct Stage {
-    pipeline: Pipeline,
-    bindings: Bindings,
-    ctx: Box<dyn RenderingBackend>,
+	pipeline: Pipeline,
+	bindings: Bindings,
+	ctx: Box<dyn RenderingBackend>,
 }
 
 impl Stage {
-    pub fn new() -> Stage {
-        let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
+	pub fn new() -> Stage {
+		let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
 
-        #[rustfmt::skip]
+		#[rustfmt::skip]
         let vertices: [Vertex; 3] = [
             Vertex { pos : [ -0.5, -0.5 ], color: [1., 0., 0., 1.] },
             Vertex { pos : [  0.5, -0.5 ], color: [0., 1., 0., 1.] },
             Vertex { pos : [  0.0,  0.5 ], color: [0., 0., 1., 1.] },
         ];
-        let vertex_buffer = ctx.new_buffer(
-            BufferType::VertexBuffer,
-            BufferUsage::Immutable,
-            BufferSource::slice(&vertices),
-        );
+		let vertex_buffer = ctx.new_buffer(BufferType::VertexBuffer, BufferUsage::Immutable, BufferSource::slice(&vertices));
 
-        let indices: [u16; 3] = [0, 1, 2];
-        let index_buffer = ctx.new_buffer(
-            BufferType::IndexBuffer,
-            BufferUsage::Immutable,
-            BufferSource::slice(&indices),
-        );
+		let indices: [u16; 3] = [0, 1, 2];
+		let index_buffer = ctx.new_buffer(BufferType::IndexBuffer, BufferUsage::Immutable, BufferSource::slice(&indices));
 
-        let bindings = Bindings {
-            vertex_buffers: vec![vertex_buffer],
-            index_buffer: index_buffer,
-            images: vec![],
-        };
+		let bindings = Bindings {
+			vertex_buffers: vec![vertex_buffer],
+			index_buffer: index_buffer,
+			images: vec![],
+		};
 
-        let shader = ctx
-            .new_shader(
-                match ctx.info().backend {
-                    Backend::OpenGl => ShaderSource::Glsl {
-                        vertex: shader::VERTEX,
-                        fragment: shader::FRAGMENT,
-                    },
-                    Backend::Metal => ShaderSource::Msl {
-                        program: shader::METAL,
-                    },
-                },
-                shader::meta(),
-            )
-            .unwrap();
+		let shader = ctx
+			.new_shader(
+				match ctx.info().backend {
+					Backend::OpenGl => ShaderSource::Glsl {
+						vertex: shader::VERTEX,
+						fragment: shader::FRAGMENT,
+					},
+					Backend::Metal => ShaderSource::Msl { program: shader::METAL },
+				},
+				shader::meta(),
+			)
+			.unwrap();
 
-        let pipeline = ctx.new_pipeline(
-            &[BufferLayout::default()],
-            &[
-                VertexAttribute::new("in_pos", VertexFormat::Float2),
-                VertexAttribute::new("in_color", VertexFormat::Float4),
-            ],
-            shader,
-            PipelineParams::default(),
-        );
+		let pipeline = ctx.new_pipeline(
+			&[BufferLayout::default()],
+			&[VertexAttribute::new("in_pos", VertexFormat::Float2), VertexAttribute::new("in_color", VertexFormat::Float4)],
+			shader,
+			PipelineParams::default(),
+		);
 
-        Stage {
-            pipeline,
-            bindings,
-            ctx,
-        }
-    }
+		Stage { pipeline, bindings, ctx }
+	}
 }
 
 impl EventHandler for Stage {
-    fn update(&mut self) {}
+	fn update(&mut self) {}
 
-    fn draw(&mut self) {
-        self.ctx.begin_default_pass(Default::default());
+	fn draw(&mut self) {
+		self.ctx.begin_default_pass(Default::default());
 
-        self.ctx.apply_pipeline(&self.pipeline);
-        self.ctx.apply_bindings(&self.bindings);
-        self.ctx.draw(0, 3, 1);
-        self.ctx.end_render_pass();
+		self.ctx.apply_pipeline(&self.pipeline);
+		self.ctx.apply_bindings(&self.bindings);
+		self.ctx.draw(0, 3, 1);
+		self.ctx.end_render_pass();
 
-        self.ctx.commit_frame();
-    }
+		self.ctx.commit_frame();
+	}
 }
 
 fn main() {
-    let mut conf = conf::Conf::default();
-    let metal = std::env::args().nth(1).as_deref() == Some("metal");
-    conf.platform.apple_gfx_api = if metal {
-        conf::AppleGfxApi::Metal
-    } else {
-        conf::AppleGfxApi::OpenGl
-    };
+	let mut conf = conf::Conf::default();
+	let metal = std::env::args().nth(1).as_deref() == Some("metal");
+	conf.platform.apple_gfx_api = if metal { conf::AppleGfxApi::Metal } else { conf::AppleGfxApi::OpenGl };
 
-    miniquad::start(conf, move || Box::new(Stage::new()));
+	miniquad::start(conf, move || Box::new(Stage::new()));
 }
 
 mod shader {
-    use miniquad::*;
+	use miniquad::*;
 
-    pub const VERTEX: &str = r#"#version 100
+	pub const VERTEX: &str = r#"#version 100
     attribute vec2 in_pos;
     attribute vec4 in_color;
 
@@ -115,14 +94,14 @@ mod shader {
         color = in_color;
     }"#;
 
-    pub const FRAGMENT: &str = r#"#version 100
+	pub const FRAGMENT: &str = r#"#version 100
     varying lowp vec4 color;
 
     void main() {
         gl_FragColor = color;
     }"#;
 
-    pub const METAL: &str = r#"
+	pub const METAL: &str = r#"
     #include <metal_stdlib>
 
     using namespace metal;
@@ -154,10 +133,10 @@ mod shader {
         return in.color;
     }"#;
 
-    pub fn meta() -> ShaderMeta {
-        ShaderMeta {
-            images: vec![],
-            uniforms: UniformBlockLayout { uniforms: vec![] },
-        }
-    }
+	pub fn meta() -> ShaderMeta {
+		ShaderMeta {
+			images: vec![],
+			uniforms: UniformBlockLayout { uniforms: vec![] },
+		}
+	}
 }

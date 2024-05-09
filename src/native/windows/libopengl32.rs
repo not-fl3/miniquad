@@ -9,25 +9,25 @@ pub type wglGetCurrentDC = extern "system" fn() -> HDC;
 pub type wglMakeCurrent = extern "system" fn(_: HDC, _: HGLRC) -> bool;
 
 pub struct LibOpengl32 {
-    pub module: crate::native::module::Module,
-    pub wglCreateContext: wglCreateContext,
-    pub wglDeleteContext: wglDeleteContext,
-    pub wglGetProcAddress: wglGetProcAddress,
-    pub wglGetCurrentDC: wglGetCurrentDC,
-    pub wglMakeCurrent: wglMakeCurrent,
+	pub module: crate::native::module::Module,
+	pub wglCreateContext: wglCreateContext,
+	pub wglDeleteContext: wglDeleteContext,
+	pub wglGetProcAddress: wglGetProcAddress,
+	pub wglGetCurrentDC: wglGetCurrentDC,
+	pub wglMakeCurrent: wglMakeCurrent,
 }
 
 impl LibOpengl32 {
-    pub fn try_load() -> Option<LibOpengl32> {
-        crate::native::module::Module::load("opengl32.dll")
-            .map(|module| LibOpengl32 {
-                wglCreateContext: module.get_symbol("wglCreateContext").unwrap(),
-                wglDeleteContext: module.get_symbol("wglDeleteContext").unwrap(),
-                wglGetProcAddress: module.get_symbol("wglGetProcAddress").unwrap(),
-                wglGetCurrentDC: module.get_symbol("wglGetCurrentDC").unwrap(),
-                wglMakeCurrent: module.get_symbol("wglMakeCurrent").unwrap(),
-                module,
-            })
-            .ok()
-    }
+	pub fn try_load() -> Option<LibOpengl32> {
+		crate::native::module::Module::load("opengl32.dll")
+			.map(|module| LibOpengl32 {
+				wglCreateContext: module.get_symbol("wglCreateContext").unwrap(),
+				wglDeleteContext: module.get_symbol("wglDeleteContext").unwrap(),
+				wglGetProcAddress: module.get_symbol("wglGetProcAddress").unwrap(),
+				wglGetCurrentDC: module.get_symbol("wglGetCurrentDC").unwrap(),
+				wglMakeCurrent: module.get_symbol("wglMakeCurrent").unwrap(),
+				module,
+			})
+			.ok()
+	}
 }
