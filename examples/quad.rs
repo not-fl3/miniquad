@@ -1,4 +1,4 @@
-use miniquad::*;
+use miniquad_wasm_bindgen::*;
 
 #[repr(C)]
 struct Vec2 {
@@ -99,11 +99,11 @@ fn main() {
 	let metal = std::env::args().nth(1).as_deref() == Some("metal");
 	conf.platform.apple_gfx_api = if metal { conf::AppleGfxApi::Metal } else { conf::AppleGfxApi::OpenGl };
 
-	miniquad::start(conf, move || Box::new(Stage::new()));
+	miniquad_wasm_bindgen::start(conf, move || Box::new(Stage::new()));
 }
 
 mod shader {
-	use miniquad::*;
+	use miniquad_wasm_bindgen::*;
 
 	pub const VERTEX: &str = r#"#version 100
     attribute vec2 in_pos;
@@ -150,7 +150,7 @@ mod shader {
     };
 
     vertex RasterizerData vertexShader(
-      Vertex v [[stage_in]], 
+      Vertex v [[stage_in]],
       constant Uniforms& uniforms [[buffer(0)]])
     {
         RasterizerData out;

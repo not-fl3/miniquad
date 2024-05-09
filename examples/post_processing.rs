@@ -1,4 +1,4 @@
-use miniquad::*;
+use miniquad_wasm_bindgen::*;
 
 use glam::{vec3, Mat4};
 
@@ -219,11 +219,11 @@ impl EventHandler for Stage {
 }
 
 fn main() {
-	miniquad::start(conf::Conf::default(), || Box::new(Stage::new()));
+	miniquad_wasm_bindgen::start(conf::Conf::default(), || Box::new(Stage::new()));
 }
 
 mod post_processing_shader {
-	use miniquad::*;
+	use miniquad_wasm_bindgen::*;
 
 	pub const VERTEX: &str = r#"#version 100
     attribute vec2 pos;
@@ -278,7 +278,7 @@ mod post_processing_shader {
 }
 
 mod offscreen_shader {
-	use miniquad::*;
+	use miniquad_wasm_bindgen::*;
 
 	pub const VERTEX: &str = r#"#version 100
     attribute vec4 pos;

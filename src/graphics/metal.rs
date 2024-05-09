@@ -188,7 +188,7 @@ fn roundup_ub_buffer(current_buffer: u64) -> u64 {
 // buffer.update() half-update buffer - it doesn't really send data to the GPU claiming ownership,
 // it postpone reading the CPU memory until drawcall will actually happen.
 // There is no way to flush the buffer and makes metal's "update" function to update GPU memory right away.
-// Thus miniquad keeps a lot of buffer's copies...
+// Thus miniquad_wasm_bindgen keeps a lot of buffer's copies...
 const BUFFERS_IN_ROTATION: usize = 30;
 
 #[derive(Clone, Copy, Debug)]

@@ -1,4 +1,4 @@
-use miniquad::*;
+use miniquad_wasm_bindgen::*;
 
 struct Stage {
 	ctx: GlContext,
@@ -12,7 +12,7 @@ impl EventHandler for Stage {
 }
 
 fn main() {
-	miniquad::start(
+	miniquad_wasm_bindgen::start(
 		conf::Conf {
 			window_title: "Miniquad".to_string(),
 			window_width: 1024,

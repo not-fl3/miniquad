@@ -233,7 +233,7 @@ pub enum CursorIcon {
 	NWSEResize,
 }
 
-/// Start miniquad.
+/// Start miniquad_wasm_bindgen.
 pub fn start<F>(conf: conf::Conf, f: F)
 where
 	F: 'static + FnOnce() -> Box<dyn EventHandler>,

@@ -43,7 +43,7 @@ where
 	let main_canvas = document()
 		.query_selector(&conf.platform.web_canvas_query_selector)
 		.unwrap()
-		.expect(format!("Unable to start miniquad: Canvas {} not found!", conf.platform.web_canvas_query_selector).as_str())
+		.expect(format!("Unable to start miniquad_wasm_bindgen: Canvas {} not found!", conf.platform.web_canvas_query_selector).as_str())
 		.dyn_into::<HtmlCanvasElement>()
 		.unwrap();
 	let high_dpi = conf.high_dpi;

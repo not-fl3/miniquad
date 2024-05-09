@@ -322,7 +322,7 @@ unsafe extern "system" fn win32_wndproc(hwnd: HWND, umsg: UINT, wparam: WPARAM, 
 		WM_MOUSEMOVE => {
 			payload.mouse_x = GET_X_LPARAM(lparam) as f32 * payload.mouse_scale;
 			payload.mouse_y = GET_Y_LPARAM(lparam) as f32 * payload.mouse_scale;
-			// mouse enter was not handled by miniquad anyway
+			// mouse enter was not handled by miniquad_wasm_bindgen anyway
 			// if !_sapp.win32_mouse_tracked {
 			//     _sapp.win32_mouse_tracked = true;
 
@@ -375,7 +375,7 @@ unsafe extern "system" fn win32_wndproc(hwnd: HWND, umsg: UINT, wparam: WPARAM, 
 		}
 
 		WM_MOUSELEAVE => {
-			// mouse leave was not handled by miniquad anyway
+			// mouse leave was not handled by miniquad_wasm_bindgen anyway
 			// _sapp.win32_mouse_tracked = false;
 			// _sapp_win32_mouse_event(
 			//     sapp_event_type_SAPP_EVENTTYPE_MOUSE_LEAVE,
@@ -585,7 +585,7 @@ unsafe fn create_window(window_title: &str, fullscreen: bool, resizable: bool, w
 
 unsafe fn create_msg_window() -> (HWND, HDC) {
 	let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
-	let window_name = "miniquad message window\0".encode_utf16().collect::<Vec<u16>>();
+	let window_name = "miniquad_wasm_bindgen message window\0".encode_utf16().collect::<Vec<u16>>();
 	let msg_hwnd = CreateWindowExW(
 		WS_EX_OVERLAPPEDWINDOW,
 		class_name.as_ptr() as _,

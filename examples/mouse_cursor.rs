@@ -1,4 +1,4 @@
-use miniquad::*;
+use miniquad_wasm_bindgen::*;
 
 struct Stage {}
 
@@ -34,5 +34,5 @@ impl EventHandler for Stage {
 }
 
 fn main() {
-	miniquad::start(conf::Conf::default(), || Box::new(Stage {}));
+	miniquad_wasm_bindgen::start(conf::Conf::default(), || Box::new(Stage {}));
 }

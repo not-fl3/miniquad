@@ -361,7 +361,7 @@ pub struct TextureParams {
 	pub mipmap_filter: MipmapFilterMode,
 	pub width: u32,
 	pub height: u32,
-	// All miniquad API could work without this flag being explicit.
+	// All miniquad_wasm_bindgen API could work without this flag being explicit.
 	// We can decide if mipmaps are required by the data provided
 	// And reallocate non-mipmapped texture(on metal) on generateMipmaps call
 	// But! Reallocating cubemaps is too much struggle, so leave it for later.
@@ -398,8 +398,8 @@ pub(crate) enum TextureIdInner {
 pub struct TextureId(TextureIdInner);
 
 impl TextureId {
-	/// Wrap raw platform texture into a TextureId acceptable for miniquad
-	/// Without allocating any miniquad memory and without letting miniquad
+	/// Wrap raw platform texture into a TextureId acceptable for miniquad_wasm_bindgen
+	/// Without allocating any miniquad_wasm_bindgen memory and without letting miniquad_wasm_bindgen
 	/// manage the texture.
 	pub fn from_raw_id(raw_id: RawId) -> TextureId {
 		TextureId(TextureIdInner::Raw(raw_id))
@@ -413,7 +413,7 @@ impl TextureId {
 ///
 /// Example:
 ///```
-///# use miniquad::{BlendState, BlendFactor, BlendValue, Equation};
+///# use miniquad_wasm_bindgen::{BlendState, BlendFactor, BlendValue, Equation};
 ///BlendState::new(
 ///    Equation::Add,
 ///    BlendFactor::Value(BlendValue::SourceAlpha),
@@ -652,7 +652,7 @@ pub struct PipelineParams {
 	/// Color (RGB) blend function. If None - blending will be disabled for this pipeline.
 	/// Usual use case to get alpha-blending:
 	///```
-	///# use miniquad::{PipelineParams, BlendState, BlendValue, BlendFactor, Equation};
+	///# use miniquad_wasm_bindgen::{PipelineParams, BlendState, BlendValue, BlendFactor, Equation};
 	///PipelineParams {
 	///    color_blend: Some(BlendState::new(
 	///        Equation::Add,
@@ -668,7 +668,7 @@ pub struct PipelineParams {
 	/// On webgl canvas's resulting alpha channel will be used to blend the whole canvas background.
 	/// To avoid modifying only alpha channel, but keep usual transparency:
 	///```
-	///# use miniquad::{PipelineParams, BlendState, BlendValue, BlendFactor, Equation};
+	///# use miniquad_wasm_bindgen::{PipelineParams, BlendState, BlendValue, BlendFactor, Equation};
 	///PipelineParams {
 	///    color_blend: Some(BlendState::new(
 	///        Equation::Add,
@@ -770,7 +770,7 @@ pub struct BufferId(usize);
 ///
 /// The query is created using [`ElapsedQuery::new()`] function.
 /// ```
-/// use miniquad::graphics::ElapsedQuery;
+/// use miniquad_wasm_bindgen::graphics::ElapsedQuery;
 /// // initialization
 /// let mut query = ElapsedQuery::new();
 /// ```
@@ -778,11 +778,11 @@ pub struct BufferId(usize);
 /// [`ElapsedQuery::end_query()`]
 ///
 /// ```
-/// # use miniquad::graphics::ElapsedQuery;
+/// # use miniquad_wasm_bindgen::graphics::ElapsedQuery;
 /// # let mut query = ElapsedQuery::new();
 ///
 /// query.begin_query();
-/// // one or multiple calls to miniquad::GraphicsContext::draw()
+/// // one or multiple calls to miniquad_wasm_bindgen::GraphicsContext::draw()
 /// query.end_query();
 /// ```
 ///
@@ -791,7 +791,7 @@ pub struct BufferId(usize);
 ///
 /// ```
 /// // couple frames later:
-/// # use miniquad::graphics::ElapsedQuery;
+/// # use miniquad_wasm_bindgen::graphics::ElapsedQuery;
 /// # let mut query = ElapsedQuery::new();
 /// # query.begin_query();
 /// # query.end_query();
@@ -804,7 +804,7 @@ pub struct BufferId(usize);
 /// And during finalization:
 /// ```
 /// // clean-up
-/// # use miniquad::graphics::ElapsedQuery;
+/// # use miniquad_wasm_bindgen::graphics::ElapsedQuery;
 /// # let mut query = ElapsedQuery::new();
 /// # query.begin_query();
 /// # query.end_query();
@@ -1025,10 +1025,10 @@ pub struct ContextInfo {
 	/// allowing to see which glsl versions are actually supported.
 	/// Unfortunately, it only works on GL4.3+... and even there it is not quite correct.
 	///
-	/// miniquad will take a guess based on GL_VERSION_STRING, current platform and implementation details.
+	/// miniquad_wasm_bindgen will take a guess based on GL_VERSION_STRING, current platform and implementation details.
 	/// Would be all false on metal.
 	pub glsl_support: GlslSupport,
-	/// List of platform-dependent features that miniquad failed to make cross-platforms
+	/// List of platform-dependent features that miniquad_wasm_bindgen failed to make cross-platforms
 	/// and therefore they might be missing.
 	pub features: Features,
 }
@@ -1037,7 +1037,7 @@ pub trait RenderingBackend {
 	fn info(&self) -> ContextInfo;
 	/// For metal context's ShaderSource should contain MSL source string, for GL - glsl.
 	/// If in doubt, _most_ OpenGL contexts support "#version 100" glsl shaders.
-	/// So far miniquad never encountered where it can create a rendering context, but `version 100` shaders are not supported.
+	/// So far miniquad_wasm_bindgen never encountered where it can create a rendering context, but `version 100` shaders are not supported.
 	///
 	/// Typical `new_shader` invocation for an MSL and `glsl version 100` sources:
 	/// ```ignore
@@ -1166,7 +1166,7 @@ pub trait RenderingBackend {
 
 	/// Delete GPU buffer, leaving handle unmodified.
 	///
-	/// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
+	/// More high-level code on top of miniquad_wasm_bindgen probably is going to call this in Drop implementation of some
 	/// more RAII buffer object.
 	///
 	/// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why
@@ -1175,7 +1175,7 @@ pub trait RenderingBackend {
 
 	/// Delete GPU texture, leaving handle unmodified.
 	///
-	/// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
+	/// More high-level code on top of miniquad_wasm_bindgen probably is going to call this in Drop implementation of some
 	/// more RAII buffer object.
 	///
 	/// There is no protection against using deleted textures later. However its not a CPU-level UB and thats why

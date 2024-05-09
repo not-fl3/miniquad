@@ -11,7 +11,7 @@
 //! render to a lower-resolution framebuffer on HighDPI displays and the
 //! rendered content will be upscaled by the window system composer.
 //! In a HighDPI scenario, you still request the same window size during
-//! [`miniquad::start`](../fn.start.html), but the framebuffer sizes returned by [`Context::screen_size`](../graphics/struct.Context.html#method.screen_size)
+//! [`miniquad_wasm_bindgen::start`](../fn.start.html), but the framebuffer sizes returned by [`Context::screen_size`](../graphics/struct.Context.html#method.screen_size)
 //! will be scaled up according to the DPI scaling ratio.
 //! You can also get a DPI scaling factor with the function
 //! [`Context::dpi_scale`](../graphics/struct.Context.html#method.dpi_scale).
@@ -76,7 +76,7 @@ pub struct Platform {
 	/// try EGL. If EGL also fails - panic.
 	pub linux_x11_gl: LinuxX11Gl,
 
-	/// Wayland or X11. Defaults to X11WithWaylandFallback - miniquad will try
+	/// Wayland or X11. Defaults to X11WithWaylandFallback - miniquad_wasm_bindgen will try
 	/// to load "libX11.so", but if there is no - will try to initialize
 	/// through wayland natively. If both  fails (no graphics server at
 	/// all, like KMS) - will panic.

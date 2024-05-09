@@ -1,13 +1,16 @@
 [package]
-name = "miniquad"
-version = "0.4.0"
-authors = ["not-fl3 <not.fl3@gmail.com>"]
-edition = "2018"
+name = "miniquad-wasm-bindgen"
+version = "0.1.0"
+authors = [
+	"not-fl3 <not.fl3@gmail.com>",
+	"sokorototo <nyachiengatoto@gmail.com>",
+]
+edition = "2021"
 license = "MIT/Apache-2.0"
 homepage = "https://github.com/not-fl3/miniquad"
 repository = "https://github.com/not-fl3/miniquad"
 description = """
-Cross-platform window context and rendering library.
+Hard fork of miniquad with wasm-bindgen support.
 """
 readme = "README.md"
 exclude = ["examples/"]

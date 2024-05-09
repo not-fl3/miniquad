@@ -1,4 +1,4 @@
-use miniquad::*;
+use miniquad_wasm_bindgen::*;
 
 use glam::{vec3, Mat4};
 
@@ -190,11 +190,11 @@ fn main() {
 	let metal = std::env::args().nth(1).as_deref() == Some("metal");
 	conf.platform.apple_gfx_api = if metal { conf::AppleGfxApi::Metal } else { conf::AppleGfxApi::OpenGl };
 
-	miniquad::start(conf, move || Box::new(Stage::new()));
+	miniquad_wasm_bindgen::start(conf, move || Box::new(Stage::new()));
 }
 
 mod display_shader {
-	use miniquad::*;
+	use miniquad_wasm_bindgen::*;
 
 	pub const VERTEX: &str = r#"#version 100
     attribute vec4 in_pos;
@@ -278,7 +278,7 @@ mod display_shader {
 }
 
 mod offscreen_shader {
-	use miniquad::*;
+	use miniquad_wasm_bindgen::*;
 
 	pub const VERTEX: &str = r#"#version 100
     attribute vec3 in_pos;

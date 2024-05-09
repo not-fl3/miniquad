@@ -149,12 +149,12 @@ impl Texture {
 		unsafe {
 			glGenTextures(1, &mut texture as *mut _);
 			ctx.cache.bind_texture(0, params.kind.into(), texture);
-			glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad_wasm_bindgen always uses row alignment of 1
 
 			if cfg!(not(target_arch = "wasm32")) {
 				// if not WASM
 				if params.format == TextureFormat::Alpha {
-					// if alpha miniquad texture, the value on non-WASM is stored in red channel
+					// if alpha miniquad_wasm_bindgen texture, the value on non-WASM is stored in red channel
 					// swizzle red -> alpha
 					glTexParameteri(params.kind.into(), GL_TEXTURE_SWIZZLE_A, GL_RED as _);
 				} else {
@@ -294,12 +294,12 @@ impl Texture {
 		let (_, format, pixel_type) = self.params.format.into();
 
 		unsafe {
-			glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad always uses row alignment of 1
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // miniquad_wasm_bindgen always uses row alignment of 1
 
 			if cfg!(not(target_arch = "wasm32")) {
 				// if not WASM
 				if self.params.format == TextureFormat::Alpha {
-					// if alpha miniquad texture, the value on non-WASM is stored in red channel
+					// if alpha miniquad_wasm_bindgen texture, the value on non-WASM is stored in red channel
 					// swizzle red -> alpha
 					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED as _);
 				} else {
@@ -418,6 +418,7 @@ impl GlContext {
 
 			glGenVertexArrays(1, &mut vao as *mut _);
 			glBindVertexArray(vao);
+
 			GlContext {
 				default_framebuffer,
 				shaders: vec![],
@@ -654,10 +655,10 @@ impl RenderingBackend for GlContext {
 		// It was tested on really old windows machines, virtual machines etc. glsl100 always works!
 		glsl_support.v100 = true;
 
-		// on wasm miniquad always creates webgl1 context, with the only glsl available being version 100
+		// on wasm miniquad_wasm_bindgen always creates webgl1 context, with the only glsl available being version 100
 		#[cfg(target_arch = "wasm32")]
 		{
-			// on web, miniquad always loads EXT_shader_texture_lod and OES_standard_derivatives
+			// on web, miniquad_wasm_bindgen always loads EXT_shader_texture_lod and OES_standard_derivatives
 			glsl_support.v100_ext = true;
 		}
 
@@ -1031,7 +1032,7 @@ impl RenderingBackend for GlContext {
 
 	/// Delete GPU buffer, leaving handle unmodified.
 	///
-	/// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
+	/// More high-level code on top of miniquad_wasm_bindgen probably is going to call this in Drop implementation of some
 	/// more RAII buffer object.
 	///
 	/// There is no protection against using deleted textures later. However its not an UB in OpenGl and thats why

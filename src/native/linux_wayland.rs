@@ -200,7 +200,7 @@ unsafe extern "C" fn pointer_handle_axis(_data: *mut ::std::os::raw::c_void, _wl
 	// https://wayland-book.com/seat/pointer.html
 	if axis == 0 {
 		// Vertical scroll
-		// Wayland defines the direction differently to miniquad so lets flip it
+		// Wayland defines the direction differently to miniquad_wasm_bindgen so lets flip it
 		value = -value;
 		EVENTS.push(WaylandEvent::PointerAxis(0.0, value));
 	} else if axis == 1 {

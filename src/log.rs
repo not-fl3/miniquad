@@ -145,7 +145,7 @@ macro_rules! trace {
 
 /// log-rs used `macro_export(local_inner_macros)` instead of $crate::log! to support older rustc version
 /// but actually there is an other difference - $crate::log does not support macros reexport :(
-/// so even miniquad is fine with 1.31+ rustc version, we need to use local_inner_macros as well
+/// so even miniquad_wasm_bindgen is fine with 1.31+ rustc version, we need to use local_inner_macros as well
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __log_format_args {
