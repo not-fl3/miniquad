@@ -51,8 +51,18 @@ web-sys = { version = "0.3", features = [
 	"Clipboard",
 	"MouseEvent",
 	"DomRect",
+	"DomRectReadOnly",
 	"WheelEvent",
-	"KeyboardEvent"
+	"KeyboardEvent",
+	"ResizeObserver",
+	"ResizeObserverEntry",
+	"TouchEvent",
+	"TouchList",
+	"Touch",
+	"DragEvent",
+	"DataTransfer",
+	"File",
+	"FileList",
 ] }
 console_error_panic_hook = "0.1"
 pollster = "0.3.0"

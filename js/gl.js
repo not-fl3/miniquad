@@ -21,8 +21,6 @@ var clipboard = null;
 var plugins = [];
 var wasm_memory;
 
-var high_dpi = false;
-
 canvas.focus();
 
 canvas.requestPointerLock = canvas.requestPointerLock ||
@@ -364,25 +362,6 @@ function _webglGet(name_, p, type) {
 var Module;
 var wasm_exports;
 
-// resizes the canvas window, and calls on_resize if it is defined
-function resize(canvas, on_resize) {
-    var dpr = dpi_scale();
-    var displayWidth = canvas.clientWidth * dpr;
-    var displayHeight = canvas.clientHeight * dpr;
-
-    if (canvas.width != displayWidth ||
-        canvas.height != displayHeight) {
-        canvas.width = displayWidth;
-        canvas.height = displayHeight;
-        if (on_resize != undefined)
-            on_resize(Math.floor(displayWidth), Math.floor(displayHeight))
-    }
-}
-
-function animation() {
-    wasm_exports.frame();
-    window.requestAnimationFrame(animation);
-}
 
 const SAPP_EVENTTYPE_TOUCHES_BEGAN = 10;
 const SAPP_EVENTTYPE_TOUCHES_MOVED = 11;
@@ -393,148 +372,6 @@ const SAPP_MODIFIER_SHIFT = 1;
 const SAPP_MODIFIER_CTRL = 2;
 const SAPP_MODIFIER_ALT = 4;
 const SAPP_MODIFIER_SUPER = 8;
-
-function into_sapp_mousebutton(btn) {
-    switch (btn) {
-        case 0: return 0;
-        case 1: return 2;
-        case 2: return 1;
-        default: return btn;
-    }
-}
-
-function into_sapp_keycode(key_code) {
-    switch (key_code) {
-        case "Space": return 32;
-        case "Quote": return 222;
-        case "Comma": return 44;
-        case "Minus": return 45;
-        case "Period": return 46;
-        case "Slash": return 189;
-        case "Digit0": return 48;
-        case "Digit1": return 49;
-        case "Digit2": return 50;
-        case "Digit3": return 51;
-        case "Digit4": return 52;
-        case "Digit5": return 53;
-        case "Digit6": return 54;
-        case "Digit7": return 55;
-        case "Digit8": return 56;
-        case "Digit9": return 57;
-        case "Semicolon": return 59;
-        case "Equal": return 61;
-        case "KeyA": return 65;
-        case "KeyB": return 66;
-        case "KeyC": return 67;
-        case "KeyD": return 68;
-        case "KeyE": return 69;
-        case "KeyF": return 70;
-        case "KeyG": return 71;
-        case "KeyH": return 72;
-        case "KeyI": return 73;
-        case "KeyJ": return 74;
-        case "KeyK": return 75;
-        case "KeyL": return 76;
-        case "KeyM": return 77;
-        case "KeyN": return 78;
-        case "KeyO": return 79;
-        case "KeyP": return 80;
-        case "KeyQ": return 81;
-        case "KeyR": return 82;
-        case "KeyS": return 83;
-        case "KeyT": return 84;
-        case "KeyU": return 85;
-        case "KeyV": return 86;
-        case "KeyW": return 87;
-        case "KeyX": return 88;
-        case "KeyY": return 89;
-        case "KeyZ": return 90;
-        case "BracketLeft": return 91;
-        case "Backslash": return 92;
-        case "BracketRight": return 93;
-        case "Backquote": return 96;
-        case "Escape": return 256;
-        case "Enter": return 257;
-        case "Tab": return 258;
-        case "Backspace": return 259;
-        case "Insert": return 260;
-        case "Delete": return 261;
-        case "ArrowRight": return 262;
-        case "ArrowLeft": return 263;
-        case "ArrowDown": return 264;
-        case "ArrowUp": return 265;
-        case "PageUp": return 266;
-        case "PageDown": return 267;
-        case "Home": return 268;
-        case "End": return 269;
-        case "CapsLock": return 280;
-        case "ScrollLock": return 281;
-        case "NumLock": return 282;
-        case "PrintScreen": return 283;
-        case "Pause": return 284;
-        case "F1": return 290;
-        case "F2": return 291;
-        case "F3": return 292;
-        case "F4": return 293;
-        case "F5": return 294;
-        case "F6": return 295;
-        case "F7": return 296;
-        case "F8": return 297;
-        case "F9": return 298;
-        case "F10": return 299;
-        case "F11": return 300;
-        case "F12": return 301;
-        case "F13": return 302;
-        case "F14": return 303;
-        case "F15": return 304;
-        case "F16": return 305;
-        case "F17": return 306;
-        case "F18": return 307;
-        case "F19": return 308;
-        case "F20": return 309;
-        case "F21": return 310;
-        case "F22": return 311;
-        case "F23": return 312;
-        case "F24": return 313;
-        case "Numpad0": return 320;
-        case "Numpad1": return 321;
-        case "Numpad2": return 322;
-        case "Numpad3": return 323;
-        case "Numpad4": return 324;
-        case "Numpad5": return 325;
-        case "Numpad6": return 326;
-        case "Numpad7": return 327;
-        case "Numpad8": return 328;
-        case "Numpad9": return 329;
-        case "NumpadDecimal": return 330;
-        case "NumpadDivide": return 331;
-        case "NumpadMultiply": return 332;
-        case "NumpadSubtract": return 333;
-        case "NumpadAdd": return 334;
-        case "NumpadEnter": return 335;
-        case "NumpadEqual": return 336;
-        case "ShiftLeft": return 340;
-        case "ControlLeft": return 341;
-        case "AltLeft": return 342;
-        case "OSLeft": return 343;
-        case "ShiftRight": return 344;
-        case "ControlRight": return 345;
-        case "AltRight": return 346;
-        case "OSRight": return 347;
-        case "ContextMenu": return 348;
-    }
-
-    console.log("Unsupported keyboard key: ", key_code)
-}
-
-// Returns window.devicePixelRatio if high_dpi is true, otherwise 1.0
-function dpi_scale() {
-    if (high_dpi) {
-        return window.devicePixelRatio || 1.0;
-    } else {
-        return 1.0;
-    }
-}
 
 function texture_size(internalFormat, width, height) {
     if (internalFormat == gl.ALPHA) {
@@ -548,17 +385,6 @@ function texture_size(internalFormat, width, height) {
         return width * height * 3;
     }
 }
-
-function mouse_relative_position(clientX, clientY) {
-    var targetRect = canvas.getBoundingClientRect();
-
-    var x = (clientX - targetRect.left) * dpi_scale();
-    var y = (clientY - targetRect.top) * dpi_scale();
-
-    return { x, y };
-}
-
-var emscripten_shaders_hack = false;
 
 var importObject = {
     env: {
@@ -576,9 +402,6 @@ var importObject = {
         },
         console_error: function (ptr) {
             console.error(UTF8ToString(ptr));
-        },
-        set_emscripten_shader_hack: function (flag) {
-            emscripten_shaders_hack = flag;
         },
         sapp_clipboard_write: function (ptr, len) {
             clipboard = UTF8ToString(ptr, len);
@@ -873,37 +696,6 @@ var importObject = {
         glShaderSource: function (shader, count, string, length) {
             GL.validateGLObjectID(GL.shaders, shader, 'glShaderSource', 'shader');
             var source = GL.getSource(shader, count, string, length);
-
-            // https://github.com/emscripten-core/emscripten/blob/incoming/src/library_webgl.js#L2708
-            if (emscripten_shaders_hack) {
-                source = source.replace(/#extension GL_OES_standard_derivatives : enable/g, "");
-                source = source.replace(/#extension GL_EXT_shader_texture_lod : enable/g, '');
-                var prelude = '';
-                if (source.indexOf('gl_FragColor') != -1) {
-                    prelude += 'out mediump vec4 GL_FragColor;\n';
-                    source = source.replace(/gl_FragColor/g, 'GL_FragColor');
-                }
-                if (source.indexOf('attribute') != -1) {
-                    source = source.replace(/attribute/g, 'in');
-                    source = source.replace(/varying/g, 'out');
-                } else {
-                    source = source.replace(/varying/g, 'in');
-                }
-
-                source = source.replace(/textureCubeLodEXT/g, 'textureCubeLod');
-                source = source.replace(/texture2DLodEXT/g, 'texture2DLod');
-                source = source.replace(/texture2DProjLodEXT/g, 'texture2DProjLod');
-                source = source.replace(/texture2DGradEXT/g, 'texture2DGrad');
-                source = source.replace(/texture2DProjGradEXT/g, 'texture2DProjGrad');
-                source = source.replace(/textureCubeGradEXT/g, 'textureCubeGrad');
-
-                source = source.replace(/textureCube/g, 'texture');
-                source = source.replace(/texture1D/g, 'texture');
-                source = source.replace(/texture2D/g, 'texture');
-                source = source.replace(/texture3D/g, 'texture');
-                source = source.replace(/#version 100/g, '#version 300 es\n' + prelude);
-            }
-
             gl.shaderSource(GL.shaders[shader], source);
         },
         glGetProgramInfoLog: function (program, maxLength, length, infoLog) {
@@ -1040,209 +832,6 @@ var importObject = {
         },
         glGenerateMipmap: function (index) {
             gl.generateMipmap(index);
-        },
-
-        run_animation_loop: () => {
-            canvas.onmousemove = function (event) {
-                var relative_position = mouse_relative_position(event.clientX, event.clientY);
-                var x = relative_position.x;
-                var y = relative_position.y;
-
-                // TODO: do not send mouse_move when cursor is captured
-                wasm_exports.mouse_move(Math.floor(x), Math.floor(y));
-
-                // TODO: check that mouse is captured?
-                if (event.movementX != 0 || event.movementY != 0) {
-                    wasm_exports.raw_mouse_move(Math.floor(event.movementX), Math.floor(event.movementY));
-                }
-            };
-            canvas.onmousedown = function (event) {
-                var relative_position = mouse_relative_position(event.clientX, event.clientY);
-                var x = relative_position.x;
-                var y = relative_position.y;
-
-                var btn = into_sapp_mousebutton(event.button);
-                wasm_exports.mouse_down(x, y, btn);
-            };
-            // SO WEB SO CONSISTENT
-            canvas.addEventListener('wheel',
-                function (event) {
-                    event.preventDefault();
-                    wasm_exports.mouse_wheel(-event.deltaX, -event.deltaY);
-                });
-            canvas.onmouseup = function (event) {
-                var relative_position = mouse_relative_position(event.clientX, event.clientY);
-                var x = relative_position.x;
-                var y = relative_position.y;
-
-                var btn = into_sapp_mousebutton(event.button);
-                wasm_exports.mouse_up(x, y, btn);
-            };
-            canvas.onkeydown = function (event) {
-                var sapp_key_code = into_sapp_keycode(event.code);
-                switch (sapp_key_code) {
-                    //  space, arrows - prevent scrolling of the page
-                    case 32: case 262: case 263: case 264: case 265:
-                    // F1-F10
-                    case 290: case 291: case 292: case 293: case 294: case 295: case 296: case 297: case 298: case 299:
-                    // backspace is Back on Firefox/Windows
-                    case 259:
-                    // tab - for UI
-                    case 258:
-                    // quote and slash are Quick Find on Firefox
-                    case 39: case 47:
-                        event.preventDefault();
-                        break;
-                }
-
-                var modifiers = 0;
-                if (event.ctrlKey) {
-                    modifiers |= SAPP_MODIFIER_CTRL;
-                }
-                if (event.shiftKey) {
-                    modifiers |= SAPP_MODIFIER_SHIFT;
-                }
-                if (event.altKey) {
-                    modifiers |= SAPP_MODIFIER_ALT;
-                }
-                wasm_exports.key_down(sapp_key_code, modifiers, event.repeat);
-                // for "space", "quote", and "slash" preventDefault will prevent
-                // key_press event, so send it here instead
-                if (sapp_key_code == 32 || sapp_key_code == 39 || sapp_key_code == 47) {
-                    wasm_exports.key_press(sapp_key_code);
-                }
-            };
-            canvas.onkeyup = function (event) {
-                var sapp_key_code = into_sapp_keycode(event.code);
-
-                var modifiers = 0;
-                if (event.ctrlKey) {
-                    modifiers |= SAPP_MODIFIER_CTRL;
-                }
-                if (event.shiftKey) {
-                    modifiers |= SAPP_MODIFIER_SHIFT;
-                }
-                if (event.altKey) {
-                    modifiers |= SAPP_MODIFIER_ALT;
-                }
-
-                wasm_exports.key_up(sapp_key_code, modifiers);
-            };
-            canvas.onkeypress = function (event) {
-                var sapp_key_code = into_sapp_keycode(event.code);
-
-                // firefox do not send onkeypress events for ctrl+keys and delete key while chrome do
-                // workaround to make this behavior consistent
-                let chrome_only = sapp_key_code == 261 || event.ctrlKey;
-                if (chrome_only == false) {
-                    wasm_exports.key_press(event.charCode);
-                }
-            };
-
-            canvas.addEventListener("touchstart", function (event) {
-                event.preventDefault();
-
-                for (const touch of event.changedTouches) {
-                    let relative_position = mouse_relative_position(touch.clientX, touch.clientY);
-                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_BEGAN, touch.identifier, relative_position.x, relative_position.y);
-                }
-            });
-            canvas.addEventListener("touchend", function (event) {
-                event.preventDefault();
-
-                for (const touch of event.changedTouches) {
-                    let relative_position = mouse_relative_position(touch.clientX, touch.clientY);
-                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_ENDED, touch.identifier, relative_position.x, relative_position.y);
-                }
-            });
-            canvas.addEventListener("touchcancel", function (event) {
-                event.preventDefault();
-
-                for (const touch of event.changedTouches) {
-                    let relative_position = mouse_relative_position(touch.clientX, touch.clientY);
-                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_CANCELED, touch.identifier, relative_position.x, relative_position.y);
-                }
-            });
-            canvas.addEventListener("touchmove", function (event) {
-                event.preventDefault();
-
-                for (const touch of event.changedTouches) {
-                    let relative_position = mouse_relative_position(touch.clientX, touch.clientY);
-                    wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_MOVED, touch.identifier, relative_position.x, relative_position.y);
-                }
-            });
-
-            window.onresize = function () {
-                resize(canvas, wasm_exports.resize);
-            };
-            window.addEventListener("copy", function (e) {
-                if (clipboard != null) {
-                    event.clipboardData.setData('text/plain', clipboard);
-                    event.preventDefault();
-                }
-            });
-            window.addEventListener("cut", function (e) {
-                if (clipboard != null) {
-                    event.clipboardData.setData('text/plain', clipboard);
-                    event.preventDefault();
-                }
-            });
-
-            window.addEventListener("paste", function (e) {
-                e.stopPropagation();
-                e.preventDefault();
-                var clipboardData = e.clipboardData || window.clipboardData;
-                var pastedData = clipboardData.getData('Text');
-
-                if (pastedData != undefined && pastedData != null && pastedData.length != 0) {
-                    var len = (new TextEncoder().encode(pastedData)).length;
-                    var msg = wasm_exports.allocate_vec_u8(len);
-                    var heap = new Uint8Array(wasm_memory.buffer, msg, len);
-                    stringToUTF8(pastedData, heap, 0, len);
-                    wasm_exports.on_clipboard_paste(msg, len);
-                }
-            });
-
-            window.ondragover = function (e) {
-                e.preventDefault();
-            };
-
-            window.ondrop = async function (e) {
-                e.preventDefault();
-
-                wasm_exports.on_files_dropped_start();
-
-                for (let file of e.dataTransfer.files) {
-                    const nameLen = file.name.length;
-                    const nameVec = wasm_exports.allocate_vec_u8(nameLen);
-                    const nameHeap = new Uint8Array(wasm_memory.buffer, nameVec, nameLen);
-                    stringToUTF8(file.name, nameHeap, 0, nameLen);
-
-                    const fileBuf = await file.arrayBuffer();
-                    const fileLen = fileBuf.byteLength;
-                    const fileVec = wasm_exports.allocate_vec_u8(fileLen);
-                    const fileHeap = new Uint8Array(wasm_memory.buffer, fileVec, fileLen);
-                    fileHeap.set(new Uint8Array(fileBuf), 0);
-
-                    wasm_exports.on_file_dropped(nameVec, nameLen, fileVec, fileLen);
-                }
-
-                wasm_exports.on_files_dropped_finish();
-            };
-
-            let lastFocus = document.hasFocus();
-            var checkFocus = function () {
-                let hasFocus = document.hasFocus();
-                if (lastFocus == hasFocus) {
-                    wasm_exports.focus(hasFocus);
-                    lastFocus = hasFocus;
-                }
-            }
-            document.addEventListener("visibilitychange", checkFocus);
-            window.addEventListener("focus", checkFocus);
-            window.addEventListener("blur", checkFocus);
-
-            window.requestAnimationFrame(animation);
         },
 
         fs_load_file: function (ptr, len) {
