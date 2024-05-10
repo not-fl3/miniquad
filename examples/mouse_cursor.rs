@@ -14,6 +14,14 @@ impl EventHandler for Stage {
 		}
 	}
 
+	fn raw_mouse_motion(&mut self, dx: f32, dy: f32) {
+		println!("Mouse moved by: {} {}", dx, dy);
+	}
+
+	fn mouse_motion_event(&mut self, _x: f32, _y: f32) {
+		println!("Raw Mouse moved to: {} {}", _x, _y);
+	}
+
 	fn mouse_button_down_event(&mut self, button: MouseButton, _: f32, _: f32) {
 		static CURSORS: [CursorIcon; 12] = [
 			CursorIcon::Default,
