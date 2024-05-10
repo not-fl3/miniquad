@@ -4,7 +4,8 @@ use crate::native::ios;
 #[derive(Debug)]
 pub enum Error {
 	IOError(std::io::Error),
-	DownloadFailed,
+	/// XmlHttpRequest failed, contains status text
+	DownloadFailed(String),
 	AndroidAssetLoadingError,
 	/// MainBundle pathForResource returned null
 	IOSAssetNoSuchFile,
@@ -72,7 +73,7 @@ fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
 mod wasm {
 	use super::{Error, Response};
 
-	use wasm_bindgen::{closure::Closure, JsCast};
+	use wasm_bindgen::{closure::Closure, JsCast, UnwrapThrowExt};
 	use web_sys::{js_sys, XmlHttpRequest};
 
 	pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
@@ -80,14 +81,14 @@ mod wasm {
 			if xhr.open("GET", path).is_ok() {
 				xhr.set_response_type(web_sys::XmlHttpRequestResponseType::Arraybuffer);
 
-				let xhr_clone = xhr.clone();
-				let callback: Closure<dyn Fn()> = Closure::new(move || {
-					match xhr_clone.response() {
+				let xhr_1 = xhr.clone();
+				let present: Closure<dyn Fn()> = Closure::new(move || {
+					match xhr_1.response() {
 						Ok(d) => {
-							if xhr_clone.status().unwrap() != 200 {
+							if xhr_1.status().unwrap() != 200 {
 								#[cfg(feature = "log-impl")]
-								crate::error!("XmlHttpRequest failed: {:?}", xhr_clone.status_text().unwrap());
-								on_loaded(Err(Error::DownloadFailed));
+								crate::error!("XmlHttpRequest failed: {:?}", xhr_1.status_text().unwrap());
+								on_loaded(Err(Error::DownloadFailed(xhr_1.status_text().unwrap_throw())));
 							} else {
 								let array = d.dyn_into::<js_sys::ArrayBuffer>().unwrap();
 								let array = js_sys::Uint8Array::new(&array).to_vec();
@@ -97,16 +98,17 @@ mod wasm {
 						Err(_e) => {
 							#[cfg(feature = "log-impl")]
 							crate::error!("XmlHttpRequest failed: {:?}", _e);
-							on_loaded(Err(Error::DownloadFailed));
+							on_loaded(Err(Error::DownloadFailed(xhr_1.status_text().unwrap_throw())));
 						}
 					};
 				});
 
-				xhr.set_onload(Some(callback.as_ref().unchecked_ref()));
+				xhr.set_onerror(Some(present.as_ref().unchecked_ref()));
+				xhr.set_onload(Some(present.as_ref().unchecked_ref()));
 			} else {
 				#[cfg(feature = "log-impl")]
 				crate::error!("Unable to open XmlHttpRequest");
-				on_loaded(Err(Error::DownloadFailed));
+				on_loaded(Err(Error::DownloadFailed(xhr.status_text().unwrap_throw())));
 			};
 		}
 	}

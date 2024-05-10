@@ -254,6 +254,7 @@ pub const GL_QUERY_RESULT_AVAILABLE: u32 = 34919;
 pub const GL_VENDOR: u32 = 0x1F00;
 pub const GL_VERSION: u32 = 0x1F02;
 pub const GL_SHADING_LANGUAGE_VERSION: GLenum = 0x8B8C;
+pub const GL_SHADER_COMPILER: GLenum = 0x8DFA;
 pub const GL_TEXTURE_BASE_LEVEL: GLenum = 0x813C;
 pub const GL_TEXTURE_MAX_LEVEL: GLenum = 0x813D;
 pub const GL_TEXTURE_CUBE_MAP_SEAMLESS: GLenum = 0x884F;
@@ -318,6 +319,23 @@ pub unsafe fn glGetIntegerv(pname: GLenum, data: *mut GLint) {
 		let error = format!("GL_INVALID_VALUE in glGet EM_FUNC_SIG_PARAM_I v(name={}) : Function called with null out pointer!", pname);
 		throw_str(&error)
 	});
+
+	let mut ret: Option<isize> = None;
+	match pname {
+		// GL_SHADER_COMPILER
+		0x8DFA => {
+			ret = Some(1);
+		}
+		// GL_NUM_PROGRAM_BINARY_FORMATS, GL_NUM_SHADER_BINARY_FORMATS
+		0x87FE | 0x8DF9 => {
+			ret = Some(0);
+		}
+		// GL_NUM_COMPRESSED_TEXTURE_FORMATS
+		0x86A2 => {
+			ret = Some(0);
+		}
+		_ => {}
+	}
 }
 
 extern "C" {

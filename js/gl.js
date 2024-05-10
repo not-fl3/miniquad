@@ -153,6 +153,11 @@ var GL = {
     timerQueries: [],
     contexts: {},
     programInfos: {},
+    errors: [],
+
+    recordError(error) {
+        GL.errors.push(error);
+    },
 
     getNewId: function (table) {
         var ret = GL.counter++;
@@ -786,17 +791,6 @@ var importObject = {
 };
 
 
-function register_plugins(plugins) {
-    if (plugins == undefined)
-        return;
-
-    for (var i = 0; i < plugins.length; i++) {
-        if (plugins[i].register_plugin != undefined && plugins[i].register_plugin != null) {
-            plugins[i].register_plugin(importObject);
-        }
-    }
-}
-
 function u32_to_semver(crate_version) {
     let major_version = (crate_version >> 24) & 0xff;
     let minor_version = (crate_version >> 16) & 0xff;
@@ -834,11 +828,6 @@ function init_plugins(plugins) {
     }
 }
 
-
-function miniquad_add_plugin(plugin) {
-    plugins.push(plugin);
-}
-
 // read module imports and create fake functions in import object
 // this is will allow to successfeully link wasm even with wrong version of gl.js
 // needed to workaround firefox bug with lost error on wasm linking errors
@@ -855,59 +844,27 @@ function add_missing_functions_stabs(obj) {
     }
 }
 
-function load(wasm_path) {
+async function load(wasm_path) {
     var req = fetch(wasm_path);
 
-    register_plugins(plugins);
-
-    if (typeof WebAssembly.compileStreaming === 'function') {
-        WebAssembly.compileStreaming(req)
-            .then(obj => {
-                add_missing_functions_stabs(obj);
-                return WebAssembly.instantiate(obj, importObject);
-            })
-            .then(
-                obj => {
-                    wasm_memory = obj.exports.memory;
-                    wasm_exports = obj.exports;
-
-                    var crate_version = u32_to_semver(wasm_exports.crate_version());
-                    if (version != crate_version) {
-                        console.error(
-                            "Version mismatch: gl.js version is: " + version +
-                            ", miniquad crate version is: " + crate_version);
-                    }
-                    init_plugins(plugins);
-                    obj.exports.main();
-                })
-            .catch(err => {
-                console.error("WASM failed to load, probably incompatible gl.js version");
-                console.error(err);
-            })
-    } else {
-        req
-            .then(function (x) { return x.arrayBuffer(); })
-            .then(function (bytes) { return WebAssembly.compile(bytes); })
-            .then(function (obj) {
-                add_missing_functions_stabs(obj);
-                return WebAssembly.instantiate(obj, importObject);
-            })
-            .then(function (obj) {
-                wasm_memory = obj.exports.memory;
-                wasm_exports = obj.exports;
-
-                var crate_version = u32_to_semver(wasm_exports.crate_version());
-                if (version != crate_version) {
-                    console.error(
-                        "Version mismatch: gl.js version is: " + version +
-                        ", rust sapp-wasm crate version is: " + crate_version);
-                }
-                init_plugins(plugins);
-                obj.exports.main();
-            })
-            .catch(err => {
-                console.error("WASM failed to load, probably incompatible gl.js version");
-                console.error(err);
-            });
+    // register plugins
+    if (!Array.isArray(plugins)) return;
+    for (var i = 0; i < plugins.length; i++) {
+        if (plugins[i].register_plugin != undefined && plugins[i].register_plugin != null) {
+            plugins[i].register_plugin(importObject);
+        }
     }
+
+    // Compile and instantiate the module
+    let module = await WebAssembly.compileStreaming(req);
+    add_missing_functions_stabs(module);
+    let instance = await WebAssembly.instantiate(module, importObject);
+
+    // Get the exports
+    wasm_memory = instance.exports.memory;
+    wasm_exports = instance.exports;
+
+    // start
+    init_plugins(plugins);
+    wasm_exports.main();
 }
