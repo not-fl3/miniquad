@@ -86,18 +86,18 @@ wayland_interface!(
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub(crate) struct xdg_wm_base_listener {
-	pub ping: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_wm_base, _: u32) -> ()>,
+	pub ping: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_wm_base, _: u32) >,
 }
 
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub(crate) struct xdg_surface_listener {
-	pub configure: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_surface, _: u32) -> ()>,
+	pub configure: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_surface, _: u32) >,
 }
 
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub(crate) struct xdg_toplevel_listener {
-	pub configure: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_toplevel, _: i32, _: i32, _: *mut wl_array) -> ()>,
-	pub close: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_toplevel) -> ()>,
+	pub configure: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_toplevel, _: i32, _: i32, _: *mut wl_array) >,
+	pub close: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_toplevel) >,
 }

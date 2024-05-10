@@ -268,7 +268,7 @@ unsafe extern "C" fn xdg_toplevel_handle_close(data: *mut std::ffi::c_void, _xdg
 	payload.closed = true;
 }
 
-unsafe extern "C" fn xdg_toplevel_handle_configure(data: *mut std::ffi::c_void, _toplevel: *mut extensions::xdg_shell::xdg_toplevel, width: i32, height: i32, _states: *mut wl_array) -> () {
+unsafe extern "C" fn xdg_toplevel_handle_configure(data: *mut std::ffi::c_void, _toplevel: *mut extensions::xdg_shell::xdg_toplevel, width: i32, height: i32, _states: *mut wl_array) {
 	assert!(!data.is_null());
 	let payload: &mut WaylandPayload = &mut *(data as *mut _);
 	let mut d = crate::native_display().lock().unwrap();
@@ -297,7 +297,7 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(data: *mut std::ffi::c_void, 
 	}
 }
 
-unsafe extern "C" fn xdg_wm_base_handle_ping(data: *mut std::ffi::c_void, toplevel: *mut extensions::xdg_shell::xdg_wm_base, serial: u32) -> () {
+unsafe extern "C" fn xdg_wm_base_handle_ping(data: *mut std::ffi::c_void, toplevel: *mut extensions::xdg_shell::xdg_wm_base, serial: u32) {
 	assert!(!data.is_null());
 	let payload: &mut WaylandPayload = &mut *(data as *mut _);
 

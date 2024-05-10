@@ -44,21 +44,21 @@ pub type GLuint64 = ::std::os::raw::c_ulonglong;
 pub type GLsizei = ::std::os::raw::c_int;
 pub type GLchar = ::std::os::raw::c_char;
 
-pub type PFNGLXDESTROYCONTEXTPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXContext) -> ()>;
-pub type PFNGLXDESTROYWINDOWPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXWindow) -> ()>;
-pub type PFNGLXSWAPBUFFERSPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXDrawable) -> ()>;
+pub type PFNGLXDESTROYCONTEXTPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXContext) >;
+pub type PFNGLXDESTROYWINDOWPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXWindow) >;
+pub type PFNGLXSWAPBUFFERSPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXDrawable) >;
 
 pub type PFNGLXGETFBCONFIGATTRIBPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXFBConfig, _: libc::c_int, _: *mut libc::c_int) -> libc::c_int>;
 pub type PFNGLXGETFBCONFIGSPROC = Option<unsafe extern "C" fn(_: *mut Display, _: libc::c_int, _: *mut libc::c_int) -> *mut GLXFBConfig>;
 pub type PFNGLXMAKECURRENTPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXDrawable, _: GLXContext) -> libc::c_int>;
 pub type PFNGLXSWAPINTERVALMESAPROC = Option<unsafe extern "C" fn(_: libc::c_int) -> libc::c_int>;
-pub type PFNGLXSWAPINTERVALEXTPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXDrawable, _: libc::c_int) -> ()>;
+pub type PFNGLXSWAPINTERVALEXTPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXDrawable, _: libc::c_int) >;
 pub type PFNGLXGETCLIENTSTRINGPROC = Option<unsafe extern "C" fn(_: *mut Display, _: libc::c_int) -> *const libc::c_char>;
 pub type PFNGLXCREATEWINDOWPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXFBConfig, _: Window, _: *const libc::c_int) -> GLXWindow>;
 pub type PFNGLXCREATECONTEXTATTRIBSARBPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXFBConfig, _: GLXContext, _: libc::c_int, _: *const libc::c_int) -> GLXContext>;
 pub type PFNGLXGETVISUALFROMFBCONFIGPROC = Option<unsafe extern "C" fn(_: *mut Display, _: GLXFBConfig) -> *mut XVisualInfo>;
 pub type PFNGLXQUERYEXTENSIONSSTRINGPROC = Option<unsafe extern "C" fn(_: *mut Display, _: libc::c_int) -> *const libc::c_char>;
-pub type __GLXextproc = Option<unsafe extern "C" fn() -> ()>;
+pub type __GLXextproc = Option<unsafe extern "C" fn() >;
 pub type PFNGLXGETPROCADDRESSPROC = Option<unsafe extern "C" fn(_: *const GLubyte) -> __GLXextproc>;
 pub type PFNGLXQUERYVERSIONPROC = Option<unsafe extern "C" fn(_: *mut Display, _: *mut libc::c_int, _: *mut libc::c_int) -> libc::c_int>;
 pub type PFNGLXQUERYEXTENSIONPROC = Option<unsafe extern "C" fn(_: *mut Display, _: *mut libc::c_int, _: *mut libc::c_int) -> libc::c_int>;
@@ -108,7 +108,7 @@ impl LibGlx {
 			.ok()
 	}
 
-	pub unsafe fn get_procaddr(&self, procname: &str) -> Option<unsafe extern "C" fn() -> ()> {
+	pub unsafe fn get_procaddr(&self, procname: &str) -> Option<unsafe extern "C" fn() > {
 		if self.glxGetProcAddress.is_some() {
 			let name = std::ffi::CString::new(procname).unwrap();
 			self.glxGetProcAddress.expect("non-null function pointer")(name.as_ptr() as _)

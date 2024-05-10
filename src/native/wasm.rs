@@ -447,7 +447,7 @@ fn init_file_drop_events(canvas: &HtmlCanvasElement) {
 				let count = files.length();
 
 				let mut paths = Vec::with_capacity(count as _);
-				let mut bytes = Vec::<Vec<u8>>::with_capacity(count as _);
+				let mut bytes = Vec::with_capacity(count as _);
 
 				for i in 0..count {
 					if let Some(file) = files.item(i) {
@@ -548,7 +548,7 @@ impl Clipboard {
 
 impl crate::native::Clipboard for Clipboard {
 	fn get(&mut self) -> Option<String> {
-		self.0.borrow_mut().take()
+		self.0.borrow_mut().clone()
 	}
 
 	fn set(&mut self, data: &str) {
