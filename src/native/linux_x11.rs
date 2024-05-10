@@ -61,6 +61,7 @@ impl X11Display {
 				let x = (*event).xmotion.x as libc::c_float;
 				let y = (*event).xmotion.y as libc::c_float;
 
+				// TODO: Needs further testing for MOUSE4 and MOUSE5
 				match btn {
 					crate::event::MouseButton::Other(o) => match o {
 						4 => event_handler.mouse_wheel_event(0.0, 1.0),

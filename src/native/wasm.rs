@@ -4,7 +4,7 @@ pub mod webgl;
 use wasm_bindgen::{closure::Closure, JsCast, UnwrapThrowExt};
 use web_sys::*;
 
-use std::{path::PathBuf, sync::mpsc::Receiver};
+use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::mpsc::Receiver};
 
 use crate::{
 	event::EventHandler,
@@ -63,7 +63,7 @@ where
 	let (tx, rx) = std::sync::mpsc::channel();
 
 	// setup display
-	let display = NativeDisplayData::new(main_canvas.width() as _, main_canvas.height() as _, tx, Box::new(Clipboard));
+	let display = NativeDisplayData::new(main_canvas.width() as _, main_canvas.height() as _, tx, Clipboard::new(&main_canvas));
 	crate::set_display(display);
 
 	// setup event handler
@@ -489,24 +489,70 @@ pub extern "C" fn allocate_vec_u8(len: usize) -> *mut u8 {
 	ptr
 }
 
-struct Clipboard;
+struct Clipboard(Rc<RefCell<Option<String>>>);
+
+// SAFETY: The Web is single-threaded, so we are always on the same thread
+unsafe impl Sync for Clipboard {}
+unsafe impl Send for Clipboard {}
+
+impl Clipboard {
+	fn new(canvas: &HtmlCanvasElement) -> Box<Clipboard> {
+		let state = Rc::new(RefCell::new(None));
+
+		// setup paste event, where JS writes into the state
+		let state_2 = state.clone();
+		let paste_closure: Closure<dyn Fn(_)> = Closure::new(move |ev: ClipboardEvent| {
+			if let Some(date) = ev.clipboard_data() {
+				match date.get_data("text") {
+					Ok(text) => *state_2.borrow_mut() = Some(text),
+					Err(e) => {
+						#[cfg(feature = "log-impl")]
+						crate::error!("Unable to paste text: {:?}", e);
+					}
+				}
+			}
+		});
+
+		let paste_fn_ref = paste_closure.as_ref().unchecked_ref();
+		canvas.add_event_listener_with_callback("paste", paste_fn_ref).unwrap_throw();
+
+		// setup cut, copy events, where JS reads from the state
+		let state_3 = state.clone();
+		let copy_closure: Closure<dyn Fn(_)> = Closure::new(move |ev: ClipboardEvent| {
+			if let Some(date) = ev.clipboard_data() {
+				if let Some(text) = state_3.borrow().as_ref() {
+					date.set_data("text", text).unwrap_throw();
+					ev.prevent_default();
+				}
+			}
+		});
+
+		let copy_fn_ref = copy_closure.as_ref().unchecked_ref();
+		canvas.add_event_listener_with_callback("copy", copy_fn_ref).unwrap_throw();
+
+		let state_4 = state.clone();
+		let cut_closure: Closure<dyn Fn(_)> = Closure::new(move |ev: ClipboardEvent| {
+			if let Some(date) = ev.clipboard_data() {
+				if let Some(text) = state_4.borrow_mut().take() {
+					date.set_data("text", text.as_str()).unwrap_throw();
+					ev.prevent_default();
+				}
+			}
+		});
+
+		let cut_fn_ref = cut_closure.as_ref().unchecked_ref();
+		canvas.add_event_listener_with_callback("cut", cut_fn_ref).unwrap_throw();
+
+		Box::new(Self(state))
+	}
+}
 
 impl crate::native::Clipboard for Clipboard {
 	fn get(&mut self) -> Option<String> {
-		let navigator = window()?.navigator();
-		let clipboard = navigator.clipboard()?;
-		let promise = clipboard.read_text();
-		let future = wasm_bindgen_futures::JsFuture::from(promise);
-		let result = pollster::block_on(future).unwrap();
-		result.as_string()
+		self.0.borrow_mut().take()
 	}
 
 	fn set(&mut self, data: &str) {
-		let navigator = window().unwrap().navigator();
-		if let Some(clipboard) = navigator.clipboard() {
-			let promise = clipboard.write_text(data);
-			let future = wasm_bindgen_futures::JsFuture::from(promise);
-			let _ = pollster::block_on(future).unwrap();
-		}
+		*self.0.borrow_mut() = Some(data.to_string());
 	}
 }
