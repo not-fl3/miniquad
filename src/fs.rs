@@ -80,6 +80,7 @@ mod wasm {
 		if let Ok(xhr) = XmlHttpRequest::new() {
 			if xhr.open("GET", path).is_ok() {
 				xhr.set_response_type(web_sys::XmlHttpRequestResponseType::Arraybuffer);
+				xhr.set_timeout(5 * 1000); // 5 seconds
 
 				let xhr_1 = xhr.clone();
 				let present: Closure<dyn Fn()> = Closure::new(move || {
@@ -95,21 +96,19 @@ mod wasm {
 								on_loaded(Ok(array));
 							}
 						}
-						Err(_e) => {
-							#[cfg(feature = "log-impl")]
-							crate::error!("XmlHttpRequest failed: {:?}", _e);
-							on_loaded(Err(Error::DownloadFailed(xhr_1.status_text().unwrap_throw())));
-						}
+						Err(e) => on_loaded(Err(Error::DownloadFailed(format!("XmlHttpRequest failed: {:?}", e)))),
 					};
 				});
 
+				xhr.set_ontimeout(Some(present.as_ref().unchecked_ref()));
 				xhr.set_onerror(Some(present.as_ref().unchecked_ref()));
 				xhr.set_onload(Some(present.as_ref().unchecked_ref()));
 			} else {
-				#[cfg(feature = "log-impl")]
-				crate::error!("Unable to open XmlHttpRequest");
-				on_loaded(Err(Error::DownloadFailed(xhr.status_text().unwrap_throw())));
+				on_loaded(Err(Error::DownloadFailed("Unable to open XmlHttpRequest".to_string())));
 			};
+
+			// Send the request
+			xhr.send().unwrap();
 		}
 	}
 }
