@@ -502,8 +502,8 @@ impl Clipboard {
 		// setup paste event, where JS writes into the state
 		let state_2 = state.clone();
 		let paste_closure: Closure<dyn Fn(_)> = Closure::new(move |ev: ClipboardEvent| {
-			if let Some(date) = ev.clipboard_data() {
-				match date.get_data("text") {
+			if let Some(dt) = ev.clipboard_data() {
+				match dt.get_data("text") {
 					Ok(text) => *state_2.borrow_mut() = Some(text),
 					Err(e) => {
 						#[cfg(feature = "log-impl")]
@@ -513,34 +513,33 @@ impl Clipboard {
 			}
 		});
 
-		let paste_fn_ref = paste_closure.as_ref().unchecked_ref();
-		canvas.add_event_listener_with_callback("paste", paste_fn_ref).unwrap_throw();
-
-		// setup cut, copy events, where JS reads from the state
+		// setup cut and copy events, where JS reads from the state
 		let state_3 = state.clone();
 		let copy_closure: Closure<dyn Fn(_)> = Closure::new(move |ev: ClipboardEvent| {
-			if let Some(date) = ev.clipboard_data() {
+			if let Some(dt) = ev.clipboard_data() {
 				if let Some(text) = state_3.borrow().as_ref() {
-					date.set_data("text", text).unwrap_throw();
+					dt.set_data("text", text).unwrap_throw();
 					ev.prevent_default();
 				}
 			}
 		});
-
-		let copy_fn_ref = copy_closure.as_ref().unchecked_ref();
-		canvas.add_event_listener_with_callback("copy", copy_fn_ref).unwrap_throw();
 
 		let state_4 = state.clone();
 		let cut_closure: Closure<dyn Fn(_)> = Closure::new(move |ev: ClipboardEvent| {
-			if let Some(date) = ev.clipboard_data() {
+			if let Some(dt) = ev.clipboard_data() {
 				if let Some(text) = state_4.borrow_mut().take() {
-					date.set_data("text", text.as_str()).unwrap_throw();
+					dt.set_data("text", text.as_str()).unwrap_throw();
 					ev.prevent_default();
 				}
 			}
 		});
 
+		let paste_fn_ref = paste_closure.as_ref().unchecked_ref();
+		let copy_fn_ref = copy_closure.as_ref().unchecked_ref();
 		let cut_fn_ref = cut_closure.as_ref().unchecked_ref();
+
+		canvas.add_event_listener_with_callback("paste", paste_fn_ref).unwrap_throw();
+		canvas.add_event_listener_with_callback("copy", copy_fn_ref).unwrap_throw();
 		canvas.add_event_listener_with_callback("cut", cut_fn_ref).unwrap_throw();
 
 		Box::new(Self(state))
