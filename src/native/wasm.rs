@@ -42,22 +42,37 @@ where
 	// set window title
 	document().set_title(&conf.window_title);
 
-	// initialize main canvas
+	// get main canvas
 	let main_canvas = document()
 		.query_selector(&conf.platform.web_canvas_query_selector)
 		.unwrap()
 		.expect(format!("Unable to start miniquad_wasm_bindgen: Canvas {} not found!", conf.platform.web_canvas_query_selector).as_str())
 		.dyn_into::<HtmlCanvasElement>()
 		.unwrap();
+
+	// initialize main canvas
 	let high_dpi = conf.high_dpi;
 	let dpi = get_dpi_scale(high_dpi) as i32;
 
-	// initialize canvas dimensions
 	main_canvas.set_width((conf.window_width * dpi) as u32);
 	main_canvas.set_height((conf.window_width * dpi) as u32);
 	main_canvas.style().set_property("width", &format!("{}px", conf.window_width)).unwrap();
 	main_canvas.style().set_property("height", &format!("{}px", conf.window_height)).unwrap();
 	main_canvas.focus().unwrap();
+
+	let mut webgl_attributes = WebGlContextAttributes::new();
+	webgl_attributes.alpha(conf.platform.framebuffer_alpha);
+	webgl_attributes.power_preference(WebGlPowerPreference::HighPerformance);
+	webgl_attributes.stencil(true);
+
+	// setup webgl context
+	let gl = main_canvas
+		.get_context_with_context_options("webgl2", &webgl_attributes.into())
+		.unwrap_throw()
+		.unwrap_throw()
+		.dyn_into::<WebGl2RenderingContext>()
+		.unwrap_throw();
+	webgl::set_gl(gl);
 
 	// setup requests channel
 	let (tx, rx) = std::sync::mpsc::channel();
@@ -71,6 +86,7 @@ where
 	get_event_handler(Some(event_handler));
 
 	// setup event listeners
+	let _ = main_canvas.focus();
 	init_mouse_events(&main_canvas);
 	init_keyboard_events(&main_canvas);
 	init_focus_events(&main_canvas);

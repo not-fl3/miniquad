@@ -4,7 +4,10 @@
 
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 
+use std::collections::BTreeMap;
+
 use wasm_bindgen::*;
+use web_sys::*;
 
 pub type GLenum = ::std::os::raw::c_uint;
 pub type GLboolean = ::std::os::raw::c_uchar;
@@ -44,6 +47,7 @@ pub const GL_DRAW_FRAMEBUFFER: u32 = 0x8CA9;
 pub const GL_FRAMEBUFFER_COMPLETE: u32 = 0x8CD5;
 pub const GL_NUM_EXTENSIONS: u32 = 0x821D;
 pub const GL_INFO_LOG_LENGTH: u32 = 0x8B84;
+pub const GL_SHADER_SOURCE_LENGTH: u32 = 0x8B88;
 pub const GL_VERTEX_SHADER: u32 = 0x8B31;
 pub const GL_INCR: u32 = 0x1E02;
 pub const GL_DYNAMIC_DRAW: u32 = 0x88E8;
@@ -152,7 +156,7 @@ pub const GL_SRC_ALPHA: u32 = 0x0302;
 pub const GL_INCR_WRAP: u32 = 0x8507;
 pub const GL_LESS: u32 = 0x0201;
 pub const GL_MULTISAMPLE: u32 = 0x809D;
-pub const GL_FRAMEBUFFER_BINDING: u32 = 0x8CA6;
+pub const GL_FRAMEBUFFER_BINDING: u32 = 0x8CA6; // 36006
 pub const GL_BACK: u32 = 0x0405;
 pub const GL_ALWAYS: u32 = 0x0207;
 pub const GL_FUNC_ADD: u32 = 0x8006;
@@ -160,6 +164,9 @@ pub const GL_ONE_MINUS_DST_COLOR: u32 = 0x0307;
 pub const GL_NOTEQUAL: u32 = 0x0205;
 pub const GL_DST_COLOR: u32 = 0x0306;
 pub const GL_COMPILE_STATUS: u32 = 0x8B81;
+pub const GL_DELETE_STATUS: u32 = 0x8B80;
+pub const GL_SHADER_TYPE: u32 = 0x8B4F;
+pub const GL_ACTIVE_UNIFORMS: u32 = 0x8B86;
 pub const GL_RED: u32 = 0x1903;
 pub const GL_GREEN: u32 = 6404;
 pub const GL_BLUE: u32 = 6405;
@@ -314,33 +321,258 @@ pub struct __GLsync {
 }
 pub type GLsync = *mut __GLsync;
 
-pub unsafe fn glGetIntegerv(pname: GLenum, data: *mut GLint) {
-	let data: &mut GLint = data.as_mut().unwrap_or_else(|| {
-		let error = format!("GL_INVALID_VALUE in glGet EM_FUNC_SIG_PARAM_I v(name={}) : Function called with null out pointer!", pname);
-		throw_str(&error)
-	});
+static mut GL: Option<WebGl2RenderingContext> = None;
 
-	let mut ret: Option<isize> = None;
-	match pname {
-		// GL_SHADER_COMPILER
-		0x8DFA => {
-			ret = Some(1);
-		}
-		// GL_NUM_PROGRAM_BINARY_FORMATS, GL_NUM_SHADER_BINARY_FORMATS
-		0x87FE | 0x8DF9 => {
-			ret = Some(0);
-		}
-		// GL_NUM_COMPRESSED_TEXTURE_FORMATS
-		0x86A2 => {
-			ret = Some(0);
-		}
-		_ => {}
+pub(crate) fn set_gl(gl: WebGl2RenderingContext) {
+	unsafe {
+		GL = Some(gl);
 	}
 }
 
+#[allow(dead_code)]
+pub(crate) fn get_gl() -> &'static WebGl2RenderingContext {
+	unsafe { GL.as_ref().expect_throw("WebGL context not created!") }
+}
+
+pub fn is_gl2() -> bool {
+	true
+}
+
+#[inline(always)]
+// Shortcut implementation because I couldn't be bothered to write the whole thing X)
+pub unsafe fn glGetIntegerv(_: u32, data: *mut GLint) {
+	let data: &mut GLint = data.as_mut().unwrap();
+	*data = 0;
+}
+
+pub unsafe fn glGenFramebuffers(_n: GLsizei, _framebuffers: *mut GLuint) {
+	unimplemented!("glGenFramebuffers");
+}
+
+// SAFETY: Webassembly is single-threaded
+static mut VERTEX_ARRAY_OBJECTS: Vec<WebGlVertexArrayObject> = Vec::new();
+
+pub unsafe fn glGenVertexArrays(n: GLsizei, vertex_arrays: *mut GLuint) {
+	let gl = get_gl();
+	let arrays = std::slice::from_raw_parts_mut(vertex_arrays, n as usize);
+
+	for va in arrays {
+		let vao = gl.create_vertex_array().unwrap();
+
+		VERTEX_ARRAY_OBJECTS.push(vao);
+		let idx = VERTEX_ARRAY_OBJECTS.len();
+
+		// vertex array 0 is reserved for the null vertex array
+		*va = idx as GLuint;
+	}
+}
+
+pub unsafe fn glBindVertexArray(array: GLuint) {
+	let gl = get_gl();
+	let vao = &VERTEX_ARRAY_OBJECTS[(array - 1) as usize];
+	gl.bind_vertex_array(Some(vao));
+}
+
+pub fn glGetString(name: GLenum) -> *const GLubyte {
+	let param = get_gl().get_parameter(name).unwrap();
+	let param = param.as_string().unwrap();
+
+	let c_str = std::ffi::CString::new(param).unwrap();
+	let c_str = std::mem::ManuallyDrop::new(c_str);
+
+	// string remains leaked for the remainder of the program
+	c_str.as_ptr() as _
+}
+
+// SAFETY: Webassembly is single-threaded
+static mut SHADERS: Vec<WebGlShader> = Vec::new();
+
+pub unsafe fn glCreateShader(type_: GLenum) -> GLuint {
+	let gl = get_gl();
+	let shader = gl.create_shader(type_).unwrap();
+
+	// shader 0 is reserved for the null shader
+	SHADERS.push(shader);
+	SHADERS.len() as GLuint
+}
+
+// _lengths is not used as pointers contains null-terminated strings
+pub unsafe fn glShaderSource(shader_id: GLuint, count: GLsizei, pointers: *const *const GLchar, _lengths: *const GLint) {
+	let idx = (shader_id - 1) as usize;
+	if !(0..SHADERS.len()).contains(&idx) {
+		let msg = format!("glShaderSource failed! Invalid shader id: {}", shader_id);
+		throw_str(&msg);
+	}
+
+	// get source
+	let mut source = String::new();
+
+	for i in 0..count {
+		let ptr = *pointers.offset(i as isize);
+		let slice = std::ffi::CStr::from_ptr(ptr).to_str().unwrap();
+		source.push_str(slice);
+	}
+
+	// get shader
+	let gl = get_gl();
+	let shader = &SHADERS[idx];
+	gl.shader_source(shader, &source);
+}
+
+pub unsafe fn glCompileShader(shader: GLuint) {
+	let idx = (shader - 1) as usize;
+
+	if !(0..SHADERS.len()).contains(&idx) {
+		let msg = format!("glCompileShader failed! Invalid shader id: {}", shader);
+		throw_str(&msg);
+	}
+
+	let gl = get_gl();
+	let shader = &SHADERS[idx];
+
+	gl.compile_shader(shader);
+}
+
+static mut SHADER_LOGS: BTreeMap<usize, String> = BTreeMap::new();
+
+pub unsafe fn glGetShaderiv(shader: GLuint, pname: GLenum, params: *mut GLint) {
+	let idx = (shader - 1) as usize;
+	let gl = get_gl();
+
+	if !(0..SHADERS.len()).contains(&idx) {
+		let msg = format!("glGetShaderiv failed! Invalid shader id: {}", shader);
+		throw_str(&msg);
+	}
+
+	match pname {
+		p if p == GL_INFO_LOG_LENGTH => {
+			let shader = &SHADERS[idx];
+			let info = gl.get_shader_info_log(shader).unwrap();
+			let len = info.len() as GLint;
+			SHADER_LOGS.insert(idx, info);
+			*params = len;
+		}
+		p if p == GL_SHADER_SOURCE_LENGTH => {
+			let shader = &SHADERS[idx];
+			let source = gl.get_shader_source(shader).unwrap();
+			*params = source.len() as GLint;
+		}
+		p if p == GL_SHADER_TYPE => {
+			let shader = &SHADERS[idx];
+			let param = gl.get_shader_parameter(shader, p).as_f64().unwrap_throw() as GLint;
+			*params = param;
+		}
+		p if p == GL_COMPILE_STATUS || p == GL_DELETE_STATUS => {
+			let shader = &SHADERS[idx];
+			let param = gl.get_shader_parameter(shader, p).as_bool().unwrap_throw();
+			*params = param as GLint;
+		}
+		_ => {
+			let msg = format!("glGetShaderiv failed! Invalid pname: {}", pname);
+			throw_str(&msg);
+		}
+	}
+}
+
+pub unsafe fn glGetShaderInfoLog(shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar) {
+	let idx = (shader - 1) as usize;
+
+	if !(0..SHADERS.len()).contains(&idx) {
+		let msg = format!("glGetShaderInfoLog failed! Invalid shader id: {}", shader);
+		throw_str(&msg);
+	}
+
+	let log = SHADER_LOGS.get(&idx).unwrap_throw();
+	let mut len = log.len() as GLsizei;
+
+	// infoLog does not need to be nu
+	if bufSize > 0 {
+		len = len.min(bufSize - 1);
+		let slice = log.as_bytes();
+		std::ptr::copy_nonoverlapping(slice.as_ptr() as _, infoLog as _, len as usize);
+	}
+
+	*length = len;
+}
+
+// SAFETY: Webassembly is single-threaded
+static mut PROGRAMS: Vec<WebGlProgram> = Vec::new();
+
+pub unsafe fn glCreateProgram() -> GLuint {
+	let gl = get_gl();
+	let program = gl.create_program().unwrap();
+
+	// program 0 is reserved for the null program
+	PROGRAMS.push(program);
+	PROGRAMS.len() as GLuint
+}
+
+pub unsafe fn glAttachShader(program: GLuint, shader: GLuint) {
+	let idx = (program - 1) as usize;
+	let shader_idx = (shader - 1) as usize;
+
+	if !(0..PROGRAMS.len()).contains(&idx) {
+		let msg = format!("glAttachShader failed! Invalid program id: {}", program);
+		throw_str(&msg);
+	}
+
+	if !(0..SHADERS.len()).contains(&shader_idx) {
+		let msg = format!("glAttachShader failed! Invalid shader id: {}", shader);
+		throw_str(&msg);
+	}
+
+	let gl = get_gl();
+	gl.attach_shader(&PROGRAMS[idx], &SHADERS[shader_idx]);
+}
+
+#[derive(Default)]
+struct ProgramInfos {
+	uniforms: (),
+	max_uniform_length: usize,
+}
+
+// SAFETY: Webassembly is single-threaded
+static mut UNIFORMS: BTreeMap<usize, BTreeMap<String, GLint>> = BTreeMap::new();
+
+pub unsafe fn glLinkProgram(program: GLuint) {
+	let idx = (program - 1) as usize;
+
+	if !(0..PROGRAMS.len()).contains(&idx) {
+		let msg = format!("glLinkProgram failed! Invalid program id: {}", program);
+		throw_str(&msg);
+	}
+
+	let gl = get_gl();
+	let program = &PROGRAMS[idx];
+	gl.link_program(program);
+
+	// Populate Uniform Table
+	let uniforms = gl.get_program_parameter(program, GL_ACTIVE_UNIFORMS).as_f64().unwrap_throw() as u32;
+	for i in 0..uniforms {
+		let active_info = gl.get_active_uniform(program, i).unwrap_throw();
+		let mut name = active_info.name();
+
+		// setup
+		let mut program_info = ProgramInfos::default();
+		program_info.max_uniform_length = name.len() + 1;
+
+		// canonicalize
+		if &name[..name.len() - 1] == "]" {
+			let slice = name.rfind('[').unwrap_throw();
+			name.truncate(slice);
+		}
+
+		// get location
+		if let Some(loc) = gl.get_uniform_location(program, &name) {
+			
+		};
+	}
+}
+
+pub fn glGetProgramiv(program: GLuint, pname: GLenum, params: *mut GLint) {}
+
 extern "C" {
 	pub fn glActiveTexture(texture: GLenum);
-	pub fn glAttachShader(program: GLuint, shader: GLuint);
 	pub fn glBindAttribLocation(program: GLuint, index: GLuint, name: *const GLchar);
 	pub fn glBindBuffer(target: GLenum, buffer: GLuint);
 	pub fn glBindFramebuffer(target: GLenum, framebuffer: GLuint);
@@ -359,13 +591,10 @@ extern "C" {
 	pub fn glClearDepthf(d: GLfloat);
 	pub fn glClearStencil(s: GLint);
 	pub fn glColorMask(red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean);
-	pub fn glCompileShader(shader: GLuint);
 	pub fn glCompressedTexImage2D(target: GLenum, level: GLint, internalformat: GLenum, width: GLsizei, height: GLsizei, border: GLint, imageSize: GLsizei, data: *const ::std::os::raw::c_void);
 	pub fn glCompressedTexSubImage2D(target: GLenum, level: GLint, xoffset: GLint, yoffset: GLint, width: GLsizei, height: GLsizei, format: GLenum, imageSize: GLsizei, data: *const ::std::os::raw::c_void);
 	pub fn glCopyTexImage2D(target: GLenum, level: GLint, internalformat: GLenum, x: GLint, y: GLint, width: GLsizei, height: GLsizei, border: GLint);
 	pub fn glCopyTexSubImage2D(target: GLenum, level: GLint, xoffset: GLint, yoffset: GLint, x: GLint, y: GLint, width: GLsizei, height: GLsizei);
-	pub fn glCreateProgram() -> GLuint;
-	pub fn glCreateShader(type_: GLenum) -> GLuint;
 	pub fn glCullFace(mode: GLenum);
 	pub fn glDeleteBuffers(n: GLsizei, buffers: *const GLuint);
 	pub fn glDeleteFramebuffers(n: GLsizei, framebuffers: *const GLuint);
@@ -390,7 +619,6 @@ extern "C" {
 	pub fn glFrontFace(mode: GLenum);
 	pub fn glGenBuffers(n: GLsizei, buffers: *mut GLuint);
 	pub fn glGenerateMipmap(target: GLenum);
-	pub fn glGenFramebuffers(n: GLsizei, framebuffers: *mut GLuint);
 	pub fn glGenRenderbuffers(n: GLsizei, renderbuffers: *mut GLuint);
 	pub fn glGenTextures(n: GLsizei, textures: *mut GLuint);
 	pub fn glGetActiveAttrib(program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut GLchar);
@@ -402,14 +630,10 @@ extern "C" {
 	pub fn glGetError() -> GLenum;
 	pub fn glGetFloatv(pname: GLenum, data: *mut GLfloat);
 	pub fn glGetFramebufferAttachmentParameteriv(target: GLenum, attachment: GLenum, pname: GLenum, params: *mut GLint);
-	pub fn glGetProgramiv(program: GLuint, pname: GLenum, params: *mut GLint);
 	pub fn glGetProgramInfoLog(program: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar);
 	pub fn glGetRenderbufferParameteriv(target: GLenum, pname: GLenum, params: *mut GLint);
-	pub fn glGetShaderiv(shader: GLuint, pname: GLenum, params: *mut GLint);
-	pub fn glGetShaderInfoLog(shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar);
 	pub fn glGetShaderPrecisionFormat(shadertype: GLenum, precisiontype: GLenum, range: *mut GLint, precision: *mut GLint);
 	pub fn glGetShaderSource(shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, source: *mut GLchar);
-	pub fn glGetString(name: GLenum) -> *const GLubyte;
 	pub fn glGetTexParameterfv(target: GLenum, pname: GLenum, params: *mut GLfloat);
 	pub fn glGetTexParameteriv(target: GLenum, pname: GLenum, params: *mut GLint);
 	pub fn glGetUniformfv(program: GLuint, location: GLint, params: *mut GLfloat);
@@ -427,7 +651,6 @@ extern "C" {
 	pub fn glIsShader(shader: GLuint) -> GLboolean;
 	pub fn glIsTexture(texture: GLuint) -> GLboolean;
 	pub fn glLineWidth(width: GLfloat);
-	pub fn glLinkProgram(program: GLuint);
 	pub fn glPixelStorei(pname: GLenum, param: GLint);
 	pub fn glPolygonOffset(factor: GLfloat, units: GLfloat);
 	pub fn glReadPixels(x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, type_: GLenum, pixels: *mut ::std::os::raw::c_void);
@@ -436,7 +659,6 @@ extern "C" {
 	pub fn glSampleCoverage(value: GLfloat, invert: GLboolean);
 	pub fn glScissor(x: GLint, y: GLint, width: GLsizei, height: GLsizei);
 	pub fn glShaderBinary(count: GLsizei, shaders: *const GLuint, binaryformat: GLenum, binary: *const ::std::os::raw::c_void, length: GLsizei);
-	pub fn glShaderSource(shader: GLuint, count: GLsizei, string: *const *const GLchar, length: *const GLint);
 	pub fn glStencilFunc(func: GLenum, ref_: GLint, mask: GLuint);
 	pub fn glStencilFuncSeparate(face: GLenum, func: GLenum, ref_: GLint, mask: GLuint);
 	pub fn glStencilMask(mask: GLuint);
@@ -545,9 +767,7 @@ extern "C" {
 	pub fn glFramebufferTextureLayer(target: GLenum, attachment: GLenum, texture: GLuint, level: GLint, layer: GLint);
 	pub fn glMapBufferRange(target: GLenum, offset: GLintptr, length: GLsizeiptr, access: GLbitfield) -> *mut ::std::os::raw::c_void;
 	pub fn glFlushMappedBufferRange(target: GLenum, offset: GLintptr, length: GLsizeiptr);
-	pub fn glBindVertexArray(array: GLuint);
 	pub fn glDeleteVertexArrays(n: GLsizei, arrays: *const GLuint);
-	pub fn glGenVertexArrays(n: GLsizei, arrays: *mut GLuint);
 	pub fn glIsVertexArray(array: GLuint) -> GLboolean;
 	pub fn glGetIntegeri_v(target: GLenum, index: GLuint, data: *mut GLint);
 	pub fn glBeginTransformFeedback(primitiveMode: GLenum);
@@ -621,8 +841,4 @@ extern "C" {
 	pub fn glTexStorage2D(target: GLenum, levels: GLsizei, internalformat: GLenum, width: GLsizei, height: GLsizei);
 	pub fn glTexStorage3D(target: GLenum, levels: GLsizei, internalformat: GLenum, width: GLsizei, height: GLsizei, depth: GLsizei);
 	pub fn glGetInternalformativ(target: GLenum, internalformat: GLenum, pname: GLenum, bufSize: GLsizei, params: *mut GLint);
-}
-
-pub fn is_gl2() -> bool {
-	false
 }

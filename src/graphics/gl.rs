@@ -320,15 +320,15 @@ impl Texture {
 
 		let mut fbo = 0;
 		unsafe {
-			let mut binded_fbo: i32 = 0;
-			glGetIntegerv(gl::GL_DRAW_FRAMEBUFFER_BINDING, &mut binded_fbo);
+			let mut bound_fbo: i32 = 0;
+			glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &mut bound_fbo);
 			glGenFramebuffers(1, &mut fbo);
 			glBindFramebuffer(gl::GL_FRAMEBUFFER, fbo);
 			glFramebufferTexture2D(gl::GL_FRAMEBUFFER, gl::GL_COLOR_ATTACHMENT0, gl::GL_TEXTURE_2D, self.raw, 0);
 
 			glReadPixels(0, 0, self.params.width as _, self.params.height as _, format, pixel_type, bytes.as_mut_ptr() as _);
 
-			glBindFramebuffer(gl::GL_FRAMEBUFFER, binded_fbo as _);
+			glBindFramebuffer(gl::GL_FRAMEBUFFER, bound_fbo as _);
 			glDeleteFramebuffers(1, &fbo);
 		}
 	}
@@ -414,8 +414,8 @@ impl GlContext {
 		unsafe {
 			let mut default_framebuffer: GLuint = 0;
 			glGetIntegerv(GL_FRAMEBUFFER_BINDING, &mut default_framebuffer as *mut _ as *mut _);
-			let mut vao = 0;
 
+			let mut vao = 0;
 			glGenVertexArrays(1, &mut vao as *mut _);
 			glBindVertexArray(vao);
 
@@ -463,6 +463,7 @@ fn load_shader_internal(vertex_shader: &str, fragment_shader: &str, meta: Shader
 		let fragment_shader = load_shader(GL_FRAGMENT_SHADER, fragment_shader)?;
 
 		let program = glCreateProgram();
+
 		glAttachShader(program, vertex_shader);
 		glAttachShader(program, fragment_shader);
 		glLinkProgram(program);
@@ -502,45 +503,44 @@ fn load_shader_internal(vertex_shader: &str, fragment_shader: &str, meta: Shader
 	}
 }
 
-pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderError> {
-	unsafe {
-		let shader = glCreateShader(shader_type);
-		assert!(shader != 0);
+pub unsafe fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderError> {
+	let shader = glCreateShader(shader_type);
+	assert!(shader != 0);
 
-		let cstring = CString::new(source)?;
-		let csource = [cstring];
-		glShaderSource(shader, 1, csource.as_ptr() as *const _, std::ptr::null());
-		glCompileShader(shader);
+	let cstring = CString::new(source)?;
+	let csource = (&cstring) as *const CString;
 
-		let mut is_compiled = 0;
-		glGetShaderiv(shader, GL_COMPILE_STATUS, &mut is_compiled as *mut _);
-		if is_compiled == 0 {
-			let mut max_length: i32 = 0;
-			glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &mut max_length as *mut _);
+	glShaderSource(shader, 1, csource as *const _, std::ptr::null());
+	glCompileShader(shader);
 
-			let mut error_message = vec![0u8; max_length as usize + 1];
-			glGetShaderInfoLog(shader, max_length, &mut max_length as *mut _, error_message.as_mut_ptr() as *mut _);
+	let mut is_compiled = 0;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &mut is_compiled as *mut _);
+	if is_compiled == 0 {
+		let mut max_length: i32 = 0;
+		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &mut max_length as *mut _);
 
-			assert!(max_length >= 1);
-			let mut error_message = std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1]).into_owned();
+		let mut error_message = vec![0u8; max_length as usize + 1];
+		glGetShaderInfoLog(shader, max_length, &mut max_length as *mut _, error_message.as_mut_ptr() as *mut _);
 
-			// On Wasm + Chrome, for unknown reason, string with zero-terminator is returned. On Firefox there is no zero-terminators in JavaScript string.
-			if error_message.ends_with('\0') {
-				error_message.pop();
-			}
+		assert!(max_length >= 1);
+		let mut error_message = std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1]).into_owned();
 
-			return Err(ShaderError::CompilationError {
-				shader_type: match shader_type {
-					GL_VERTEX_SHADER => ShaderType::Vertex,
-					GL_FRAGMENT_SHADER => ShaderType::Fragment,
-					_ => unreachable!(),
-				},
-				error_message,
-			});
+		// On Wasm + Chrome, for unknown reason, string with zero-terminator is returned. On Firefox there is no zero-terminators in JavaScript string.
+		if error_message.ends_with('\0') {
+			error_message.pop();
 		}
 
-		Ok(shader)
+		return Err(ShaderError::CompilationError {
+			shader_type: match shader_type {
+				GL_VERTEX_SHADER => ShaderType::Vertex,
+				GL_FRAGMENT_SHADER => ShaderType::Fragment,
+				_ => unreachable!(),
+			},
+			error_message,
+		});
 	}
+
+	Ok(shader)
 }
 
 impl GlContext {
@@ -643,10 +643,17 @@ impl GlContext {
 	}
 }
 
+#[allow(unused_unsafe)]
 impl RenderingBackend for GlContext {
 	fn info(&self) -> ContextInfo {
 		let version_string = unsafe { glGetString(super::gl::GL_VERSION) };
 		let gl_version_string = unsafe { std::ffi::CStr::from_ptr(version_string as _) }.to_str().unwrap().to_string();
+
+		#[cfg(target_arch = "wasm32")]
+		{
+			// reclaim memory
+			let _ = unsafe { std::ffi::CString::from_raw(version_string as _) };
+		}
 
 		let mut glsl_support = GlslSupport::default();
 
@@ -683,13 +690,16 @@ impl RenderingBackend for GlContext {
 			features: self.features.clone(),
 		}
 	}
+
 	fn new_shader(&mut self, shader: ShaderSource, meta: ShaderMeta) -> Result<ShaderId, ShaderError> {
 		let (fragment, vertex) = match shader {
 			ShaderSource::Glsl { fragment, vertex } => (fragment, vertex),
 			_ => panic!("Metal source on OpenGl context"),
 		};
+
 		let shader = load_shader_internal(vertex, fragment, meta)?;
 		self.shaders.push(shader);
+
 		Ok(ShaderId(self.shaders.len() - 1))
 	}
 

@@ -12,9 +12,6 @@ const version = "0.3.12";
 
 const canvas = document.querySelector("#glcanvas");
 const gl = canvas.getContext("webgl");
-if (gl === null) {
-    alert("Unable to initialize WebGL. Your browser or machine may not support it.");
-}
 
 var clipboard = null;
 
@@ -39,39 +36,38 @@ function assert(flag, message) {
     }
 }
 
-function acquireVertexArrayObjectExtension(ctx) {
+function acquireVertexArrayObjectExtension(gl) {
     // Extension available in WebGL 1 from Firefox 25 and WebKit 536.28/desktop Safari 6.0.3 onwards. Core feature in WebGL 2.
-    var ext = ctx.getExtension('OES_vertex_array_object');
+    var ext = gl.getExtension('OES_vertex_array_object');
     if (ext) {
-        ctx['createVertexArray'] = function () { return ext['createVertexArrayOES'](); };
-        ctx['deleteVertexArray'] = function (vao) { ext['deleteVertexArrayOES'](vao); };
-        ctx['bindVertexArray'] = function (vao) { ext['bindVertexArrayOES'](vao); };
-        ctx['isVertexArray'] = function (vao) { return ext['isVertexArrayOES'](vao); };
+        gl['createVertexArray'] = function () { return ext['createVertexArrayOES'](); };
+        gl['deleteVertexArray'] = function (vao) { ext['deleteVertexArrayOES'](vao); };
+        gl['bindVertexArray'] = function (vao) { ext['bindVertexArrayOES'](vao); };
+        gl['isVertexArray'] = function (vao) { return ext['isVertexArrayOES'](vao); };
     }
     else {
         alert("Unable to get OES_vertex_array_object extension");
     }
 }
 
-
-function acquireInstancedArraysExtension(ctx) {
+function acquireInstancedArraysExtension(gl) {
     // Extension available in WebGL 1 from Firefox 26 and Google Chrome 30 onwards. Core feature in WebGL 2.
-    var ext = ctx.getExtension('ANGLE_instanced_arrays');
+    var ext = gl.getExtension('ANGLE_instanced_arrays');
     if (ext) {
-        ctx['vertexAttribDivisor'] = function (index, divisor) { ext['vertexAttribDivisorANGLE'](index, divisor); };
-        ctx['drawArraysInstanced'] = function (mode, first, count, primcount) { ext['drawArraysInstancedANGLE'](mode, first, count, primcount); };
-        ctx['drawElementsInstanced'] = function (mode, count, type, indices, primcount) { ext['drawElementsInstancedANGLE'](mode, count, type, indices, primcount); };
+        gl['vertexAttribDivisor'] = function (index, divisor) { ext['vertexAttribDivisorANGLE'](index, divisor); };
+        gl['drawArraysInstanced'] = function (mode, first, count, primcount) { ext['drawArraysInstancedANGLE'](mode, first, count, primcount); };
+        gl['drawElementsInstanced'] = function (mode, count, type, indices, primcount) { ext['drawElementsInstancedANGLE'](mode, count, type, indices, primcount); };
     }
 }
 
-function acquireDisjointTimerQueryExtension(ctx) {
-    var ext = ctx.getExtension('EXT_disjoint_timer_query');
+function acquireDisjointTimerQueryExtension(gl) {
+    var ext = gl.getExtension('EXT_disjoint_timer_query');
     if (ext) {
-        ctx['createQuery'] = function () { return ext['createQueryEXT'](); };
-        ctx['beginQuery'] = function (target, query) { return ext['beginQueryEXT'](target, query); };
-        ctx['endQuery'] = function (target) { return ext['endQueryEXT'](target); };
-        ctx['deleteQuery'] = function (query) { ext['deleteQueryEXT'](query); };
-        ctx['getQueryObject'] = function (query, pname) { return ext['getQueryObjectEXT'](query, pname); };
+        gl['createQuery'] = function () { return ext['createQueryEXT'](); };
+        gl['beginQuery'] = function (target, query) { return ext['beginQueryEXT'](target, query); };
+        gl['endQuery'] = function (target) { return ext['endQueryEXT'](target); };
+        gl['deleteQuery'] = function (query) { ext['deleteQueryEXT'](query); };
+        gl['getQueryObject'] = function (query, pname) { return ext['getQueryObjectEXT'](query, pname); };
     }
 }
 
@@ -91,8 +87,8 @@ if (gl.getExtension('WEBGL_depth_texture') == null) {
     alert("Cant initialize WEBGL_depth_texture extension");
 }
 
-function getArray(ptr, arr, n) {
-    return new arr(wasm_memory.buffer, ptr, n);
+function getArray(ptr, type, length) {
+    return new type(wasm_memory.buffer, ptr, length);
 }
 
 function UTF8ToString(ptr, len) {
@@ -176,25 +172,24 @@ var GL = {
             }
         }
     },
-    getSource: function (shader, count, string, length) {
+    getSource: function (count, pointers, lengths) {
         var source = '';
         for (var i = 0; i < count; ++i) {
-            var len = length == 0 ? undefined : getArray(length + i * 4, Uint32Array, 1)[0];
-            source += UTF8ToString(getArray(string + i * 4, Uint32Array, 1)[0], len);
+            let len = lengths == 0 ? undefined : getArray(lengths + i * 4, Uint32Array, 1)[0];
+            let pointer = getArray(pointers + i * 4, Uint32Array, 1)[0];
+            source += UTF8ToString(pointer, len);
         }
         return source;
     },
     populateUniformTable: function (program) {
-        GL.validateGLObjectID(GL.programs, program, 'populateUniformTable', 'program');
         var p = GL.programs[program];
         var ptable = GL.programInfos[program] = {
             uniforms: {},
             maxUniformLength: 0, // This is eagerly computed below, since we already enumerate all uniforms anyway.
-            maxAttributeLength: -1, // This is lazily computed and cached, computed when/if first asked, "-1" meaning not computed yet.
-            maxUniformBlockNameLength: -1 // Lazily computed as well
         };
 
         var utable = ptable.uniforms;
+
         // A program's uniform table maps the string name of an uniform to an integer location of that uniform.
         // The global GL.uniforms map maps integer locations to WebGLUniformLocations.
         var numUniforms = gl.getProgramParameter(p, 0x8B86/*GL_ACTIVE_UNIFORMS*/);
@@ -231,10 +226,11 @@ var GL = {
     }
 }
 
-function _glGenObject(n, buffers, createFunction, objectTable, functionName) {
+function _glGenObject(n, buffers, createFunction, objectTable, _functionName) {
     for (var i = 0; i < n; i++) {
         var buffer = gl[createFunction]();
-        var id = buffer && GL.getNewId(objectTable);
+        var id = buffer ? GL.getNewId(objectTable) : buffer;
+
         if (buffer) {
             buffer.name = id;
             objectTable[id] = buffer;
@@ -242,8 +238,9 @@ function _glGenObject(n, buffers, createFunction, objectTable, functionName) {
             console.error("GL_INVALID_OPERATION");
             GL.recordError(0x0502 /* GL_INVALID_OPERATION */);
 
-            alert('GL_INVALID_OPERATION in ' + functionName + ': GLctx.' + createFunction + ' returned null - most likely GL context is lost!');
+            alert('GL_INVALID_OPERATION in ' + _functionName + ': GLctx.' + createFunction + ' returned null - most likely GL context is lost!');
         }
+
         getArray(buffers + i * 4, Int32Array, 1)[0] = id;
     }
 }
@@ -369,103 +366,22 @@ var importObject = {
         glDrawElements: function (mode, count, type, indices) {
             gl.drawElements(mode, count, type, indices);
         },
-        glGetIntegerv: function (name_, p) {
+        glGetIntegerv: function (p) {
+            // name always 0x8CA6 for GL_FRAMEBUFFER_BINDING
+
             // Guard against user passing a null pointer.
             // Note that GLES2 spec does not say anything about how passing a null pointer should be treated.
             // Testing on desktop core GL 3, the application crashes on glGetIntegerv to a null pointer, but
             // better to report an error instead of doing anything random.
             if (!p) {
-                console.error('GL_INVALID_VALUE in glGet EM_FUNC_SIG_PARAM_I v(name=' + name_ + ': Function called with null out pointer!');
+                console.error('GL_INVALID_VALUE in glGet EM_FUNC_SIG_PARAM_I v(name=' + 0x8CA6 + ': Function called with null out pointer!');
                 GL.recordError(0x501 /* GL_INVALID_VALUE */);
                 return;
             }
-            var ret = undefined;
-            switch (name_) { // Handle a few trivial GLES values
-                case 0x8DFA: // GL_SHADER_COMPILER
-                    ret = 1;
-                    break;
-                case 0x87FE: // GL_NUM_PROGRAM_BINARY_FORMATS
-                case 0x8DF9: // GL_NUM_SHADER_BINARY_FORMATS
-                    ret = 0;
-                    break;
-                case 0x86A2: // GL_NUM_COMPRESSED_TEXTURE_FORMATS
-                    // WebGL doesn't have GL_NUM_COMPRESSED_TEXTURE_FORMATS (it's obsolete since GL_COMPRESSED_TEXTURE_FORMATS returns a JS array that can be queried for length),
-                    // so implement it ourselves to allow C++ GLES2 code get the length.
-                    var formats = gl.getParameter(0x86A3 /*GL_COMPRESSED_TEXTURE_FORMATS*/);
-                    ret = formats ? formats.length : 0;
-                    break;
-                case 0x821D: // GL_NUM_EXTENSIONS
-                    assert(false, "unimplemented");
-                    break;
-                case 0x821B: // GL_MAJOR_VERSION
-                case 0x821C: // GL_MINOR_VERSION
-                    assert(false, "unimplemented");
-                    break;
-            }
 
-            if (ret === undefined) {
-                var result = gl.getParameter(name_);
-                switch (typeof (result)) {
-                    case "number":
-                        ret = result;
-                        break;
-                    case "boolean":
-                        ret = result ? 1 : 0;
-                        break;
-                    case "string":
-                        GL.recordError(0x500); // GL_INVALID_ENUM
-                        console.error('GL_INVALID_ENUM in glGet EM_FUNC_SIG_PARAM_I v(' + name_ + ') on a name which returns a string!');
-                        return;
-                    case "object":
-                        if (result === null) {
-                            // null is a valid result for some (e.g., which buffer is bound - perhaps nothing is bound), but otherwise
-                            // can mean an invalid name_, which we need to report as an error
-                            switch (name_) {
-                                case 0x8894: // ARRAY_BUFFER_BINDING
-                                case 0x8B8D: // CURRENT_PROGRAM
-                                case 0x8895: // ELEMENT_ARRAY_BUFFER_BINDING
-                                case 0x8CA6: // FRAMEBUFFER_BINDING
-                                case 0x8CA7: // RENDERBUFFER_BINDING
-                                case 0x8069: // TEXTURE_BINDING_2D
-                                case 0x85B5: // WebGL 2 GL_VERTEX_ARRAY_BINDING, or WebGL 1 extension OES_vertex_array_object GL_VERTEX_ARRAY_BINDING_OES
-                                case 0x8919: // GL_SAMPLER_BINDING
-                                case 0x8E25: // GL_TRANSFORM_FEEDBACK_BINDING
-                                case 0x8514: { // TEXTURE_BINDING_CUBE_MAP
-                                    ret = 0;
-                                    break;
-                                }
-                                default: {
-                                    GL.recordError(0x500); // GL_INVALID_ENUM
-                                    console.error('GL_INVALID_ENUM in glGet EM_FUNC_SIG_PARAM_I v(' + name_ + ') and it returns null!');
-                                    return;
-                                }
-                            }
-                        } else if (result instanceof Float32Array ||
-                            result instanceof Uint32Array ||
-                            result instanceof Int32Array ||
-                            result instanceof Array) {
-                            for (var i = 0; i < result.length; ++i) {
-                                assert(false, "unimplemented")
-                            }
-                            return;
-                        } else {
-                            try {
-                                ret = result.name | 0;
-                            } catch (e) {
-                                GL.recordError(0x500); // GL_INVALID_ENUM
-                                console.error('GL_INVALID_ENUM in glGet EM_FUNC_SIG_PARAM_I v: Unknown object returned from WebGL getParameter(' + name_ + ')! (error: ' + e + ')');
-                                return;
-                            }
-                        }
-                        break;
-                    default:
-                        GL.recordError(0x500); // GL_INVALID_ENUM
-                        console.error('GL_INVALID_ENUM in glGet EM_FUNC_SIG_PARAM_I v: Native code calling glGet EM_FUNC_SIG_PARAM_I v(' + name_ + ') and it returns ' + result + ' of type ' + typeof (result) + '!');
-                        return;
-                }
-            }
-
-            getArray(p, Int32Array, 1)[0] = ret;
+            // sets value at p in wasm memory to 0 int32
+            let arr = new Int32Array(wasm_memory.buffer, p, 1);
+            arr[0] = 0;
         },
         glUniform1f: function (location, v0) {
             GL.validateGLObjectID(GL.uniforms, location, 'glUniform1f', 'location');
@@ -519,6 +435,21 @@ var importObject = {
             _glGenObject(n, arrays, 'createVertexArray', GL.vaos, 'glGenVertexArrays');
         },
         glGenFramebuffers: function (n, ids) {
+            for (var i = 0; i < n; i++) {
+                var buffer = gl['createFramebuffer']();
+                var id = buffer && GL.getNewId(objectTable);
+                if (buffer) {
+                    buffer.name = id;
+                    objectTable[id] = buffer;
+                } else {
+                    console.error("GL_INVALID_OPERATION");
+                    GL.recordError(0x0502 /* GL_INVALID_OPERATION */);
+
+                    alert('GL_INVALID_OPERATION in ' + _functionName + ': GLctx.' + 'createFramebuffer' + ' returned null - most likely GL context is lost!');
+                }
+
+                getArray(buffers + i * 4, Int32Array, 1)[0] = id;
+            }
             _glGenObject(n, ids, 'createFramebuffer', GL.framebuffers, 'glGenFramebuffers');
         },
         glBindVertexArray: function (vao) {
@@ -644,7 +575,7 @@ var importObject = {
 
         glShaderSource: function (shader, count, string, length) {
             GL.validateGLObjectID(GL.shaders, shader, 'glShaderSource', 'shader');
-            var source = GL.getSource(shader, count, string, length);
+            var source = GL.getSource(count, string, length);
             gl.shaderSource(GL.shaders[shader], source);
         },
         glGetProgramInfoLog: function (program, maxLength, _length, infoLog) {
@@ -672,7 +603,7 @@ var importObject = {
             gl.compileShader(GL.shaders[shader]);
         },
         glGetShaderiv: function (shader, pname, p) {
-            assert(p);
+            assert(p); // shader index 0 is reserved for error cases
             GL.validateGLObjectID(GL.shaders, shader, 'glGetShaderiv', 'shader');
             if (pname == 0x8B84) { // GL_INFO_LOG_LENGTH
                 var log = gl.getShaderInfoLog(GL.shaders[shader]);

@@ -100,8 +100,7 @@ pub struct Platform {
 	pub swap_interval: Option<i32>,
 
 	/// Whether the framebuffer should have an alpha channel.
-	/// Currently supported only on Android
-	/// TODO: Make it works on web, on web it should make a transparent HTML5 canvas
+	/// Currently supported only on Android and Web. On Web, sets `WebGlContextAttributes.alpha = true`.
 	/// TODO: Document(and check) what does it actually mean on android. Transparent window?
 	pub framebuffer_alpha: bool,
 

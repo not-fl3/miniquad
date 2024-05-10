@@ -54,14 +54,17 @@ wasm-bindgen-futures = "0.4.42"
 default-features = false
 version = "0.3"
 features = [
+	# log-impl
+	"console",
+	# Base
 	"Window",
-	"HtmlCanvasElement",
+	"DomRectReadOnly",
 	"Document",
+	"DomRect",
 	"CssStyleDeclaration",
+	# Input and Events
 	"ClipboardEvent",
 	"MouseEvent",
-	"DomRect",
-	"DomRectReadOnly",
 	"WheelEvent",
 	"KeyboardEvent",
 	"ResizeObserver",
@@ -70,12 +73,23 @@ features = [
 	"TouchList",
 	"Touch",
 	"DragEvent",
+	# IO
+	"XmlHttpRequest",
+	"XmlHttpRequestResponseType",
 	"DataTransfer",
 	"File",
 	"FileList",
-	"XmlHttpRequest",
-	"XmlHttpRequestResponseType",
-	"console",
+	# Rendering
+	"HtmlCanvasElement",
+	"WebGl2RenderingContext",
+	"WebGlContextAttributes",
+	"WebGlPowerPreference",
+	"WebGlFramebuffer",
+	"WebGlProgram",
+	"WebGlVertexArrayObject",
+	"WebGlShader",
+	"WebGlActiveInfo",
+	"WebGlUniformLocation",
 ]
 
 [dev-dependencies]
