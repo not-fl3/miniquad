@@ -4,6 +4,8 @@
 
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 
+use wasm_bindgen::*;
+
 pub type GLenum = ::std::os::raw::c_uint;
 pub type GLboolean = ::std::os::raw::c_uchar;
 pub type GLbitfield = ::std::os::raw::c_uint;
@@ -311,6 +313,13 @@ pub struct __GLsync {
 }
 pub type GLsync = *mut __GLsync;
 
+pub unsafe fn glGetIntegerv(pname: GLenum, data: *mut GLint) {
+	let data: &mut GLint = data.as_mut().unwrap_or_else(|| {
+		let error = format!("GL_INVALID_VALUE in glGet EM_FUNC_SIG_PARAM_I v(name={}) : Function called with null out pointer!", pname);
+		throw_str(&error)
+	});
+}
+
 extern "C" {
 	pub fn glActiveTexture(texture: GLenum);
 	pub fn glAttachShader(program: GLuint, shader: GLuint);
@@ -375,7 +384,6 @@ extern "C" {
 	pub fn glGetError() -> GLenum;
 	pub fn glGetFloatv(pname: GLenum, data: *mut GLfloat);
 	pub fn glGetFramebufferAttachmentParameteriv(target: GLenum, attachment: GLenum, pname: GLenum, params: *mut GLint);
-	pub fn glGetIntegerv(pname: GLenum, data: *mut GLint);
 	pub fn glGetProgramiv(program: GLuint, pname: GLenum, params: *mut GLint);
 	pub fn glGetProgramInfoLog(program: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar);
 	pub fn glGetRenderbufferParameteriv(target: GLenum, pname: GLenum, params: *mut GLint);
