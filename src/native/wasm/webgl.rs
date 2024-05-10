@@ -167,6 +167,7 @@ pub const GL_COMPILE_STATUS: u32 = 0x8B81;
 pub const GL_DELETE_STATUS: u32 = 0x8B80;
 pub const GL_SHADER_TYPE: u32 = 0x8B4F;
 pub const GL_ACTIVE_UNIFORMS: u32 = 0x8B86;
+pub const GL_ACTIVE_ATTRIBUTES: u32 = 0x8B89;
 pub const GL_RED: u32 = 0x1903;
 pub const GL_GREEN: u32 = 6404;
 pub const GL_BLUE: u32 = 6405;
@@ -334,6 +335,22 @@ pub(crate) fn get_gl() -> &'static WebGl2RenderingContext {
 	unsafe { GL.as_ref().expect_throw("WebGL context not created!") }
 }
 
+mod counter {
+	static mut COUNTER: u32 = 0;
+
+	pub(crate) fn increment() -> u32 {
+		unsafe {
+			// COUNTER is always greater than zero
+			COUNTER += 1;
+			COUNTER
+		}
+	}
+
+	pub(crate) fn get() -> u32 {
+		unsafe { COUNTER }
+	}
+}
+
 pub fn is_gl2() -> bool {
 	true
 }
@@ -350,7 +367,7 @@ pub unsafe fn glGenFramebuffers(_n: GLsizei, _framebuffers: *mut GLuint) {
 }
 
 // SAFETY: Webassembly is single-threaded
-static mut VERTEX_ARRAY_OBJECTS: Vec<WebGlVertexArrayObject> = Vec::new();
+static mut VERTEX_ARRAY_OBJECTS: BTreeMap<u32, WebGlVertexArrayObject> = BTreeMap::new();
 
 pub unsafe fn glGenVertexArrays(n: GLsizei, vertex_arrays: *mut GLuint) {
 	let gl = get_gl();
@@ -359,8 +376,8 @@ pub unsafe fn glGenVertexArrays(n: GLsizei, vertex_arrays: *mut GLuint) {
 	for va in arrays {
 		let vao = gl.create_vertex_array().unwrap();
 
-		VERTEX_ARRAY_OBJECTS.push(vao);
-		let idx = VERTEX_ARRAY_OBJECTS.len();
+		let idx = counter::increment();
+		VERTEX_ARRAY_OBJECTS.insert(idx, vao);
 
 		// vertex array 0 is reserved for the null vertex array
 		*va = idx as GLuint;
@@ -368,8 +385,12 @@ pub unsafe fn glGenVertexArrays(n: GLsizei, vertex_arrays: *mut GLuint) {
 }
 
 pub unsafe fn glBindVertexArray(array: GLuint) {
+	if array == 0 {
+		throw_str("glBindVertexArray failed! Vertex array 0 is reserved for error cases!");
+	}
+
 	let gl = get_gl();
-	let vao = &VERTEX_ARRAY_OBJECTS[(array - 1) as usize];
+	let vao = VERTEX_ARRAY_OBJECTS.get(&array).unwrap_throw();
 	gl.bind_vertex_array(Some(vao));
 }
 
@@ -385,22 +406,22 @@ pub fn glGetString(name: GLenum) -> *const GLubyte {
 }
 
 // SAFETY: Webassembly is single-threaded
-static mut SHADERS: Vec<WebGlShader> = Vec::new();
+static mut SHADERS: BTreeMap<u32, WebGlShader> = BTreeMap::new();
 
 pub unsafe fn glCreateShader(type_: GLenum) -> GLuint {
 	let gl = get_gl();
 	let shader = gl.create_shader(type_).unwrap();
 
 	// shader 0 is reserved for the null shader
-	SHADERS.push(shader);
-	SHADERS.len() as GLuint
+	let idx = counter::increment();
+	SHADERS.insert(idx, shader);
+	idx
 }
 
 // _lengths is not used as pointers contains null-terminated strings
-pub unsafe fn glShaderSource(shader_id: GLuint, count: GLsizei, pointers: *const *const GLchar, _lengths: *const GLint) {
-	let idx = (shader_id - 1) as usize;
-	if !(0..SHADERS.len()).contains(&idx) {
-		let msg = format!("glShaderSource failed! Invalid shader id: {}", shader_id);
+pub unsafe fn glShaderSource(shader_idx: GLuint, count: GLsizei, pointers: *const *const GLchar, _lengths: *const GLint) {
+	if shader_idx == 0 || !SHADERS.contains_key(&shader_idx) {
+		let msg = format!("glShaderSource failed! Invalid shader id: {}", shader_idx);
 		throw_str(&msg);
 	}
 
@@ -415,55 +436,49 @@ pub unsafe fn glShaderSource(shader_id: GLuint, count: GLsizei, pointers: *const
 
 	// get shader
 	let gl = get_gl();
-	let shader = &SHADERS[idx];
+	let shader = SHADERS.get(&shader_idx).unwrap_throw();
 	gl.shader_source(shader, &source);
 }
 
-pub unsafe fn glCompileShader(shader: GLuint) {
-	let idx = (shader - 1) as usize;
-
-	if !(0..SHADERS.len()).contains(&idx) {
-		let msg = format!("glCompileShader failed! Invalid shader id: {}", shader);
+pub unsafe fn glCompileShader(shader_idx: GLuint) {
+	if shader_idx == 0 || !SHADERS.contains_key(&shader_idx) {
+		let msg = format!("glCompileShader failed! Invalid shader id: {}", shader_idx);
 		throw_str(&msg);
 	}
 
 	let gl = get_gl();
-	let shader = &SHADERS[idx];
+	let shader = SHADERS.get(&shader_idx).unwrap_throw();
 
 	gl.compile_shader(shader);
 }
 
-static mut SHADER_LOGS: BTreeMap<usize, String> = BTreeMap::new();
+static mut SHADER_LOGS: BTreeMap<u32, String> = BTreeMap::new();
 
-pub unsafe fn glGetShaderiv(shader: GLuint, pname: GLenum, params: *mut GLint) {
-	let idx = (shader - 1) as usize;
-	let gl = get_gl();
-
-	if !(0..SHADERS.len()).contains(&idx) {
-		let msg = format!("glGetShaderiv failed! Invalid shader id: {}", shader);
+pub unsafe fn glGetShaderiv(shader_idx: GLuint, pname: GLenum, params: *mut GLint) {
+	if shader_idx == 0 || !SHADERS.contains_key(&shader_idx) {
+		let msg = format!("glGetShaderiv failed! Invalid shader id: {}", shader_idx);
 		throw_str(&msg);
 	}
 
+	let gl = get_gl();
+	let shader = SHADERS.get(&shader_idx).unwrap_throw();
+
 	match pname {
 		p if p == GL_INFO_LOG_LENGTH => {
-			let shader = &SHADERS[idx];
 			let info = gl.get_shader_info_log(shader).unwrap();
 			let len = info.len() as GLint;
-			SHADER_LOGS.insert(idx, info);
+			SHADER_LOGS.insert(shader_idx, info);
 			*params = len;
 		}
 		p if p == GL_SHADER_SOURCE_LENGTH => {
-			let shader = &SHADERS[idx];
 			let source = gl.get_shader_source(shader).unwrap();
 			*params = source.len() as GLint;
 		}
 		p if p == GL_SHADER_TYPE => {
-			let shader = &SHADERS[idx];
 			let param = gl.get_shader_parameter(shader, p).as_f64().unwrap_throw() as GLint;
 			*params = param;
 		}
 		p if p == GL_COMPILE_STATUS || p == GL_DELETE_STATUS => {
-			let shader = &SHADERS[idx];
 			let param = gl.get_shader_parameter(shader, p).as_bool().unwrap_throw();
 			*params = param as GLint;
 		}
@@ -474,15 +489,19 @@ pub unsafe fn glGetShaderiv(shader: GLuint, pname: GLenum, params: *mut GLint) {
 	}
 }
 
-pub unsafe fn glGetShaderInfoLog(shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar) {
-	let idx = (shader - 1) as usize;
-
-	if !(0..SHADERS.len()).contains(&idx) {
-		let msg = format!("glGetShaderInfoLog failed! Invalid shader id: {}", shader);
+pub unsafe fn glGetShaderInfoLog(shader_idx: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar) {
+	if shader_idx == 0 || !SHADERS.contains_key(&shader_idx) {
+		let msg = format!("glGetShaderInfoLog failed! Invalid shader id: {}", shader_idx);
 		throw_str(&msg);
 	}
 
-	let log = SHADER_LOGS.get(&idx).unwrap_throw();
+	// attempt to get cached log
+	let mut extracted_log = None;
+	let log = SHADER_LOGS.get(&shader_idx).unwrap_or_else(|| {
+		let shader = SHADERS.get(&shader_idx).unwrap_throw();
+		extracted_log.get_or_insert_with(|| get_gl().get_shader_info_log(shader).unwrap_throw())
+	});
+
 	let mut len = log.len() as GLsizei;
 
 	// infoLog does not need to be nu
@@ -496,80 +515,150 @@ pub unsafe fn glGetShaderInfoLog(shader: GLuint, bufSize: GLsizei, length: *mut 
 }
 
 // SAFETY: Webassembly is single-threaded
-static mut PROGRAMS: Vec<WebGlProgram> = Vec::new();
+static mut PROGRAMS: BTreeMap<u32, WebGlProgram> = BTreeMap::new();
 
 pub unsafe fn glCreateProgram() -> GLuint {
 	let gl = get_gl();
 	let program = gl.create_program().unwrap();
 
 	// program 0 is reserved for the null program
-	PROGRAMS.push(program);
-	PROGRAMS.len() as GLuint
+	let idx = counter::increment();
+	PROGRAMS.insert(idx, program);
+	idx
 }
 
-pub unsafe fn glAttachShader(program: GLuint, shader: GLuint) {
-	let idx = (program - 1) as usize;
-	let shader_idx = (shader - 1) as usize;
-
-	if !(0..PROGRAMS.len()).contains(&idx) {
-		let msg = format!("glAttachShader failed! Invalid program id: {}", program);
+pub unsafe fn glAttachShader(program_idx: GLuint, shader_idx: GLuint) {
+	if program_idx == 0 || !PROGRAMS.contains_key(&program_idx) {
+		let msg = format!("glAttachShader failed! Invalid program id: {}", program_idx);
 		throw_str(&msg);
 	}
 
-	if !(0..SHADERS.len()).contains(&shader_idx) {
-		let msg = format!("glAttachShader failed! Invalid shader id: {}", shader);
+	if shader_idx == 0 || !SHADERS.contains_key(&shader_idx) {
+		let msg = format!("glAttachShader failed! Invalid shader id: {}", shader_idx);
 		throw_str(&msg);
 	}
 
 	let gl = get_gl();
-	gl.attach_shader(&PROGRAMS[idx], &SHADERS[shader_idx]);
+	let shader = SHADERS.get(&shader_idx).unwrap_throw();
+	let program = PROGRAMS.get(&program_idx).unwrap_throw();
+
+	gl.attach_shader(program, shader);
 }
 
 #[derive(Default)]
-struct ProgramInfos {
-	uniforms: (),
-	max_uniform_length: usize,
+struct ProgramInfo {
+	uniforms: BTreeMap<String, [u32; 2]>,
+	max_uniform_length: u32,
 }
 
 // SAFETY: Webassembly is single-threaded
-static mut UNIFORMS: BTreeMap<usize, BTreeMap<String, GLint>> = BTreeMap::new();
+static mut UNIFORMS: BTreeMap<u32, WebGlUniformLocation> = BTreeMap::new();
+static mut PROGRAM_INFOS: BTreeMap<u32, ProgramInfo> = BTreeMap::new();
 
-pub unsafe fn glLinkProgram(program: GLuint) {
-	let idx = (program - 1) as usize;
-
-	if !(0..PROGRAMS.len()).contains(&idx) {
-		let msg = format!("glLinkProgram failed! Invalid program id: {}", program);
+pub unsafe fn glLinkProgram(program_idx: GLuint) {
+	if program_idx == 0 || !PROGRAMS.contains_key(&program_idx) {
+		let msg = format!("glLinkProgram failed! Invalid program id: {}", program_idx);
 		throw_str(&msg);
 	}
 
 	let gl = get_gl();
-	let program = &PROGRAMS[idx];
+	let program = PROGRAMS.get(&program_idx).unwrap_throw();
 	gl.link_program(program);
 
-	// Populate Uniform Table
+	// setup program info
+	let mut program_info = ProgramInfo::default();
+
+	// A program's uniform table maps the string name of an uniform to an integer location of that uniform.
+	// The global UNIFORMS map maps integer locations to WebGLUniformLocations.
 	let uniforms = gl.get_program_parameter(program, GL_ACTIVE_UNIFORMS).as_f64().unwrap_throw() as u32;
 	for i in 0..uniforms {
 		let active_info = gl.get_active_uniform(program, i).unwrap_throw();
 		let mut name = active_info.name();
 
-		// setup
-		let mut program_info = ProgramInfos::default();
-		program_info.max_uniform_length = name.len() + 1;
+		// This is eagerly computed below, since we already enumerate all uniforms anyway.
+		program_info.max_uniform_length = (name.len() + 1) as _;
 
-		// canonicalize
+		// If we are dealing with an array, e.g. vec4 foo[3], strip off the array index part to canonicalize that "foo", "foo[]",
+		// and "foo[0]" will mean the same. Loop below will populate foo[1] and foo[2].
 		if &name[..name.len() - 1] == "]" {
 			let slice = name.rfind('[').unwrap_throw();
 			name.truncate(slice);
 		}
 
-		// get location
+		// Optimize memory usage slightly: If we have an array of uniforms, e.g. 'vec3 colors[3];', then
+		// only store the string 'colors' in utable, and 'colors[0]', 'colors[1]' and 'colors[2]' will be parsed as 'colors'+i.
+		// Note that for the GL.uniforms table, we still need to fetch the all WebGLUniformLocations for all the indices.
 		if let Some(loc) = gl.get_uniform_location(program, &name) {
-			
+			let id = counter::increment() as _;
+			program_info.uniforms.insert(name.clone(), [active_info.size() as u32, id]);
+			UNIFORMS.insert(id, loc);
+
+			for i in 1..active_info.size() {
+				let name = format!("{}[{}]", name, i);
+				let loc = gl.get_uniform_location(program, &name).unwrap_throw();
+				UNIFORMS.insert(counter::increment(), loc);
+			}
 		};
+	}
+
+	// insert
+	PROGRAM_INFOS.insert(program_idx, program_info);
+}
+
+// SAFETY: Webassembly is single-threaded
+static mut PROGRAM_LOGS: BTreeMap<u32, String> = BTreeMap::new();
+
+pub unsafe fn glGetProgramiv(program_idx: GLuint, pname: GLenum, params: *mut GLint) {
+	if program_idx == 0 || !PROGRAMS.contains_key(&program_idx) || program_idx > counter::get() {
+		let msg = format!("glGetProgramiv failed! Invalid program id: {}", program_idx);
+		throw_str(&msg);
+	}
+
+	let gl = get_gl();
+	let program = PROGRAMS.get(&program_idx).unwrap_throw();
+
+	match pname {
+		p if p == GL_INFO_LOG_LENGTH => {
+			let info = gl.get_program_info_log(program).unwrap();
+			let len = info.len() as GLint;
+			PROGRAM_LOGS.insert(program_idx, info);
+			*params = len;
+		}
+		p if p == GL_LINK_STATUS || p == GL_DELETE_STATUS => {
+			let param = gl.get_program_parameter(program, p).as_bool().unwrap_throw();
+			*params = param as GLint;
+		}
+		_p => {
+			#[cfg(feature = "log-impl")]
+			crate::error!("glGetProgramiv failed! Unsupported pname: {}", _p);
+		}
 	}
 }
 
-pub fn glGetProgramiv(program: GLuint, pname: GLenum, params: *mut GLint) {}
+pub unsafe fn glGetProgramInfoLog(program: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar) {
+	if program == 0 || !PROGRAMS.contains_key(&program) || program > counter::get() {
+		let msg = format!("glGetProgramInfoLog failed! Invalid program id: {}", program);
+		throw_str(&msg);
+	}
+
+	// attempt to get cached log
+	let mut extracted_log = None;
+	let log = PROGRAM_LOGS.get(&program).unwrap_or_else(|| {
+		let program = PROGRAMS.get(&program).unwrap_throw();
+		extracted_log.get_or_insert_with(|| get_gl().get_program_info_log(program).unwrap_throw())
+	});
+
+	let mut len = log.len() as GLsizei;
+
+	// infoLog does not need to be nu
+	if bufSize > 0 {
+		len = len.min(bufSize - 1);
+		let slice = log.as_bytes();
+		std::ptr::copy_nonoverlapping(slice.as_ptr() as _, infoLog as _, len as usize);
+	}
+
+	*length = len;
+}
 
 extern "C" {
 	pub fn glActiveTexture(texture: GLenum);
@@ -630,7 +719,6 @@ extern "C" {
 	pub fn glGetError() -> GLenum;
 	pub fn glGetFloatv(pname: GLenum, data: *mut GLfloat);
 	pub fn glGetFramebufferAttachmentParameteriv(target: GLenum, attachment: GLenum, pname: GLenum, params: *mut GLint);
-	pub fn glGetProgramInfoLog(program: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar);
 	pub fn glGetRenderbufferParameteriv(target: GLenum, pname: GLenum, params: *mut GLint);
 	pub fn glGetShaderPrecisionFormat(shadertype: GLenum, precisiontype: GLenum, range: *mut GLint, precision: *mut GLint);
 	pub fn glGetShaderSource(shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, source: *mut GLchar);

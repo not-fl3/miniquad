@@ -182,7 +182,7 @@ var GL = {
         return source;
     },
     populateUniformTable: function (program) {
-        var p = GL.programs[program];
+        var program = GL.programs[program];
         var ptable = GL.programInfos[program] = {
             uniforms: {},
             maxUniformLength: 0, // This is eagerly computed below, since we already enumerate all uniforms anyway.
@@ -192,12 +192,12 @@ var GL = {
 
         // A program's uniform table maps the string name of an uniform to an integer location of that uniform.
         // The global GL.uniforms map maps integer locations to WebGLUniformLocations.
-        var numUniforms = gl.getProgramParameter(p, 0x8B86/*GL_ACTIVE_UNIFORMS*/);
+        var numUniforms = gl.getProgramParameter(program, 0x8B86/*GL_ACTIVE_UNIFORMS*/);
         for (var i = 0; i < numUniforms; ++i) {
-            var u = gl.getActiveUniform(p, i);
+            var active_info = gl.getActiveUniform(program, i);
 
-            var name = u.name;
-            ptable.maxUniformLength = Math.max(ptable.maxUniformLength, name.length + 1);
+            var name = active_info.name;
+            ptable.maxUniformLength = name.length + 1;
 
             // If we are dealing with an array, e.g. vec4 foo[3], strip off the array index part to canonicalize that "foo", "foo[]",
             // and "foo[0]" will mean the same. Loop below will populate foo[1] and foo[2].
@@ -208,15 +208,15 @@ var GL = {
             // Optimize memory usage slightly: If we have an array of uniforms, e.g. 'vec3 colors[3];', then
             // only store the string 'colors' in utable, and 'colors[0]', 'colors[1]' and 'colors[2]' will be parsed as 'colors'+i.
             // Note that for the GL.uniforms table, we still need to fetch the all WebGLUniformLocations for all the indices.
-            var loc = gl.getUniformLocation(p, name);
+            var loc = gl.getUniformLocation(program, name);
             if (loc) {
                 var id = GL.getNewId(GL.uniforms);
-                utable[name] = [u.size, id];
+                utable[name] = [active_info.size, id];
                 GL.uniforms[id] = loc;
 
-                for (var j = 1; j < u.size; ++j) {
+                for (var j = 1; j < active_info.size; ++j) {
                     var n = name + '[' + j + ']';
-                    loc = gl.getUniformLocation(p, n);
+                    loc = gl.getUniformLocation(program, n);
                     id = GL.getNewId(GL.uniforms);
 
                     GL.uniforms[id] = loc;
@@ -522,6 +522,7 @@ var importObject = {
         glGetProgramiv: function (program, pname, p) {
             assert(p);
             GL.validateGLObjectID(GL.programs, program, 'glGetProgramiv', 'program');
+
             if (program >= GL.counter) {
                 console.error("GL_INVALID_VALUE in glGetProgramiv");
                 return;

@@ -521,9 +521,9 @@ impl Clipboard {
 			if let Some(dt) = ev.clipboard_data() {
 				match dt.get_data("text") {
 					Ok(text) => *state_2.borrow_mut() = Some(text),
-					Err(e) => {
+					Err(_e) => {
 						#[cfg(feature = "log-impl")]
-						crate::error!("Unable to paste text: {:?}", e);
+						crate::error!("Unable to paste text: {:?}", _e);
 					}
 				}
 			}
