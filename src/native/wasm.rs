@@ -82,36 +82,6 @@ where
 	event_loop(main_canvas, "default", rx);
 }
 
-#[no_mangle]
-pub extern "C" fn allocate_vec_u8(len: usize) -> *mut u8 {
-	let mut string = vec![0u8; len];
-	let ptr = string.as_mut_ptr();
-	string.leak();
-	ptr
-}
-
-struct Clipboard;
-
-impl crate::native::Clipboard for Clipboard {
-	fn get(&mut self) -> Option<String> {
-		let navigator = window()?.navigator();
-		let clipboard = navigator.clipboard()?;
-		let promise = clipboard.read_text();
-		let future = wasm_bindgen_futures::JsFuture::from(promise);
-		let result = pollster::block_on(future).unwrap();
-		result.as_string()
-	}
-
-	fn set(&mut self, data: &str) {
-		let navigator = window().unwrap().navigator();
-		if let Some(clipboard) = navigator.clipboard() {
-			let promise = clipboard.write_text(data);
-			let future = wasm_bindgen_futures::JsFuture::from(promise);
-			let _ = pollster::block_on(future).unwrap();
-		}
-	}
-}
-
 fn event_loop(main_canvas: web_sys::HtmlCanvasElement, last_cursor_css: &'static str, rx: Receiver<Request>) {
 	let event_handler = get_event_handler(None);
 	let mut next_cursor_css = last_cursor_css;
@@ -509,4 +479,34 @@ fn init_file_drop_events(canvas: &HtmlCanvasElement) {
 
 	canvas.add_event_listener_with_callback("dragover", drag_over_fn_ref).unwrap_throw();
 	canvas.add_event_listener_with_callback("drop", drop_fn_ref).unwrap_throw();
+}
+
+#[no_mangle]
+pub extern "C" fn allocate_vec_u8(len: usize) -> *mut u8 {
+	let mut string = vec![0u8; len];
+	let ptr = string.as_mut_ptr();
+	string.leak();
+	ptr
+}
+
+struct Clipboard;
+
+impl crate::native::Clipboard for Clipboard {
+	fn get(&mut self) -> Option<String> {
+		let navigator = window()?.navigator();
+		let clipboard = navigator.clipboard()?;
+		let promise = clipboard.read_text();
+		let future = wasm_bindgen_futures::JsFuture::from(promise);
+		let result = pollster::block_on(future).unwrap();
+		result.as_string()
+	}
+
+	fn set(&mut self, data: &str) {
+		let navigator = window().unwrap().navigator();
+		if let Some(clipboard) = navigator.clipboard() {
+			let promise = clipboard.write_text(data);
+			let future = wasm_bindgen_futures::JsFuture::from(promise);
+			let _ = pollster::block_on(future).unwrap();
+		}
+	}
 }
