@@ -1,5 +1,5 @@
 [package]
-name = "miniquad-wasm-bindgen"
+name = "miniquad_wasm_bindgen"
 version = "0.1.0"
 authors = [
 	"not-fl3 <not.fl3@gmail.com>",
