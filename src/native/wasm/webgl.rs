@@ -547,7 +547,7 @@ pub unsafe fn glAttachShader(program_idx: GLuint, shader_idx: GLuint) {
 
 #[derive(Default)]
 struct ProgramInfo {
-	uniforms: BTreeMap<String, [u32; 2]>,
+	uniforms: BTreeMap<String, (WebGlActiveInfo, u32)>,
 	max_uniform_length: u32,
 }
 
@@ -589,11 +589,13 @@ pub unsafe fn glLinkProgram(program_idx: GLuint) {
 		// only store the string 'colors' in utable, and 'colors[0]', 'colors[1]' and 'colors[2]' will be parsed as 'colors'+i.
 		// Note that for the GL.uniforms table, we still need to fetch the all WebGLUniformLocations for all the indices.
 		if let Some(loc) = gl.get_uniform_location(program, &name) {
-			let id = counter::increment() as _;
-			program_info.uniforms.insert(name.clone(), [active_info.size() as u32, id]);
-			UNIFORMS.insert(id, loc);
+			let uniform_id = counter::increment() as _;
+			let size = active_info.size();
 
-			for i in 1..active_info.size() {
+			program_info.uniforms.insert(name.clone(), (active_info, uniform_id));
+			UNIFORMS.insert(uniform_id, loc);
+
+			for i in 1..size {
 				let name = format!("{}[{}]", name, i);
 				let loc = gl.get_uniform_location(program, &name).unwrap_throw();
 				UNIFORMS.insert(counter::increment(), loc);
@@ -658,6 +660,43 @@ pub unsafe fn glGetProgramInfoLog(program: GLuint, bufSize: GLsizei, length: *mu
 	}
 
 	*length = len;
+}
+
+pub unsafe fn glUseProgram(program: GLuint) {
+	if program == 0 || !PROGRAMS.contains_key(&program) {
+		let msg = format!("glUseProgram failed! Invalid program id: {}", program);
+		throw_str(&msg);
+	}
+
+	let gl = get_gl();
+	let program = PROGRAMS.get(&program).unwrap_throw();
+	gl.use_program(Some(program));
+}
+
+pub unsafe fn glGetUniformLocation(program: GLuint, name: *const GLchar) -> GLint {
+	// If user passed an array accessor "[index]", parse the array index off the accessor.
+	let name = std::ffi::CStr::from_ptr(name).to_str().unwrap_throw();
+	let mut array_index = None;
+
+	// parse array index
+	if name.ends_with(']') {
+		let left_brace = name.rfind('[').unwrap_throw();
+
+		if left_brace != name.len() - 2 {
+			// input is "name[index]"
+			array_index = Some(name[left_brace + 1..name.len() - 1].parse::<usize>().unwrap_throw());
+		};
+	}
+
+	// get uniform location
+	let program_info = PROGRAM_INFOS.get(&program).unwrap_throw();
+	if let Some((info, uniform_idx)) = program_info.uniforms.get(name) {
+		if array_index.is_some() && array_index.map(|a| a < info.size() as _).unwrap_or(false) {
+			return *uniform_idx as GLint + array_index.unwrap_or(0) as GLint;
+		}
+	};
+
+	-1 // Unable to find uniform
 }
 
 extern "C" {
@@ -726,7 +765,6 @@ extern "C" {
 	pub fn glGetTexParameteriv(target: GLenum, pname: GLenum, params: *mut GLint);
 	pub fn glGetUniformfv(program: GLuint, location: GLint, params: *mut GLfloat);
 	pub fn glGetUniformiv(program: GLuint, location: GLint, params: *mut GLint);
-	pub fn glGetUniformLocation(program: GLuint, name: *const GLchar) -> GLint;
 	pub fn glGetVertexAttribfv(index: GLuint, pname: GLenum, params: *mut GLfloat);
 	pub fn glGetVertexAttribiv(index: GLuint, pname: GLenum, params: *mut GLint);
 	pub fn glGetVertexAttribPointerv(index: GLuint, pname: GLenum, pointer: *mut *mut ::std::os::raw::c_void);
@@ -778,7 +816,6 @@ extern "C" {
 	pub fn glUniformMatrix2fv(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat);
 	pub fn glUniformMatrix3fv(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat);
 	pub fn glUniformMatrix4fv(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat);
-	pub fn glUseProgram(program: GLuint);
 	pub fn glValidateProgram(program: GLuint);
 	pub fn glVertexAttrib1f(index: GLuint, x: GLfloat);
 	pub fn glVertexAttrib1fv(index: GLuint, v: *const GLfloat);

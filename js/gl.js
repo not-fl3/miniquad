@@ -407,6 +407,7 @@ var importObject = {
             GL.validateGLObjectID(GL.programs, program, 'glGetUniformLocation', 'program');
             name = UTF8ToString(name);
             var arrayIndex = 0;
+
             // If user passed an array accessor "[index]", parse the array index off the accessor.
             if (name[name.length - 1] == ']') {
                 var leftBrace = name.lastIndexOf('[');

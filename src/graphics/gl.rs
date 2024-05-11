@@ -367,7 +367,7 @@ pub struct ShaderImage {
 }
 
 fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
-	let cname = CString::new(name).unwrap_or_else(|e| panic!("{}", e));
+	let cname = CString::new(name).unwrap();
 	let location = unsafe { glGetUniformLocation(program, cname.as_ptr()) };
 
 	if location == -1 {
@@ -708,10 +708,12 @@ impl RenderingBackend for GlContext {
 		self.textures.0.push(texture);
 		TextureId(TextureIdInner::Managed(self.textures.0.len() - 1))
 	}
+
 	fn delete_texture(&mut self, texture: TextureId) {
 		let t = self.textures.get(texture);
 		t.delete();
 	}
+
 	fn texture_set_wrap(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap) {
 		let t = self.textures.get(texture);
 
