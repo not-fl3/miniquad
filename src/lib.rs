@@ -212,6 +212,17 @@ pub mod window {
         });
     }
 
+    pub fn set_window_position(new_x: u32, new_y: u32) {
+        let mut d = native_display().lock().unwrap();
+        d.native_requests.send(native::Request::SetWindowPosition { new_x, new_y });
+    }
+
+    /// Get the position of the window.
+    pub fn get_window_position() -> (u32, u32) {
+        let mut d = native_display().lock().unwrap();
+        d.screen_position
+    }
+
     pub fn set_fullscreen(fullscreen: bool) {
         let mut d = native_display().lock().unwrap();
         d.native_requests

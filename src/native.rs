@@ -8,6 +8,7 @@ pub(crate) struct DroppedFiles {
 pub(crate) struct NativeDisplayData {
     pub screen_width: i32,
     pub screen_height: i32,
+    pub screen_position: (u32, u32),
     pub dpi_scale: f32,
     pub high_dpi: bool,
     pub quit_requested: bool,
@@ -38,6 +39,7 @@ impl NativeDisplayData {
         NativeDisplayData {
             screen_width,
             screen_height,
+            screen_position: (0, 0),
             dpi_scale: 1.,
             high_dpi: false,
             quit_requested: false,
@@ -61,6 +63,7 @@ pub(crate) enum Request {
     ShowMouse(bool),
     SetMouseCursor(crate::CursorIcon),
     SetWindowSize { new_width: u32, new_height: u32 },
+    SetWindowPosition{ new_x: u32, new_y: u32 },
     SetFullscreen(bool),
     ShowKeyboard(bool),
 }
