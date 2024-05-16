@@ -324,6 +324,9 @@ impl X11Display {
                     new_width,
                     new_height,
                 } => self.set_window_size(self.window, new_width as _, new_height as _),
+                SetWindowPosition { new_x, new_y } => {
+                    eprintln!("Not implemented for X11")
+                }
                 SetFullscreen(fullscreen) => self.set_fullscreen(self.window, fullscreen),
                 ShowKeyboard(show) => {
                     eprintln!("Not implemented for X11")
