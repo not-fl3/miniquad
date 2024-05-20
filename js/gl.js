@@ -77,6 +77,13 @@ function acquireDisjointTimerQueryExtension(ctx) {
     }
 }
 
+function acquireDrawBuffers(ctx) {
+    var ext = ctx.getExtension('WEBGL_draw_buffers');
+    if (ext) {
+        ctx['drawBuffers'] = function (bufs) { return ext['drawBuffersWEBGL'](bufs); };
+    }
+}
+
 try {
     gl.getExtension("EXT_shader_texture_lod");
     gl.getExtension("OES_standard_derivatives");
@@ -87,6 +94,7 @@ try {
 acquireVertexArrayObjectExtension(gl);
 acquireInstancedArraysExtension(gl);
 acquireDisjointTimerQueryExtension(gl);
+acquireDrawBuffers(gl);
 
 // https://developer.mozilla.org/en-US/docs/Web/API/WEBGL_depth_texture
 if (gl.getExtension('WEBGL_depth_texture') == null) {
@@ -833,6 +841,9 @@ var importObject = {
         glDrawArrays: function (mode, first, count) {
             gl.drawArrays(mode, first, count);
         },
+        glDrawBuffers: function (n, bufs) {
+            gl.drawBuffers(getArray(bufs, Int32Array, n));
+        },
         glCreateProgram: function () {
             var id = GL.getNewId(GL.programs);
             var program = gl.createProgram();
@@ -845,7 +856,7 @@ var importObject = {
             GL.validateGLObjectID(GL.shaders, shader, 'glAttachShader', 'shader');
             gl.attachShader(GL.programs[program], GL.shaders[shader]);
         },
-        glDettachShader: function (program, shader) {
+        glDetachShader: function (program, shader) {
             GL.validateGLObjectID(GL.programs, program, 'glDetachShader', 'program');
             GL.validateGLObjectID(GL.shaders, shader, 'glDetachShader', 'shader');
             gl.detachShader(GL.programs[program], GL.shaders[shader]);
@@ -1016,6 +1027,12 @@ var importObject = {
             if (id == null) { return }
             gl.deleteShader(id);
             GL.shaders[shader] = null
+        },
+        glDeleteProgram: function (program) {
+            var id = GL.programs[program];
+            if (id == null) { return }
+            gl.deleteProgram(id);
+            GL.programs[program] = null
         },
         glDeleteBuffers: function (n, buffers) {
             for (var i = 0; i < n; i++) {
