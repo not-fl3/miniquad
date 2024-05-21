@@ -168,13 +168,11 @@ pub unsafe fn update_cursor() {
     sapp_set_cursor(css_name.as_ptr(), css_name.len());
 }
 
+// gl.js version required to be shipped alongside this rust code.
+// "crate_version" is a misleading, but it can't be changed for legacy reasons.
 #[no_mangle]
 pub extern "C" fn crate_version() -> u32 {
-    let major = env!("CARGO_PKG_VERSION_MAJOR").parse::<u32>().unwrap();
-    let minor = env!("CARGO_PKG_VERSION_MINOR").parse::<u32>().unwrap();
-    let patch = env!("CARGO_PKG_VERSION_PATCH").parse::<u32>().unwrap();
-
-    (major << 24) + (minor << 16) + patch
+    1
 }
 
 #[no_mangle]
