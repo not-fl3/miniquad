@@ -8,7 +8,7 @@
 
 "use strict";
 
-const version = "0.3.12";
+const version = 1;
 
 const canvas = document.querySelector("#glcanvas");
 const gl = canvas.getContext("webgl");
@@ -1403,14 +1403,6 @@ function register_plugins(plugins) {
     }
 }
 
-function u32_to_semver(crate_version) {
-    let major_version = (crate_version >> 24) & 0xff;
-    let minor_version = (crate_version >> 16) & 0xff;
-    let patch_version = crate_version & 0xffff;
-
-    return major_version + "." + minor_version + "." + patch_version;
-}
-
 function init_plugins(plugins) {
     if (plugins == undefined)
         return;
@@ -1429,7 +1421,7 @@ function init_plugins(plugins) {
             if (wasm_exports[version_func] == undefined) {
                 console.log("Plugin " + plugins[i].name + " is present in JS bundle, but is not used in the rust code.");
             } else {
-                var crate_version = u32_to_semver(wasm_exports[version_func]());
+                var crate_version = wasm_exports[version_func]();
 
                 if (plugins[i].version != crate_version) {
                     console.error("Plugin " + plugins[i].name + " version mismatch" +
@@ -1477,7 +1469,7 @@ function load(wasm_path) {
                     wasm_memory = obj.exports.memory;
                     wasm_exports = obj.exports;
 
-                    var crate_version = u32_to_semver(wasm_exports.crate_version());
+                    var crate_version = wasm_exports.crate_version();
                     if (version != crate_version) {
                         console.error(
                             "Version mismatch: gl.js version is: " + version +
@@ -1487,7 +1479,6 @@ function load(wasm_path) {
                     obj.exports.main();
                 })
             .catch(err => {
-                console.error("WASM failed to load, probably incompatible gl.js version");
                 console.error(err);
             })
     } else {
@@ -1502,7 +1493,7 @@ function load(wasm_path) {
                 wasm_memory = obj.exports.memory;
                 wasm_exports = obj.exports;
 
-                var crate_version = u32_to_semver(wasm_exports.crate_version());
+                var crate_version = wasm_exports.crate_version();
                 if (version != crate_version) {
                     console.error(
                         "Version mismatch: gl.js version is: " + version +
