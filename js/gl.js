@@ -1399,7 +1399,10 @@ var importObject = {
             resize(canvas, wasm_exports.resize);
         },
         sapp_schedule_update: function () {
-            window.requestAnimationFrame(animation);
+            if (animation_frame_timeout) {
+                window.cancelAnimationFrame(animation_frame_timeout);
+            }
+            animation_frame_timeout = window.requestAnimationFrame(animation);
         }
     }
 };

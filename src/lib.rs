@@ -201,8 +201,11 @@ pub mod window {
     ///
     /// Does nothing without `conf.platform.blocking_event_loop`.
     pub fn schedule_update() {
-        let mut d = native_display().lock().unwrap();
-        d.native_requests.send(native::Request::ScheduleUpdate);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let mut d = native_display().lock().unwrap();
+            d.native_requests.send(native::Request::ScheduleUpdate);
+        }
 
         #[cfg(target_arch = "wasm32")]
         unsafe {
