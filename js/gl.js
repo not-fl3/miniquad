@@ -20,8 +20,12 @@ var clipboard = null;
 
 var plugins = [];
 var wasm_memory;
+var animation_frame_timeout;
 
 var high_dpi = false;
+// if true, requestAnimationFrame will only be called from "schedule_update"
+// if false, requestAnimationFrame will be called at the end of each frame
+var blocking_event_loop = false;
 
 canvas.focus();
 
@@ -424,7 +428,12 @@ function resize(canvas, on_resize) {
 
 function animation() {
     wasm_exports.frame();
-    window.requestAnimationFrame(animation);
+    if (!window.blocking_event_loop) {
+        if (animation_frame_timeout) {
+            window.cancelAnimationFrame(animation_frame_timeout);
+        }
+        animation_frame_timeout = window.requestAnimationFrame(animation);
+    }
 }
 
 const SAPP_EVENTTYPE_TOUCHES_BEGAN = 10;
@@ -1114,7 +1123,7 @@ var importObject = {
             window.high_dpi = high_dpi;
             resize(canvas);
         },
-        run_animation_loop: function (ptr) {
+        run_animation_loop: function (blocking) {
             canvas.onmousemove = function (event) {
                 var relative_position = mouse_relative_position(event.clientX, event.clientY);
                 var x = relative_position.x;
@@ -1314,6 +1323,7 @@ var importObject = {
             window.addEventListener("focus", checkFocus);
             window.addEventListener("blur", checkFocus);
 
+            window.blocking_event_loop = blocking;
             window.requestAnimationFrame(animation);
         },
 
@@ -1387,6 +1397,9 @@ var importObject = {
             canvas.width = new_width;
             canvas.height = new_height;
             resize(canvas, wasm_exports.resize);
+        },
+        sapp_schedule_update: function () {
+            window.requestAnimationFrame(animation);
         }
     }
 };

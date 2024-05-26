@@ -98,6 +98,13 @@ pub struct Platform {
     /// the way to limit FPS in the game!
     pub swap_interval: Option<i32>,
 
+    /// A way to reduce CPU usage to zero when waiting for an incoming event.
+    /// update()/draw() will only be called after `window::request_update()`.
+    /// It is recommended to put `request_update` at the end of `resize_event` and
+    /// relevant mouse/keyboard input.
+    /// `request_update` may be used from other threads to "wake up" the window.
+    pub blocking_event_loop: bool,
+
     /// Whether the framebuffer should have an alpha channel.
     /// Currently supported only on Android
     /// TODO: Make it works on web, on web it should make a transparent HTML5 canvas
@@ -113,9 +120,10 @@ impl Default for Platform {
     fn default() -> Platform {
         Platform {
             linux_x11_gl: LinuxX11Gl::GLXWithEGLFallback,
-            swap_interval: None,
             linux_backend: LinuxBackend::X11Only,
             apple_gfx_api: AppleGfxApi::OpenGl,
+            blocking_event_loop: false,
+            swap_interval: None,
             framebuffer_alpha: false,
             wayland_use_fallback_decorations: true,
         }

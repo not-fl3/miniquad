@@ -78,6 +78,7 @@ where
     let h = unsafe { canvas_height() as _ };
     let clipboard = Box::new(Clipboard);
     crate::set_display(NativeDisplayData {
+        blocking_event_loop: conf.platform.blocking_event_loop,
         ..NativeDisplayData::new(w, h, tx, clipboard)
     });
     EVENT_HANDLER.with(|g| {
@@ -86,7 +87,7 @@ where
 
     // start requestAnimationFrame loop
     unsafe {
-        run_animation_loop();
+        run_animation_loop(conf.platform.blocking_event_loop);
     }
 }
 
@@ -100,7 +101,7 @@ pub unsafe fn sapp_height() -> ::std::os::raw::c_int {
 
 extern "C" {
     pub fn setup_canvas_size(high_dpi: bool);
-    pub fn run_animation_loop();
+    pub fn run_animation_loop(blocking: bool);
     pub fn canvas_width() -> i32;
     pub fn canvas_height() -> i32;
     pub fn dpi_scale() -> f32;
@@ -126,7 +127,7 @@ extern "C" {
     pub fn sapp_set_fullscreen(fullscreen: bool);
     pub fn sapp_is_fullscreen() -> bool;
     pub fn sapp_set_window_size(new_width: u32, new_height: u32);
-
+    pub fn sapp_schedule_update();
     pub fn now() -> f64;
 }
 
