@@ -16,6 +16,7 @@ pub(crate) struct NativeDisplayData {
     pub native_requests: mpsc::Sender<Request>,
     pub clipboard: Box<dyn Clipboard>,
     pub dropped_files: DroppedFiles,
+    pub blocking_event_loop: bool,
 
     #[cfg(target_vendor = "apple")]
     pub view: crate::native::apple::frameworks::ObjcId,
@@ -47,6 +48,7 @@ impl NativeDisplayData {
             native_requests,
             clipboard,
             dropped_files: Default::default(),
+            blocking_event_loop: false,
             #[cfg(target_vendor = "apple")]
             gfx_api: crate::conf::AppleGfxApi::OpenGl,
             #[cfg(target_vendor = "apple")]
@@ -59,6 +61,7 @@ impl NativeDisplayData {
 
 #[derive(Debug)]
 pub(crate) enum Request {
+    ScheduleUpdate,
     SetCursorGrab(bool),
     ShowMouse(bool),
     SetMouseCursor(crate::CursorIcon),
