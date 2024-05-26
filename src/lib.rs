@@ -143,6 +143,11 @@ pub mod window {
         d.high_dpi
     }
 
+    pub fn blocking_event_loop() -> bool {
+        let d = native_display().lock().unwrap();
+        d.blocking_event_loop
+    }
+
     /// This function simply quits the application without
     /// giving the user a chance to intervene. Usually this might
     /// be called when the user clicks the 'Ok' button in a 'Really Quit?'
@@ -190,6 +195,21 @@ pub mod window {
         d.native_requests.send(native::Request::SetCursorGrab(grab));
     }
 
+    /// With `conf.platform.blocking_event_loop`, `schedule_update` called from an
+    /// event handler makes draw()/update() functions to be called without waiting
+    /// for a next event.
+    ///
+    /// Does nothing without `conf.platform.blocking_event_loop`.
+    pub fn schedule_update() {
+        let mut d = native_display().lock().unwrap();
+        d.native_requests.send(native::Request::ScheduleUpdate);
+
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            native::wasm::sapp_schedule_update();
+        }
+    }
+
     /// Show or hide the mouse cursor
     pub fn show_mouse(shown: bool) {
         let mut d = native_display().lock().unwrap();
@@ -214,7 +234,8 @@ pub mod window {
 
     pub fn set_window_position(new_x: u32, new_y: u32) {
         let mut d = native_display().lock().unwrap();
-        d.native_requests.send(native::Request::SetWindowPosition { new_x, new_y });
+        d.native_requests
+            .send(native::Request::SetWindowPosition { new_x, new_y });
     }
 
     /// Get the position of the window.
