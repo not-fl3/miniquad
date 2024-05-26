@@ -73,7 +73,7 @@ impl Stage {
                 VertexAttribute::new("in_uv", VertexFormat::Float2),
             ],
             shader,
-            PipelineParams::default()
+            PipelineParams::default(),
         );
 
         let uniforms = shader::Uniforms {

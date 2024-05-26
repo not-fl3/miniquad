@@ -66,7 +66,7 @@ pub(crate) enum Request {
     ShowMouse(bool),
     SetMouseCursor(crate::CursorIcon),
     SetWindowSize { new_width: u32, new_height: u32 },
-    SetWindowPosition{ new_x: u32, new_y: u32 },
+    SetWindowPosition { new_x: u32, new_y: u32 },
     SetFullscreen(bool),
     ShowKeyboard(bool),
 }
