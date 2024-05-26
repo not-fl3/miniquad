@@ -183,7 +183,7 @@ impl MacosDisplay {
                     new_height,
                 } => self.set_window_size(new_width as _, new_height as _),
                 SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
-                SetWindowPosition{new_x, new_y} => {
+                SetWindowPosition { new_x, new_y } => {
                     eprintln!("Not implemented for macos");
                 }
                 _ => {}
