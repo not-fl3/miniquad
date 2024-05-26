@@ -150,6 +150,7 @@ impl From<PrimitiveType> for MTLPrimitiveType {
         match primitive_type {
             PrimitiveType::Triangles => MTLPrimitiveType::Triangle,
             PrimitiveType::Lines => MTLPrimitiveType::Line,
+            PrimitiveType::Points => MTLPrimitiveType::Point,
         }
     }
 }
