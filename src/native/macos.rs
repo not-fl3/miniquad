@@ -148,8 +148,7 @@ impl MacosDisplay {
     unsafe fn update_dimensions(&mut self) -> Option<(i32, i32)> {
         let mut d = native_display().lock().unwrap();
         if d.high_dpi {
-            let screen: ObjcId = msg_send![self.window, screen];
-            let dpi_scale: f64 = msg_send![screen, backingScaleFactor];
+            let dpi_scale: f64 = msg_send![self.window, backingScaleFactor];
             d.dpi_scale = dpi_scale as f32;
         } else {
             d.dpi_scale = 1.0;
