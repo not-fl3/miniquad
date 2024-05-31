@@ -752,7 +752,7 @@ impl RenderingBackend for GlContext {
             .unwrap()
             .to_string();
         let gles3 = gl_version_string.contains("OpenGL ES 3");
-        let gles2 = !gles3 && gl_version_string.contains("OpenGL ES");
+        //let gles2 = !gles3 && gl_version_string.contains("OpenGL ES");
 
         let mut glsl_support = GlslSupport::default();
 
@@ -848,7 +848,7 @@ impl RenderingBackend for GlContext {
 
         unsafe {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_x as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_x as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_y as i32);
         }
         self.cache.restore_texture_binding(0);
     }
@@ -1024,7 +1024,7 @@ impl RenderingBackend for GlContext {
         } in attributes
         {
             let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());
-            let mut cache = buffer_cache
+            let cache = buffer_cache
                 .get_mut(*buffer_index)
                 .unwrap_or_else(|| panic!());
 
@@ -1055,7 +1055,7 @@ impl RenderingBackend for GlContext {
             buffer_index,
         } in attributes
         {
-            let mut buffer_data = &mut buffer_cache
+            let buffer_data = &mut buffer_cache
                 .get_mut(*buffer_index)
                 .unwrap_or_else(|| panic!());
             let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());

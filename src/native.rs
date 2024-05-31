@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::sync::mpsc;
 
 #[derive(Default)]

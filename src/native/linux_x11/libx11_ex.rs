@@ -173,7 +173,7 @@ impl LibX11 {
 
         let mut protocols: [Atom; 1] = [self.extensions.wm_delete_window];
         (self.XSetWMProtocols)(display, window, protocols.as_mut_ptr(), 1 as libc::c_int);
-        let mut hints = (self.XAllocSizeHints)();
+        let hints = (self.XAllocSizeHints)();
         (*hints).flags |= PWinGravity;
         if conf.window_resizable == false {
             (*hints).flags |= PMinSize | PMaxSize;

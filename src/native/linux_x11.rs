@@ -156,7 +156,7 @@ impl X11Display {
             _ => {}
         };
 
-        let mut d = crate::native_display().try_lock().unwrap();
+        let d = crate::native_display().try_lock().unwrap();
         if d.quit_requested && !d.quit_ordered {
             drop(d);
             event_handler.quit_requested_event();
@@ -328,11 +328,11 @@ impl X11Display {
                     new_width,
                     new_height,
                 } => self.set_window_size(self.window, new_width as _, new_height as _),
-                SetWindowPosition { new_x, new_y } => {
+                SetWindowPosition { .. } => {
                     eprintln!("Not implemented for X11")
                 }
                 SetFullscreen(fullscreen) => self.set_fullscreen(self.window, fullscreen),
-                ShowKeyboard(show) => {
+                ShowKeyboard(..) => {
                     eprintln!("Not implemented for X11")
                 }
             }

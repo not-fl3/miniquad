@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, static_mut_refs)]
 
 mod libwayland_client;
 mod libwayland_egl;
