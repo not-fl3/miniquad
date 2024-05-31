@@ -40,9 +40,9 @@ impl<T> ResourceManager<T> {
         self.id - 1
     }
 
-    pub fn remove(&mut self, id: usize) {
+    pub fn remove(&mut self, id: usize) -> T {
         // Let it crash if the resource is not found
-        self.resources.remove(&id).unwrap();
+        self.resources.remove(&id).unwrap()
     }
 }
 

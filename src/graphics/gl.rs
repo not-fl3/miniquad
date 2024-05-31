@@ -261,12 +261,6 @@ impl Texture {
         }
     }
 
-    pub fn delete(&self) {
-        unsafe {
-            glDeleteTextures(1, &self.raw as *const _);
-        }
-    }
-
     pub fn resize(&mut self, ctx: &mut GlContext, width: u32, height: u32, source: Option<&[u8]>) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.params.kind.into(), self.raw);
@@ -814,9 +808,14 @@ impl RenderingBackend for GlContext {
         self.textures.0.push(texture);
         TextureId(TextureIdInner::Managed(self.textures.0.len() - 1))
     }
+
     fn delete_texture(&mut self, texture: TextureId) {
+        self.cache.clear_texture_bindings();
+
         let t = self.textures.get(texture);
-        t.delete();
+        unsafe {
+            glDeleteTextures(1, &t.raw as *const _);
+        }
     }
 
     fn delete_shader(&mut self, program: ShaderId) {
@@ -988,17 +987,16 @@ impl RenderingBackend for GlContext {
     fn delete_render_pass(&mut self, render_pass: RenderPass) {
         let pass_id = render_pass.0;
 
-        let render_pass = &self.passes[pass_id];
+        let render_pass = self.passes.remove(pass_id);
 
         unsafe { glDeleteFramebuffers(1, &render_pass.gl_fb as *const _) }
 
         for color_texture in &render_pass.color_textures {
-            self.textures.get(*color_texture).delete();
+            self.delete_texture(*color_texture);
         }
         if let Some(depth_texture) = render_pass.depth_texture {
-            self.textures.get(depth_texture).delete();
+            self.delete_texture(depth_texture);
         }
-        self.passes.remove(pass_id);
     }
 
     fn new_pipeline(
