@@ -284,15 +284,17 @@ unsafe extern "system" fn win32_wndproc(
 
     match umsg {
         WM_CLOSE => {
-            let mut quit_requested = false;
-
             let mut d = crate::native_display().lock().unwrap();
             // only give user a chance to intervene when sapp_quit() wasn't already called
             if !d.quit_ordered {
                 // if window should be closed and event handling is enabled, give user code
                 // a change to intervene via sapp_cancel_quit()
                 d.quit_requested = true;
-                quit_requested = true;
+                drop(d);
+                // the prevent event may require access to native_display
+                event_handler.quit_requested_event();
+                // Re-acquire native_display
+                d = crate::native_display().lock().unwrap();
                 // if user code hasn't intervened, quit the app
                 if d.quit_requested {
                     d.quit_ordered = true;
@@ -300,11 +302,6 @@ unsafe extern "system" fn win32_wndproc(
             }
             if d.quit_ordered {
                 PostQuitMessage(0);
-            }
-
-            if quit_requested {
-                drop(d);
-                event_handler.quit_requested_event();
             }
             return 0;
         }
