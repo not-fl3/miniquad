@@ -745,7 +745,6 @@ impl RenderingBackend for GlContext {
             .to_str()
             .unwrap()
             .to_string();
-        let gles3 = gl_version_string.contains("OpenGL ES 3");
         //let gles2 = !gles3 && gl_version_string.contains("OpenGL ES");
 
         let mut glsl_support = GlslSupport::default();
@@ -760,10 +759,17 @@ impl RenderingBackend for GlContext {
         {
             // on web, miniquad always loads EXT_shader_texture_lod and OES_standard_derivatives
             glsl_support.v100_ext = true;
+
+            let webgl2 = gl_version_string.contains("WebGL 2.0");
+            if webgl2 {
+                glsl_support.v300es = true;
+            }
         }
 
         #[cfg(not(target_arch = "wasm32"))]
         {
+            let gles3 = gl_version_string.contains("OpenGL ES 3");
+
             if gles3 {
                 glsl_support.v300es = true;
             }
@@ -810,7 +816,7 @@ impl RenderingBackend for GlContext {
     }
 
     fn delete_texture(&mut self, texture: TextureId) {
-        self.cache.clear_texture_bindings();
+        //self.cache.clear_texture_bindings();
 
         let t = self.textures.get(texture);
         unsafe {

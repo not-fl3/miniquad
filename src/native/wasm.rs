@@ -3,8 +3,6 @@ pub mod webgl;
 
 mod keycodes;
 
-pub use webgl::*;
-
 use std::{
     cell::RefCell,
     path::PathBuf,
@@ -65,6 +63,14 @@ where
             });
             unsafe { console_log(msg.as_ptr()) };
         }));
+    }
+
+    let version = match conf.platform.webgl_version {
+        crate::conf::WebGLVersion::WebGL1 => 1,
+        crate::conf::WebGLVersion::WebGL2 => 2,
+    };
+    unsafe {
+        init_webgl(version);
     }
 
     // setup initial canvas size
@@ -128,6 +134,7 @@ extern "C" {
     pub fn sapp_is_fullscreen() -> bool;
     pub fn sapp_set_window_size(new_width: u32, new_height: u32);
     pub fn sapp_schedule_update();
+    pub fn init_webgl(version: i32);
     pub fn now() -> f64;
 }
 
@@ -173,7 +180,7 @@ pub unsafe fn update_cursor() {
 // "crate_version" is a misleading, but it can't be changed for legacy reasons.
 #[no_mangle]
 pub extern "C" fn crate_version() -> u32 {
-    1
+    2
 }
 
 #[no_mangle]
@@ -213,7 +220,6 @@ pub extern "C" fn on_clipboard_paste(msg: *mut u8, len: usize) {
 pub extern "C" fn frame() {
     REQUESTS.with(|r| {
         while let Ok(request) = r.borrow_mut().as_mut().unwrap().try_recv() {
-            use Request::*;
             match request {
                 Request::SetCursorGrab(grab) => unsafe { sapp_set_cursor_grab(grab) },
                 Request::ShowMouse(show) => unsafe { show_mouse(show) },
