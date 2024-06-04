@@ -68,6 +68,12 @@ pub enum AppleGfxApi {
     Metal,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum WebGLVersion {
+    WebGL1,
+    WebGL2
+}
+
 /// Platform specific settings.
 #[derive(Debug)]
 pub struct Platform {
@@ -83,6 +89,12 @@ pub struct Platform {
     ///
     /// Defaults to X11Only. Wayland implementation is way too unstable right now.
     pub linux_backend: LinuxBackend,
+
+    /// While miniquad itself only use webgl1 features, withing webgl2 context it
+    /// is possible to:
+    /// - use gles3 shaders
+    /// - do raw webgl2 opengl calls
+    pub webgl_version: WebGLVersion,
 
     /// Which rendering context to create, Metal or OpenGL.
     /// Miniquad always links with Metal.framework (assuming it is always present)
@@ -122,6 +134,7 @@ impl Default for Platform {
             linux_x11_gl: LinuxX11Gl::GLXWithEGLFallback,
             linux_backend: LinuxBackend::X11Only,
             apple_gfx_api: AppleGfxApi::OpenGl,
+            webgl_version: WebGLVersion::WebGL1,
             blocking_event_loop: false,
             swap_interval: None,
             framebuffer_alpha: false,
