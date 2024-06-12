@@ -389,6 +389,6 @@ where
     }
 }
 
-pub fn hack() {
-    crate::native::apple::apple_util::startup_hack();
+pub fn prevent_double_click_bug_on_macos() {
+    crate::native::apple::apple_util::prevent_double_click_bug_on_macos();
 }
