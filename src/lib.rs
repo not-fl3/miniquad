@@ -1,11 +1,11 @@
 #![doc = include_str!("../README.md")]
-#![allow(warnings)]
-
 pub mod conf;
 mod event;
 pub mod fs;
 pub mod graphics;
 mod native;
+use std::collections::HashMap;
+use std::ops::{Index, IndexMut};
 
 #[cfg(feature = "log-impl")]
 pub mod log;
@@ -17,6 +17,47 @@ pub use graphics::*;
 mod default_icon;
 
 pub use native::gl;
+
+#[derive(Clone)]
+pub(crate) struct ResourceManager<T> {
+    id: usize,
+    resources: HashMap<usize, T>,
+}
+
+impl<T> Default for ResourceManager<T> {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            resources: HashMap::new(),
+        }
+    }
+}
+
+impl<T> ResourceManager<T> {
+    pub fn add(&mut self, resource: T) -> usize {
+        self.resources.insert(self.id, resource);
+        self.id += 1;
+        self.id - 1
+    }
+
+    pub fn remove(&mut self, id: usize) -> T {
+        // Let it crash if the resource is not found
+        self.resources.remove(&id).unwrap()
+    }
+}
+
+impl<T> Index<usize> for ResourceManager<T> {
+    type Output = T;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.resources[&index]
+    }
+}
+
+impl<T> IndexMut<usize> for ResourceManager<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.resources.get_mut(&index).unwrap()
+    }
+}
 
 pub mod date {
     #[cfg(not(target_arch = "wasm32"))]
@@ -44,7 +85,9 @@ use std::sync::{Mutex, OnceLock};
 static NATIVE_DISPLAY: OnceLock<Mutex<native::NativeDisplayData>> = OnceLock::new();
 
 fn set_display(display: native::NativeDisplayData) {
-    NATIVE_DISPLAY.set(Mutex::new(display));
+    NATIVE_DISPLAY
+        .set(Mutex::new(display))
+        .unwrap_or_else(|_| panic!("NATIVE_DISPLAY already set"));
 }
 fn native_display() -> &'static Mutex<native::NativeDisplayData> {
     NATIVE_DISPLAY
@@ -100,6 +143,11 @@ pub mod window {
         d.high_dpi
     }
 
+    pub fn blocking_event_loop() -> bool {
+        let d = native_display().lock().unwrap();
+        d.blocking_event_loop
+    }
+
     /// This function simply quits the application without
     /// giving the user a chance to intervene. Usually this might
     /// be called when the user clicks the 'Ok' button in a 'Really Quit?'
@@ -143,36 +191,79 @@ pub mod window {
     ///         so set_cursor_grab(false) on window's focus lost is recommended.
     /// TODO: implement window focus events
     pub fn set_cursor_grab(grab: bool) {
-        let mut d = native_display().lock().unwrap();
-        d.native_requests.send(native::Request::SetCursorGrab(grab));
+        let d = native_display().lock().unwrap();
+        d.native_requests
+            .send(native::Request::SetCursorGrab(grab))
+            .unwrap();
+    }
+
+    /// With `conf.platform.blocking_event_loop`, `schedule_update` called from an
+    /// event handler makes draw()/update() functions to be called without waiting
+    /// for a next event.
+    ///
+    /// Does nothing without `conf.platform.blocking_event_loop`.
+    pub fn schedule_update() {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let d = native_display().lock().unwrap();
+            d.native_requests
+                .send(native::Request::ScheduleUpdate)
+                .unwrap();
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            native::wasm::sapp_schedule_update();
+        }
     }
 
     /// Show or hide the mouse cursor
     pub fn show_mouse(shown: bool) {
-        let mut d = native_display().lock().unwrap();
-        d.native_requests.send(native::Request::ShowMouse(shown));
+        let d = native_display().lock().unwrap();
+        d.native_requests
+            .send(native::Request::ShowMouse(shown))
+            .unwrap();
     }
 
     /// Set the mouse cursor icon.
     pub fn set_mouse_cursor(cursor_icon: CursorIcon) {
-        let mut d = native_display().lock().unwrap();
+        let d = native_display().lock().unwrap();
         d.native_requests
-            .send(native::Request::SetMouseCursor(cursor_icon));
+            .send(native::Request::SetMouseCursor(cursor_icon))
+            .unwrap();
     }
 
     /// Set the application's window size.
     pub fn set_window_size(new_width: u32, new_height: u32) {
-        let mut d = native_display().lock().unwrap();
-        d.native_requests.send(native::Request::SetWindowSize {
-            new_width,
-            new_height,
-        });
+        let d = native_display().lock().unwrap();
+        d.native_requests
+            .send(native::Request::SetWindowSize {
+                new_width,
+                new_height,
+            })
+            .unwrap();
+    }
+
+    pub fn set_window_position(new_x: u32, new_y: u32) {
+        let d = native_display().lock().unwrap();
+        d.native_requests
+            .send(native::Request::SetWindowPosition { new_x, new_y })
+            .unwrap();
+    }
+
+    /// Get the position of the window.
+    /// TODO: implement for other platforms
+    #[cfg(target_os = "windows")]
+    pub fn get_window_position() -> (u32, u32) {
+        let d = native_display().lock().unwrap();
+        d.screen_position
     }
 
     pub fn set_fullscreen(fullscreen: bool) {
-        let mut d = native_display().lock().unwrap();
+        let d = native_display().lock().unwrap();
         d.native_requests
-            .send(native::Request::SetFullscreen(fullscreen));
+            .send(native::Request::SetFullscreen(fullscreen))
+            .unwrap();
     }
 
     /// Get current OS clipboard value
@@ -202,8 +293,10 @@ pub mod window {
     /// Show/hide onscreen keyboard.
     /// Only works on Android right now.
     pub fn show_keyboard(show: bool) {
-        let mut d = native_display().lock().unwrap();
-        d.native_requests.send(native::Request::ShowKeyboard(show));
+        let d = native_display().lock().unwrap();
+        d.native_requests
+            .send(native::Request::ShowKeyboard(show))
+            .unwrap();
     }
 
     #[cfg(target_vendor = "apple")]

@@ -68,6 +68,12 @@ pub enum AppleGfxApi {
     Metal,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum WebGLVersion {
+    WebGL1,
+    WebGL2
+}
+
 /// Platform specific settings.
 #[derive(Debug)]
 pub struct Platform {
@@ -84,6 +90,12 @@ pub struct Platform {
     /// Defaults to X11Only. Wayland implementation is way too unstable right now.
     pub linux_backend: LinuxBackend,
 
+    /// While miniquad itself only use webgl1 features, withing webgl2 context it
+    /// is possible to:
+    /// - use gles3 shaders
+    /// - do raw webgl2 opengl calls
+    pub webgl_version: WebGLVersion,
+
     /// Which rendering context to create, Metal or OpenGL.
     /// Miniquad always links with Metal.framework (assuming it is always present)
     /// but it links with OpenGL dynamically and only if required.
@@ -97,6 +109,13 @@ pub struct Platform {
     /// In other words - "swap_interval" is a hint for a GPU driver, this is not
     /// the way to limit FPS in the game!
     pub swap_interval: Option<i32>,
+
+    /// A way to reduce CPU usage to zero when waiting for an incoming event.
+    /// update()/draw() will only be called after `window::request_update()`.
+    /// It is recommended to put `request_update` at the end of `resize_event` and
+    /// relevant mouse/keyboard input.
+    /// `request_update` may be used from other threads to "wake up" the window.
+    pub blocking_event_loop: bool,
 
     /// Whether the framebuffer should have an alpha channel.
     /// Currently supported only on Android
@@ -113,9 +132,11 @@ impl Default for Platform {
     fn default() -> Platform {
         Platform {
             linux_x11_gl: LinuxX11Gl::GLXWithEGLFallback,
-            swap_interval: None,
             linux_backend: LinuxBackend::X11Only,
             apple_gfx_api: AppleGfxApi::OpenGl,
+            webgl_version: WebGLVersion::WebGL1,
+            blocking_event_loop: false,
+            swap_interval: None,
             framebuffer_alpha: false,
             wayland_use_fallback_decorations: true,
         }
@@ -153,9 +174,9 @@ pub struct Conf {
     /// Miniquad allows to change the window icon programmatically.
     /// The icon will be used as
     /// - taskbar and titlebar icons on Windows.
+    /// - dock and titlebar icon on  MacOs.
     /// - TODO: favicon on HTML5
     /// - TODO: taskbar and titlebar(highly dependent on the WM) icons on Linux
-    /// - TODO: dock and titlebar icon on  MacOs
     pub icon: Option<Icon>,
 
     /// Platform specific settings. Hints to OS for context creation, driver-specific

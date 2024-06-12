@@ -49,6 +49,7 @@ pub(crate) struct WindowsDisplay {
     dc: HDC,
     event_handler: Option<Box<dyn EventHandler>>,
     modal_resizing_timer: usize,
+    update_requested: bool,
 }
 
 impl WindowsDisplay {
@@ -129,6 +130,26 @@ impl WindowsDisplay {
                 SWP_NOMOVE,
             )
         };
+    }
+    /// Set the window position in screen coordinates.
+    fn set_window_position(&mut self, new_x: u32, new_y: u32) {
+        let mut rect: RECT = unsafe { std::mem::zeroed() };
+        if unsafe { GetClientRect(self.wnd, &mut rect as *mut _ as _) } != 0 {
+            let mut new_rect = rect;
+            new_rect.right = new_rect.right - new_rect.left + new_x as i32;
+            new_rect.bottom = new_rect.bottom - new_rect.top + new_y as i32;
+            unsafe {
+                SetWindowPos(
+                    self.wnd,
+                    HWND_TOP,
+                    new_x as i32,
+                    new_y as i32,
+                    0,
+                    0,
+                    SWP_NOSIZE,
+                )
+            };
+        }
     }
 
     fn set_fullscreen(&mut self, fullscreen: bool) {
@@ -730,28 +751,50 @@ impl WindowsDisplay {
     }
 
     /// updates current window and framebuffer size from the window's client rect,
-    /// returns true if size has changed
+    /// and window position from the window's rect.
+    /// returns true if size or position has changed
     unsafe fn update_dimensions(&mut self, hwnd: HWND) -> bool {
         let mut d = crate::native_display().lock().unwrap();
         let mut rect: RECT = std::mem::zeroed();
 
-        if GetClientRect(hwnd, &mut rect as *mut _ as _) != 0 {
-            let window_width = ((rect.right - rect.left) as f32 / self.window_scale) as i32;
-            let window_height = ((rect.bottom - rect.top) as f32 / self.window_scale) as i32;
+        // Get the outer rectangle of the window in screen coordinates
+        if GetWindowRect(hwnd, &mut rect as *mut _ as _) != 0 {
+            // Get the client area rectangle in client coordinates
+            let mut client_rect: RECT = std::mem::zeroed();
+            if GetClientRect(hwnd, &mut client_rect as *mut _ as _) != 0 {
+                // Calculate window width and height based on the client area
+                let window_width =
+                    ((client_rect.right - client_rect.left) as f32 / self.window_scale) as i32;
+                let window_height =
+                    ((client_rect.bottom - client_rect.top) as f32 / self.window_scale) as i32;
 
-            // prevent a framebuffer size of 0 when window is minimized
-            let fb_width = ((window_width as f32 * self.content_scale) as i32).max(1);
-            let fb_height = ((window_height as f32 * self.content_scale) as i32).max(1);
-            if fb_width != d.screen_width || fb_height != d.screen_height {
-                d.screen_width = fb_width;
-                d.screen_height = fb_height;
-                return true;
+                // Prevent a framebuffer size of 0 when the window is minimized
+                let fb_width = ((window_width as f32 * self.content_scale) as i32).max(1);
+                let fb_height = ((window_height as f32 * self.content_scale) as i32).max(1);
+
+                // Check for size changes
+                if fb_width != d.screen_width || fb_height != d.screen_height {
+                    d.screen_width = fb_width;
+                    d.screen_height = fb_height;
+                    return true;
+                }
+
+                // Check for position changes
+                if (rect.left as u32, rect.top as u32) != d.screen_position {
+                    d.screen_position = (rect.left as u32, rect.top as u32);
+                    return true;
+                }
+            } else {
+                // Handle error or default case
+                d.screen_width = 1;
+                d.screen_height = 1;
             }
         } else {
-            d.screen_width = 1;
-            d.screen_height = 1;
+            // Handle error or default case
+            d.screen_position = (0, 0);
         }
-        return false;
+
+        false
     }
 
     unsafe fn init_dpi(&mut self, high_dpi: bool) {
@@ -785,6 +828,9 @@ impl WindowsDisplay {
         use Request::*;
         unsafe {
             match request {
+                ScheduleUpdate => {
+                    self.update_requested = true;
+                }
                 SetCursorGrab(grab) => self.set_cursor_grab(grab),
                 ShowMouse(show) => self.show_mouse(show),
                 SetMouseCursor(icon) => self.set_mouse_cursor(icon),
@@ -792,6 +838,7 @@ impl WindowsDisplay {
                     new_width,
                     new_height,
                 } => self.set_window_size(new_width as _, new_height as _),
+                SetWindowPosition { new_x, new_y } => self.set_window_position(new_x, new_y),
                 SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
                 ShowKeyboard(show) => {
                     eprintln!("Not implemented for windows")
@@ -844,6 +891,7 @@ where
             dc,
             event_handler: None,
             modal_resizing_timer: 0,
+            update_requested: true,
         };
         display.init_dpi(conf.high_dpi);
 
@@ -852,6 +900,7 @@ where
         crate::set_display(NativeDisplayData {
             high_dpi: conf.high_dpi,
             dpi_scale: display.window_scale,
+            blocking_event_loop: conf.platform.blocking_event_loop,
             ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
         });
 
@@ -879,21 +928,32 @@ where
                 display.process_request(request);
             }
 
-            let mut msg: MSG = std::mem::zeroed();
-            while PeekMessageW(&mut msg as *mut _ as _, NULL as _, 0, 0, PM_REMOVE) != 0 {
-                if WM_QUIT == msg.message {
+            let mut dispatch_message = |mut msg: MSG| {
+                if msg.message == WM_QUIT {
                     done = true;
-                    continue;
                 } else {
                     TranslateMessage(&mut msg as *mut _ as _);
                     DispatchMessageW(&mut msg as *mut _ as _);
                 }
+            };
+            let mut msg: MSG = std::mem::zeroed();
+            let block_on_wait = conf.platform.blocking_event_loop && !display.update_requested;
+            if block_on_wait {
+                GetMessageW(&mut msg as *mut _ as _, NULL as _, 0, 0);
+                dispatch_message(msg);
+            } else {
+                while PeekMessageW(&mut msg as *mut _ as _, NULL as _, 0, 0, PM_REMOVE) != 0 {
+                    dispatch_message(msg);
+                }
             }
 
-            display.event_handler.as_mut().unwrap().update();
-            display.event_handler.as_mut().unwrap().draw();
+            if !conf.platform.blocking_event_loop || display.update_requested {
+                display.update_requested = false;
+                display.event_handler.as_mut().unwrap().update();
+                display.event_handler.as_mut().unwrap().draw();
 
-            SwapBuffers(display.dc);
+                SwapBuffers(display.dc);
+            }
 
             if display.update_dimensions(wnd) {
                 let d = crate::native_display().lock().unwrap();

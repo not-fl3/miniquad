@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::sync::mpsc;
 
 #[derive(Default)]
@@ -8,6 +10,7 @@ pub(crate) struct DroppedFiles {
 pub(crate) struct NativeDisplayData {
     pub screen_width: i32,
     pub screen_height: i32,
+    pub screen_position: (u32, u32),
     pub dpi_scale: f32,
     pub high_dpi: bool,
     pub quit_requested: bool,
@@ -15,6 +18,7 @@ pub(crate) struct NativeDisplayData {
     pub native_requests: mpsc::Sender<Request>,
     pub clipboard: Box<dyn Clipboard>,
     pub dropped_files: DroppedFiles,
+    pub blocking_event_loop: bool,
 
     #[cfg(target_vendor = "apple")]
     pub view: crate::native::apple::frameworks::ObjcId,
@@ -38,6 +42,7 @@ impl NativeDisplayData {
         NativeDisplayData {
             screen_width,
             screen_height,
+            screen_position: (0, 0),
             dpi_scale: 1.,
             high_dpi: false,
             quit_requested: false,
@@ -45,6 +50,7 @@ impl NativeDisplayData {
             native_requests,
             clipboard,
             dropped_files: Default::default(),
+            blocking_event_loop: false,
             #[cfg(target_vendor = "apple")]
             gfx_api: crate::conf::AppleGfxApi::OpenGl,
             #[cfg(target_vendor = "apple")]
@@ -57,10 +63,12 @@ impl NativeDisplayData {
 
 #[derive(Debug)]
 pub(crate) enum Request {
+    ScheduleUpdate,
     SetCursorGrab(bool),
     ShowMouse(bool),
     SetMouseCursor(crate::CursorIcon),
     SetWindowSize { new_width: u32, new_height: u32 },
+    SetWindowPosition { new_x: u32, new_y: u32 },
     SetFullscreen(bool),
     ShowKeyboard(bool),
 }

@@ -3,8 +3,6 @@ pub mod webgl;
 
 mod keycodes;
 
-pub use webgl::*;
-
 use std::{
     cell::RefCell,
     path::PathBuf,
@@ -67,6 +65,14 @@ where
         }));
     }
 
+    let version = match conf.platform.webgl_version {
+        crate::conf::WebGLVersion::WebGL1 => 1,
+        crate::conf::WebGLVersion::WebGL2 => 2,
+    };
+    unsafe {
+        init_webgl(version);
+    }
+
     // setup initial canvas size
     unsafe {
         setup_canvas_size(conf.high_dpi);
@@ -78,6 +84,7 @@ where
     let h = unsafe { canvas_height() as _ };
     let clipboard = Box::new(Clipboard);
     crate::set_display(NativeDisplayData {
+        blocking_event_loop: conf.platform.blocking_event_loop,
         ..NativeDisplayData::new(w, h, tx, clipboard)
     });
     EVENT_HANDLER.with(|g| {
@@ -86,7 +93,7 @@ where
 
     // start requestAnimationFrame loop
     unsafe {
-        run_animation_loop();
+        run_animation_loop(conf.platform.blocking_event_loop);
     }
 }
 
@@ -100,7 +107,7 @@ pub unsafe fn sapp_height() -> ::std::os::raw::c_int {
 
 extern "C" {
     pub fn setup_canvas_size(high_dpi: bool);
-    pub fn run_animation_loop();
+    pub fn run_animation_loop(blocking: bool);
     pub fn canvas_width() -> i32;
     pub fn canvas_height() -> i32;
     pub fn dpi_scale() -> f32;
@@ -126,7 +133,8 @@ extern "C" {
     pub fn sapp_set_fullscreen(fullscreen: bool);
     pub fn sapp_is_fullscreen() -> bool;
     pub fn sapp_set_window_size(new_width: u32, new_height: u32);
-
+    pub fn sapp_schedule_update();
+    pub fn init_webgl(version: i32);
     pub fn now() -> f64;
 }
 
@@ -168,13 +176,11 @@ pub unsafe fn update_cursor() {
     sapp_set_cursor(css_name.as_ptr(), css_name.len());
 }
 
+// gl.js version required to be shipped alongside this rust code.
+// "crate_version" is a misleading, but it can't be changed for legacy reasons.
 #[no_mangle]
 pub extern "C" fn crate_version() -> u32 {
-    let major = env!("CARGO_PKG_VERSION_MAJOR").parse::<u32>().unwrap();
-    let minor = env!("CARGO_PKG_VERSION_MINOR").parse::<u32>().unwrap();
-    let patch = env!("CARGO_PKG_VERSION_PATCH").parse::<u32>().unwrap();
-
-    (major << 24) + (minor << 16) + patch
+    2
 }
 
 #[no_mangle]
@@ -214,7 +220,6 @@ pub extern "C" fn on_clipboard_paste(msg: *mut u8, len: usize) {
 pub extern "C" fn frame() {
     REQUESTS.with(|r| {
         while let Ok(request) = r.borrow_mut().as_mut().unwrap().try_recv() {
-            use Request::*;
             match request {
                 Request::SetCursorGrab(grab) => unsafe { sapp_set_cursor_grab(grab) },
                 Request::ShowMouse(show) => unsafe { show_mouse(show) },

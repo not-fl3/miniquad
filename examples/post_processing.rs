@@ -144,7 +144,7 @@ impl Stage {
                 VertexAttribute::new("uv", VertexFormat::Float2),
             ],
             default_shader,
-            PipelineParams::default()
+            PipelineParams::default(),
         );
 
         let offscreen_shader = ctx

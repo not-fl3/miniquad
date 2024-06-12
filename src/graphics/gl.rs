@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use crate::window;
+use crate::{window, ResourceManager};
 
 mod cache;
 
@@ -261,12 +261,6 @@ impl Texture {
         }
     }
 
-    pub fn delete(&self) {
-        unsafe {
-            glDeleteTextures(1, &self.raw as *const _);
-        }
-    }
-
     pub fn resize(&mut self, ctx: &mut GlContext, width: u32, height: u32, source: Option<&[u8]>) {
         ctx.cache.store_texture_binding(0);
         ctx.cache.bind_texture(0, self.params.kind.into(), self.raw);
@@ -443,10 +437,10 @@ impl Textures {
     }
 }
 pub struct GlContext {
-    shaders: Vec<ShaderInternal>,
-    pipelines: Vec<PipelineInternal>,
-    passes: Vec<RenderPassInternal>,
-    buffers: Vec<Buffer>,
+    shaders: ResourceManager<ShaderInternal>,
+    pipelines: ResourceManager<PipelineInternal>,
+    passes: ResourceManager<RenderPassInternal>,
+    buffers: ResourceManager<Buffer>,
     textures: Textures,
     default_framebuffer: GLuint,
     pub(crate) cache: GlCache,
@@ -468,10 +462,10 @@ impl GlContext {
             glBindVertexArray(vao);
             GlContext {
                 default_framebuffer,
-                shaders: vec![],
-                pipelines: vec![],
-                passes: vec![],
-                buffers: vec![],
+                shaders: ResourceManager::default(),
+                pipelines: ResourceManager::default(),
+                passes: ResourceManager::default(),
+                buffers: ResourceManager::default(),
                 textures: Textures(vec![]),
                 features: Features {
                     instancing: !crate::native::gl::is_gl2(),
@@ -520,6 +514,11 @@ fn load_shader_internal(
         glAttachShader(program, vertex_shader);
         glAttachShader(program, fragment_shader);
         glLinkProgram(program);
+
+        // delete no longer used shaders
+        glDetachShader(program, vertex_shader);
+        glDeleteShader(vertex_shader);
+        glDeleteShader(fragment_shader);
 
         let mut link_status = 0;
         glGetProgramiv(program, GL_LINK_STATUS, &mut link_status as *mut _);
@@ -746,8 +745,7 @@ impl RenderingBackend for GlContext {
             .to_str()
             .unwrap()
             .to_string();
-        let gles3 = gl_version_string.contains("OpenGL ES 3");
-        let gles2 = !gles3 && gl_version_string.contains("OpenGL ES");
+        //let gles2 = !gles3 && gl_version_string.contains("OpenGL ES");
 
         let mut glsl_support = GlslSupport::default();
 
@@ -761,10 +759,17 @@ impl RenderingBackend for GlContext {
         {
             // on web, miniquad always loads EXT_shader_texture_lod and OES_standard_derivatives
             glsl_support.v100_ext = true;
+
+            let webgl2 = gl_version_string.contains("WebGL 2.0");
+            if webgl2 {
+                glsl_support.v300es = true;
+            }
         }
 
         #[cfg(not(target_arch = "wasm32"))]
         {
+            let gles3 = gl_version_string.contains("OpenGL ES 3");
+
             if gles3 {
                 glsl_support.v300es = true;
             }
@@ -796,8 +801,7 @@ impl RenderingBackend for GlContext {
             _ => panic!("Metal source on OpenGl context"),
         };
         let shader = load_shader_internal(vertex, fragment, meta)?;
-        self.shaders.push(shader);
-        Ok(ShaderId(self.shaders.len() - 1))
+        Ok(ShaderId(self.shaders.add(shader)))
     }
 
     fn new_texture(
@@ -810,10 +814,26 @@ impl RenderingBackend for GlContext {
         self.textures.0.push(texture);
         TextureId(TextureIdInner::Managed(self.textures.0.len() - 1))
     }
+
     fn delete_texture(&mut self, texture: TextureId) {
+        //self.cache.clear_texture_bindings();
+
         let t = self.textures.get(texture);
-        t.delete();
+        unsafe {
+            glDeleteTextures(1, &t.raw as *const _);
+        }
     }
+
+    fn delete_shader(&mut self, program: ShaderId) {
+        unsafe { glDeleteProgram(self.shaders[program.0].program) };
+        self.shaders.remove(program.0);
+        self.cache.cur_pipeline = None;
+    }
+
+    fn delete_pipeline(&mut self, pipeline: Pipeline) {
+        self.pipelines.remove(pipeline.0);
+    }
+
     fn texture_set_wrap(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap) {
         let t = self.textures.get(texture);
 
@@ -833,7 +853,7 @@ impl RenderingBackend for GlContext {
 
         unsafe {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_x as i32);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_x as i32);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_y as i32);
         }
         self.cache.restore_texture_binding(0);
     }
@@ -877,6 +897,12 @@ impl RenderingBackend for GlContext {
     ) {
         let mut t = self.textures.get(texture);
         t.resize(self, width, height, source);
+        match texture.0 {
+            TextureIdInner::Managed(tex_id) => {
+                self.textures.0[tex_id].params = t.params;
+            }
+            _ => {}
+        };
     }
     fn texture_read_pixels(&mut self, texture: TextureId, source: &mut [u8]) {
         let t = self.textures.get(texture);
@@ -959,23 +985,23 @@ impl RenderingBackend for GlContext {
             depth_texture: depth_img,
         };
 
-        self.passes.push(pass);
-
-        RenderPass(self.passes.len() - 1)
+        RenderPass(self.passes.add(pass))
     }
     fn render_pass_color_attachments(&self, render_pass: RenderPass) -> &[TextureId] {
         &self.passes[render_pass.0].color_textures
     }
     fn delete_render_pass(&mut self, render_pass: RenderPass) {
-        let render_pass = &mut self.passes[render_pass.0];
+        let pass_id = render_pass.0;
 
-        unsafe { glDeleteFramebuffers(1, &mut render_pass.gl_fb as *mut _) }
+        let render_pass = self.passes.remove(pass_id);
+
+        unsafe { glDeleteFramebuffers(1, &render_pass.gl_fb as *const _) }
 
         for color_texture in &render_pass.color_textures {
-            self.textures.get(*color_texture).delete();
+            self.delete_texture(*color_texture);
         }
         if let Some(depth_texture) = render_pass.depth_texture {
-            self.textures.get(depth_texture).delete();
+            self.delete_texture(depth_texture);
         }
     }
 
@@ -1002,7 +1028,7 @@ impl RenderingBackend for GlContext {
         } in attributes
         {
             let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());
-            let mut cache = buffer_cache
+            let cache = buffer_cache
                 .get_mut(*buffer_index)
                 .unwrap_or_else(|| panic!());
 
@@ -1033,7 +1059,7 @@ impl RenderingBackend for GlContext {
             buffer_index,
         } in attributes
         {
-            let mut buffer_data = &mut buffer_cache
+            let buffer_data = &mut buffer_cache
                 .get_mut(*buffer_index)
                 .unwrap_or_else(|| panic!());
             let layout = buffer_layout.get(*buffer_index).unwrap_or_else(|| panic!());
@@ -1086,8 +1112,7 @@ impl RenderingBackend for GlContext {
             params,
         };
 
-        self.pipelines.push(pipeline);
-        Pipeline(self.pipelines.len() - 1)
+        Pipeline(self.pipelines.add(pipeline))
     }
 
     fn apply_pipeline(&mut self, pipeline: &Pipeline) {
@@ -1095,7 +1120,7 @@ impl RenderingBackend for GlContext {
 
         {
             let pipeline = &self.pipelines[pipeline.0];
-            let shader = &mut self.shaders[pipeline.shader.0];
+            let shader = &self.shaders[pipeline.shader.0];
             unsafe {
                 glUseProgram(shader.program);
             }
@@ -1177,8 +1202,8 @@ impl RenderingBackend for GlContext {
             size,
             index_type,
         };
-        self.buffers.push(buffer);
-        BufferId(self.buffers.len() - 1)
+
+        BufferId(self.buffers.add(buffer))
     }
 
     fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
@@ -1222,6 +1247,7 @@ impl RenderingBackend for GlContext {
         unsafe { glDeleteBuffers(1, &self.buffers[buffer.0].gl_buf as *const _) }
         self.cache.clear_buffer_bindings();
         self.cache.clear_vertex_attributes();
+        self.buffers.remove(buffer.0);
     }
 
     /// Set a new viewport rectangle.

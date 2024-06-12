@@ -587,6 +587,7 @@ gl_loader!(
     fn glStencilMask(mask: GLuint) -> (),
     fn glStencilMaskSeparate(face: GLenum, mask: GLuint) -> (),
     fn glAttachShader(program: GLuint, shader: GLuint) -> (),
+    fn glDetachShader(program: GLuint, shader: GLuint) -> (),
     fn glGetError() -> GLenum,
     fn glClearColor(red: GLclampf, green: GLclampf, blue: GLclampf, alpha: GLclampf) -> (),
     fn glBlendColor(red: GLclampf, green: GLclampf, blue: GLclampf, alpha: GLclampf) -> (),

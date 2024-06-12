@@ -6,6 +6,8 @@
 //! So this module is drawing some sort of a window border, just for GNOME
 //! looks horrible, doesn't fit OS theme at all, but better than nothing
 
+#![allow(static_mut_refs)]
+
 use crate::{
     native::linux_wayland::{
         extensions::viewporter::{wp_viewport, wp_viewport_interface, wp_viewporter},

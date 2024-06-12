@@ -150,6 +150,7 @@ impl From<PrimitiveType> for MTLPrimitiveType {
         match primitive_type {
             PrimitiveType::Triangles => MTLPrimitiveType::Triangle,
             PrimitiveType::Lines => MTLPrimitiveType::Line,
+            PrimitiveType::Points => MTLPrimitiveType::Point,
         }
     }
 }
@@ -1246,6 +1247,13 @@ impl RenderingBackend for MetalContext {
                        baseInstance:0
             ];
         }
+    }
+
+    fn delete_shader(&mut self, shader: ShaderId) {
+        // TODO: place holder
+    }
+    fn delete_pipeline(&mut self, pipeline: Pipeline) {
+        // TODO: place holder
     }
 
     fn commit_frame(&mut self) {

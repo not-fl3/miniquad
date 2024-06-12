@@ -183,6 +183,8 @@ pub const kCGEventLeftMouseUp: u32 = 2;
 pub const kCGMouseEventClickState: u32 = 1;
 //pub const kCGEventSourceStateHIDSystemState: u32 = 1;
 
+type DataReleaseCallback = unsafe extern "C" fn(info: *mut &[u8], data: *const c_void, size: usize);
+
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
     pub fn CGEventSourceCreate(state_id: u32) -> ObjcId;
@@ -215,7 +217,37 @@ extern "C" {
     pub fn CGColorCreateGenericRGB(red: f64, green: f64, blue: f64, alpha: f64) -> ObjcId;
     pub fn CGAssociateMouseAndMouseCursorPosition(connected: bool);
     pub fn CGWarpMouseCursorPosition(newCursorPosition: NSPoint);
+
+    pub fn CGImageCreate(
+        width: usize,
+        height: usize,
+        bpc: usize,
+        bpp: usize,
+        bpr: usize,
+        colorspace: *const ObjcId,
+        bitmap_info: u32,
+        provider: *const ObjcId,
+        decode: *const c_void,
+        interpolate: bool,
+        intent: u32,
+    ) -> *const ObjcId;
+    pub fn CGImageRelease(image: *const ObjcId);
+
+    pub fn CGDataProviderCreateWithData(
+        info: *mut &[u8],
+        data: *const u8,
+        size: usize,
+        callback: DataReleaseCallback,
+    ) -> *const ObjcId;
+    pub fn CGDataProviderRelease(provider: *const ObjcId);
+
+    pub fn CGColorSpaceCreateDeviceRGB() -> *const ObjcId;
+    pub fn CGColorSpaceRelease(space: *const ObjcId);
 }
+
+pub const kCGBitmapByteOrderDefault: u32 = (0 << 12);
+pub const kCGImageAlphaLast: u32 = 3;
+pub const kCGRenderingIntentDefault: u32 = 0;
 
 #[link(name = "Metal", kind = "framework")]
 extern "C" {
