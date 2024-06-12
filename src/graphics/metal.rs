@@ -254,7 +254,7 @@ struct Textures(Vec<Texture>);
 impl Textures {
     fn get(&self, texture: TextureId) -> Texture {
         match texture.0 {
-            TextureIdInner::Raw(RawId::Metal(texture)) => unimplemented!(),
+            TextureIdInner::Raw(RawId::Metal(_texture)) => unimplemented!(),
             TextureIdInner::Raw(RawId::OpenGl(_)) => panic!("Gl texture in Metal context!"),
             TextureIdInner::Managed(texture) => self.0[texture],
         }
@@ -262,7 +262,7 @@ impl Textures {
 
     fn get_mut(&mut self, texture: TextureId) -> &mut Texture {
         match texture.0 {
-            TextureIdInner::Raw(RawId::Metal(texture)) => unimplemented!(),
+            TextureIdInner::Raw(RawId::Metal(_texture)) => unimplemented!(),
             TextureIdInner::Raw(RawId::OpenGl(_)) => panic!("Gl texture in Metal context!"),
             TextureIdInner::Managed(texture) => &mut self.0[texture],
         }
@@ -632,7 +632,7 @@ impl RenderingBackend for MetalContext {
             BufferSource::Slice(data) => data,
             _ => panic!("buffer_update expects BufferSource::slice"),
         };
-        let mut buffer = &mut self.buffers[buffer.0];
+        let buffer = &mut self.buffers[buffer.0];
         assert!(data.size <= buffer.size);
 
         unsafe {
@@ -1068,7 +1068,7 @@ impl RenderingBackend for MetalContext {
                                    atIndex:(index + 1) as u64];
                 buffer.next_value = buffer.value + 1;
             }
-            let mut index_buffer = &mut self.buffers[index_buffer.0];
+            let index_buffer = &mut self.buffers[index_buffer.0];
             self.index_buffer = Some(index_buffer.raw[index_buffer.value]);
             index_buffer.next_value = index_buffer.value + 1;
 
@@ -1249,10 +1249,10 @@ impl RenderingBackend for MetalContext {
         }
     }
 
-    fn delete_shader(&mut self, shader: ShaderId) {
+    fn delete_shader(&mut self, _shader: ShaderId) {
         // TODO: place holder
     }
-    fn delete_pipeline(&mut self, pipeline: Pipeline) {
+    fn delete_pipeline(&mut self, _pipeline: Pipeline) {
         // TODO: place holder
     }
 
