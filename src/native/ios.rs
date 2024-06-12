@@ -5,7 +5,7 @@
 use {
     crate::{
         conf::{self, AppleGfxApi, Conf},
-        event::{EventHandler, TouchPhase},
+        event::{EventHandler, KeyCode, KeyMods, TouchPhase},
         fs,
         native::{
             apple::{
@@ -16,8 +16,22 @@ use {
         },
         native_display,
     },
-    std::os::raw::c_void,
+    std::{
+        cell::RefCell,
+        os::raw::c_void,
+        sync::{mpsc, Arc, Mutex},
+        thread::{self},
+    },
 };
+
+struct MainThreadState {
+    quit: bool,
+    paused: bool,
+    update_requested: bool,
+    view: *mut Object,
+    keymods: KeyMods,
+    cur_msg: Message,
+}
 
 struct IosDisplay {
     view: ObjcId,
@@ -29,6 +43,7 @@ struct IosDisplay {
     event_handler: Option<Box<dyn EventHandler>>,
     _gles2: bool,
     f: Option<Box<dyn 'static + FnOnce() -> Box<dyn EventHandler>>>,
+    state: Arc<Mutex<MainThreadState>>,
 }
 
 impl IosDisplay {
@@ -41,6 +56,20 @@ impl IosDisplay {
             }
         }
     }
+
+    fn init_event_handler(&mut self) {
+        let f = self.f.take().unwrap();
+
+        if self.gfx_api == AppleGfxApi::OpenGl {
+            crate::native::gl::load_gl_funcs(|proc| {
+                let name = std::ffi::CString::new(proc).unwrap();
+
+                unsafe { get_proc_address(name.as_ptr() as _) }
+            });
+        }
+
+        self.event_handler = Some(f());
+    }
 }
 
 fn get_window_payload(this: &Object) -> &mut IosDisplay {
@@ -50,10 +79,61 @@ fn get_window_payload(this: &Object) -> &mut IosDisplay {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum Message {
+    Resize {
+        width: i32,
+        height: i32,
+    },
+    Touch {
+        phase: TouchPhase,
+        touch_id: u64,
+        x: f32,
+        y: f32,
+    },
+    Character {
+        character: u32,
+    },
+    KeyDown {
+        keycode: KeyCode,
+    },
+    KeyUp {
+        keycode: KeyCode,
+    },
+    Pause,
+    Resume,
+    Destroy,
+}
+unsafe impl Send for Message {}
+
+thread_local! {
+    static MESSAGES_TX: RefCell<Option<mpsc::Sender<Message>>> = RefCell::new(None);
+}
+
+impl MainThreadState {
+    fn process_request(&mut self, request: crate::native::Request) {
+        use crate::native::Request::*;
+
+        match request {
+            ScheduleUpdate => {
+                self.update_requested = true;
+            }
+            _ => {}
+        }
+    }
+}
+
+fn send_message(message: Message) {
+    MESSAGES_TX.with(|tx| {
+        let mut tx = tx.borrow_mut();
+        tx.as_mut().unwrap().send(message).unwrap();
+    })
+}
+
 pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
     let mut decl = ClassDecl::new("QuadView", superclass).unwrap();
 
-    fn on_touch(this: &Object, event: ObjcId, mut callback: impl FnMut(u64, f32, f32)) {
+    fn on_touch(this: &Object, event: ObjcId, phase: TouchPhase) {
         unsafe {
             let enumerator: ObjcId = msg_send![event, allTouches];
             let size: u64 = msg_send![enumerator, count];
@@ -66,43 +146,109 @@ pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
                 if native_display().lock().unwrap().high_dpi {
                     ios_pos.x *= 2.;
                     ios_pos.y *= 2.;
+                } else {
+                    let content_scale_factor: f64 = msg_send![this, contentScaleFactor];
+                    ios_pos.x *= content_scale_factor;
+                    ios_pos.y *= content_scale_factor;
                 }
 
-                callback(touch_id, ios_pos.x as _, ios_pos.y as _);
+                send_message(Message::Touch {
+                    phase,
+                    touch_id,
+                    x: ios_pos.x as f32,
+                    y: ios_pos.y as f32,
+                });
             }
         }
     }
     extern "C" fn touches_began(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
-        let payload = get_window_payload(this);
-
-        if let Some(ref mut event_handler) = payload.event_handler {
-            on_touch(this, event, |id, x, y| {
-                event_handler.touch_event(TouchPhase::Started, id, x as _, y as _);
-            });
-        }
+        on_touch(this, event, TouchPhase::Started);
     }
 
     extern "C" fn touches_moved(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
-        let payload = get_window_payload(this);
-
-        if let Some(ref mut event_handler) = payload.event_handler {
-            on_touch(this, event, |id, x, y| {
-                event_handler.touch_event(TouchPhase::Moved, id, x as _, y as _);
-            });
-        }
+        on_touch(this, event, TouchPhase::Moved);
     }
 
     extern "C" fn touches_ended(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
-        let payload = get_window_payload(this);
-
-        if let Some(ref mut event_handler) = payload.event_handler {
-            on_touch(this, event, |id, x, y| {
-                event_handler.touch_event(TouchPhase::Ended, id, x as _, y as _);
-            });
-        }
+        on_touch(this, event, TouchPhase::Ended);
     }
 
-    extern "C" fn touches_canceled(_: &Object, _: Sel, _: ObjcId, _: ObjcId) {}
+    extern "C" fn touches_canceled(this: &Object, _: Sel, _: ObjcId, event: ObjcId) {
+        on_touch(this, event, TouchPhase::Cancelled);
+    }
+
+    extern "C" fn process_message(this: &Object, _: Sel, _: ObjcId) {
+        let payload = get_window_payload(this);
+        if payload.event_handler.is_none() {
+            payload.init_event_handler();
+        }
+        let msg = {
+            let state = payload.state.lock().unwrap();
+            state.cur_msg
+        };
+        match msg {
+            Message::Pause => {
+                let mut state = payload.state.lock().unwrap();
+                state.paused = true;
+            }
+            Message::Resume => {
+                let mut state = payload.state.lock().unwrap();
+                state.paused = false;
+            }
+            Message::Destroy => {
+                let mut state = payload.state.lock().unwrap();
+                state.quit = true;
+            }
+            Message::Touch {
+                phase,
+                touch_id,
+                x,
+                y,
+            } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.touch_event(phase, touch_id, x, y);
+                }
+            }
+            Message::Character { character } => {
+                if let Some(character) = char::from_u32(character) {
+                    if let Some(ref mut event_handler) = payload.event_handler {
+                        event_handler.char_event(character, Default::default(), false);
+                    }
+                }
+            }
+            Message::KeyDown { keycode } => {
+                let mut state = payload.state.lock().unwrap();
+                match keycode {
+                    KeyCode::LeftShift | KeyCode::RightShift => state.keymods.shift = true,
+                    KeyCode::LeftControl | KeyCode::RightControl => state.keymods.ctrl = true,
+                    KeyCode::LeftAlt | KeyCode::RightAlt => state.keymods.alt = true,
+                    KeyCode::LeftSuper | KeyCode::RightSuper => state.keymods.logo = true,
+                    _ => {}
+                }
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.key_down_event(keycode, state.keymods, false);
+                }
+            }
+            Message::KeyUp { keycode } => {
+                let mut state = payload.state.lock().unwrap();
+                match keycode {
+                    KeyCode::LeftShift | KeyCode::RightShift => state.keymods.shift = false,
+                    KeyCode::LeftControl | KeyCode::RightControl => state.keymods.ctrl = false,
+                    KeyCode::LeftAlt | KeyCode::RightAlt => state.keymods.alt = false,
+                    KeyCode::LeftSuper | KeyCode::RightSuper => state.keymods.logo = false,
+                    _ => {}
+                }
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.key_up_event(keycode, state.keymods);
+                }
+            }
+            Message::Resize { width, height } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.resize_event(width as _, height as _);
+                }
+            }
+        }
+    }
 
     unsafe {
         decl.add_method(sel!(isOpaque), yes as extern "C" fn(&Object, Sel) -> BOOL);
@@ -121,6 +267,10 @@ pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
         decl.add_method(
             sel!(touchesCanceled: withEvent:),
             touches_canceled as extern "C" fn(&Object, Sel, ObjcId, ObjcId),
+        );
+        decl.add_method(
+            sel!(processMessage:),
+            process_message as extern "C" fn(&Object, Sel, ObjcId),
         );
     }
 
@@ -162,17 +312,7 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
     extern "C" fn draw_in_rect(this: &Object, _: Sel, _: ObjcId, _: ObjcId) {
         let payload = get_window_payload(this);
         if payload.event_handler.is_none() {
-            let f = payload.f.take().unwrap();
-
-            if payload.gfx_api == AppleGfxApi::OpenGl {
-                crate::native::gl::load_gl_funcs(|proc| {
-                    let name = std::ffi::CString::new(proc).unwrap();
-
-                    unsafe { get_proc_address(name.as_ptr() as _) }
-                });
-            }
-
-            payload.event_handler = Some(f());
+            payload.init_event_handler();
         }
 
         let main_screen: ObjcId = unsafe { msg_send![class!(UIScreen), mainScreen] };
@@ -185,9 +325,10 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
                 screen_rect.size.height as i32 * 2,
             )
         } else {
+            let content_scale_factor: f64 = unsafe { msg_send![payload.view, contentScaleFactor] };
             (
-                screen_rect.size.width as i32,
-                screen_rect.size.height as i32,
+                (screen_rect.size.width * content_scale_factor) as i32,
+                (screen_rect.size.height * content_scale_factor) as i32,
             )
         };
 
@@ -202,11 +343,14 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
             if let Some(ref mut event_handler) = payload.event_handler {
                 event_handler.resize_event(screen_width as _, screen_height as _);
             }
+            // send_message(Message::Resize { width: screen_width, height: screen_height });
         }
 
         if let Some(ref mut event_handler) = payload.event_handler {
             event_handler.update();
             event_handler.draw();
+            let mut s = payload.state.lock().unwrap();
+            s.update_requested = false;
         }
     }
     // wrapper to make sel! macros happy
@@ -269,7 +413,7 @@ unsafe fn create_opengl_view(screen_rect: NSRect, _sample_count: i32, high_dpi: 
     msg_send_![glk_view_obj, setContext: eagl_context_obj];
 
     msg_send_![glk_view_obj, setDelegate: glk_view_dlg_obj];
-    msg_send_![glk_view_obj, setEnableSetNeedsDisplay: NO];
+    msg_send_![glk_view_obj, setEnableSetNeedsDisplay: YES];
     msg_send_![glk_view_obj, setUserInteractionEnabled: YES];
     msg_send_![glk_view_obj, setMultipleTouchEnabled: YES];
     if high_dpi {
@@ -278,11 +422,10 @@ unsafe fn create_opengl_view(screen_rect: NSRect, _sample_count: i32, high_dpi: 
         msg_send_![glk_view_obj, setContentScaleFactor: 1.0];
     }
 
-    let view_ctrl_obj: ObjcId = msg_send![class!(GLKViewController), alloc];
+    let view_ctrl_obj: ObjcId = msg_send![class!(UIViewController), alloc];
     let view_ctrl_obj: ObjcId = msg_send![view_ctrl_obj, init];
 
     msg_send_![view_ctrl_obj, setView: glk_view_obj];
-    msg_send_![view_ctrl_obj, setPreferredFramesPerSecond:60];
 
     View {
         view: glk_view_obj,
@@ -304,6 +447,8 @@ unsafe fn create_metal_view(screen_rect: NSRect, _sample_count: i32, _high_dpi: 
 
     msg_send_![view_ctrl_obj, setView: mtk_view_obj];
 
+    msg_send_![mtk_view_obj, setEnableSetNeedsDisplay: YES];
+    msg_send_![mtk_view_obj, setPaused: YES];
     msg_send_![mtk_view_obj, setPreferredFramesPerSecond:60];
     msg_send_![mtk_view_obj, setDelegate: mtk_view_dlg_obj];
     let device = MTLCreateSystemDefaultDevice();
@@ -343,7 +488,7 @@ pub fn define_app_delegate() -> *const Class {
             let main_screen: ObjcId = msg_send![class!(UIScreen), mainScreen];
             let screen_rect: NSRect = msg_send![main_screen, bounds];
 
-            let (screen_width, screen_height) = if conf.high_dpi {
+            let (_, _) = if conf.high_dpi {
                 (
                     screen_rect.size.width as i32 * 2,
                     screen_rect.size.height as i32 * 2,
@@ -395,12 +540,32 @@ pub fn define_app_delegate() -> *const Class {
             };
 
             let (tx, rx) = std::sync::mpsc::channel();
+
+            MESSAGES_TX.with(move |messages_tx| *messages_tx.borrow_mut() = Some(tx));
+
             let clipboard = Box::new(IosClipboard);
+            let (tx, requests_rx) = std::sync::mpsc::channel();
             crate::set_display(NativeDisplayData {
                 high_dpi: conf.high_dpi,
                 gfx_api: conf.platform.apple_gfx_api,
+                blocking_event_loop: conf.platform.blocking_event_loop,
+                view: view.view,
                 ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
             });
+
+            let state_original = Arc::new(Mutex::new(MainThreadState {
+                quit: false,
+                paused: true,
+                update_requested: true,
+                view: view.view,
+                keymods: KeyMods {
+                    shift: false,
+                    ctrl: false,
+                    alt: false,
+                    logo: false,
+                },
+                cur_msg: Message::Resume,
+            }));
 
             let payload = Box::new(IosDisplay {
                 view: view.view,
@@ -412,6 +577,7 @@ pub fn define_app_delegate() -> *const Class {
                 f: Some(Box::new(f)),
                 event_handler: None,
                 _gles2: view._gles2,
+                state: state_original.clone(),
             });
             let payload_ptr = Box::into_raw(payload) as *mut std::ffi::c_void;
 
@@ -424,8 +590,87 @@ pub fn define_app_delegate() -> *const Class {
             msg_send_![window_obj, setRootViewController: view.view_ctrl];
 
             msg_send_![window_obj, makeKeyAndVisible];
+
+            struct SendHack<F>(F);
+            unsafe impl<F> Send for SendHack<F> {}
+
+            let state = SendHack(state_original.clone());
+            thread::spawn(move || {
+                let s = state.0;
+
+                loop {
+                    while let Ok(request) = requests_rx.try_recv() {
+                        s.lock().unwrap().process_request(request);
+                    }
+
+                    let block_on_wait = {
+                        let s = s.lock().unwrap();
+                        (conf.platform.blocking_event_loop && !s.update_requested) || s.paused
+                    };
+
+                    if block_on_wait {
+                        let res = rx.recv();
+
+                        if let Ok(msg) = res {
+                            let view;
+                            {
+                                let mut s = s.lock().unwrap();
+                                view = s.view;
+                                s.cur_msg = msg;
+                            }
+                            msg_send_![&*view, performSelectorOnMainThread:sel!(processMessage:) withObject:nil waitUntilDone:YES];
+                        }
+                    } else {
+                        // process all the messages from the main thread
+                        while let Ok(msg) = rx.try_recv() {
+                            let view;
+                            {
+                                let mut s = s.lock().unwrap();
+                                view = s.view;
+                                s.cur_msg = msg;
+                            }
+                            msg_send_![&*view, performSelectorOnMainThread:sel!(processMessage:) withObject:nil waitUntilDone:YES];
+                        }
+                    }
+
+                    let update_requested;
+                    let view;
+                    {
+                        let s = s.lock().unwrap();
+                        update_requested = s.update_requested;
+                        view = s.view;
+                    }
+
+                    if !conf.platform.blocking_event_loop || update_requested {
+                        match conf.platform.apple_gfx_api {
+                            AppleGfxApi::OpenGl => {
+                                msg_send_![&*view, performSelectorOnMainThread:sel!(display) withObject:nil waitUntilDone:YES];
+                            }
+                            AppleGfxApi::Metal => {
+                                msg_send_![&*view, performSelectorOnMainThread:sel!(setNeedsDisplay) withObject:nil waitUntilDone:NO];
+                            }
+                        }
+                    }
+
+                    thread::yield_now();
+                }
+            });
         }
         YES
+    }
+
+    #[cfg(target_os = "ios")]
+    #[link(name = "UIKit", kind = "framework")]
+    extern "C" {
+        pub static UIWindowSceneSessionRoleApplication: ObjcId;
+    }
+
+    extern "C" fn application_did_become_active(_: &Object, _: Sel, _: ObjcId) {
+        send_message(Message::Resume);
+    }
+
+    extern "C" fn application_will_resign_active(_: &Object, _: Sel, _: ObjcId) {
+        send_message(Message::Pause);
     }
 
     unsafe {
@@ -433,6 +678,14 @@ pub fn define_app_delegate() -> *const Class {
             sel!(application: didFinishLaunchingWithOptions:),
             did_finish_launching_with_options
                 as extern "C" fn(&Object, Sel, ObjcId, ObjcId) -> BOOL,
+        );
+        decl.add_method(
+            sel!(applicationDidBecomeActive:),
+            application_did_become_active as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(applicationWillResignActive:),
+            application_will_resign_active as extern "C" fn(&Object, Sel, ObjcId),
         );
     }
 
@@ -450,14 +703,12 @@ fn define_textfield_dlg() -> *const Class {
     extern "C" fn keyboard_did_change_frame(_: &Object, _: Sel, _notif: ObjcId) {}
 
     extern "C" fn should_change_characters_in_range(
-        this: &Object,
+        _: &Object,
         _: Sel,
         _textfield: ObjcId,
         _range: NSRange,
         string: ObjcId,
     ) -> BOOL {
-        let payload = get_window_payload(this);
-
         unsafe {
             let len: u64 = msg_send![string, length];
             if len > 0 {
@@ -466,47 +717,39 @@ fn define_textfield_dlg() -> *const Class {
 
                     match c {
                         c if c >= 32 && (c < 0xD800 || c > 0xDFFF) => {
-                            let c: char = char::from_u32(c as u32).unwrap();
-                            if let Some(ref mut event_handler) = payload.event_handler {
-                                event_handler.char_event(c, Default::default(), false);
-                            }
+                            send_message(Message::Character {
+                                character: c as u32,
+                            })
                         }
                         10 => {
-                            if let Some(ref mut event_handler) = payload.event_handler {
-                                event_handler.key_down_event(
-                                    crate::event::KeyCode::Enter,
-                                    Default::default(),
-                                    false,
-                                );
-                                event_handler
-                                    .key_up_event(crate::event::KeyCode::Enter, Default::default());
-                            }
+                            send_message(Message::KeyDown {
+                                keycode: crate::event::KeyCode::Enter,
+                            });
+                            send_message(Message::KeyUp {
+                                keycode: crate::event::KeyCode::Enter,
+                            });
                         }
                         32 => {
-                            if let Some(ref mut event_handler) = payload.event_handler {
-                                event_handler.char_event(' ', Default::default(), false);
-                                event_handler.key_down_event(
-                                    crate::event::KeyCode::Space,
-                                    Default::default(),
-                                    false,
-                                );
-                                event_handler
-                                    .key_up_event(crate::event::KeyCode::Space, Default::default());
-                            }
+                            send_message(Message::Character {
+                                character: ' ' as u32,
+                            });
+                            send_message(Message::KeyDown {
+                                keycode: crate::event::KeyCode::Space,
+                            });
+                            send_message(Message::KeyUp {
+                                keycode: crate::event::KeyCode::Space,
+                            });
                         }
                         _ => {}
                     }
                 }
             } else {
-                if let Some(ref mut event_handler) = payload.event_handler {
-                    event_handler.key_down_event(
-                        crate::event::KeyCode::Backspace,
-                        Default::default(),
-                        false,
-                    );
-                    event_handler
-                        .key_up_event(crate::event::KeyCode::Backspace, Default::default());
-                }
+                send_message(Message::KeyDown {
+                    keycode: crate::event::KeyCode::Backspace,
+                });
+                send_message(Message::KeyUp {
+                    keycode: crate::event::KeyCode::Backspace,
+                });
             }
         }
         NO

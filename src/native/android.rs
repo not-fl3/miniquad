@@ -285,13 +285,7 @@ impl MainThreadState {
             }
             ShowKeyboard(show) => unsafe {
                 let env = attach_jni_env();
-                ndk_utils::call_void_method!(
-                    env,
-                    ACTIVITY,
-                    "showKeyboard",
-                    "(Z)V",
-                    show as i32
-                );
+                ndk_utils::call_void_method!(env, ACTIVITY, "showKeyboard", "(Z)V", show as i32);
             },
             _ => {}
         }
