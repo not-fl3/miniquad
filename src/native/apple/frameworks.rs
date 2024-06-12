@@ -94,6 +94,31 @@ extern "C" {
     pub fn NSLog(fmt: ObjcId, ...);
 }
 
+#[repr(packed)]
+pub struct ProcessSerialNumber {
+    pub a: u32,
+    pub b: u32,
+}
+
+#[repr(i32)]
+pub enum WhichProcess {
+    kNoProcess = 0,
+    kSystemProcess,
+    kCurrentProcess,
+}
+
+#[repr(i32)]
+pub enum TransformProcess {
+    kProcessTransformToForegroundApplication = 1,
+    kProcessTransformToBackgroundApplication = 2,
+    kProcessTransformToUIElementApplication = 4,
+}
+
+#[link(name = "ApplicationServices", kind = "framework")]
+extern "C" {
+    pub fn TransformProcessType(psn: *const ProcessSerialNumber, transformState: u32) -> i32;
+}
+
 #[link(name = "ImageIO", kind = "framework")]
 extern "C" {
     pub static kUTTypePNG: ObjcId;

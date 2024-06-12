@@ -565,3 +565,59 @@ pub extern "C" fn yes(_: &Object, _: Sel) -> BOOL {
 pub extern "C" fn yes1(_: &Object, _: Sel, _: ObjcId) -> BOOL {
     YES
 }
+
+static mut HACKED: bool = false;
+
+pub fn define_app_delegate_class() -> *const Class {
+    println!("Defining app delegate!");
+
+    let superclass = class!(NSObject);
+    let mut decl = ClassDecl::new("MyAppDelegate", superclass).unwrap();
+
+    unsafe {
+        decl.add_method(
+            sel!(applicationShouldTerminateAfterLastWindowClosed:),
+            yes1 as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
+        );
+        decl.add_method(
+            sel!(applicationDidUpdate:),
+            application_did_update as extern "C" fn(&Object, Sel, ObjcId),
+        );
+    }
+
+    extern "C" fn application_did_update(this: &Object, _: Sel, _: ObjcId) {
+        unsafe {
+            if !HACKED {
+                HACKED = true;
+                println!("Application did update, delegate was called!");
+
+                let psn = ProcessSerialNumber {
+                    a: 0,
+                    b: WhichProcess::kCurrentProcess as u32,
+                };
+
+                let os_status: i32 = TransformProcessType(
+                    std::ptr::addr_of!(psn),
+                    TransformProcess::kProcessTransformToForegroundApplication as u32,
+                );
+
+                println!("os_status: {}", os_status);
+
+                let ns_app: ObjcId = msg_send![class!(NSApplication), sharedApplication];
+                let () = msg_send![ns_app, activateIgnoringOtherApps: YES];
+            }
+        }
+    }
+
+    return decl.register();
+}
+
+pub fn startup_hack() {
+    unsafe {
+        let app_delegate_class = define_app_delegate_class();
+        let app_delegate_instance: ObjcId = msg_send![app_delegate_class, new];
+
+        let ns_app: ObjcId = msg_send![class!(NSApplication), sharedApplication];
+        let () = msg_send![ns_app, setDelegate: app_delegate_instance];
+    }
+}

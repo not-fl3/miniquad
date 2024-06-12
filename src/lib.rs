@@ -295,3 +295,7 @@ where
         native::ios::run(conf, f);
     }
 }
+
+pub fn hack() {
+    crate::native::apple::apple_util::startup_hack();
+}
