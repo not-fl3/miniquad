@@ -152,7 +152,10 @@ impl MacosDisplay {
             let dpi_scale: f64 = msg_send![self.window, backingScaleFactor];
             d.dpi_scale = dpi_scale as f32;
         } else {
-            d.dpi_scale = 1.0;
+            let bounds: NSRect = msg_send![self.view, bounds];
+            let backing_size: NSSize = msg_send![self.view, convertSizeToBacking: NSSize {width: bounds.size.width, height: bounds.size.height}];
+
+            d.dpi_scale = (backing_size.width / bounds.size.width) as f32;
         }
 
         let bounds: NSRect = msg_send![self.view, bounds];
