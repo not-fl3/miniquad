@@ -158,7 +158,7 @@ pub const kCGEventLeftMouseUp: u32 = 2;
 pub const kCGMouseEventClickState: u32 = 1;
 //pub const kCGEventSourceStateHIDSystemState: u32 = 1;
 
-type DataReleaseCallback = unsafe extern "C" fn(info: *mut &[u8], data: *const c_void, size: usize);
+type DataReleaseCallback = unsafe extern "C" fn(*mut c_void, *const c_void, usize);
 
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
@@ -209,7 +209,7 @@ extern "C" {
     pub fn CGImageRelease(image: *const ObjcId);
 
     pub fn CGDataProviderCreateWithData(
-        info: *mut &[u8],
+        info: *mut c_void,
         data: *const u8,
         size: usize,
         callback: DataReleaseCallback,
@@ -220,7 +220,7 @@ extern "C" {
     pub fn CGColorSpaceRelease(space: *const ObjcId);
 }
 
-pub const kCGBitmapByteOrderDefault: u32 = (0 << 12);
+pub const kCGBitmapByteOrderDefault: u32 = 0 << 12;
 pub const kCGImageAlphaLast: u32 = 3;
 pub const kCGRenderingIntentDefault: u32 = 0;
 
