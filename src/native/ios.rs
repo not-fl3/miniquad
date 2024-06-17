@@ -340,10 +340,7 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
                 d.screen_width = screen_width;
                 d.screen_height = screen_height;
             }
-            if let Some(ref mut event_handler) = payload.event_handler {
-                event_handler.resize_event(screen_width as _, screen_height as _);
-            }
-            // send_message(Message::Resize { width: screen_width, height: screen_height });
+            send_message(Message::Resize { width: screen_width, height: screen_height });
         }
 
         if let Some(ref mut event_handler) = payload.event_handler {
@@ -644,7 +641,17 @@ pub fn define_app_delegate() -> *const Class {
                     if !conf.platform.blocking_event_loop || update_requested {
                         match conf.platform.apple_gfx_api {
                             AppleGfxApi::OpenGl => {
-                                msg_send_![&*view, performSelectorOnMainThread:sel!(display) withObject:nil waitUntilDone:YES];
+                                // Why it differs from Metal? I don't realy know. Looks like a bug.
+                                // Somehow it needs `setNeedsDisplay` to redraw after touch.
+                                // With plain `display` it draws only after another touch.
+                                // But when it's not blocking_event_loop it makes fps really drop with `setNeedsDisplay`.
+                                // I hope it will work the same on the real device.
+                                if conf.platform.blocking_event_loop {
+                                    msg_send_![&*view, performSelectorOnMainThread:sel!(setNeedsDisplay) withObject:nil waitUntilDone:NO];
+                                }
+                                else {
+                                    msg_send_![&*view, performSelectorOnMainThread:sel!(display) withObject:nil waitUntilDone:YES];
+                                }
                             }
                             AppleGfxApi::Metal => {
                                 msg_send_![&*view, performSelectorOnMainThread:sel!(setNeedsDisplay) withObject:nil waitUntilDone:NO];
