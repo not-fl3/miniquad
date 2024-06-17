@@ -21,6 +21,7 @@ import android.view.inputmethod.InputMethodManager;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 
 import android.graphics.Color;
 import android.graphics.Insets;
@@ -207,7 +208,16 @@ class ResizingLayout
     public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
         if (Build.VERSION.SDK_INT >= 30) {
             Insets imeInsets = insets.getInsets(WindowInsets.Type.ime());
-            v.setPadding(0, 0, 0, imeInsets.bottom);
+            Insets sysInsets = insets.getInsets(WindowInsets.Type.systemBars());
+
+            // The sys insets change when orientation changes and sys bars
+            // change position.
+            v.setPadding(
+                sysInsets.left,
+                sysInsets.top,
+                sysInsets.right,
+                imeInsets.bottom + sysInsets.bottom
+            );
         }
         return insets;
     }
