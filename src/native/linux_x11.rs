@@ -171,9 +171,6 @@ impl X11Display {
     // TODO: right now it just exits early if fullscreen is false.
     // should be able to able to go back from fullscreen to windowed instead
     unsafe fn set_fullscreen(&mut self, window: Window, fullscreen: bool) {
-        if !fullscreen {
-            return;
-        }
         let wm_state = (self.libx11.XInternAtom)(
             self.display,
             b"_NET_WM_STATE\x00" as *const u8 as *const _,
@@ -181,7 +178,11 @@ impl X11Display {
         );
         let wm_fullscreen = (self.libx11.XInternAtom)(
             self.display,
-            b"_NET_WM_STATE_FULLSCREEN\x00" as *const u8 as *const _,
+            if fullscreen {
+                b"_NET_WM_STATE_FULLSCREEN\x00" as *const u8 as *const _
+            } else {
+                b"\x00" as *const u8 as *const _
+            },
             false as _,
         );
 
