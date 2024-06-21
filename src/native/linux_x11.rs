@@ -20,6 +20,7 @@ use std::collections::HashMap;
 
 pub struct X11Display {
     libx11: LibX11,
+    libxkbcommon: LibXkbCommon,
     libxi: xi_input::LibXi,
     display: *mut Display,
     root: Window,
@@ -47,7 +48,7 @@ impl X11Display {
                     &mut keysym,
                     std::ptr::null_mut(),
                 );
-                let chr = keycodes::keysym_to_unicode(keysym);
+                let chr = keycodes::keysym_to_unicode(&mut self.libxkbcommon, keysym);
                 if chr > 0 {
                     if let Some(chr) = std::char::from_u32(chr as u32) {
                         event_handler.char_event(chr, mods, repeat);
@@ -547,6 +548,7 @@ where
 {
     unsafe {
         let mut libx11 = LibX11::try_load()?;
+        let libxkbcommon = LibXkbCommon::try_load()?;
         let libxi = xi_input::LibXi::try_load()?;
 
         (libx11.XInitThreads)();
@@ -581,6 +583,7 @@ where
             root: x11_root,
             window: 0,
             libx11,
+            libxkbcommon,
             libxi,
             repeated_keycodes: [false; 256],
             cursor_cache: HashMap::new(),
