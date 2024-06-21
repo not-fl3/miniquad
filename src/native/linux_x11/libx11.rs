@@ -934,24 +934,6 @@ pub type XConvertSelection = unsafe extern "C" fn(
 pub type XSetSelectionOwner =
     unsafe extern "C" fn(_: *mut Display, _: Atom, _: Window, _: Time) -> libc::c_int;
 
-pub type XKbKeySymToUtf32 = unsafe extern "C" fn (_: u32) -> u32;
-
-#[derive(Clone)]
-pub struct LibXkbCommon {
-    pub module: std::rc::Rc<module::Module>,
-    pub xkb_keysym_to_utf32: XKbKeySymToUtf32,
-}
-
-impl LibXkbCommon {
-    pub fn try_load() -> Option<Self> {
-        crate::native::module::Module::load("libxkbcommon.so")
-            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.6"))
-            .map(|module| LibXkbCommon {
-                xkb_keysym_to_utf32: module.get_symbol("xkb_keysym_to_utf32").unwrap(),
-                module: std::rc::Rc::new(module)
-            }).ok()
-    }
-}
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct XColor {
@@ -1149,5 +1131,25 @@ impl LibX11 {
                 false as _,
             ),
         };
+    }
+}
+
+pub type XKbKeySymToUtf32 = unsafe extern "C" fn(_: u32) -> u32;
+
+#[derive(Clone)]
+pub struct LibXkbCommon {
+    pub module: std::rc::Rc<module::Module>,
+    pub xkb_keysym_to_utf32: XKbKeySymToUtf32,
+}
+
+impl LibXkbCommon {
+    pub fn try_load() -> Option<Self> {
+        crate::native::module::Module::load("libxkbcommon.so")
+            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.6"))
+            .map(|module| LibXkbCommon {
+                xkb_keysym_to_utf32: module.get_symbol("xkb_keysym_to_utf32").unwrap(),
+                module: std::rc::Rc::new(module),
+            })
+            .ok()
     }
 }
