@@ -1021,6 +1021,7 @@ unsafe impl Sync for RawId {}
 #[derive(Clone, Debug, Default)]
 pub struct GlslSupport {
     pub v130: bool,
+    pub v150: bool,
     pub v330: bool,
     pub v300es: bool,
     pub v100_ext: bool,
@@ -1048,6 +1049,17 @@ pub struct ContextInfo {
     /// List of platform-dependent features that miniquad failed to make cross-platforms
     /// and therefore they might be missing.
     pub features: Features,
+}
+
+impl ContextInfo {
+    pub fn has_integer_attributes(&self) -> bool {
+        match self.backend {
+            Backend::Metal => true,
+            Backend::OpenGl => {
+                self.glsl_support.v150 | self.glsl_support.v300es | self.glsl_support.v330
+            }
+        }
+    }
 }
 
 pub trait RenderingBackend {
