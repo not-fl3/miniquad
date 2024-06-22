@@ -445,7 +445,7 @@ pub struct GlContext {
     default_framebuffer: GLuint,
     pub(crate) cache: GlCache,
 
-    pub(crate) features: Features,
+    pub(crate) info: ContextInfo,
 }
 
 impl GlContext {
@@ -460,6 +460,11 @@ impl GlContext {
 
             glGenVertexArrays(1, &mut vao as *mut _);
             glBindVertexArray(vao);
+            let features = Features {
+                instancing: !crate::native::gl::is_gl2(),
+                ..Default::default()
+            };
+            let info = gl_info(features);
             GlContext {
                 default_framebuffer,
                 shaders: ResourceManager::default(),
@@ -467,10 +472,7 @@ impl GlContext {
                 passes: ResourceManager::default(),
                 buffers: ResourceManager::default(),
                 textures: Textures(vec![]),
-                features: Features {
-                    instancing: !crate::native::gl::is_gl2(),
-                    ..Default::default()
-                },
+                info,
                 cache: GlCache {
                     stored_index_buffer: 0,
                     stored_index_type: None,
@@ -497,7 +499,7 @@ impl GlContext {
     }
 
     pub fn features(&self) -> &Features {
-        &self.features
+        &self.info.features
     }
 }
 
@@ -736,61 +738,72 @@ impl GlContext {
         unsafe { glColorMask(r as _, g as _, b as _, a as _) }
         self.cache.color_write = color_write;
     }
+
+    fn has_integer_attributes(&self) -> bool {
+        self.info.has_integer_attributes()
+    }
+}
+
+fn gl_info(features: Features) -> ContextInfo {
+    let version_string = unsafe { glGetString(super::gl::GL_VERSION) };
+    let gl_version_string = unsafe { std::ffi::CStr::from_ptr(version_string as _) }
+        .to_str()
+        .unwrap()
+        .to_string();
+    //let gles2 = !gles3 && gl_version_string.contains("OpenGL ES");
+
+    let mut glsl_support = GlslSupport::default();
+
+    // this is not quite documented,
+    // but somehow even GL2.1 usually have all the compatibility extensions to support glsl100
+    // It was tested on really old windows machines, virtual machines etc. glsl100 always works!
+    glsl_support.v100 = true;
+
+    // on wasm miniquad always creates webgl1 context, with the only glsl available being version 100
+    #[cfg(target_arch = "wasm32")]
+    {
+        // on web, miniquad always loads EXT_shader_texture_lod and OES_standard_derivatives
+        glsl_support.v100_ext = true;
+
+        let webgl2 = gl_version_string.contains("WebGL 2.0");
+        if webgl2 {
+            glsl_support.v300es = true;
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let gles3 = gl_version_string.contains("OpenGL ES 3");
+
+        if gles3 {
+            glsl_support.v300es = true;
+        }
+    }
+
+    // there is no gl3.4, so 4+ and 3.3 covers all modern OpenGL
+    if gl_version_string.starts_with("3.2") {
+        glsl_support.v150 = true; // MacOS is defaulting to 3.2 and GLSL 150
+    } else if gl_version_string.starts_with("4") || gl_version_string.starts_with("3.3") {
+        glsl_support.v330 = true;
+    } else
+    // gl 3.0, 3.1, 3.2 maps to 1.30, 1.40, 1.50 glsl versions
+    if gl_version_string.starts_with("3") {
+        glsl_support.v130 = true;
+    }
+
+    ContextInfo {
+        backend: Backend::OpenGl,
+        gl_version_string,
+        glsl_support,
+        features: features,
+    }
 }
 
 impl RenderingBackend for GlContext {
     fn info(&self) -> ContextInfo {
-        let version_string = unsafe { glGetString(super::gl::GL_VERSION) };
-        let gl_version_string = unsafe { std::ffi::CStr::from_ptr(version_string as _) }
-            .to_str()
-            .unwrap()
-            .to_string();
-        //let gles2 = !gles3 && gl_version_string.contains("OpenGL ES");
-
-        let mut glsl_support = GlslSupport::default();
-
-        // this is not quite documented,
-        // but somehow even GL2.1 usually have all the compatibility extensions to support glsl100
-        // It was tested on really old windows machines, virtual machines etc. glsl100 always works!
-        glsl_support.v100 = true;
-
-        // on wasm miniquad always creates webgl1 context, with the only glsl available being version 100
-        #[cfg(target_arch = "wasm32")]
-        {
-            // on web, miniquad always loads EXT_shader_texture_lod and OES_standard_derivatives
-            glsl_support.v100_ext = true;
-
-            let webgl2 = gl_version_string.contains("WebGL 2.0");
-            if webgl2 {
-                glsl_support.v300es = true;
-            }
-        }
-
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let gles3 = gl_version_string.contains("OpenGL ES 3");
-
-            if gles3 {
-                glsl_support.v300es = true;
-            }
-        }
-
-        // there is no gl3.4, so 4+ and 3.3 covers all modern OpenGL
-        if gl_version_string.starts_with("4") || gl_version_string.starts_with("3.3") {
-            glsl_support.v330 = true;
-        } else
-        // gl 3.0, 3.1, 3.2 maps to 1.30, 1.40, 1.50 glsl versions
-        if gl_version_string.starts_with("3") {
-            glsl_support.v130 = true;
-        }
-
-        ContextInfo {
-            backend: Backend::OpenGl,
-            gl_version_string,
-            glsl_support,
-            features: self.features.clone(),
-        }
+        self.info.clone()
     }
+
     fn new_shader(
         &mut self,
         shader: ShaderSource,
@@ -1319,13 +1332,16 @@ impl RenderingBackend for GlContext {
                     unsafe {
                         match attribute.type_ {
                             GL_INT | GL_UNSIGNED_INT | GL_SHORT | GL_UNSIGNED_SHORT
-                            | GL_UNSIGNED_BYTE | GL_BYTE => glVertexAttribIPointer(
-                                attr_index as GLuint,
-                                attribute.size,
-                                attribute.type_,
-                                attribute.stride,
-                                attribute.offset as *mut _,
-                            ),
+                            | GL_UNSIGNED_BYTE | GL_BYTE => {
+                                assert!(self.has_integer_attributes());
+                                glVertexAttribIPointer(
+                                    attr_index as GLuint,
+                                    attribute.size,
+                                    attribute.type_,
+                                    attribute.stride,
+                                    attribute.offset as *mut _,
+                                )
+                            }
                             _ => glVertexAttribPointer(
                                 attr_index as GLuint,
                                 attribute.size,
@@ -1335,7 +1351,7 @@ impl RenderingBackend for GlContext {
                                 attribute.offset as *mut _,
                             ),
                         }
-                        if self.features.instancing {
+                        if self.info.features.instancing {
                             glVertexAttribDivisor(attr_index as GLuint, attribute.divisor as u32);
                         }
                         glEnableVertexAttribArray(attr_index as GLuint);
@@ -1515,7 +1531,7 @@ impl RenderingBackend for GlContext {
             "Drawing without any binded pipeline"
         );
 
-        if !self.features.instancing && num_instances != 1 {
+        if !self.info.features.instancing && num_instances != 1 {
             eprintln!("Instanced rendering is not supported by the GPU");
             eprintln!("Ignoring this draw call");
             return;
