@@ -781,6 +781,9 @@ var importObject = {
         glVertexAttribPointer: function (index, size, type, normalized, stride, ptr) {
             gl.vertexAttribPointer(index, size, type, !!normalized, stride, ptr);
         },
+        glVertexAttribIPointer: function (index, size, type, stride, ptr) {
+            gl.vertexAttribIPointer(index, size, type, stride, ptr);
+        },
         glGetUniformLocation: function (program, name) {
             GL.validateGLObjectID(GL.programs, program, 'glGetUniformLocation', 'program');
             name = UTF8ToString(name);
