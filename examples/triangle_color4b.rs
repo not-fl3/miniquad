@@ -144,7 +144,7 @@ mod shader {
         RasterizerData out;
 
         out.position = float4(v.in_pos.xy, 0.0, 1.0);
-        out.color = float4(v.in_color);
+        out.color = float4(v.in_color) / 255.0;
 
         return out;
     }
