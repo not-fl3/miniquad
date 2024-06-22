@@ -1197,15 +1197,6 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn glVertexAttribIPointer(
-        index: GLuint,
-        size: GLint,
-        type_: GLenum,
-        stride: GLsizei,
-        pointer: *const ::std::os::raw::c_void,
-    );
-}
-extern "C" {
     pub fn glGetVertexAttribIiv(index: GLuint, pname: GLenum, params: *mut GLint);
 }
 extern "C" {
