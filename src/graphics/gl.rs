@@ -456,10 +456,7 @@ impl GlContext {
                 GL_FRAMEBUFFER_BINDING,
                 &mut default_framebuffer as *mut _ as *mut _,
             );
-            let mut vao = 0;
 
-            glGenVertexArrays(1, &mut vao as *mut _);
-            glBindVertexArray(vao);
             GlContext {
                 default_framebuffer,
                 shaders: ResourceManager::default(),
