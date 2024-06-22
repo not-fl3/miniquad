@@ -91,15 +91,19 @@ impl EventHandler for Stage {
 
 fn main() {
     let mut conf = conf::Conf::default();
-    conf.platform.apple_gfx_api = conf::AppleGfxApi::Metal;
-
+    let metal = std::env::args().nth(1).as_deref() == Some("metal");
+    conf.platform.apple_gfx_api = if metal {
+        conf::AppleGfxApi::Metal
+    } else {
+        conf::AppleGfxApi::OpenGl
+    };
     miniquad::start(conf, move || Box::new(Stage::new()));
 }
 
 mod shader {
     use miniquad::*;
 
-    pub const VERTEX: &str = r#"#version 300 es
+    pub const VERTEX: &str = r#"#version 150
     in vec2 in_pos;
     in lowp uvec4 in_color;
 
@@ -110,11 +114,12 @@ mod shader {
         color = vec4(in_color) / 255.0;
     }"#;
 
-    pub const FRAGMENT: &str = r#"#version 300 es
+    pub const FRAGMENT: &str = r#"#version 150
     in lowp vec4 color;
+    out vec4 frag_color;
 
     void main() {
-        gl_FragColor = color;
+        frag_color = color;
     }"#;
 
     pub const METAL: &str = r#"
