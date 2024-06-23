@@ -404,12 +404,12 @@ where
 
         let mut count = (display.libx11.XPending)(display.display);
         let block_on_wait = conf.platform.blocking_event_loop && !display.update_requested;
-        if block_on_wait {
+        if block_on_wait && count == 0 {
             // if there are multiple events pending, it is still desired to process
             // them all in one frame.
             // However, when there are no events in the queue, +1 hack
             // will block main thread and release the cpu until the new event.
-            count = count + 1;
+            count = 1;
         }
 
         for _ in 0..count {
