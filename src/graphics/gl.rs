@@ -41,6 +41,7 @@ struct ShaderUniform {
 
 struct ShaderInternal {
     program: GLuint,
+    version: u32,
     images: Vec<ShaderImage>,
     uniforms: Vec<ShaderUniform>,
 }
@@ -509,8 +510,8 @@ fn load_shader_internal(
     meta: ShaderMeta,
 ) -> Result<ShaderInternal, ShaderError> {
     unsafe {
-        let vertex_shader = load_shader(GL_VERTEX_SHADER, vertex_shader)?;
-        let fragment_shader = load_shader(GL_FRAGMENT_SHADER, fragment_shader)?;
+        let (vertex_shader, vertex_version) = load_shader(GL_VERTEX_SHADER, vertex_shader)?;
+        let (fragment_shader, fragment_version) = load_shader(GL_FRAGMENT_SHADER, fragment_shader)?;
 
         let program = glCreateProgram();
         glAttachShader(program, vertex_shader);
@@ -559,15 +560,17 @@ fn load_shader_internal(
             Some(res)
         }).collect();
 
+        assert!(vertex_version == fragment_version); // Probably most shader usages use same version for both
         Ok(ShaderInternal {
             program,
+            version: vertex_version,
             images,
             uniforms,
         })
     }
 }
 
-pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderError> {
+pub fn load_shader(shader_type: GLenum, source: &str) -> Result<(GLuint, u32), ShaderError> {
     unsafe {
         let shader = glCreateShader(shader_type);
         assert!(shader != 0);
@@ -611,7 +614,26 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderEr
             });
         }
 
-        Ok(shader)
+        let mut version = 110; // About default version: https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)#Version
+
+        let mut pos = 0;
+        // To not depend on regexes but expect comments in every place since it is valid shader syntax
+        if let Some(pound_pos) = source.find('#') {
+            pos += pound_pos;
+            if let Some(version_pos) = source[pos..].find("version") {
+                pos += version_pos;
+                if let Some(number_pos) = source[pos..].find(|c: char| ('0'..'9').contains(&c)) {
+                    pos += number_pos;
+                    let version_str = source[pos..]
+                        .chars()
+                        .take_while(|c| ('0'..'9').contains(&c))
+                        .collect::<String>();
+                    version = version_str.parse().unwrap();
+                }
+            }
+        }
+
+        Ok((shader, version))
     }
 }
 
@@ -739,8 +761,8 @@ impl GlContext {
         self.cache.color_write = color_write;
     }
 
-    fn has_integer_attributes(&self) -> bool {
-        self.info.has_integer_attributes()
+    fn has_integer_attributes(&self, shader_version: u32) -> bool {
+        self.info.has_integer_attributes(shader_version)
     }
 }
 
@@ -1332,8 +1354,9 @@ impl RenderingBackend for GlContext {
                     unsafe {
                         match attribute.type_ {
                             GL_INT | GL_UNSIGNED_INT | GL_SHORT | GL_UNSIGNED_SHORT
-                            | GL_UNSIGNED_BYTE | GL_BYTE => {
-                                assert!(self.has_integer_attributes());
+                            | GL_UNSIGNED_BYTE | GL_BYTE
+                                if self.has_integer_attributes(shader.version) =>
+                            {
                                 glVertexAttribIPointer(
                                     attr_index as GLuint,
                                     attribute.size,

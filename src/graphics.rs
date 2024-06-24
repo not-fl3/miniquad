@@ -1052,11 +1052,12 @@ pub struct ContextInfo {
 }
 
 impl ContextInfo {
-    pub fn has_integer_attributes(&self) -> bool {
+    pub fn has_integer_attributes(&self, shader_version: u32) -> bool {
         match self.backend {
             Backend::Metal => true,
             Backend::OpenGl => {
-                self.glsl_support.v150 | self.glsl_support.v300es | self.glsl_support.v330
+                (self.glsl_support.v150 | self.glsl_support.v300es | self.glsl_support.v330)
+                    && shader_version >= 150
             }
         }
     }
