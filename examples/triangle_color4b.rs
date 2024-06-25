@@ -60,7 +60,10 @@ impl Stage {
             &[BufferLayout::default()],
             &[
                 VertexAttribute::new("in_pos", VertexFormat::Float2),
-                VertexAttribute::new("in_color", VertexFormat::Byte4),
+                VertexAttribute {
+                    gl_pass_as_float: false,
+                    ..VertexAttribute::new("in_color", VertexFormat::Byte4)
+                },
             ],
             shader,
             PipelineParams::default(),

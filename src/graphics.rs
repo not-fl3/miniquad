@@ -236,6 +236,15 @@ pub struct VertexAttribute {
     pub name: &'static str,
     pub format: VertexFormat,
     pub buffer_index: usize,
+    /// This flag affects integer VertexFormats, Byte*, Short*, Int*
+    /// Taking Byte4 as an example:
+    /// On Metal, it might be received as either `float4` or `uint4`
+    /// On OpenGl and `gl_pass_as_float = true` shaders should receive it as `vec4`
+    /// With `gl_pass_as_float = false`, as `uvec4`
+    ///
+    /// Note that `uvec4` requires at least `150` glsl version
+    /// Before setting `gl_pass_as_float` to false, better check `context.info().has_integer_attributes()` and double check that shaders are at least `150`
+    pub gl_pass_as_float: bool,
 }
 
 impl VertexAttribute {
@@ -252,6 +261,7 @@ impl VertexAttribute {
             name,
             format,
             buffer_index,
+            gl_pass_as_float: true,
         }
     }
 }
