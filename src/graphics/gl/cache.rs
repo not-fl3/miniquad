@@ -9,6 +9,7 @@ pub struct VertexAttributeInternal {
     pub stride: i32,
     pub buffer_index: usize,
     pub divisor: i32,
+    pub gl_pass_as_float: bool,
 }
 
 #[derive(Default, Copy, Clone)]
