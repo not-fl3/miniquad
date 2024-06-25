@@ -1145,7 +1145,8 @@ pub struct LibXkbCommon {
 impl LibXkbCommon {
     pub fn try_load() -> Option<Self> {
         crate::native::module::Module::load("libxkbcommon.so")
-            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.6"))
+            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0"))
+            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0.0.0.0"))
             .map(|module| LibXkbCommon {
                 xkb_keysym_to_utf32: module.get_symbol("xkb_keysym_to_utf32").unwrap(),
                 module: std::rc::Rc::new(module),
