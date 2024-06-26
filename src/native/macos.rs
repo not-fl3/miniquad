@@ -1272,7 +1272,7 @@ where
 
             if !conf.platform.blocking_event_loop || update_requested {
                 unsafe {
-                    msg_send_![view, performSelectorOnMainThread:sel!(setNeedsDisplay:) withObject:YES waitUntilDone:NO];
+                    msg_send_![view, performSelectorOnMainThread:sel!(setNeedsDisplay:) withObject:nil waitUntilDone:NO];
                 }
             }
             thread::yield_now();
