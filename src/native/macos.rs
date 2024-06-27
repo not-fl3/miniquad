@@ -713,6 +713,12 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         }
     }
 
+    extern "C" fn set_needs_display_hack(this: &Object, _: Sel) {
+        unsafe {
+            msg_send_![this, setNeedsDisplay: YES];
+        }
+    }
+
     decl.add_method(
         sel!(canBecomeKey),
         yes as extern "C" fn(&Object, Sel) -> BOOL,
@@ -782,6 +788,10 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
     decl.add_method(
         sel!(processMessage:),
         process_message as extern "C" fn(&Object, Sel, ObjcId),
+    );
+    decl.add_method(
+        sel!(setNeedsDisplayHack),
+        set_needs_display_hack as extern "C" fn(&Object, Sel),
     );
 }
 
@@ -1272,7 +1282,7 @@ where
 
             if !conf.platform.blocking_event_loop || update_requested {
                 unsafe {
-                    msg_send_![view, performSelectorOnMainThread:sel!(setNeedsDisplay:) withObject:nil waitUntilDone:NO];
+                    msg_send_![view, performSelectorOnMainThread:sel!(setNeedsDisplayHack) withObject:nil waitUntilDone:NO];
                 }
             }
             thread::yield_now();
