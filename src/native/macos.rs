@@ -901,6 +901,39 @@ unsafe fn set_icon(ns_app: ObjcId, icon: &Icon) {
     CGImageRelease(image);
 }
 
+/// Initialize the system menu bar for this application
+/// - ns_app: This NSApplication
+unsafe fn initialize_menu_bar(ns_app: ObjcId) {
+    // Adapted from Winit `menu::initialize`
+
+    // System menu bar
+    let menu_bar = msg_send_![class!(NSMenu), new];
+    // Entry for the app menu dropdown in the menu bar
+    let app_menu_item = msg_send_![class!(NSMenuItem), new];
+    let app_menu = msg_send_![class!(NSMenu), new];
+
+    // Hook up the menu components to the application
+    msg_send_![app_menu_item, setSubmenu: app_menu];
+    msg_send_![menu_bar, addItem: app_menu_item];
+    msg_send_![ns_app, setMainMenu: menu_bar];
+
+    // Add quit menu entry with shortcut command-q
+    // It uses NSRunningApplication.localizedName, which will try to use the localized name,
+    //  and will go through a chain of fallbacks based on what name strings are set in
+    //  the Application bundle files, ending with the executable name.
+    let running_application = msg_send_![class!(NSRunningApplication), currentApplication];
+    let application_name = msg_send_![running_application, localizedName];
+    let quit_item_title = str_to_nsstring(&format!("Quit {}", nsstring_to_string(application_name)));
+    let quit_item = msg_send_![class!(NSMenuItem), alloc];
+    let quit_item = msg_send_![
+        quit_item,
+        initWithTitle: quit_item_title
+        action: sel!(terminate:)
+        keyEquivalent: str_to_nsstring("q")
+    ];
+    msg_send_![app_menu, addItem: quit_item];
+}
+
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
@@ -945,6 +978,8 @@ where
     if let Some(icon) = &conf.icon {
         set_icon(ns_app, icon);
     }
+
+    initialize_menu_bar(ns_app);
 
     let window_masks = NSWindowStyleMask::NSTitledWindowMask as u64
         | NSWindowStyleMask::NSClosableWindowMask as u64
