@@ -903,7 +903,6 @@ unsafe fn set_icon(ns_app: ObjcId, icon: &Icon) {
 
 /// Initialize the system menu bar for this application
 /// - ns_app: This NSApplication
-#[no_mangle]
 unsafe fn initialize_menu_bar(ns_app: ObjcId) {
     // Adapted from Winit `menu::initialize`
 
