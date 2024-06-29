@@ -919,9 +919,12 @@ unsafe fn initialize_menu_bar(ns_app: ObjcId) {
     let () = msg_send![ns_app, setMainMenu: menu_bar];
 
     // Add quit menu entry with shortcut command-q
-    let process_info: ObjcId = msg_send![class!(NSProcessInfo), processInfo];
-    let process_name: ObjcId = msg_send![process_info, processName];
-    let quit_item_title = str_to_nsstring(&format!("Quit {}", nsstring_to_string(process_name)));
+    // It uses NSRunningApplication.localizedName, which will try to use the localized name,
+    //  and will go through a chain of fallbacks based on what name strings are set in
+    //  the Application bundle files, ending with the executable name.
+    let running_application: ObjcId = msg_send![class!(NSRunningApplication), currentApplication];
+    let application_name: ObjcId = msg_send![running_application, localizedName];
+    let quit_item_title = str_to_nsstring(&format!("Quit {}", nsstring_to_string(application_name)));
     let quit_item: ObjcId = msg_send![class!(NSMenuItem), alloc];
     let quit_item: ObjcId = msg_send![
         quit_item,
