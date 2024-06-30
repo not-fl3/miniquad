@@ -14,10 +14,10 @@ pub use {
         class,
         declare::ClassDecl,
         msg_send,
-        runtime::{Class, Object, Protocol, Sel, BOOL, NO, YES},
+        runtime::{Class, Object, Sel, BOOL, NO, YES},
         sel, sel_impl, Encode, Encoding,
     },
-    std::{ffi::c_void, os::raw::c_ulong, ptr::NonNull},
+    std::{ffi::c_void, ptr::NonNull},
 };
 
 //use bitflags::bitflags;

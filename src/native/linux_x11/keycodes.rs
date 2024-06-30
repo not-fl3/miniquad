@@ -165,6 +165,9 @@ pub unsafe fn translate_mouse_button(button: i32) -> MouseButton {
     };
 }
 
-pub unsafe extern "C" fn keysym_to_unicode(libxkbcommon: &mut LibXkbCommon, keysym: super::libx11::KeySym) -> i32 {
-    return (libxkbcommon.xkb_keysym_to_utf32)(keysym as u32) as i32
+pub unsafe extern "C" fn keysym_to_unicode(
+    libxkbcommon: &mut LibXkbCommon,
+    keysym: super::libx11::KeySym,
+) -> i32 {
+    return (libxkbcommon.xkb_keysym_to_utf32)(keysym as u32) as i32;
 }

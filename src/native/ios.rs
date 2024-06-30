@@ -340,7 +340,10 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
                 d.screen_width = screen_width;
                 d.screen_height = screen_height;
             }
-            send_message(Message::Resize { width: screen_width, height: screen_height });
+            send_message(Message::Resize {
+                width: screen_width,
+                height: screen_height,
+            });
         }
 
         if let Some(ref mut event_handler) = payload.event_handler {
@@ -648,8 +651,7 @@ pub fn define_app_delegate() -> *const Class {
                                 // I hope it will work the same on the real device.
                                 if conf.platform.blocking_event_loop {
                                     msg_send_![&*view, performSelectorOnMainThread:sel!(setNeedsDisplay) withObject:nil waitUntilDone:NO];
-                                }
-                                else {
+                                } else {
                                     msg_send_![&*view, performSelectorOnMainThread:sel!(display) withObject:nil waitUntilDone:YES];
                                 }
                             }

@@ -210,13 +210,6 @@ pub struct Buffer {
     next_value: usize,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct ShaderUniform {
-    size: u64,
-    offset: u64,
-    format: MTLVertexFormat,
-}
-
 #[derive(Debug)]
 struct ShaderInternal {
     vertex_function: ObjcId,
