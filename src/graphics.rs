@@ -57,14 +57,14 @@ impl UniformType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UniformDesc {
     pub name: String,
     pub uniform_type: UniformType,
     pub array_count: usize,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UniformBlockLayout {
     pub uniforms: Vec<UniformDesc>,
 }
