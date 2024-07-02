@@ -1,5 +1,6 @@
 #![allow(non_upper_case_globals, non_snake_case)]
 
+use crate::native::module;
 use super::{
     libx11::{self, Display, Window, _XPrivDisplay},
     xi_input,
@@ -64,7 +65,7 @@ type XFreeEventData = fn(_: *mut Display, _: *mut libx11::XGenericEventCookie);
 
 #[derive(Clone)]
 pub struct LibXi {
-    _module: std::rc::Rc<crate::native::module::Module>,
+    _module: std::rc::Rc<module::Module>,
     _XQueryExtension: XQueryExtension,
     XIQueryVersion: XIQueryVersion,
     XISelectEvents: XISelectEvents,
@@ -74,9 +75,9 @@ pub struct LibXi {
 }
 
 impl LibXi {
-    pub fn try_load() -> Option<LibXi> {
-        crate::native::module::Module::load("libXi.so")
-            .or_else(|_| crate::native::module::Module::load("libXi.so.6"))
+    pub fn try_load() -> Result<LibXi, module::Error> {
+        module::Module::load("libXi.so")
+            .or_else(|_| module::Module::load("libXi.so.6"))
             .map(|module| LibXi {
                 _XQueryExtension: module.get_symbol("XQueryExtension").unwrap(),
                 XIQueryVersion: module.get_symbol("XIQueryVersion").unwrap(),
@@ -86,7 +87,6 @@ impl LibXi {
                 xi_extension_opcode: None,
                 _module: std::rc::Rc::new(module),
             })
-            .ok()
     }
 
     pub unsafe fn query_xi_extension(

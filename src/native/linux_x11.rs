@@ -10,13 +10,30 @@ mod xi_input;
 
 use crate::{
     event::EventHandler,
-    native::{egl, gl, NativeDisplayData, Request},
+    native::{egl, gl, NativeDisplayData, Request, module},
     CursorIcon,
 };
 
 use libx11::*;
 
 use std::collections::HashMap;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum X11Error {
+    LibraryNotFound(module::Error),
+    GLXError(String),
+}
+impl std::fmt::Display for X11Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+impl From<module::Error> for X11Error {
+    fn from(error: module::Error) -> X11Error {
+        X11Error::LibraryNotFound(error)
+    }
+}
+impl std::error::Error for X11Error {}
 
 pub struct X11Display {
     libx11: LibX11,
@@ -352,7 +369,7 @@ where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     let mut glx = match glx::Glx::init(&mut display.libx11, display.display, screen, conf) {
-        Some(glx) => glx,
+        Ok(glx) => glx,
         _ => return Err(display),
     };
     let visual = glx.visual;
@@ -543,7 +560,7 @@ where
     Ok(())
 }
 
-pub fn run<F>(conf: &crate::conf::Conf, f: &mut Option<F>) -> Option<()>
+pub fn run<F>(conf: &crate::conf::Conf, f: &mut Option<F>) -> Result<(), X11Error>
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
@@ -614,5 +631,5 @@ where
             }
         }
     }
-    Some(())
+    Ok(())
 }
