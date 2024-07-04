@@ -1,4 +1,5 @@
 use crate::event::KeyCode;
+use crate::native::linux_wayland::libxkbcommon::LibXkbCommon;
 
 pub fn translate(keysym: u32) -> KeyCode {
     // See xkbcommon/xkbcommon-keysyms.h
@@ -124,4 +125,8 @@ pub fn translate(keysym: u32) -> KeyCode {
         60 => return KeyCode::World1,
         _ => return KeyCode::Unknown,
     };
+}
+
+pub unsafe extern "C" fn keysym_to_unicode(libxkbcommon: &mut LibXkbCommon, keysym: u32) -> i32 {
+    return (libxkbcommon.xkb_keysym_to_utf32)(keysym as u32) as i32;
 }
