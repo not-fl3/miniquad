@@ -40,6 +40,8 @@ pub type xkb_state_update_mask = unsafe extern "C" fn(
     locked_layout: u32,
 ) -> ::std::os::raw::c_int;
 
+pub type xkb_keysym_to_utf32 = unsafe extern "C" fn(_: u32) -> u32;
+
 #[derive(Clone)]
 pub struct LibXkbCommon {
     _module: std::rc::Rc<crate::native::module::Module>,
@@ -51,12 +53,15 @@ pub struct LibXkbCommon {
     pub xkb_state_unref: xkb_state_unref,
     pub xkb_state_key_get_one_sym: xkb_state_key_get_one_sym,
     pub xkb_state_update_mask: xkb_state_update_mask,
+    pub xkb_keysym_to_utf32: xkb_keysym_to_utf32,
 }
 
 impl LibXkbCommon {
     pub fn try_load() -> Option<LibXkbCommon> {
         crate::native::module::Module::load("libxkbcommon.so")
             .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0"))
+            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0.0.0"))
+            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0.0.0.0"))
             .map(|module| LibXkbCommon {
                 xkb_context_new: module.get_symbol("xkb_context_new").unwrap(),
                 xkb_context_unref: module.get_symbol("xkb_context_unref").unwrap(),
@@ -68,6 +73,7 @@ impl LibXkbCommon {
                 xkb_state_unref: module.get_symbol("xkb_state_unref").unwrap(),
                 xkb_state_key_get_one_sym: module.get_symbol("xkb_state_key_get_one_sym").unwrap(),
                 xkb_state_update_mask: module.get_symbol("xkb_state_update_mask").unwrap(),
+                xkb_keysym_to_utf32: module.get_symbol("xkb_keysym_to_utf32").unwrap(),
 
                 _module: std::rc::Rc::new(module),
             })

@@ -131,7 +131,7 @@ unsafe extern "C" fn seat_handle_capabilities(
 }
 
 enum WaylandEvent {
-    KeyboardKey(KeyCode, bool),
+    KeyboardKey(u32, bool),
     PointerMotion(f32, f32),
     PointerButton(MouseButton, bool),
     PointerAxis(f32, f32),
@@ -204,8 +204,7 @@ unsafe extern "C" fn keyboard_handle_key(
     // https://wayland-book.com/seat/keyboard.html
     // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
     let keysym = (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
-    let keycode = keycodes::translate(keysym);
-    EVENTS.push(WaylandEvent::KeyboardKey(keycode, state == 1));
+    EVENTS.push(WaylandEvent::KeyboardKey(keysym, state == 1));
 }
 unsafe extern "C" fn keyboard_handle_modifiers(
     data: *mut ::std::os::raw::c_void,
@@ -759,15 +758,23 @@ where
             alt: false,
             logo: false,
         };
-        let mut repeated_keys: HashSet<KeyCode> = HashSet::new();
+        let mut repeated_keys: HashSet<u32> = HashSet::new();
         let (mut last_mouse_x, mut last_mouse_y) = (0.0, 0.0);
 
         while display.closed == false {
             (client.wl_display_dispatch_pending)(wdisplay);
 
             if let Some(ref mut event_handler) = display.event_handler {
-                for keycode in &repeated_keys {
+                for keysym in &repeated_keys {
+                    let keycode = keycodes::translate(*keysym);
                     event_handler.key_down_event(keycode.clone(), keymods, true);
+
+                    let chr = keycodes::keysym_to_unicode(&mut display.xkb, *keysym);
+                    if chr > 0 {
+                        if let Some(chr) = std::char::from_u32(chr as u32) {
+                            event_handler.char_event(chr, keymods, true);
+                        }
+                    }
                 }
 
                 while let Ok(request) = rx.try_recv() {
@@ -796,7 +803,8 @@ where
 
                 for event in EVENTS.drain(..) {
                     match event {
-                        WaylandEvent::KeyboardKey(keycode, state) => {
+                        WaylandEvent::KeyboardKey(keysym, state) => {
+                            let keycode = keycodes::translate(keysym);
                             match keycode {
                                 KeyCode::LeftShift | KeyCode::RightShift => keymods.shift = state,
                                 KeyCode::LeftControl | KeyCode::RightControl => {
@@ -809,10 +817,17 @@ where
 
                             if state {
                                 event_handler.key_down_event(keycode, keymods, false);
-                                repeated_keys.insert(keycode);
+                                repeated_keys.insert(keysym);
+
+                                let chr = keycodes::keysym_to_unicode(&mut display.xkb, keysym);
+                                if chr > 0 {
+                                    if let Some(chr) = std::char::from_u32(chr as u32) {
+                                        event_handler.char_event(chr, keymods, false);
+                                    }
+                                }
                             } else {
                                 event_handler.key_up_event(keycode, keymods);
-                                repeated_keys.remove(&keycode);
+                                repeated_keys.remove(&keysym);
                             }
                         }
                         WaylandEvent::PointerMotion(x, y) => {
