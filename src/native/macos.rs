@@ -713,6 +713,10 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         }
     }
 
+    // apparently, its impossible to use performSelectorOnMainThread
+    // with primitive type argument, so the only way to pass
+    // YES to setNeedsDisplay - send a no argument message
+    // https://stackoverflow.com/questions/6120614/passing-primitives-through-performselectoronmainthread
     extern "C" fn set_needs_display_hack(this: &Object, _: Sel) {
         unsafe {
             msg_send_![this, setNeedsDisplay: YES];
