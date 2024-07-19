@@ -231,12 +231,6 @@ extern "C" {
     pub fn MTLCopyAllDevices() -> ObjcId; //TODO: Array
 }
 
-#[link(name = "AVFoundation", kind = "framework")]
-extern "C" {
-    pub static AVAudioUnitComponentManager: ObjcId;
-    pub static AVAudioUnit: ObjcId;
-}
-
 // Foundation
 
 #[repr(C)]
@@ -1283,57 +1277,6 @@ pub struct MIDIEventPacket {
     pub timeStamp: MIDITimeStamp,
     pub wordCount: u32,
     pub words: [u32; 64usize],
-}
-
-#[link(name = "CoreMidi", kind = "framework")]
-extern "C" {
-    pub static kMIDIPropertyManufacturer: CFStringRef;
-    pub static kMIDIPropertyDisplayName: CFStringRef;
-    pub static kMIDIPropertyUniqueID: CFStringRef;
-
-    pub fn MIDIGetNumberOfSources() -> ItemCount;
-    pub fn MIDIGetSource(sourceIndex0: ItemCount) -> MIDIEndpointRef;
-
-    pub fn MIDIGetNumberOfDestinations() -> ItemCount;
-    pub fn MIDIGetDestination(sourceIndex0: ItemCount) -> MIDIEndpointRef;
-
-    pub fn MIDIClientCreateWithBlock(
-        name: CFStringRef,
-        outClient: *mut MIDIClientRef,
-        notifyBlock: ObjcId,
-    ) -> OSStatus;
-
-    pub fn MIDIInputPortCreateWithProtocol(
-        client: MIDIClientRef,
-        portName: CFStringRef,
-        protocol: MIDIProtocolID,
-        outPort: *mut MIDIPortRef,
-        receiveBlock: ObjcId,
-    ) -> OSStatus;
-
-    pub fn MIDIOutputPortCreate(
-        client: MIDIClientRef,
-        portName: CFStringRef,
-        outPort: *mut MIDIPortRef,
-    ) -> OSStatus;
-
-    pub fn MIDIObjectGetStringProperty(
-        obj: MIDIObjectRef,
-        propertyID: CFStringRef,
-        str_: *mut CFStringRef,
-    ) -> OSStatus;
-
-    pub fn MIDIObjectGetIntegerProperty(
-        obj: MIDIObjectRef,
-        propertyID: CFStringRef,
-        outValue: *mut i32,
-    ) -> OSStatus;
-
-    pub fn MIDIPortConnectSource(
-        port: MIDIPortRef,
-        source: MIDIEndpointRef,
-        connRefCon: *mut ::std::os::raw::c_void,
-    ) -> OSStatus;
 }
 
 pub const NSOpenGLContextParameterSwapInterval: i32 = 222;
