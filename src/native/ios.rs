@@ -668,12 +668,6 @@ pub fn define_app_delegate() -> *const Class {
         YES
     }
 
-    #[cfg(target_os = "ios")]
-    #[link(name = "UIKit", kind = "framework")]
-    extern "C" {
-        pub static UIWindowSceneSessionRoleApplication: ObjcId;
-    }
-
     extern "C" fn application_did_become_active(_: &Object, _: Sel, _: ObjcId) {
         send_message(Message::Resume);
     }
