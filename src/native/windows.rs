@@ -266,12 +266,12 @@ unsafe extern "system" fn win32_wndproc(
 ) -> LRESULT {
     let display_ptr: isize;
 
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(target_pointer_width = "64")]
     {
         display_ptr = GetWindowLongPtrA(hwnd, GWLP_USERDATA)
     }
 
-    #[cfg(target_arch = "i686")]
+    #[cfg(target_pointer_width = "32")]
     {
         display_ptr = GetWindowLong(hwnd, GWLP_USERDATA)
     }
