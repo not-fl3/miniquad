@@ -1,6 +1,4 @@
-use num_enum::TryFromPrimitive;
-
-#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq, TryFromPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
 #[repr(u8)]
 pub enum MouseButton {
     Left = 0,
@@ -9,6 +7,19 @@ pub enum MouseButton {
     MB4 = 3,
     MB5 = 4,
     Unknown = 255,
+}
+
+impl MouseButton {
+    pub fn from_u8(value: u8) -> MouseButton {
+        match value {
+            0 => MouseButton::Left,
+            1 => MouseButton::Middle,
+            2 => MouseButton::Right,
+            3 => MouseButton::MB4,
+            4 => MouseButton::MB5,
+            _ => MouseButton::Unknown,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]

@@ -368,9 +368,9 @@ unsafe extern "system" fn win32_wndproc(
             let mouse_x = payload.mouse_x;
             let mouse_y = payload.mouse_y;
             let xbutton = GET_XBUTTON_WPARAM(wparam) as u8;
-            let which = MouseButton::try_from(xbutton+2);
+            let which = MouseButton::from_u8(xbutton+2);
 
-            event_handler.mouse_button_down_event(which.unwrap(), mouse_x, mouse_y);
+            event_handler.mouse_button_down_event(which, mouse_x, mouse_y);
         }
         WM_LBUTTONUP => {
             let mouse_x = payload.mouse_x;
@@ -394,9 +394,9 @@ unsafe extern "system" fn win32_wndproc(
             let mouse_x = payload.mouse_x;
             let mouse_y = payload.mouse_y;
             let xbutton = GET_XBUTTON_WPARAM(wparam) as u8;
-            let which = MouseButton::try_from(xbutton+2);
+            let which = MouseButton::from_u8(xbutton+2);
 
-            event_handler.mouse_button_up_event(which.unwrap(), mouse_x, mouse_y);
+            event_handler.mouse_button_up_event(which, mouse_x, mouse_y);
         }
 
         WM_MOUSEMOVE => {
