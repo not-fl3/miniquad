@@ -351,6 +351,12 @@ pub enum FilterMode {
     Nearest,
 }
 
+impl Default for FilterMode {
+    fn default() -> Self {
+	Self::Linear
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Hash)]
 pub enum MipmapFilterMode {
     None,

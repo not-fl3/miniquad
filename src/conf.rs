@@ -182,6 +182,11 @@ pub struct Conf {
     /// Platform specific settings. Hints to OS for context creation, driver-specific
     /// settings etc.
     pub platform: Platform,
+
+    /// Default texture filter mode
+
+    /// Default: Linear
+    pub default_filter_mode: crate::graphics::FilterMode,
 }
 
 /// Icon image in three levels of detail.
@@ -226,6 +231,7 @@ impl Default for Conf {
             window_resizable: true,
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
+	    default_filter_mode: Default::default(),
         }
     }
 }
@@ -243,6 +249,7 @@ impl Default for Conf {
             window_resizable: false,
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
+	    default_filter_mode: Default::default(),
         }
     }
 }
