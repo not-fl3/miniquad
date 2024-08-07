@@ -1,9 +1,13 @@
-#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
+use num_enum::TryFromPrimitive;
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq, TryFromPrimitive)]
 #[repr(u8)]
 pub enum MouseButton {
     Left = 0,
     Middle = 1,
     Right = 2,
+    MB4 = 3,
+    MB5 = 4,
     Unknown = 255,
 }
 
