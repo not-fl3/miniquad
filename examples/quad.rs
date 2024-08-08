@@ -124,6 +124,8 @@ fn main() {
         conf::AppleGfxApi::OpenGl
     };
     conf.platform.webgl_version = conf::WebGLVersion::WebGL2;
+    // mitigating high CPU consumption
+    conf.platform.blocking_event_loop = true;
 
     miniquad::start(conf, move || Box::new(Stage::new()));
 }

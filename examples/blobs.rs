@@ -158,6 +158,8 @@ fn main() {
     } else {
         conf::AppleGfxApi::OpenGl
     };
+    // mitigating high CPU consumption
+    conf.platform.blocking_event_loop = true;
 
     miniquad::start(conf, move || Box::new(Stage::new()));
 }
