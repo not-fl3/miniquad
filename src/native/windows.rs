@@ -10,7 +10,7 @@ use winapi::{
         hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_PAGE_GENERIC},
         minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
         ntdef::NULL,
-        windef::{HCURSOR, HDC, HICON, HWND, POINT, RECT},
+        windef::{HBRUSH, HCURSOR, HDC, HICON, HWND, POINT, RECT},
         windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
     },
     um::{
@@ -617,6 +617,7 @@ unsafe fn create_window(
     wndclassw.hInstance = GetModuleHandleW(NULL as _);
     wndclassw.hCursor = LoadCursorW(NULL as _, IDC_ARROW);
     wndclassw.hIcon = LoadIconW(NULL as _, IDI_WINLOGO);
+    wndclassw.hbrBackground = GetStockObject(BLACK_BRUSH as i32) as HBRUSH;
     let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
     wndclassw.lpszClassName = class_name.as_ptr() as _;
     wndclassw.cbWndExtra = std::mem::size_of::<*mut std::ffi::c_void>() as i32;
