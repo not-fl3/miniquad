@@ -136,6 +136,7 @@ struct MainThreadState {
     event_handler: Box<dyn EventHandler>,
     quit: bool,
     fullscreen: bool,
+    update_requested: bool,
     keymods: KeyMods,
 }
 
@@ -259,6 +260,7 @@ impl MainThreadState {
         self.event_handler.update();
 
         if self.surface.is_null() == false {
+            self.update_requested = false;
             self.event_handler.draw();
 
             unsafe {
@@ -269,27 +271,23 @@ impl MainThreadState {
 
     fn process_request(&mut self, request: crate::native::Request) {
         use crate::native::Request::*;
-        unsafe {
-            match request {
-                SetFullscreen(fullscreen) => {
-                    unsafe {
-                        let env = attach_jni_env();
-                        set_full_screen(env, fullscreen);
-                    }
-                    self.fullscreen = fullscreen;
-                }
-                ShowKeyboard(show) => unsafe {
-                    let env = attach_jni_env();
-                    ndk_utils::call_void_method!(
-                        env,
-                        ACTIVITY,
-                        "showKeyboard",
-                        "(Z)V",
-                        show as i32
-                    );
-                },
-                _ => {}
+
+        match request {
+            ScheduleUpdate => {
+                self.update_requested = true;
             }
+            SetFullscreen(fullscreen) => {
+                unsafe {
+                    let env = attach_jni_env();
+                    set_full_screen(env, fullscreen);
+                }
+                self.fullscreen = fullscreen;
+            }
+            ShowKeyboard(show) => unsafe {
+                let env = attach_jni_env();
+                ndk_utils::call_void_method!(env, ACTIVITY, "showKeyboard", "(Z)V", show as i32);
+            },
+            _ => {}
         }
     }
 }
@@ -422,6 +420,7 @@ where
         let clipboard = Box::new(AndroidClipboard::new());
         crate::set_display(NativeDisplayData {
             high_dpi: conf.high_dpi,
+            blocking_event_loop: conf.platform.blocking_event_loop,
             ..NativeDisplayData::new(screen_width as _, screen_height as _, tx, clipboard)
         });
 
@@ -436,6 +435,7 @@ where
             event_handler,
             quit: false,
             fullscreen: conf.fullscreen,
+            update_requested: true,
             keymods: KeyMods {
                 shift: false,
                 ctrl: false,
@@ -449,12 +449,24 @@ where
                 s.process_request(request);
             }
 
-            // process all the messages from the main thread
-            while let Ok(msg) = rx.try_recv() {
-                s.process_message(msg);
+            let block_on_wait = conf.platform.blocking_event_loop && !s.update_requested;
+
+            if block_on_wait {
+                let res = rx.recv();
+
+                if let Ok(msg) = res {
+                    s.process_message(msg);
+                }
+            } else {
+                // process all the messages from the main thread
+                while let Ok(msg) = rx.try_recv() {
+                    s.process_message(msg);
+                }
             }
 
-            s.frame();
+            if !conf.platform.blocking_event_loop || s.update_requested {
+                s.frame();
+            }
 
             thread::yield_now();
         }

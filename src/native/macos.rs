@@ -5,15 +5,27 @@
 use {
     crate::{
         conf::{AppleGfxApi, Icon},
-        event::{EventHandler, MouseButton},
+        event::{EventHandler, KeyCode, KeyMods, MouseButton},
         native::{
             apple::{apple_util::*, frameworks::*},
             gl, NativeDisplayData, Request,
         },
         native_display, CursorIcon,
     },
-    std::{collections::HashMap, os::raw::c_void, sync::mpsc::Receiver},
+    std::{
+        cell::RefCell,
+        collections::HashMap,
+        os::raw::c_void,
+        sync::{mpsc, Arc, Mutex},
+        thread,
+    },
 };
+
+struct MainThreadState {
+    quit: bool,
+    view: *mut Object,
+    cur_msg: Message,
+}
 
 pub struct MacosDisplay {
     window: ObjcId,
@@ -32,7 +44,8 @@ pub struct MacosDisplay {
     event_handler: Option<Box<dyn EventHandler>>,
     f: Option<Box<dyn 'static + FnOnce() -> Box<dyn EventHandler>>>,
     modifiers: Modifiers,
-    native_requests: Receiver<Request>,
+    state: Arc<Mutex<MainThreadState>>,
+    update_requested: bool,
 }
 
 impl MacosDisplay {
@@ -133,7 +146,7 @@ impl MacosDisplay {
         (new_x, new_y)
     }
 
-    fn move_mouse_inside_window(&self, window: *mut Object) {
+    fn move_mouse_inside_window(&self, _window: *mut Object) {
         unsafe {
             let frame: NSRect = msg_send![self.window, frame];
             let origin = self.transform_mouse_point(&frame.origin);
@@ -151,7 +164,10 @@ impl MacosDisplay {
             let dpi_scale: f64 = msg_send![self.window, backingScaleFactor];
             d.dpi_scale = dpi_scale as f32;
         } else {
-            d.dpi_scale = 1.0;
+            let bounds: NSRect = msg_send![self.view, bounds];
+            let backing_size: NSSize = msg_send![self.view, convertSizeToBacking: NSSize {width: bounds.size.width, height: bounds.size.height}];
+
+            d.dpi_scale = (backing_size.width / bounds.size.width) as f32;
         }
 
         let bounds: NSRect = msg_send![self.view, bounds];
@@ -172,23 +188,81 @@ impl MacosDisplay {
 
     fn process_request(&mut self, request: Request) {
         use Request::*;
-        unsafe {
-            match request {
-                SetCursorGrab(grab) => self.set_cursor_grab(self.window, grab),
-                ShowMouse(show) => self.show_mouse(show),
-                SetMouseCursor(icon) => self.set_mouse_cursor(icon),
-                SetWindowSize {
-                    new_width,
-                    new_height,
-                } => self.set_window_size(new_width as _, new_height as _),
-                SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
-                SetWindowPosition { new_x, new_y } => {
-                    eprintln!("Not implemented for macos");
-                }
-                _ => {}
+        match request {
+            ScheduleUpdate => {
+                self.update_requested = true;
             }
+            SetCursorGrab(grab) => self.set_cursor_grab(self.window, grab),
+            ShowMouse(show) => self.show_mouse(show),
+            SetMouseCursor(icon) => self.set_mouse_cursor(icon),
+            SetWindowSize {
+                new_width,
+                new_height,
+            } => self.set_window_size(new_width as _, new_height as _),
+            SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
+            SetWindowPosition { .. } => {
+                eprintln!("Not implemented for macos");
+            }
+            _ => {}
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Message {
+    Resize {
+        width: i32,
+        height: i32,
+    },
+    RawMouseMove {
+        dx: f32,
+        dy: f32,
+    },
+    MouseMove {
+        x: f32,
+        y: f32,
+    },
+    MouseButtonDown {
+        button: MouseButton,
+        x: f32,
+        y: f32,
+    },
+    MouseButtonUp {
+        button: MouseButton,
+        x: f32,
+        y: f32,
+    },
+    MouseWheel {
+        dx: f32,
+        dy: f32,
+    },
+    Character {
+        character: char,
+        keymods: KeyMods,
+        repeat: bool,
+    },
+    KeyDown {
+        keycode: KeyCode,
+        keymods: KeyMods,
+        repeat: bool,
+    },
+    KeyUp {
+        keycode: KeyCode,
+        keymods: KeyMods,
+    },
+    Destroy,
+}
+unsafe impl Send for Message {}
+
+thread_local! {
+    static MESSAGES_TX: RefCell<Option<mpsc::Sender<Message>>> = RefCell::new(None);
+}
+
+fn send_message(message: Message) {
+    MESSAGES_TX.with(|tx| {
+        let mut tx = tx.borrow_mut();
+        tx.as_mut().unwrap().send(message).unwrap();
+    })
 }
 
 #[derive(Default)]
@@ -275,18 +349,20 @@ pub fn define_cocoa_window_delegate() -> *const Class {
     extern "C" fn window_did_resize(this: &Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
         if let Some((w, h)) = unsafe { payload.update_dimensions() } {
-            if let Some(event_handler) = payload.context() {
-                event_handler.resize_event(w as _, h as _);
-            }
+            send_message(Message::Resize {
+                width: w,
+                height: h,
+            });
         }
     }
 
     extern "C" fn window_did_change_screen(this: &Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
         if let Some((w, h)) = unsafe { payload.update_dimensions() } {
-            if let Some(event_handler) = payload.context() {
-                event_handler.resize_event(w as _, h as _);
-            }
+            send_message(Message::Resize {
+                width: w,
+                height: h,
+            });
         }
     }
     extern "C" fn window_did_enter_fullscreen(this: &Object, _: Sel, _: ObjcId) {
@@ -367,15 +443,17 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
             if payload.cursor_grabbed {
                 let dx: f64 = msg_send!(event, deltaX);
                 let dy: f64 = msg_send!(event, deltaY);
-                if let Some(event_handler) = payload.context() {
-                    event_handler.raw_mouse_motion(dx as f32, dy as f32);
-                }
+                send_message(Message::RawMouseMove {
+                    dx: dx as f32,
+                    dy: dy as f32,
+                });
             } else {
                 let point: NSPoint = msg_send!(event, locationInWindow);
                 let point = payload.transform_mouse_point(&point);
-                if let Some(event_handler) = payload.context() {
-                    event_handler.mouse_motion_event(point.0, point.1);
-                }
+                send_message(Message::MouseMove {
+                    x: point.0,
+                    y: point.1,
+                });
             }
         }
     }
@@ -386,12 +464,18 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         unsafe {
             let point: NSPoint = msg_send!(event, locationInWindow);
             let point = payload.transform_mouse_point(&point);
-            if let Some(event_handler) = payload.context() {
-                if down {
-                    event_handler.mouse_button_down_event(btn, point.0, point.1);
-                } else {
-                    event_handler.mouse_button_up_event(btn, point.0, point.1);
-                }
+            if down {
+                send_message(Message::MouseButtonDown {
+                    button: btn,
+                    x: point.0,
+                    y: point.1,
+                });
+            } else {
+                send_message(Message::MouseButtonUp {
+                    button: btn,
+                    x: point.0,
+                    y: point.1,
+                });
             }
         }
     }
@@ -413,8 +497,7 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
     extern "C" fn other_mouse_up(this: &Object, _sel: Sel, event: ObjcId) {
         fire_mouse_event(this, event, false, MouseButton::Middle);
     }
-    extern "C" fn scroll_wheel(this: &Object, _sel: Sel, event: ObjcId) {
-        let payload = get_window_payload(this);
+    extern "C" fn scroll_wheel(_: &Object, _sel: Sel, event: ObjcId) {
         unsafe {
             let mut dx: f64 = msg_send![event, scrollingDeltaX];
             let mut dy: f64 = msg_send![event, scrollingDeltaY];
@@ -423,9 +506,10 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
                 dx *= 10.0;
                 dy *= 10.0;
             }
-            if let Some(event_handler) = payload.context() {
-                event_handler.mouse_wheel_event(dx as f32, dy as f32);
-            }
+            send_message(Message::MouseWheel {
+                dx: dx as f32,
+                dy: dy as f32,
+            });
         }
     }
     extern "C" fn reset_cursor_rects(this: &Object, _sel: Sel) {
@@ -451,36 +535,38 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         }
     }
 
-    extern "C" fn key_down(this: &Object, _sel: Sel, event: ObjcId) {
-        let payload = get_window_payload(this);
+    extern "C" fn key_down(_: &Object, _sel: Sel, event: ObjcId) {
         let mods = get_event_key_modifier(event);
         let repeat: bool = unsafe { msg_send!(event, isARepeat) };
         if let Some(key) = get_event_keycode(event) {
-            if let Some(event_handler) = payload.context() {
-                event_handler.key_down_event(key, mods, repeat);
-            }
+            send_message(Message::KeyDown {
+                keycode: key,
+                keymods: mods,
+                repeat,
+            });
         }
 
         if let Some(character) = get_event_char(event) {
-            if let Some(event_handler) = payload.context() {
-                event_handler.char_event(character, mods, repeat);
-            }
+            send_message(Message::Character {
+                character,
+                keymods: mods,
+                repeat,
+            });
         }
     }
 
-    extern "C" fn key_up(this: &Object, _sel: Sel, event: ObjcId) {
-        let payload = get_window_payload(this);
+    extern "C" fn key_up(_: &Object, _sel: Sel, event: ObjcId) {
         let mods = get_event_key_modifier(event);
         if let Some(key) = get_event_keycode(event) {
-            if let Some(event_handler) = payload.context() {
-                event_handler.key_up_event(key, mods);
-            }
+            send_message(Message::KeyUp {
+                keycode: key,
+                keymods: mods,
+            });
         }
     }
 
     extern "C" fn flags_changed(this: &Object, _sel: Sel, event: ObjcId) {
         fn produce_event(
-            payload: &mut MacosDisplay,
             keycode: crate::KeyCode,
             mods: crate::KeyMods,
             old_pressed: bool,
@@ -488,13 +574,16 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         ) {
             if new_pressed ^ old_pressed {
                 if new_pressed {
-                    if let Some(event_handler) = payload.context() {
-                        event_handler.key_down_event(keycode, mods, false);
-                    }
+                    send_message(Message::KeyDown {
+                        keycode,
+                        keymods: mods,
+                        repeat: false,
+                    });
                 } else {
-                    if let Some(event_handler) = payload.context() {
-                        event_handler.key_up_event(keycode, mods);
-                    }
+                    send_message(Message::KeyUp {
+                        keycode,
+                        keymods: mods,
+                    });
                 }
             }
         }
@@ -505,56 +594,48 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         let new_modifiers = Modifiers::new(flags);
 
         produce_event(
-            payload,
             crate::KeyCode::LeftShift,
             mods,
             payload.modifiers.left_shift,
             new_modifiers.left_shift,
         );
         produce_event(
-            payload,
             crate::KeyCode::RightShift,
             mods,
             payload.modifiers.right_shift,
             new_modifiers.right_shift,
         );
         produce_event(
-            payload,
             crate::KeyCode::LeftControl,
             mods,
             payload.modifiers.left_control,
             new_modifiers.left_control,
         );
         produce_event(
-            payload,
             crate::KeyCode::RightControl,
             mods,
             payload.modifiers.right_control,
             new_modifiers.right_control,
         );
         produce_event(
-            payload,
             crate::KeyCode::LeftSuper,
             mods,
             payload.modifiers.left_command,
             new_modifiers.left_command,
         );
         produce_event(
-            payload,
             crate::KeyCode::RightSuper,
             mods,
             payload.modifiers.right_command,
             new_modifiers.right_command,
         );
         produce_event(
-            payload,
             crate::KeyCode::LeftAlt,
             mods,
             payload.modifiers.left_alt,
             new_modifiers.left_alt,
         );
         produce_event(
-            payload,
             crate::KeyCode::RightAlt,
             mods,
             payload.modifiers.right_alt,
@@ -563,6 +644,85 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
 
         payload.modifiers = new_modifiers;
     }
+
+    extern "C" fn process_message(this: &Object, _: Sel, _: ObjcId) {
+        use Message::*;
+        let payload = get_window_payload(this);
+        let msg = {
+            let state = payload.state.lock().unwrap();
+            state.cur_msg
+        };
+        match msg {
+            Destroy => {
+                let mut state = payload.state.lock().unwrap();
+                state.quit = true;
+            }
+            MouseMove { x, y } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.mouse_motion_event(x, y);
+                }
+            }
+            RawMouseMove { dx, dy } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.raw_mouse_motion(dx, dy);
+                }
+            }
+            MouseButtonDown { button, x, y } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.mouse_button_down_event(button, x, y);
+                }
+            }
+            MouseButtonUp { button, x, y } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.mouse_button_up_event(button, x, y);
+                }
+            }
+            MouseWheel { dx, dy } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.mouse_wheel_event(dx as f32, dy as f32);
+                }
+            }
+            Character {
+                character,
+                keymods,
+                repeat,
+            } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.char_event(character, keymods, repeat);
+                }
+            }
+            KeyDown {
+                keycode,
+                keymods,
+                repeat,
+            } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.key_down_event(keycode, keymods, repeat);
+                }
+            }
+            KeyUp { keycode, keymods } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.key_up_event(keycode, keymods);
+                }
+            }
+            Resize { width, height } => {
+                if let Some(ref mut event_handler) = payload.event_handler {
+                    event_handler.resize_event(width as _, height as _);
+                }
+            }
+        }
+    }
+
+    // apparently, its impossible to use performSelectorOnMainThread
+    // with primitive type argument, so the only way to pass
+    // YES to setNeedsDisplay - send a no argument message
+    // https://stackoverflow.com/questions/6120614/passing-primitives-through-performselectoronmainthread
+    extern "C" fn set_needs_display_hack(this: &Object, _: Sel) {
+        unsafe {
+            msg_send_![this, setNeedsDisplay: YES];
+        }
+    }
+
     decl.add_method(
         sel!(canBecomeKey),
         yes as extern "C" fn(&Object, Sel) -> BOOL,
@@ -629,6 +789,14 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         flags_changed as extern "C" fn(&Object, Sel, ObjcId),
     );
     decl.add_method(sel!(keyUp:), key_up as extern "C" fn(&Object, Sel, ObjcId));
+    decl.add_method(
+        sel!(processMessage:),
+        process_message as extern "C" fn(&Object, Sel, ObjcId),
+    );
+    decl.add_method(
+        sel!(setNeedsDisplayHack),
+        set_needs_display_hack as extern "C" fn(&Object, Sel),
+    );
 }
 
 pub fn define_opengl_view_class() -> *const Class {
@@ -642,7 +810,12 @@ pub fn define_opengl_view_class() -> *const Class {
             let () = msg_send![super(this, superclass), reshape];
 
             if let Some((w, h)) = payload.update_dimensions() {
-                if let Some(event_handler) = payload.context() {
+                // left this because post_processing.rs turns black after the first resize
+                // and somehow this makes it draw until manual window resize
+                // (bug existed even on original macos implementation)
+
+                // send_message(Message::Resize { width: w, height: h });
+                if let Some(ref mut event_handler) = payload.event_handler {
                     event_handler.resize_event(w as _, h as _);
                 }
             }
@@ -651,14 +824,15 @@ pub fn define_opengl_view_class() -> *const Class {
 
     extern "C" fn draw_rect(this: &Object, _sel: Sel, _rect: NSRect) {
         let payload = get_window_payload(this);
-
-        while let Ok(request) = payload.native_requests.try_recv() {
-            payload.process_request(request);
-        }
+        let mut updated = false;
 
         if let Some(event_handler) = payload.context() {
             event_handler.update();
             event_handler.draw();
+            updated = true;
+        }
+        if updated {
+            payload.update_requested = false;
         }
 
         unsafe {
@@ -697,20 +871,10 @@ pub fn define_opengl_view_class() -> *const Class {
         payload.event_handler = Some(f());
     }
 
-    extern "C" fn timer_fired(this: &Object, _sel: Sel, _: ObjcId) {
-        unsafe {
-            let () = msg_send!(this, setNeedsDisplay: YES);
-        }
-    }
     let superclass = class!(NSOpenGLView);
     let mut decl: ClassDecl = ClassDecl::new("RenderViewClass", superclass).unwrap();
     unsafe {
         //decl.add_method(sel!(dealloc), dealloc as extern "C" fn(&Object, Sel));
-        decl.add_method(
-            sel!(timerFired:),
-            timer_fired as extern "C" fn(&Object, Sel, ObjcId),
-        );
-
         decl.add_method(
             sel!(prepareOpenGL),
             prepare_open_gl as extern "C" fn(&Object, Sel),
@@ -734,12 +898,6 @@ pub fn define_metal_view_class() -> *const Class {
     let mut decl = ClassDecl::new("RenderViewClass", superclass).unwrap();
     decl.add_ivar::<*mut c_void>("display_ptr");
 
-    extern "C" fn timer_fired(this: &Object, _sel: Sel, _: ObjcId) {
-        unsafe {
-            let () = msg_send!(this, setNeedsDisplay: YES);
-        }
-    }
-
     extern "C" fn draw_rect(this: &Object, _sel: Sel, _rect: NSRect) {
         let payload = get_window_payload(this);
 
@@ -748,13 +906,15 @@ pub fn define_metal_view_class() -> *const Class {
             payload.event_handler = Some(f());
         }
 
-        while let Ok(request) = payload.native_requests.try_recv() {
-            payload.process_request(request);
-        }
+        let mut updated = false;
 
         if let Some(event_handler) = payload.context() {
             event_handler.update();
             event_handler.draw();
+            updated = true;
+        }
+        if updated {
+            payload.update_requested = false;
         }
 
         unsafe {
@@ -768,10 +928,6 @@ pub fn define_metal_view_class() -> *const Class {
 
     unsafe {
         //decl.add_method(sel!(dealloc), dealloc as extern "C" fn(&Object, Sel));
-        decl.add_method(
-            sel!(timerFired:),
-            timer_fired as extern "C" fn(&Object, Sel, ObjcId),
-        );
         decl.add_method(
             sel!(drawRect:),
             draw_rect as extern "C" fn(&Object, Sel, NSRect),
@@ -803,6 +959,8 @@ unsafe fn create_metal_view(_: NSRect, sample_count: i32, _: bool) -> ObjcId {
         setDepthStencilPixelFormat: MTLPixelFormat::Depth32Float_Stencil8
     ];
     let () = msg_send![view, setSampleCount: sample_count];
+    let () = msg_send![view, setEnableSetNeedsDisplay: true];
+    let () = msg_send![view, setPaused: true];
 
     view
 }
@@ -866,8 +1024,8 @@ impl crate::native::Clipboard for MacosClipboard {
     fn set(&mut self, _data: &str) {}
 }
 
-unsafe extern "C" fn release_data(info: *mut &[u8], _: *const c_void, _: usize) {
-    Box::from_raw(info);
+unsafe extern "C" fn release_data(info: *mut c_void, _: *const c_void, _: usize) {
+    drop(Box::from_raw(info));
 }
 
 unsafe fn set_icon(ns_app: ObjcId, icon: &Icon) {
@@ -883,7 +1041,7 @@ unsafe fn set_icon(ns_app: ObjcId, icon: &Icon) {
     let size = colors.len();
     let boxed = Box::new(colors);
     let info = Box::into_raw(boxed);
-    let provider = CGDataProviderCreateWithData(info, data, size, release_data);
+    let provider = CGDataProviderCreateWithData(info as *mut c_void, data, size, release_data);
     let image = CGImageCreate(
         width,
         height,
@@ -911,17 +1069,61 @@ unsafe fn set_icon(ns_app: ObjcId, icon: &Icon) {
     CGImageRelease(image);
 }
 
+/// Initialize the system menu bar for this application
+/// - ns_app: This NSApplication
+unsafe fn initialize_menu_bar(ns_app: ObjcId) {
+    // Adapted from Winit `menu::initialize`
+
+    // System menu bar
+    let menu_bar = msg_send_![class!(NSMenu), new];
+    // Entry for the app menu dropdown in the menu bar
+    let app_menu_item = msg_send_![class!(NSMenuItem), new];
+    let app_menu = msg_send_![class!(NSMenu), new];
+
+    // Hook up the menu components to the application
+    msg_send_![app_menu_item, setSubmenu: app_menu];
+    msg_send_![menu_bar, addItem: app_menu_item];
+    msg_send_![ns_app, setMainMenu: menu_bar];
+
+    // Add quit menu entry with shortcut command-q
+    // It uses NSRunningApplication.localizedName, which will try to use the localized name,
+    //  and will go through a chain of fallbacks based on what name strings are set in
+    //  the Application bundle files, ending with the executable name.
+    let running_application = msg_send_![class!(NSRunningApplication), currentApplication];
+    let application_name = msg_send_![running_application, localizedName];
+    let quit_item_title = str_to_nsstring(&format!("Quit {}", nsstring_to_string(application_name)));
+    let quit_item = msg_send_![class!(NSMenuItem), alloc];
+    let quit_item = msg_send_![
+        quit_item,
+        initWithTitle: quit_item_title
+        action: sel!(terminate:)
+        keyEquivalent: str_to_nsstring("q")
+    ];
+    msg_send_![app_menu, addItem: quit_item];
+}
+
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (tx, requests_rx) = std::sync::mpsc::channel();
     let clipboard = Box::new(MacosClipboard);
     crate::set_display(NativeDisplayData {
         high_dpi: conf.high_dpi,
         gfx_api: conf.platform.apple_gfx_api,
+        blocking_event_loop: conf.platform.blocking_event_loop,
         ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
     });
+
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    MESSAGES_TX.with(move |messages_tx| *messages_tx.borrow_mut() = Some(tx));
+
+    let state_original = Arc::new(Mutex::new(MainThreadState {
+        quit: false,
+        view: std::ptr::null_mut(),
+        cur_msg: Message::MouseMove { x: 0., y: 0. },
+    }));
 
     let mut display = MacosDisplay {
         view: std::ptr::null_mut(),
@@ -934,8 +1136,9 @@ where
         gfx_api: conf.platform.apple_gfx_api,
         f: Some(Box::new(f)),
         event_handler: None,
-        native_requests: rx,
         modifiers: Modifiers::default(),
+        update_requested: true,
+        state: state_original.clone(),
     };
 
     let app_delegate_class = define_app_delegate();
@@ -953,6 +1156,8 @@ where
     if let Some(icon) = &conf.icon {
         set_icon(ns_app, icon);
     }
+
+    initialize_menu_bar(ns_app);
 
     let window_masks = NSWindowStyleMask::NSTitledWindowMask as u64
         | NSWindowStyleMask::NSClosableWindowMask as u64
@@ -998,6 +1203,10 @@ where
         let mut d = native_display().lock().unwrap();
         d.view = view;
     }
+    {
+        let mut s = state_original.lock().unwrap();
+        s.view = view;
+    }
     (*view).set_ivar("display_ptr", &mut display as *mut _ as *mut c_void);
 
     display.window = window;
@@ -1007,16 +1216,6 @@ where
 
     let _ = display.update_dimensions();
 
-    let nstimer: ObjcId = msg_send![
-        class!(NSTimer),
-        timerWithTimeInterval: 0.001
-        target: view
-        selector: sel!(timerFired:)
-        userInfo: nil
-        repeats: true
-    ];
-    let nsrunloop: ObjcId = msg_send![class!(NSRunLoop), currentRunLoop];
-    let () = msg_send![nsrunloop, addTimer: nstimer forMode: NSDefaultRunLoopMode];
     assert!(!view.is_null());
 
     let () = msg_send![window, makeFirstResponder: view];
@@ -1027,7 +1226,72 @@ where
 
     let () = msg_send![window, makeKeyAndOrderFront: nil];
 
-    let ns_app: ObjcId = msg_send![class!(NSApplication), sharedApplication];
+    struct SendHack<F>(F);
+    unsafe impl<F> Send for SendHack<F> {}
+
+    let state = SendHack(state_original.clone());
+    thread::spawn(move || {
+        let s = state.0;
+
+        loop {
+            while let Ok(request) = requests_rx.try_recv() {
+                let s = s.lock().unwrap();
+                let view = s.view;
+                let payload = get_window_payload(view.as_ref().unwrap());
+                payload.process_request(request);
+            }
+
+            let block_on_wait = {
+                let s = s.lock().unwrap();
+                let view = s.view;
+
+                let payload = get_window_payload(view.as_ref().unwrap());
+                conf.platform.blocking_event_loop && !payload.update_requested
+            };
+
+            if block_on_wait {
+                let res = rx.recv();
+
+                if let Ok(msg) = res {
+                    let view;
+                    {
+                        let mut s = s.lock().unwrap();
+                        view = s.view;
+                        s.cur_msg = msg;
+                    }
+                    msg_send_![&*view, performSelectorOnMainThread:sel!(processMessage:) withObject:nil waitUntilDone:YES];
+                }
+            } else {
+                // process all the messages from the main thread
+                while let Ok(msg) = rx.try_recv() {
+                    let view;
+                    {
+                        let mut s = s.lock().unwrap();
+                        view = s.view;
+                        s.cur_msg = msg;
+                    }
+                    msg_send_![&*view, performSelectorOnMainThread:sel!(processMessage:) withObject:nil waitUntilDone:YES];
+                }
+            }
+
+            let update_requested;
+            let view;
+            {
+                let s = s.lock().unwrap();
+                view = s.view;
+
+                let payload = get_window_payload(view.as_ref().unwrap());
+                update_requested = payload.update_requested;
+            }
+
+            if !conf.platform.blocking_event_loop || update_requested {
+                unsafe {
+                    msg_send_![view, performSelectorOnMainThread:sel!(setNeedsDisplayHack) withObject:nil waitUntilDone:NO];
+                }
+            }
+            thread::yield_now();
+        }
+    });
 
     let () = msg_send![ns_app, run];
 

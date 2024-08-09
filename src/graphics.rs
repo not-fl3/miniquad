@@ -57,14 +57,14 @@ impl UniformType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UniformDesc {
     pub name: String,
     pub uniform_type: UniformType,
     pub array_count: usize,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UniformBlockLayout {
     pub uniforms: Vec<UniformDesc>,
 }
@@ -236,6 +236,15 @@ pub struct VertexAttribute {
     pub name: &'static str,
     pub format: VertexFormat,
     pub buffer_index: usize,
+    /// This flag affects integer VertexFormats, Byte*, Short*, Int*
+    /// Taking Byte4 as an example:
+    /// On Metal, it might be received as either `float4` or `uint4`
+    /// On OpenGl and `gl_pass_as_float = true` shaders should receive it as `vec4`
+    /// With `gl_pass_as_float = false`, as `uvec4`
+    ///
+    /// Note that `uvec4` requires at least `150` glsl version
+    /// Before setting `gl_pass_as_float` to false, better check `context.info().has_integer_attributes()` and double check that shaders are at least `150`
+    pub gl_pass_as_float: bool,
 }
 
 impl VertexAttribute {
@@ -252,6 +261,7 @@ impl VertexAttribute {
             name,
             format,
             buffer_index,
+            gl_pass_as_float: true,
         }
     }
 }
@@ -1021,6 +1031,7 @@ unsafe impl Sync for RawId {}
 #[derive(Clone, Debug, Default)]
 pub struct GlslSupport {
     pub v130: bool,
+    pub v150: bool,
     pub v330: bool,
     pub v300es: bool,
     pub v100_ext: bool,
@@ -1048,6 +1059,17 @@ pub struct ContextInfo {
     /// List of platform-dependent features that miniquad failed to make cross-platforms
     /// and therefore they might be missing.
     pub features: Features,
+}
+
+impl ContextInfo {
+    pub fn has_integer_attributes(&self) -> bool {
+        match self.backend {
+            Backend::Metal => true,
+            Backend::OpenGl => {
+                self.glsl_support.v150 | self.glsl_support.v300es | self.glsl_support.v330
+            }
+        }
+    }
 }
 
 pub trait RenderingBackend {

@@ -541,6 +541,13 @@ gl_loader!(
         stride: GLsizei,
         pointer: *const ::std::os::raw::c_void
     ) -> (),
+    fn glVertexAttribIPointer(
+        index: GLuint,
+        size: GLint,
+        type_: GLenum,
+        stride: GLsizei,
+        pointer: *const ::std::os::raw::c_void
+    ) -> (),
     fn glDisable(cap: GLenum) -> (),
     fn glColorMask(red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean) -> (),
     fn glBindBuffer(target: GLenum, buffer: GLuint) -> (),

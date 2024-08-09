@@ -10,7 +10,7 @@ mod xi_input;
 
 use crate::{
     event::EventHandler,
-    native::{egl, gl, NativeDisplayData, Request},
+    native::{egl, gl, NativeDisplayData, Request, module},
     CursorIcon,
 };
 
@@ -18,8 +18,26 @@ use libx11::*;
 
 use std::collections::HashMap;
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum X11Error {
+    LibraryNotFound(module::Error),
+    GLXError(String),
+}
+impl std::fmt::Display for X11Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+impl From<module::Error> for X11Error {
+    fn from(error: module::Error) -> X11Error {
+        X11Error::LibraryNotFound(error)
+    }
+}
+impl std::error::Error for X11Error {}
+
 pub struct X11Display {
     libx11: LibX11,
+    libxkbcommon: LibXkbCommon,
     libxi: xi_input::LibXi,
     display: *mut Display,
     root: Window,
@@ -47,7 +65,7 @@ impl X11Display {
                     &mut keysym,
                     std::ptr::null_mut(),
                 );
-                let chr = keycodes::keysym_to_unicode(keysym);
+                let chr = keycodes::keysym_to_unicode(&mut self.libxkbcommon, keysym);
                 if chr > 0 {
                     if let Some(chr) = std::char::from_u32(chr as u32) {
                         event_handler.char_event(chr, mods, repeat);
@@ -170,9 +188,6 @@ impl X11Display {
     // TODO: right now it just exits early if fullscreen is false.
     // should be able to able to go back from fullscreen to windowed instead
     unsafe fn set_fullscreen(&mut self, window: Window, fullscreen: bool) {
-        if !fullscreen {
-            return;
-        }
         let wm_state = (self.libx11.XInternAtom)(
             self.display,
             b"_NET_WM_STATE\x00" as *const u8 as *const _,
@@ -180,7 +195,11 @@ impl X11Display {
         );
         let wm_fullscreen = (self.libx11.XInternAtom)(
             self.display,
-            b"_NET_WM_STATE_FULLSCREEN\x00" as *const u8 as *const _,
+            if fullscreen {
+                b"_NET_WM_STATE_FULLSCREEN\x00" as *const u8 as *const _
+            } else {
+                b"\x00" as *const u8 as *const _
+            },
             false as _,
         );
 
@@ -350,7 +369,7 @@ where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     let mut glx = match glx::Glx::init(&mut display.libx11, display.display, screen, conf) {
-        Some(glx) => glx,
+        Ok(glx) => glx,
         _ => return Err(display),
     };
     let visual = glx.visual;
@@ -541,12 +560,13 @@ where
     Ok(())
 }
 
-pub fn run<F>(conf: &crate::conf::Conf, f: &mut Option<F>) -> Option<()>
+pub fn run<F>(conf: &crate::conf::Conf, f: &mut Option<F>) -> Result<(), X11Error>
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     unsafe {
         let mut libx11 = LibX11::try_load()?;
+        let libxkbcommon = LibXkbCommon::try_load()?;
         let libxi = xi_input::LibXi::try_load()?;
 
         (libx11.XInitThreads)();
@@ -581,6 +601,7 @@ where
             root: x11_root,
             window: 0,
             libx11,
+            libxkbcommon,
             libxi,
             repeated_keycodes: [false; 256],
             cursor_cache: HashMap::new(),
@@ -610,5 +631,5 @@ where
             }
         }
     }
-    Some(())
+    Ok(())
 }

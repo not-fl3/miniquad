@@ -349,7 +349,8 @@ where
                 native::linux_wayland::run(&conf, f).expect("Wayland backend failed")
             }
             conf::LinuxBackend::X11WithWaylandFallback => {
-                if native::linux_x11::run(&conf, f).is_none() {
+                if let Err(err) = native::linux_x11::run(&conf, f) {
+                    eprintln!("{err:?}");
                     eprintln!("Failed to initialize through X11! Trying wayland instead");
                     native::linux_wayland::run(&conf, f);
                 }
@@ -357,7 +358,7 @@ where
             conf::LinuxBackend::WaylandWithX11Fallback => {
                 if native::linux_wayland::run(&conf, f).is_none() {
                     eprintln!("Failed to initialize through wayland! Trying X11 instead");
-                    native::linux_x11::run(&conf, f);
+                    native::linux_x11::run(&conf, f).unwrap()
                 }
             }
         }

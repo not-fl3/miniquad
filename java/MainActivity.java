@@ -21,6 +21,7 @@ import android.view.inputmethod.InputMethodManager;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 
 import android.graphics.Color;
 import android.graphics.Insets;
@@ -154,7 +155,7 @@ class QuadSurface
         if (event.getAction() == KeyEvent.ACTION_UP && keyCode != 0) {
             QuadNative.surfaceOnKeyUp(keyCode);
         }
-        
+
         if (event.getAction() == KeyEvent.ACTION_UP || event.getAction() == KeyEvent.ACTION_MULTIPLE) {
             int character = event.getUnicodeChar();
             if (character == 0) {
@@ -205,8 +206,19 @@ class ResizingLayout
 
     @Override
     public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
-        Insets imeInsets = insets.getInsets(WindowInsets.Type.ime());
-        v.setPadding(0, 0, 0, imeInsets.bottom);
+        if (Build.VERSION.SDK_INT >= 30) {
+            Insets imeInsets = insets.getInsets(WindowInsets.Type.ime());
+            Insets sysInsets = insets.getInsets(WindowInsets.Type.systemBars());
+
+            // The sys insets change when orientation changes and sys bars
+            // change position.
+            v.setPadding(
+                sysInsets.left,
+                sysInsets.top,
+                sysInsets.right,
+                imeInsets.bottom + sysInsets.bottom
+            );
+        }
         return insets;
     }
 }
@@ -316,7 +328,7 @@ public class MainActivity extends Activity {
                         imm.showSoftInput(view, 0);
                     } else {
                         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                        imm.hideSoftInputFromWindow(view.getWindowToken(),0); 
+                        imm.hideSoftInputFromWindow(view.getWindowToken(),0);
                     }
                 }
             });

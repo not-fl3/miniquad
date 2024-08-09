@@ -14,10 +14,10 @@ pub use {
         class,
         declare::ClassDecl,
         msg_send,
-        runtime::{Class, Object, Protocol, Sel, BOOL, NO, YES},
+        runtime::{Class, Object, Sel, BOOL, NO, YES},
         sel, sel_impl, Encode, Encoding,
     },
-    std::{ffi::c_void, os::raw::c_ulong, ptr::NonNull},
+    std::{ffi::c_void, ptr::NonNull},
 };
 
 //use bitflags::bitflags;
@@ -158,7 +158,7 @@ pub const kCGEventLeftMouseUp: u32 = 2;
 pub const kCGMouseEventClickState: u32 = 1;
 //pub const kCGEventSourceStateHIDSystemState: u32 = 1;
 
-type DataReleaseCallback = unsafe extern "C" fn(info: *mut &[u8], data: *const c_void, size: usize);
+type DataReleaseCallback = unsafe extern "C" fn(*mut c_void, *const c_void, usize);
 
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
@@ -209,7 +209,7 @@ extern "C" {
     pub fn CGImageRelease(image: *const ObjcId);
 
     pub fn CGDataProviderCreateWithData(
-        info: *mut &[u8],
+        info: *mut c_void,
         data: *const u8,
         size: usize,
         callback: DataReleaseCallback,
@@ -220,7 +220,7 @@ extern "C" {
     pub fn CGColorSpaceRelease(space: *const ObjcId);
 }
 
-pub const kCGBitmapByteOrderDefault: u32 = (0 << 12);
+pub const kCGBitmapByteOrderDefault: u32 = 0 << 12;
 pub const kCGImageAlphaLast: u32 = 3;
 pub const kCGRenderingIntentDefault: u32 = 0;
 
@@ -229,12 +229,6 @@ extern "C" {
     pub fn MTLCreateSystemDefaultDevice() -> ObjcId;
     #[cfg(not(target_os = "ios"))]
     pub fn MTLCopyAllDevices() -> ObjcId; //TODO: Array
-}
-
-#[link(name = "AVFoundation", kind = "framework")]
-extern "C" {
-    pub static AVAudioUnitComponentManager: ObjcId;
-    pub static AVAudioUnit: ObjcId;
 }
 
 // Foundation
@@ -1283,57 +1277,6 @@ pub struct MIDIEventPacket {
     pub timeStamp: MIDITimeStamp,
     pub wordCount: u32,
     pub words: [u32; 64usize],
-}
-
-#[link(name = "CoreMidi", kind = "framework")]
-extern "C" {
-    pub static kMIDIPropertyManufacturer: CFStringRef;
-    pub static kMIDIPropertyDisplayName: CFStringRef;
-    pub static kMIDIPropertyUniqueID: CFStringRef;
-
-    pub fn MIDIGetNumberOfSources() -> ItemCount;
-    pub fn MIDIGetSource(sourceIndex0: ItemCount) -> MIDIEndpointRef;
-
-    pub fn MIDIGetNumberOfDestinations() -> ItemCount;
-    pub fn MIDIGetDestination(sourceIndex0: ItemCount) -> MIDIEndpointRef;
-
-    pub fn MIDIClientCreateWithBlock(
-        name: CFStringRef,
-        outClient: *mut MIDIClientRef,
-        notifyBlock: ObjcId,
-    ) -> OSStatus;
-
-    pub fn MIDIInputPortCreateWithProtocol(
-        client: MIDIClientRef,
-        portName: CFStringRef,
-        protocol: MIDIProtocolID,
-        outPort: *mut MIDIPortRef,
-        receiveBlock: ObjcId,
-    ) -> OSStatus;
-
-    pub fn MIDIOutputPortCreate(
-        client: MIDIClientRef,
-        portName: CFStringRef,
-        outPort: *mut MIDIPortRef,
-    ) -> OSStatus;
-
-    pub fn MIDIObjectGetStringProperty(
-        obj: MIDIObjectRef,
-        propertyID: CFStringRef,
-        str_: *mut CFStringRef,
-    ) -> OSStatus;
-
-    pub fn MIDIObjectGetIntegerProperty(
-        obj: MIDIObjectRef,
-        propertyID: CFStringRef,
-        outValue: *mut i32,
-    ) -> OSStatus;
-
-    pub fn MIDIPortConnectSource(
-        port: MIDIPortRef,
-        source: MIDIEndpointRef,
-        connRefCon: *mut ::std::os::raw::c_void,
-    ) -> OSStatus;
 }
 
 pub const NSOpenGLContextParameterSwapInterval: i32 = 222;

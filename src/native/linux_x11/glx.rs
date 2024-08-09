@@ -1,6 +1,6 @@
 #![allow(dead_code, non_snake_case)]
 
-use super::libx11::*;
+use super::{libx11::*, X11Error};
 
 use crate::native::module;
 
@@ -128,7 +128,7 @@ pub struct LibGlx {
 }
 
 impl LibGlx {
-    pub fn try_load() -> Option<LibGlx> {
+    pub fn try_load() -> Result<LibGlx, module::Error> {
         module::Module::load("libGL.so")
             .or_else(|_| module::Module::load("libGL.so.1"))
             .map(|module| LibGlx {
@@ -149,7 +149,6 @@ impl LibGlx {
                 glxGetVisualFromFBConfig: module.get_symbol("glXGetVisualFromFBConfig").ok(),
                 module,
             })
-            .ok()
     }
 
     pub unsafe fn get_procaddr(&self, procname: &str) -> Option<unsafe extern "C" fn() -> ()> {
@@ -217,27 +216,24 @@ impl Glx {
         display: *mut Display,
         screen: i32,
         conf: &crate::conf::Conf,
-    ) -> Option<Glx> {
+    ) -> Result<Glx, X11Error> {
         let mut libgl = LibGlx::try_load()?;
 
         let mut errorbase = 0;
         let mut eventbase = 0;
 
         if (libgl.glxQueryExtension.unwrap())(display, &mut errorbase, &mut eventbase) == 0 {
-            eprintln!("GLX: GLX extension not found");
-            return None;
+            return Err(X11Error::GLXError("GLX extension not found".to_string()));
         }
 
         let mut glx_major = 0;
         let mut glx_minor = 0;
 
         if (libgl.glxQueryVersion.unwrap())(display, &mut glx_major, &mut glx_minor) == 0 {
-            eprintln!("GLX: Failed to query GLX version");
-            return None;
+            return Err(X11Error::GLXError("Failed to query GLX version".to_string()));
         }
         if glx_major == 1 && glx_minor < 3 {
-            eprintln!("GLX: GLX version 1.3 is required");
-            return None;
+            return Err(X11Error::GLXError("GLX version 1.3 is required".to_string()));
         }
 
         let exts = (libgl.glxQueryExtensionsString.unwrap())(display, screen);
@@ -303,7 +299,7 @@ impl Glx {
                 std::mem::transmute_copy(&libgl.get_procaddr("glXCreateContextAttribsARB"))
         };
 
-        Some(Glx {
+        Ok(Glx {
             libgl,
             multisample,
             visual,

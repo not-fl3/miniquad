@@ -1041,7 +1041,7 @@ pub struct LibX11 {
 }
 
 impl LibX11 {
-    pub fn try_load() -> Option<LibX11> {
+    pub fn try_load() -> Result<LibX11, module::Error> {
         crate::native::module::Module::load("libX11.so")
             .or_else(|_| crate::native::module::Module::load("libX11.so.6"))
             .map(|module| LibX11 {
@@ -1095,7 +1095,6 @@ impl LibX11 {
                 extensions: X11Extensions::default(),
                 module: std::rc::Rc::new(module),
             })
-            .ok()
     }
 
     pub unsafe fn load_extensions(&mut self, display: *mut Display) {
@@ -1131,5 +1130,26 @@ impl LibX11 {
                 false as _,
             ),
         };
+    }
+}
+
+pub type XKbKeySymToUtf32 = unsafe extern "C" fn(_: u32) -> u32;
+
+#[derive(Clone)]
+pub struct LibXkbCommon {
+    pub module: std::rc::Rc<module::Module>,
+    pub xkb_keysym_to_utf32: XKbKeySymToUtf32,
+}
+
+impl LibXkbCommon {
+    pub fn try_load() -> Result<Self, module::Error> {
+        crate::native::module::Module::load("libxkbcommon.so")
+            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0"))
+            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0.0.0"))
+            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0.0.0.0"))
+            .map(|module| LibXkbCommon {
+                xkb_keysym_to_utf32: module.get_symbol("xkb_keysym_to_utf32").unwrap(),
+                module: std::rc::Rc::new(module),
+            })
     }
 }
