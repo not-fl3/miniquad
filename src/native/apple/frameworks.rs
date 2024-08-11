@@ -75,6 +75,7 @@ extern "C" {
 extern "C" {
     pub static NSRunLoopCommonModes: ObjcId;
     pub static NSDefaultRunLoopMode: ObjcId;
+    pub static NSEventTrackingRunLoopMode: ObjcId;
     pub static NSProcessInfo: ObjcId;
     pub fn NSStringFromClass(class: ObjcId) -> ObjcId;
 
@@ -421,6 +422,8 @@ pub enum NSWindowStyleMask {
 
     NSFullSizeContentViewWindowMask = 1 << 15,
 }
+
+pub const NSWindowOcclusionStateVisible: u64 = 1 << 1;
 
 #[repr(u64)]
 #[derive(Clone, Copy, Debug, PartialEq)]
