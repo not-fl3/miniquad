@@ -612,7 +612,6 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         payload.modifiers = new_modifiers;
     }
 
-
     decl.add_method(
         sel!(canBecomeKey),
         yes as extern "C" fn(&Object, Sel) -> BOOL,
@@ -712,6 +711,18 @@ pub fn define_opengl_view_class() -> *const Class {
         }
     }
 
+    // apparently, its impossible to use performSelectorOnMainThread
+    // with primitive type argument, so the only way to pass
+    // YES to setNeedsDisplay - send a no argument message
+    // https://stackoverflow.com/questions/6120614/passing-primitives-through-performselectoronmainthread
+    // It seems that the same thing applies to [NSTimer timerWithTimeInterval:...]
+    extern "C" fn set_needs_display_hack(this: &Object, _: Sel) {
+        unsafe {
+            msg_send_![this, setNeedsDisplay: YES];
+        }
+    }
+
+
     let superclass = class!(NSView);
     let mut decl: ClassDecl = ClassDecl::new("RenderViewClass", superclass).unwrap();
     unsafe {
@@ -719,6 +730,10 @@ pub fn define_opengl_view_class() -> *const Class {
         decl.add_method(
             sel!(drawRect:),
             draw_rect as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(setNeedsDisplayHack),
+            set_needs_display_hack as extern "C" fn(&Object, Sel),
         );
 
         view_base_decl(&mut decl);
@@ -1118,13 +1133,13 @@ where
     let timer = match conf.platform.apple_gfx_api {
         AppleGfxApi::OpenGl => msg_send_![class!(NSTimer), timerWithTimeInterval:0.016 // ~60FPS
                                                            target:view
-                                                           selector:sel!(setNeedsDisplay:)
-                                                           userInfo:YES
+                                                           selector:sel!(setNeedsDisplayHack)
+                                                           userInfo:nil
                                                            repeats:YES],
         AppleGfxApi::Metal => msg_send_![class!(NSTimer), timerWithTimeInterval:0.016 // ~60FPS
                                                           target:view
                                                           selector:sel!(draw)
-                                                          userInfo:YES
+                                                          userInfo:nil
                                                           repeats:YES],
     };
     msg_send_![current_runloop, addTimer:timer forMode:NSEventTrackingRunLoopMode];
