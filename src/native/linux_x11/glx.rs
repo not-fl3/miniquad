@@ -230,10 +230,14 @@ impl Glx {
         let mut glx_minor = 0;
 
         if (libgl.glxQueryVersion.unwrap())(display, &mut glx_major, &mut glx_minor) == 0 {
-            return Err(X11Error::GLXError("Failed to query GLX version".to_string()));
+            return Err(X11Error::GLXError(
+                "Failed to query GLX version".to_string(),
+            ));
         }
         if glx_major == 1 && glx_minor < 3 {
-            return Err(X11Error::GLXError("GLX version 1.3 is required".to_string()));
+            return Err(X11Error::GLXError(
+                "GLX version 1.3 is required".to_string(),
+            ));
         }
 
         let exts = (libgl.glxQueryExtensionsString.unwrap())(display, screen);

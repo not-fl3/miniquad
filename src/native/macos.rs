@@ -722,7 +722,6 @@ pub fn define_opengl_view_class() -> *const Class {
         }
     }
 
-
     let superclass = class!(NSView);
     let mut decl: ClassDecl = ClassDecl::new("RenderViewClass", superclass).unwrap();
     unsafe {

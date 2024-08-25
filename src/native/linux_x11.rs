@@ -10,7 +10,7 @@ mod xi_input;
 
 use crate::{
     event::EventHandler,
-    native::{egl, gl, NativeDisplayData, Request, module},
+    native::{egl, gl, module, NativeDisplayData, Request},
     CursorIcon,
 };
 

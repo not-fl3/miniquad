@@ -1,10 +1,10 @@
 #![allow(non_upper_case_globals, non_snake_case)]
 
-use crate::native::module;
 use super::{
     libx11::{self, Display, Window, _XPrivDisplay},
     xi_input,
 };
+use crate::native::module;
 
 pub const XIAllDevices: libc::c_int = 0 as libc::c_int;
 pub const XI_RawMotion: libc::c_int = 17 as libc::c_int;
