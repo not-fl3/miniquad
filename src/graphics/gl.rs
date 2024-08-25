@@ -983,7 +983,7 @@ impl RenderingBackend for GlContext {
                 for i in 0..color_img.len() {
                     attachments.push(GL_COLOR_ATTACHMENT0 + i as u32);
                 }
-                glDrawBuffers(2, attachments.as_ptr() as _);
+                glDrawBuffers(color_img.len() as _, attachments.as_ptr() as _);
             }
 
             glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
