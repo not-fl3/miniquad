@@ -137,7 +137,7 @@ impl From<CompareFunc> for GLenum {
 impl Texture {
     pub fn new(
         ctx: &mut GlContext,
-        _access: TextureAccess,
+        access: TextureAccess,
         source: TextureSource,
         params: TextureParams,
     ) -> Texture {
@@ -147,8 +147,32 @@ impl Texture {
                 bytes_data.len()
             );
         }
-
+        if access != TextureAccess::RenderTarget {
+            assert!(
+                params.sample_count == 0,
+                "Multisampling is only supported for render textures"
+            );
+        }
         let (internal_format, format, pixel_type) = params.format.into();
+
+        if access == TextureAccess::RenderTarget && params.sample_count != 0 {
+            let mut renderbuffer: u32 = 0;
+            unsafe {
+                glGenRenderbuffers(1, &mut renderbuffer as *mut _);
+                glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer as _);
+                glRenderbufferStorageMultisample(
+                    GL_RENDERBUFFER,
+                    params.sample_count,
+                    internal_format,
+                    params.width as _,
+                    params.height as _,
+                );
+            }
+            return Texture {
+                raw: renderbuffer,
+                params,
+            };
+        }
 
         ctx.cache.store_texture_binding(0);
 
@@ -419,6 +443,7 @@ fn get_uniform_location(program: GLuint, name: &str) -> Option<i32> {
 pub(crate) struct RenderPassInternal {
     gl_fb: GLuint,
     color_textures: Vec<TextureId>,
+    resolves: Option<Vec<(u32, TextureId)>>,
     depth_texture: Option<TextureId>,
 }
 
@@ -444,7 +469,6 @@ pub struct GlContext {
     textures: Textures,
     default_framebuffer: GLuint,
     pub(crate) cache: GlCache,
-
     pub(crate) info: ContextInfo,
 }
 
@@ -481,6 +505,7 @@ impl GlContext {
                     index_type: None,
                     vertex_buffer: 0,
                     cur_pipeline: None,
+                    cur_pass: None,
                     color_blend: None,
                     alpha_blend: None,
                     stencil: None,
@@ -950,6 +975,7 @@ impl RenderingBackend for GlContext {
     fn new_render_pass_mrt(
         &mut self,
         color_img: &[TextureId],
+        resolve_img: Option<&[TextureId]>,
         depth_img: Option<TextureId>,
     ) -> RenderPass {
         if color_img.is_empty() && depth_img.is_none() {
@@ -957,40 +983,82 @@ impl RenderingBackend for GlContext {
         }
         let mut gl_fb = 0;
 
+        let mut resolves = vec![];
         unsafe {
             glGenFramebuffers(1, &mut gl_fb as *mut _);
             glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
             for (i, color_img) in color_img.iter().enumerate() {
-                glFramebufferTexture2D(
-                    GL_FRAMEBUFFER,
-                    GL_COLOR_ATTACHMENT0 + i as u32,
-                    GL_TEXTURE_2D,
-                    self.textures.get(*color_img).raw,
-                    0,
-                );
+                let texture = self.textures.get(*color_img);
+                if texture.params.sample_count != 0 {
+                    glFramebufferRenderbuffer(
+                        GL_FRAMEBUFFER,
+                        GL_COLOR_ATTACHMENT0 + i as u32,
+                        GL_RENDERBUFFER,
+                        texture.raw,
+                    );
+                } else {
+                    glFramebufferTexture2D(
+                        GL_FRAMEBUFFER,
+                        GL_COLOR_ATTACHMENT0 + i as u32,
+                        GL_TEXTURE_2D,
+                        texture.raw,
+                        0,
+                    );
+                }
             }
             if let Some(depth_img) = depth_img {
-                glFramebufferTexture2D(
-                    GL_FRAMEBUFFER,
-                    GL_DEPTH_ATTACHMENT,
-                    GL_TEXTURE_2D,
-                    self.textures.get(depth_img).raw,
-                    0,
-                );
-            }
-            if color_img.len() > 1 {
-                let mut attachments = vec![];
-                for i in 0..color_img.len() {
-                    attachments.push(GL_COLOR_ATTACHMENT0 + i as u32);
+                let texture = self.textures.get(depth_img);
+                if texture.params.sample_count != 0 {
+                    glFramebufferRenderbuffer(
+                        GL_FRAMEBUFFER,
+                        GL_DEPTH_ATTACHMENT,
+                        GL_RENDERBUFFER,
+                        texture.raw,
+                    );
+                } else {
+                    glFramebufferTexture2D(
+                        GL_FRAMEBUFFER,
+                        GL_DEPTH_ATTACHMENT,
+                        GL_TEXTURE_2D,
+                        texture.raw,
+                        0,
+                    );
                 }
+            }
+            let mut attachments = vec![];
+            for i in 0..color_img.len() {
+                attachments.push(GL_COLOR_ATTACHMENT0 + i as u32);
+            }
+
+            if color_img.len() > 1 {
                 glDrawBuffers(color_img.len() as _, attachments.as_ptr() as _);
             }
 
+            if let Some(resolve_img) = resolve_img {
+                for (i, resolve_img) in resolve_img.iter().enumerate() {
+                    let mut resolve_fb = 0;
+                    glGenFramebuffers(1, &mut resolve_fb as *mut _);
+                    glBindFramebuffer(GL_FRAMEBUFFER, resolve_fb);
+                    resolves.push((resolve_fb, *resolve_img));
+                    let texture = self.textures.get(*resolve_img);
+                    glFramebufferTexture2D(
+                        GL_FRAMEBUFFER,
+                        GL_COLOR_ATTACHMENT0 + i as u32,
+                        GL_TEXTURE_2D,
+                        texture.raw,
+                        0,
+                    );
+                    let fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+                    assert!(fb_status != 0);
+                    glDrawBuffers(1, attachments.as_ptr() as _);
+                }
+            }
             glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
         }
         let pass = RenderPassInternal {
             gl_fb,
             color_textures: color_img.to_vec(),
+            resolves: Some(resolves),
             depth_texture: depth_img,
         };
 
@@ -1467,6 +1535,7 @@ impl RenderingBackend for GlContext {
     }
 
     fn begin_pass(&mut self, pass: Option<RenderPass>, action: PassAction) {
+        self.cache.cur_pass = pass;
         let (framebuffer, w, h) = match pass {
             None => {
                 let (screen_width, screen_height) = window::screen_size();
@@ -1513,6 +1582,31 @@ impl RenderingBackend for GlContext {
 
     fn end_render_pass(&mut self) {
         unsafe {
+            if let Some(pass) = self.cache.cur_pass.take() {
+                let pass = &self.passes[pass.0];
+                if let Some(resolves) = &pass.resolves {
+                    glBindFramebuffer(GL_READ_FRAMEBUFFER, pass.gl_fb);
+                    for (i, (resolve_fb, resolve_img)) in resolves.iter().enumerate() {
+                        let texture = self.textures.get(*resolve_img);
+                        let w = texture.params.width;
+                        let h = texture.params.height;
+                        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, *resolve_fb);
+                        glReadBuffer(GL_COLOR_ATTACHMENT0 + i as u32);
+                        glBlitFramebuffer(
+                            0,
+                            0,
+                            w as _,
+                            h as _,
+                            0,
+                            0,
+                            w as _,
+                            h as _,
+                            GL_COLOR_BUFFER_BIT,
+                            GL_NEAREST,
+                        );
+                    }
+                }
+            }
             glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
             self.cache.bind_buffer(GL_ARRAY_BUFFER, 0, None);
             self.cache.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0, None);

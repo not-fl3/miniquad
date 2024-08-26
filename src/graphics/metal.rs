@@ -527,8 +527,12 @@ impl RenderingBackend for MetalContext {
     fn new_render_pass_mrt(
         &mut self,
         color_img: &[TextureId],
+        resolve_img: Option<&[TextureId]>,
         depth_img: Option<TextureId>,
     ) -> RenderPass {
+        if resolve_img.is_some() {
+            unimplemented!("resolve textures are not yet implemented on metal");
+        }
         unsafe {
             let render_pass_desc =
                 msg_send_![class!(MTLRenderPassDescriptor), renderPassDescriptor];
