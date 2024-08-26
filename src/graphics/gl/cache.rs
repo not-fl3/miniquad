@@ -36,6 +36,7 @@ pub struct GlCache {
     pub vertex_buffer: GLuint,
     pub textures: [CachedTexture; MAX_SHADERSTAGE_IMAGES],
     pub cur_pipeline: Option<Pipeline>,
+    pub cur_pass: Option<RenderPass>,
     pub color_blend: Option<BlendState>,
     pub alpha_blend: Option<BlendState>,
     pub stencil: Option<StencilState>,

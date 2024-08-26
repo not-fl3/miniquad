@@ -387,6 +387,13 @@ pub struct TextureParams {
     // And reallocate non-mipmapped texture(on metal) on generateMipmaps call
     // But! Reallocating cubemaps is too much struggle, so leave it for later.
     pub allocate_mipmaps: bool,
+    /// Only used for render textures. `sample_count > 1` allows anti-aliased render textures.
+    ///
+    /// On OpenGL, for a `sample_count > 1` render texture, render buffer object will
+    /// be created instead of a regulat texture.
+    ///
+    /// The only way to use 
+    pub sample_count: i32,
 }
 
 impl Default for TextureParams {
@@ -401,6 +408,7 @@ impl Default for TextureParams {
             width: 0,
             height: 0,
             allocate_mipmaps: false,
+            sample_count: 0,
         }
     }
 }
@@ -1132,6 +1140,7 @@ pub trait RenderingBackend {
                 mag_filter: FilterMode::Linear,
                 mipmap_filter: MipmapFilterMode::None,
                 allocate_mipmaps: false,
+                sample_count: 0,
             },
         )
     }
@@ -1189,12 +1198,16 @@ pub trait RenderingBackend {
         color_img: TextureId,
         depth_img: Option<TextureId>,
     ) -> RenderPass {
-        self.new_render_pass_mrt(&[color_img], depth_img)
+        self.new_render_pass_mrt(&[color_img], None, depth_img)
     }
     /// Same as "new_render_pass", but allows multiple color attachments.
+    /// if `resolve_img` is set, MSAA-resolve operation will happen in `end_render_pass`
+    /// this operation require `color_img` to have sample_count > 1,resolve_img have
+    /// sample_count == 1, and color_img.len() should be equal to resolve_img.len() 
     fn new_render_pass_mrt(
         &mut self,
         color_img: &[TextureId],
+        resolve_img: Option<&[TextureId]>,
         depth_img: Option<TextureId>,
     ) -> RenderPass;
     /// panics for depth-only or multiple color attachment render pass
