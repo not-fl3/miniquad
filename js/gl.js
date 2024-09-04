@@ -420,13 +420,14 @@ function _webglGet(name_, p, type) {
 var Module;
 var wasm_exports;
 
-function resize(canvas, on_resize) {
+function resize(canvas, on_resize, force = false) {
     var dpr = dpi_scale();
     var displayWidth = canvas.clientWidth * dpr;
     var displayHeight = canvas.clientHeight * dpr;
 
     if (canvas.width != displayWidth ||
-        canvas.height != displayHeight) {
+        canvas.height != displayHeight ||
+        force) {
         canvas.width = displayWidth;
         canvas.height = displayHeight;
         if (on_resize != undefined)
@@ -1263,6 +1264,9 @@ var importObject = {
                     wasm_exports.touch(SAPP_EVENTTYPE_TOUCHES_MOVED, touch.identifier, relative_position.x, relative_position.y);
                 }
             });
+            new ResizeObserver(function (_entries) {
+                resize(canvas, wasm_exports.resize, true);
+            }).observe(canvas);
 
             window.onresize = function () {
                 resize(canvas, wasm_exports.resize);
