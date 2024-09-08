@@ -309,7 +309,7 @@ pub mod window {
         let d = native_display().lock().unwrap();
         d.view
     }
-    #[cfg(target_ios = "ios")]
+    #[cfg(target_os = "ios")]
     pub fn apple_view_ctrl() -> crate::native::apple::frameworks::ObjcId {
         let d = native_display().lock().unwrap();
         d.view_ctrl
