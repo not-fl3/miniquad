@@ -90,8 +90,7 @@ pub struct Platform {
     /// Defaults to X11Only. Wayland implementation is way too unstable right now.
     pub linux_backend: LinuxBackend,
 
-    /// While miniquad itself only use webgl1 features, withing webgl2 context it
-    /// is possible to:
+    /// While miniquad itself only use webgl1 features, webgl2 context allows to:
     /// - use gles3 shaders
     /// - do raw webgl2 opengl calls
     pub webgl_version: WebGLVersion,
