@@ -983,7 +983,7 @@ impl RenderingBackend for GlContext {
         }
         let mut gl_fb = 0;
 
-        let mut resolves = vec![];
+        let mut resolves = None;
         unsafe {
             glGenFramebuffers(1, &mut gl_fb as *mut _);
             glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
@@ -1035,6 +1035,8 @@ impl RenderingBackend for GlContext {
             }
 
             if let Some(resolve_img) = resolve_img {
+                resolves = Some(vec![]);
+                let resolves = resolves.as_mut().unwrap();
                 for (i, resolve_img) in resolve_img.iter().enumerate() {
                     let mut resolve_fb = 0;
                     glGenFramebuffers(1, &mut resolve_fb as *mut _);
@@ -1058,7 +1060,7 @@ impl RenderingBackend for GlContext {
         let pass = RenderPassInternal {
             gl_fb,
             color_textures: color_img.to_vec(),
-            resolves: Some(resolves),
+            resolves,
             depth_texture: depth_img,
         };
 
