@@ -253,7 +253,7 @@ pub mod window {
 
     /// Get the position of the window.
     /// TODO: implement for other platforms
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     pub fn get_window_position() -> (u32, u32) {
         let d = native_display().lock().unwrap();
         d.screen_position

@@ -133,6 +133,9 @@ impl X11Display {
             }
             22 => {
                 let mut d = crate::native_display().try_lock().unwrap();
+                let left = (*event).xconfigure.x;
+                let top = (*event).xconfigure.y;
+                d.screen_position = (left as _, top as _);
                 if (*event).xconfigure.width != d.screen_width
                     || (*event).xconfigure.height != d.screen_height
                 {
@@ -263,6 +266,11 @@ impl X11Display {
         (self.libx11.XFlush)(self.display);
     }
 
+    /// Set the window position in screen coordinates.
+    unsafe fn set_window_position(&mut self, window: Window, new_x: i32, new_y: i32) {
+        (self.libx11.XMoveWindow)(self.display, window, new_x, new_y);
+    }
+
     fn show_mouse(&mut self, shown: bool) {
         unsafe {
             if shown {
@@ -347,8 +355,8 @@ impl X11Display {
                     new_width,
                     new_height,
                 } => self.set_window_size(self.window, new_width as _, new_height as _),
-                SetWindowPosition { .. } => {
-                    eprintln!("Not implemented for X11")
+                SetWindowPosition { new_x, new_y } => {
+                    self.set_window_position(self.window, new_x as _, new_y as _)
                 }
                 SetFullscreen(fullscreen) => self.set_fullscreen(self.window, fullscreen),
                 ShowKeyboard(..) => {

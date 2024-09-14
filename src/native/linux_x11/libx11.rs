@@ -858,6 +858,8 @@ pub type XLowerWindow = unsafe extern "C" fn(_: *mut Display, _: Window) -> libc
 pub type XRaiseWindow = unsafe extern "C" fn(_: *mut Display, _: Window) -> libc::c_int;
 pub type XResizeWindow =
     unsafe extern "C" fn(_: *mut Display, _: Window, _: libc::c_int, _: libc::c_int) -> libc::c_int;
+pub type XMoveWindow =
+    unsafe extern "C" fn(_: *mut Display, _: Window, _: libc::c_int, _: libc::c_int) -> libc::c_int;
 pub type XPending = unsafe extern "C" fn(_: *mut Display) -> libc::c_int;
 pub type XNextEvent = unsafe extern "C" fn(_: *mut Display, _: *mut XEvent) -> libc::c_int;
 pub type XGetKeyboardMapping = unsafe extern "C" fn(
@@ -1013,6 +1015,7 @@ pub struct LibX11 {
     pub XLowerWindow: XLowerWindow,
     pub XRaiseWindow: XRaiseWindow,
     pub XResizeWindow: XResizeWindow,
+    pub XMoveWindow: XMoveWindow,
     pub XPending: XPending,
     pub XNextEvent: XNextEvent,
     pub XGetKeyboardMapping: XGetKeyboardMapping,
@@ -1065,6 +1068,7 @@ impl LibX11 {
                 XLowerWindow: module.get_symbol("XLowerWindow").unwrap(),
                 XRaiseWindow: module.get_symbol("XRaiseWindow").unwrap(),
                 XResizeWindow: module.get_symbol("XResizeWindow").unwrap(),
+                XMoveWindow: module.get_symbol("XMoveWindow").unwrap(),
                 XPending: module.get_symbol("XPending").unwrap(),
                 XNextEvent: module.get_symbol("XNextEvent").unwrap(),
                 XGetKeyboardMapping: module.get_symbol("XGetKeyboardMapping").unwrap(),
