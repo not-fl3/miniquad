@@ -139,6 +139,8 @@ pub enum KeyCode {
     RightAlt = 0xffea,
     RightSuper = 0xffec,
     Menu = 0xff67,
+    // Android back button
+    Back = 0xff04,
     Unknown = 0x01ff,
 }
 

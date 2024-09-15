@@ -6,6 +6,7 @@ pub fn translate_keycode(keycode: u32) -> KeyCode {
         0x01 => KeyCode::Left,
         0x02 => KeyCode::Right,
         0x03 => KeyCode::Home,
+        0x04 => KeyCode::Back,
         0x07 => KeyCode::Key0,
         0x08 => KeyCode::Key1,
         0x09 => KeyCode::Key2,
