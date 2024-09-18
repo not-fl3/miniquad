@@ -392,7 +392,7 @@ pub struct TextureParams {
     /// On OpenGL, for a `sample_count > 1` render texture, render buffer object will
     /// be created instead of a regulat texture.
     ///
-    /// The only way to use 
+    /// The only way to use
     pub sample_count: i32,
 }
 
@@ -662,6 +662,7 @@ impl Default for Equation {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum PrimitiveType {
+    TriangleStrip,
     Triangles,
     Lines,
     Points,
@@ -670,6 +671,7 @@ pub enum PrimitiveType {
 impl From<PrimitiveType> for GLenum {
     fn from(primitive_type: PrimitiveType) -> Self {
         match primitive_type {
+            PrimitiveType::TriangleStrip => GL_TRIANGLE_STRIP,
             PrimitiveType::Triangles => GL_TRIANGLES,
             PrimitiveType::Lines => GL_LINES,
             PrimitiveType::Points => GL_POINTS,
@@ -1203,7 +1205,7 @@ pub trait RenderingBackend {
     /// Same as "new_render_pass", but allows multiple color attachments.
     /// if `resolve_img` is set, MSAA-resolve operation will happen in `end_render_pass`
     /// this operation require `color_img` to have sample_count > 1,resolve_img have
-    /// sample_count == 1, and color_img.len() should be equal to resolve_img.len() 
+    /// sample_count == 1, and color_img.len() should be equal to resolve_img.len()
     fn new_render_pass_mrt(
         &mut self,
         color_img: &[TextureId],
