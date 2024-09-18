@@ -188,6 +188,31 @@ impl X11Display {
         }
     }
 
+    unsafe fn update_screen_mouse_position(&mut self) {
+        let mut root_return: Window = 0;
+        let mut child_return: Window = 0;
+        let mut root_x_return: libc::c_int = 0;
+        let mut root_y_return: libc::c_int = 0;
+        let mut win_x_return: libc::c_int = 0;
+        let mut win_y_return: libc::c_int = 0;
+        let mut mask_return: libc::c_uint = 0;
+
+        (self.libx11.XQueryPointer)(
+            self.display,
+            self.window,
+            &mut root_return as *mut _,
+            &mut child_return as *mut _,
+            &mut root_x_return as *mut _,
+            &mut root_y_return as *mut _,
+            &mut win_x_return as *mut _,
+            &mut win_y_return as *mut _,
+            &mut mask_return as *mut _,
+        );
+
+        let mut d = crate::native_display().try_lock().unwrap();
+        d.screen_mouse_position = (root_x_return, root_y_return);
+    }
+
     // TODO: right now it just exits early if fullscreen is false.
     // should be able to able to go back from fullscreen to windowed instead
     unsafe fn set_fullscreen(&mut self, window: Window, fullscreen: bool) {
@@ -428,6 +453,8 @@ where
         }
         glx.make_current(display.display, glx_window, glx_context);
 
+        display.update_screen_mouse_position();
+
         let mut count = (display.libx11.XPending)(display.display);
         let block_on_wait = conf.platform.blocking_event_loop && !display.update_requested;
         if block_on_wait {
@@ -538,6 +565,8 @@ where
         while let Ok(request) = rx.try_recv() {
             display.process_request(request);
         }
+
+        display.update_screen_mouse_position();
 
         let mut count = (display.libx11.XPending)(display.display);
         let block_on_wait = conf.platform.blocking_event_loop && !display.update_requested;
