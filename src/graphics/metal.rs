@@ -233,7 +233,7 @@ struct PipelineInternal {
     //layout: Vec<BufferLayout>,
     //attributes: Vec<VertexAttributeInternal>,
     _shader: ShaderId,
-    //params: PipelineParams,
+    params: PipelineParams,
 }
 
 #[derive(Clone, Copy)]
@@ -1018,7 +1018,7 @@ impl RenderingBackend for MetalContext {
                 //layout: buffer_layout.to_vec(),
                 //attributes: vertex_layout,
                 _shader: shader,
-                //params,
+                params,
             };
 
             self.pipelines.push(pipeline);
@@ -1232,10 +1232,12 @@ impl RenderingBackend for MetalContext {
         let render_encoder = self.render_encoder.unwrap();
         assert!(self.index_buffer.is_some());
         let index_buffer = self.index_buffer.unwrap();
+        let pip = &self.pipelines[self.current_pipeline.unwrap().0];
+        let primitive_type: MTLPrimitiveType = pip.params.primitive_type.into();
 
         assert!(base_element == 0); // TODO: figure indexBufferOffset/baseVertex
         unsafe {
-            msg_send_![render_encoder, drawIndexedPrimitives:MTLPrimitiveType::Triangle
+            msg_send_![render_encoder, drawIndexedPrimitives:primitive_type
                        indexCount:num_elements as u64
                        indexType:MTLIndexType::UInt16
                        indexBuffer:index_buffer
