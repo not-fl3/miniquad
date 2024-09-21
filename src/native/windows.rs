@@ -30,6 +30,7 @@ use libopengl32::LibOpengl32;
 
 pub(crate) struct WindowsDisplay {
     fullscreen: bool,
+    borderless: bool,
     dpi_aware: bool,
     window_resizable: bool,
     cursor_grabbed: bool,
@@ -104,7 +105,7 @@ impl WindowsDisplay {
         rect.right = (rect.left + new_width as i32) as _;
         rect.top = (rect.bottom - new_height as i32) as _;
 
-        let win_style = get_win_style(self.fullscreen, self.window_resizable);
+        let win_style = get_win_style(self.fullscreen, self.borderless, self.window_resizable);
         let win_style_ex: DWORD = unsafe { GetWindowLongA(self.wnd, GWL_EXSTYLE) as _ };
         if unsafe {
             AdjustWindowRectEx(
@@ -155,7 +156,8 @@ impl WindowsDisplay {
     fn set_fullscreen(&mut self, fullscreen: bool) {
         self.fullscreen = fullscreen as _;
 
-        let win_style: DWORD = get_win_style(self.fullscreen, self.window_resizable);
+        let win_style: DWORD =
+            get_win_style(self.fullscreen, self.borderless, self.window_resizable);
 
         unsafe {
             #[cfg(target_arch = "x86_64")]
@@ -196,12 +198,17 @@ impl WindowsDisplay {
     }
 }
 
-fn get_win_style(is_fullscreen: bool, is_resizable: bool) -> DWORD {
+fn get_win_style(is_fullscreen: bool, is_borderless: bool, is_resizable: bool) -> DWORD {
     if is_fullscreen {
         WS_POPUP | WS_SYSMENU | WS_VISIBLE
     } else {
-        let mut win_style: DWORD =
-            WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+        let mut win_style: DWORD = WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_SYSMENU | WS_MINIMIZEBOX;
+
+        if !is_borderless {
+            win_style |= WS_CAPTION;
+        } else {
+            win_style |= WS_POPUP;
+        }
 
         if is_resizable {
             win_style |= WS_MAXIMIZEBOX | WS_SIZEBOX;
@@ -606,6 +613,7 @@ unsafe fn set_icon(wnd: HWND, icon: &Icon) {
 unsafe fn create_window(
     window_title: &str,
     fullscreen: bool,
+    borderless: bool,
     resizable: bool,
     width: i32,
     height: i32,
@@ -623,7 +631,7 @@ unsafe fn create_window(
     wndclassw.cbWndExtra = std::mem::size_of::<*mut std::ffi::c_void>() as i32;
     RegisterClassW(&wndclassw);
 
-    let win_style: DWORD;
+    let win_style: DWORD = get_win_style(fullscreen, borderless, resizable);
     let win_ex_style: DWORD = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
     let mut rect = RECT {
         left: 0,
@@ -633,22 +641,9 @@ unsafe fn create_window(
     };
 
     if fullscreen {
-        win_style = WS_POPUP | WS_SYSMENU | WS_VISIBLE;
         rect.right = GetSystemMetrics(SM_CXSCREEN);
         rect.bottom = GetSystemMetrics(SM_CYSCREEN);
     } else {
-        win_style = if resizable {
-            WS_CLIPSIBLINGS
-                | WS_CLIPCHILDREN
-                | WS_CAPTION
-                | WS_SYSMENU
-                | WS_MINIMIZEBOX
-                | WS_MAXIMIZEBOX
-                | WS_SIZEBOX
-        } else {
-            WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
-        };
-
         rect.right = width;
         rect.bottom = height;
     }
@@ -857,6 +852,7 @@ where
         let (wnd, dc) = create_window(
             &conf.window_title,
             conf.fullscreen,
+            conf.borderless,
             conf.window_resizable,
             conf.window_width as _,
             conf.window_height as _,
@@ -870,6 +866,7 @@ where
         let (msg_wnd, msg_dc) = create_msg_window();
         let mut display = WindowsDisplay {
             fullscreen: false,
+            borderless: false,
             dpi_aware: false,
             window_resizable: conf.window_resizable,
             cursor_grabbed: false,
