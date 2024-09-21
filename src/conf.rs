@@ -162,6 +162,10 @@ pub struct Conf {
     ///
     /// Default: false
     pub fullscreen: bool,
+    /// Whether the window should be created without borders, ignored on wasm/android.
+    ///
+    /// Default: false
+    pub borderless: bool,
     /// MSAA sample count
     ///
     /// Default: 1
@@ -221,6 +225,7 @@ impl Default for Conf {
             window_height: 600,
             high_dpi: false,
             fullscreen: false,
+            borderless: false,
             sample_count: 1,
             window_resizable: true,
             icon: Some(Icon::miniquad_logo()),
@@ -238,6 +243,7 @@ impl Default for Conf {
             window_height: 600,
             high_dpi: true,
             fullscreen: true,
+            borderless: false,
             sample_count: 1,
             window_resizable: false,
             icon: Some(Icon::miniquad_logo()),
