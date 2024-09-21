@@ -277,7 +277,7 @@ impl X11Display {
             self.display,
             window,
             hints_atom as _,
-            4 as _,
+            hints_atom as _,
             32,
             PropModeReplace,
             &mut hints as *mut _ as *mut _,
