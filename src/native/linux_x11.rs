@@ -16,7 +16,7 @@ use crate::{
 
 use libx11::*;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, mem};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum X11Error {
@@ -261,6 +261,31 @@ impl X11Display {
         }
     }
 
+    unsafe fn set_borderless(&mut self, window: Window, borderless: bool) {
+        let hints_atom = (self.libx11.XInternAtom)(
+            self.display,
+            b"_MOTIF_WM_HINTS\x00" as *const u8 as *const _,
+            false as _,
+        );
+
+        let mut hints: MWMHints = mem::zeroed();
+
+        hints.flags = hints_atom;
+        hints.decorations = if borderless { 0 } else { 1 };
+
+        (self.libx11.XChangeProperty)(
+            self.display,
+            window,
+            hints_atom as _,
+            4 as _,
+            32,
+            PropModeReplace,
+            &mut hints as *mut _ as *mut _,
+            5,
+        );
+        (self.libx11.XFlush)(self.display);
+    }
+
     unsafe fn set_window_size(&mut self, window: Window, new_width: i32, new_height: i32) {
         (self.libx11.XResizeWindow)(self.display, window, new_width, new_height);
         (self.libx11.XFlush)(self.display);
@@ -418,6 +443,9 @@ where
     });
     if conf.fullscreen {
         display.set_fullscreen(display.window, true);
+    }
+    if conf.borderless {
+        display.set_borderless(display.window, true);
     }
 
     let mut event_handler = (f.take().unwrap())();
