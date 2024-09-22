@@ -384,6 +384,7 @@ impl X11Display {
                     self.set_window_position(self.window, new_x as _, new_y as _)
                 }
                 SetFullscreen(fullscreen) => self.set_fullscreen(self.window, fullscreen),
+                SetBorderless(borderless) => self.set_borderless(self.window, borderless),
                 ShowKeyboard(..) => {
                     eprintln!("Not implemented for X11")
                 }

@@ -266,6 +266,13 @@ pub mod window {
             .unwrap();
     }
 
+    pub fn set_borderless(borderless: bool) {
+        let d = native_display().lock().unwrap();
+        d.native_requests
+            .send(native::Request::SetBorderless(borderless))
+            .unwrap();
+    }
+
     /// Get current OS clipboard value
     pub fn clipboard_get() -> Option<String> {
         let mut d = native_display().lock().unwrap();
