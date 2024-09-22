@@ -378,7 +378,10 @@ impl RenderingBackend for MetalContext {
             backend: Backend::Metal,
             gl_version_string: Default::default(),
             glsl_support: Default::default(),
-            features: Features { instancing: true },
+            features: Features {
+                instancing: true,
+                resolve_attachments: false,
+            },
         }
     }
     fn buffer_size(&mut self, buffer: BufferId) -> usize {
