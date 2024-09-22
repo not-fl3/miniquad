@@ -51,6 +51,22 @@ struct Texture {
     params: TextureParams,
 }
 
+impl TextureFormat {
+    fn sized_internal_format(&self) -> GLenum {
+        match self {
+            TextureFormat::RGB8 => GL_RGB8,
+            TextureFormat::RGBA8 => GL_RGBA8,
+            TextureFormat::RGBA16F => GL_RGBA16F,
+            TextureFormat::Depth => GL_DEPTH_COMPONENT16,
+            TextureFormat::Depth32 => GL_DEPTH_COMPONENT32,
+            #[cfg(target_arch = "wasm32")]
+            TextureFormat::Alpha => GL_ALPHA,
+            #[cfg(not(target_arch = "wasm32"))]
+            TextureFormat::Alpha => GL_R8,
+        }
+    }
+}
+
 /// Converts from TextureFormat to (internal_format, format, pixel_type)
 impl From<TextureFormat> for (GLenum, GLenum, GLenum) {
     fn from(format: TextureFormat) -> Self {
@@ -160,6 +176,7 @@ impl Texture {
             unsafe {
                 glGenRenderbuffers(1, &mut renderbuffer as *mut _);
                 glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer as _);
+                let internal_format = params.format.sized_internal_format();
                 glRenderbufferStorageMultisample(
                     GL_RENDERBUFFER,
                     params.sample_count,
