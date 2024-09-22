@@ -392,7 +392,7 @@ pub struct TextureParams {
     /// On OpenGL, for a `sample_count > 1` render texture, render buffer object will
     /// be created instead of a regulat texture.
     ///
-    /// The only way to use 
+    /// The only way to use
     pub sample_count: i32,
 }
 
@@ -569,11 +569,21 @@ pub const MAX_SHADERSTAGE_IMAGES: usize = 12;
 #[derive(Clone, Debug)]
 pub struct Features {
     pub instancing: bool,
+    /// Does current rendering backend support automatic resolve of
+    /// multisampled render passes on end_render_pass.
+    /// Would be false on WebGl1 and GL2.
+    ///
+    /// With resolve_attachments: false, not-none resolve_img in new_render_pass will
+    /// result in a runtime panic.
+    pub resolve_attachments: bool,
 }
 
 impl Default for Features {
     fn default() -> Features {
-        Features { instancing: true }
+        Features {
+            instancing: true,
+            resolve_attachments: true,
+        }
     }
 }
 
@@ -1203,7 +1213,10 @@ pub trait RenderingBackend {
     /// Same as "new_render_pass", but allows multiple color attachments.
     /// if `resolve_img` is set, MSAA-resolve operation will happen in `end_render_pass`
     /// this operation require `color_img` to have sample_count > 1,resolve_img have
-    /// sample_count == 1, and color_img.len() should be equal to resolve_img.len() 
+    /// sample_count == 1, and color_img.len() should be equal to resolve_img.len()
+    ///
+    /// Note that resolve attachments may be not supported by current backend!
+    /// They are only available when `ctx.info().features.resolve_attachments` is true.
     fn new_render_pass_mrt(
         &mut self,
         color_img: &[TextureId],

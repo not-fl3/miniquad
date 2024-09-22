@@ -501,11 +501,7 @@ impl GlContext {
 
             glGenVertexArrays(1, &mut vao as *mut _);
             glBindVertexArray(vao);
-            let features = Features {
-                instancing: !crate::native::gl::is_gl2(),
-                ..Default::default()
-            };
-            let info = gl_info(features);
+            let info = gl_info();
             GlContext {
                 default_framebuffer,
                 shaders: ResourceManager::default(),
@@ -782,13 +778,24 @@ impl GlContext {
     }
 }
 
-fn gl_info(features: Features) -> ContextInfo {
+fn gl_info() -> ContextInfo {
     let version_string = unsafe { glGetString(super::gl::GL_VERSION) };
     let gl_version_string = unsafe { std::ffi::CStr::from_ptr(version_string as _) }
         .to_str()
         .unwrap()
         .to_string();
     //let gles2 = !gles3 && gl_version_string.contains("OpenGL ES");
+
+    let gl2 = gl_version_string.is_empty()
+        || gl_version_string.starts_with("2")
+        || gl_version_string.starts_with("OpenGL ES 2");
+    let webgl1 = gl_version_string == "WebGL 1.0";
+
+    let features = Features {
+        instancing: !gl2,
+        resolve_attachments: !webgl1 && !gl2,
+        ..Default::default()
+    };
 
     let mut glsl_support = GlslSupport::default();
 
