@@ -299,7 +299,9 @@ public class MainActivity extends Activity {
 
                     if (fullscreen) {
                         getWindow().setFlags(LayoutParams.FLAG_LAYOUT_NO_LIMITS, LayoutParams.FLAG_LAYOUT_NO_LIMITS);
-                        getWindow().getAttributes().layoutInDisplayCutoutMode = LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                        if (Build.VERSION.SDK_INT >= 28) {
+                            getWindow().getAttributes().layoutInDisplayCutoutMode = LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                        }
                         if (Build.VERSION.SDK_INT >= 30) {
                             getWindow().setDecorFitsSystemWindows(false);
                         } else {
