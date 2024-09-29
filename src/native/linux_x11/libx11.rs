@@ -918,6 +918,17 @@ pub type XrmDestroyDatabase = unsafe extern "C" fn(_: XrmDatabase);
 pub type XrmGetStringDatabase = unsafe extern "C" fn(_: *const libc::c_char) -> XrmDatabase;
 pub type XkbSetDetectableAutoRepeat =
     unsafe extern "C" fn(_: *mut Display, _: libc::c_int, _: *mut libc::c_int) -> libc::c_int;
+pub type XQueryPointer = unsafe extern "C" fn(
+    _: *mut Display,
+    _: Window,
+    _: *mut Window,
+    _: *mut Window,
+    _: *mut libc::c_int,
+    _: *mut libc::c_int,
+    _: *mut libc::c_int,
+    _: *mut libc::c_int,
+    _: *mut libc::c_uint,
+) -> libc::c_int;
 pub type XQueryExtension = unsafe extern "C" fn(
     _: *mut Display,
     _: *const libc::c_char,
@@ -1033,6 +1044,7 @@ pub struct LibX11 {
     pub XrmDestroyDatabase: XrmDestroyDatabase,
     pub XrmGetStringDatabase: XrmGetStringDatabase,
     pub XkbSetDetectableAutoRepeat: XkbSetDetectableAutoRepeat,
+    pub XQueryPointer: XQueryPointer,
     pub XQueryExtension: XQueryExtension,
     pub XConvertSelection: XConvertSelection,
     pub XSetSelectionOwner: XSetSelectionOwner,
@@ -1088,6 +1100,7 @@ impl LibX11 {
                 XkbSetDetectableAutoRepeat: module
                     .get_symbol("XkbSetDetectableAutoRepeat")
                     .unwrap(),
+                XQueryPointer: module.get_symbol("XQueryPointer").unwrap(),
                 XQueryExtension: module.get_symbol("XQueryExtension").unwrap(),
                 XConvertSelection: module.get_symbol("XConvertSelection").unwrap(),
                 XSetSelectionOwner: module.get_symbol("XSetSelectionOwner").unwrap(),
