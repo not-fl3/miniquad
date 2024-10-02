@@ -9,24 +9,24 @@ pub struct wl_egl_window {
 }
 pub type wl_egl_window_create = unsafe extern "C" fn(
     surface: *mut wl_surface,
-    width: ::std::os::raw::c_int,
-    height: ::std::os::raw::c_int,
+    width: ::core::ffi::c_int,
+    height: ::core::ffi::c_int,
 ) -> *mut wl_egl_window;
 
 pub type wl_egl_window_destroy = unsafe extern "C" fn(egl_window: *mut wl_egl_window);
 
 pub type wl_egl_window_resize = unsafe extern "C" fn(
     egl_window: *mut wl_egl_window,
-    width: ::std::os::raw::c_int,
-    height: ::std::os::raw::c_int,
-    dx: ::std::os::raw::c_int,
-    dy: ::std::os::raw::c_int,
+    width: ::core::ffi::c_int,
+    height: ::core::ffi::c_int,
+    dx: ::core::ffi::c_int,
+    dy: ::core::ffi::c_int,
 );
 
 pub type wl_egl_window_get_attached_size = unsafe extern "C" fn(
     egl_window: *mut wl_egl_window,
-    width: *mut ::std::os::raw::c_int,
-    height: *mut ::std::os::raw::c_int,
+    width: *mut ::core::ffi::c_int,
+    height: *mut ::core::ffi::c_int,
 );
 
 pub struct LibWaylandEgl {

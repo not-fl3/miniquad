@@ -4,24 +4,24 @@
 
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 
-pub type GLenum = ::std::os::raw::c_uint;
-pub type GLboolean = ::std::os::raw::c_uchar;
-pub type GLbitfield = ::std::os::raw::c_uint;
-pub type GLvoid = ::std::os::raw::c_void;
-pub type GLbyte = ::std::os::raw::c_schar;
-pub type GLshort = ::std::os::raw::c_short;
-pub type GLint = ::std::os::raw::c_int;
-pub type GLubyte = ::std::os::raw::c_uchar;
-pub type GLushort = ::std::os::raw::c_ushort;
-pub type GLuint = ::std::os::raw::c_uint;
-pub type GLint64 = ::std::os::raw::c_longlong;
-pub type GLuint64 = ::std::os::raw::c_ulonglong;
-pub type GLsizei = ::std::os::raw::c_int;
-pub type GLchar = ::std::os::raw::c_char;
+pub type GLenum = ::core::ffi::c_uint;
+pub type GLboolean = ::core::ffi::c_uchar;
+pub type GLbitfield = ::core::ffi::c_uint;
+pub type GLvoid = ::core::ffi::c_void;
+pub type GLbyte = ::core::ffi::c_schar;
+pub type GLshort = ::core::ffi::c_short;
+pub type GLint = ::core::ffi::c_int;
+pub type GLubyte = ::core::ffi::c_uchar;
+pub type GLushort = ::core::ffi::c_ushort;
+pub type GLuint = ::core::ffi::c_uint;
+pub type GLint64 = ::core::ffi::c_longlong;
+pub type GLuint64 = ::core::ffi::c_ulonglong;
+pub type GLsizei = ::core::ffi::c_int;
+pub type GLchar = ::core::ffi::c_char;
 
-pub type khronos_ssize_t = ::std::os::raw::c_long;
-pub type khronos_usize_t = ::std::os::raw::c_ulong;
-pub type khronos_intptr_t = ::std::os::raw::c_long;
+pub type khronos_ssize_t = ::core::ffi::c_long;
+pub type khronos_usize_t = ::core::ffi::c_ulong;
+pub type khronos_intptr_t = ::core::ffi::c_long;
 
 pub type GLsizeiptr = khronos_ssize_t;
 pub type GLintptr = khronos_intptr_t;
@@ -334,14 +334,14 @@ extern "C" {
     pub fn glBufferData(
         target: GLenum,
         size: GLsizeiptr,
-        data: *const ::std::os::raw::c_void,
+        data: *const ::core::ffi::c_void,
         usage: GLenum,
     );
     pub fn glBufferSubData(
         target: GLenum,
         offset: GLintptr,
         size: GLsizeiptr,
-        data: *const ::std::os::raw::c_void,
+        data: *const ::core::ffi::c_void,
     );
     pub fn glCheckFramebufferStatus(target: GLenum) -> GLenum;
     pub fn glClear(mask: GLbitfield);
@@ -358,7 +358,7 @@ extern "C" {
         height: GLsizei,
         border: GLint,
         imageSize: GLsizei,
-        data: *const ::std::os::raw::c_void,
+        data: *const ::core::ffi::c_void,
     );
     pub fn glCompressedTexSubImage2D(
         target: GLenum,
@@ -369,7 +369,7 @@ extern "C" {
         height: GLsizei,
         format: GLenum,
         imageSize: GLsizei,
-        data: *const ::std::os::raw::c_void,
+        data: *const ::core::ffi::c_void,
     );
     pub fn glCopyTexImage2D(
         target: GLenum,
@@ -411,7 +411,7 @@ extern "C" {
         mode: GLenum,
         count: GLsizei,
         type_: GLenum,
-        indices: *const ::std::os::raw::c_void,
+        indices: *const ::core::ffi::c_void,
     );
     pub fn glEnable(cap: GLenum);
     pub fn glEnableVertexAttribArray(index: GLuint);
@@ -510,7 +510,7 @@ extern "C" {
     pub fn glGetVertexAttribPointerv(
         index: GLuint,
         pname: GLenum,
-        pointer: *mut *mut ::std::os::raw::c_void,
+        pointer: *mut *mut ::core::ffi::c_void,
     );
     pub fn glHint(target: GLenum, mode: GLenum);
     pub fn glIsBuffer(buffer: GLuint) -> GLboolean;
@@ -531,7 +531,7 @@ extern "C" {
         height: GLsizei,
         format: GLenum,
         type_: GLenum,
-        pixels: *mut ::std::os::raw::c_void,
+        pixels: *mut ::core::ffi::c_void,
     );
     pub fn glReleaseShaderCompiler();
     pub fn glRenderbufferStorage(
@@ -546,7 +546,7 @@ extern "C" {
         count: GLsizei,
         shaders: *const GLuint,
         binaryformat: GLenum,
-        binary: *const ::std::os::raw::c_void,
+        binary: *const ::core::ffi::c_void,
         length: GLsizei,
     );
     pub fn glShaderSource(
@@ -570,7 +570,7 @@ extern "C" {
         border: GLint,
         format: GLenum,
         type_: GLenum,
-        pixels: *const ::std::os::raw::c_void,
+        pixels: *const ::core::ffi::c_void,
     );
     pub fn glTexParameterf(target: GLenum, pname: GLenum, param: GLfloat);
     pub fn glTexParameterfv(target: GLenum, pname: GLenum, params: *const GLfloat);
@@ -585,7 +585,7 @@ extern "C" {
         height: GLsizei,
         format: GLenum,
         type_: GLenum,
-        pixels: *const ::std::os::raw::c_void,
+        pixels: *const ::core::ffi::c_void,
     );
     pub fn glUniform1f(location: GLint, v0: GLfloat);
     pub fn glUniform1fv(location: GLint, count: GLsizei, value: *const GLfloat);
@@ -637,14 +637,14 @@ extern "C" {
         type_: GLenum,
         normalized: GLboolean,
         stride: GLsizei,
-        pointer: *const ::std::os::raw::c_void,
+        pointer: *const ::core::ffi::c_void,
     );
     pub fn glVertexAttribIPointer(
         index: GLuint,
         size: GLint,
         type_: GLenum,
         stride: GLsizei,
-        pointer: *const ::std::os::raw::c_void,
+        pointer: *const ::core::ffi::c_void,
     );
     pub fn glViewport(x: GLint, y: GLint, width: GLsizei, height: GLsizei);
     pub fn glReadBuffer(src: GLenum);
@@ -654,7 +654,7 @@ extern "C" {
         end: GLuint,
         count: GLsizei,
         type_: GLenum,
-        indices: *const ::std::os::raw::c_void,
+        indices: *const ::core::ffi::c_void,
     );
     pub fn glTexImage3D(
         target: GLenum,
@@ -666,7 +666,7 @@ extern "C" {
         border: GLint,
         format: GLenum,
         type_: GLenum,
-        pixels: *const ::std::os::raw::c_void,
+        pixels: *const ::core::ffi::c_void,
     );
     pub fn glTexSubImage3D(
         target: GLenum,
@@ -679,7 +679,7 @@ extern "C" {
         depth: GLsizei,
         format: GLenum,
         type_: GLenum,
-        pixels: *const ::std::os::raw::c_void,
+        pixels: *const ::core::ffi::c_void,
     );
     pub fn glCopyTexSubImage3D(
         target: GLenum,
@@ -701,7 +701,7 @@ extern "C" {
         depth: GLsizei,
         border: GLint,
         imageSize: GLsizei,
-        data: *const ::std::os::raw::c_void,
+        data: *const ::core::ffi::c_void,
     );
     pub fn glCompressedTexSubImage3D(
         target: GLenum,
@@ -714,7 +714,7 @@ extern "C" {
         depth: GLsizei,
         format: GLenum,
         imageSize: GLsizei,
-        data: *const ::std::os::raw::c_void,
+        data: *const ::core::ffi::c_void,
     );
     pub fn glGenQueries(n: GLsizei, ids: *mut GLuint);
     pub fn glDeleteQueries(n: GLsizei, ids: *const GLuint);
@@ -729,7 +729,7 @@ extern "C" {
     pub fn glGetBufferPointerv(
         target: GLenum,
         pname: GLenum,
-        params: *mut *mut ::std::os::raw::c_void,
+        params: *mut *mut ::core::ffi::c_void,
     );
     pub fn glDrawBuffers(n: GLsizei, bufs: *const GLenum);
     pub fn glUniformMatrix2x3fv(
@@ -799,7 +799,7 @@ extern "C" {
         offset: GLintptr,
         length: GLsizeiptr,
         access: GLbitfield,
-    ) -> *mut ::std::os::raw::c_void;
+    ) -> *mut ::core::ffi::c_void;
     pub fn glFlushMappedBufferRange(target: GLenum, offset: GLintptr, length: GLsizeiptr);
     pub fn glBindVertexArray(array: GLuint);
     pub fn glDeleteVertexArrays(n: GLsizei, arrays: *const GLuint);
@@ -901,7 +901,7 @@ extern "C" {
         mode: GLenum,
         count: GLsizei,
         type_: GLenum,
-        indices: *const ::std::os::raw::c_void,
+        indices: *const ::core::ffi::c_void,
         instancecount: GLsizei,
     );
     pub fn glFenceSync(condition: GLenum, flags: GLbitfield) -> GLsync;
@@ -941,12 +941,12 @@ extern "C" {
         bufSize: GLsizei,
         length: *mut GLsizei,
         binaryFormat: *mut GLenum,
-        binary: *mut ::std::os::raw::c_void,
+        binary: *mut ::core::ffi::c_void,
     );
     pub fn glProgramBinary(
         program: GLuint,
         binaryFormat: GLenum,
-        binary: *const ::std::os::raw::c_void,
+        binary: *const ::core::ffi::c_void,
         length: GLsizei,
     );
     pub fn glProgramParameteri(program: GLuint, pname: GLenum, value: GLint);

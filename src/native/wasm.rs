@@ -97,11 +97,11 @@ where
     }
 }
 
-pub unsafe fn sapp_width() -> ::std::os::raw::c_int {
+pub unsafe fn sapp_width() -> ::core::ffi::c_int {
     canvas_width()
 }
 
-pub unsafe fn sapp_height() -> ::std::os::raw::c_int {
+pub unsafe fn sapp_height() -> ::core::ffi::c_int {
     canvas_height()
 }
 
@@ -111,11 +111,11 @@ extern "C" {
     pub fn canvas_width() -> i32;
     pub fn canvas_height() -> i32;
     pub fn dpi_scale() -> f32;
-    pub fn console_debug(msg: *const ::std::os::raw::c_char);
-    pub fn console_log(msg: *const ::std::os::raw::c_char);
-    pub fn console_info(msg: *const ::std::os::raw::c_char);
-    pub fn console_warn(msg: *const ::std::os::raw::c_char);
-    pub fn console_error(msg: *const ::std::os::raw::c_char);
+    pub fn console_debug(msg: *const ::core::ffi::c_char);
+    pub fn console_log(msg: *const ::core::ffi::c_char);
+    pub fn console_info(msg: *const ::core::ffi::c_char);
+    pub fn console_warn(msg: *const ::core::ffi::c_char);
+    pub fn console_error(msg: *const ::core::ffi::c_char);
 
     pub fn sapp_set_clipboard(clipboard: *const i8, len: usize);
 

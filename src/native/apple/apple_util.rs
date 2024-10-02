@@ -12,7 +12,7 @@ use crate::{
 
 pub fn nsstring_to_string(string: ObjcId) -> String {
     unsafe {
-        let utf8_string: *const std::os::raw::c_uchar = msg_send![string, UTF8String];
+        let utf8_string: *const core::ffi::c_uchar = msg_send![string, UTF8String];
         let utf8_len: usize = msg_send![string, lengthOfBytesUsingEncoding: UTF8_ENCODING];
         let slice = std::slice::from_raw_parts(utf8_string, utf8_len);
         std::str::from_utf8_unchecked(slice).to_owned()
@@ -51,7 +51,7 @@ pub fn load_undocumented_cursor(cursor_name: &str) -> ObjcId {
 
 pub unsafe fn ccfstr_from_str(inp: &str) -> CFStringRef {
     let null = format!("{}\0", inp);
-    __CFStringMakeConstantString(null.as_ptr() as *const ::std::os::raw::c_char)
+    __CFStringMakeConstantString(null.as_ptr() as *const ::core::ffi::c_char)
 }
 
 pub unsafe fn cfstring_ref_to_string(cfstring: CFStringRef) -> String {
@@ -155,7 +155,7 @@ pub fn get_event_key_modifier(event: ObjcId) -> KeyMods {
 }
 
 pub fn get_event_keycode(event: ObjcId) -> Option<KeyCode> {
-    let scan_code: std::os::raw::c_ushort = unsafe { msg_send![event, keyCode] };
+    let scan_code: core::ffi::c_ushort = unsafe { msg_send![event, keyCode] };
 
     Some(match scan_code {
         0x00 => KeyCode::A,
@@ -468,21 +468,21 @@ pub fn load_mouse_cursor(cursor: CursorIcon) -> ObjcId {
 //         {
 //             #[repr(C)]
 //             struct BlockDescriptor {
-//                 reserved: std::os::raw::c_ulong,
-//                 size: std::os::raw::c_ulong,
-//                 copy_helper: extern "C" fn(*mut std::os::raw::c_void, *const std::os::raw::c_void),
-//                 dispose_helper: extern "C" fn(*mut std::os::raw::c_void),
+//                 reserved: core::ffi::c_ulong,
+//                 size: core::ffi::c_ulong,
+//                 copy_helper: extern "C" fn(*mut core::ffi::c_void, *const core::ffi::c_void),
+//                 dispose_helper: extern "C" fn(*mut core::ffi::c_void),
 //             }
 
 //             static DESCRIPTOR: BlockDescriptor = BlockDescriptor {
 //                 reserved: 0,
-//                 size: mem::size_of::<BlockLiteral>() as std::os::raw::c_ulong,
+//                 size: mem::size_of::<BlockLiteral>() as core::ffi::c_ulong,
 //                 copy_helper,
 //                 dispose_helper,
 //             };
 
 //             #[allow(unused_unsafe)]
-//             extern "C" fn copy_helper(dst: *mut std::os::raw::c_void, src: *const std::os::raw::c_void) {
+//             extern "C" fn copy_helper(dst: *mut core::ffi::c_void, src: *const core::ffi::c_void) {
 //                 unsafe {
 //                     ptr::write(
 //                         &mut (*(dst as *mut BlockLiteral)).inner as *mut _,
@@ -492,7 +492,7 @@ pub fn load_mouse_cursor(cursor: CursorIcon) -> ObjcId {
 //             }
 
 //             #[allow(unused_unsafe)]
-//             extern "C" fn dispose_helper(src: *mut std::os::raw::c_void) {
+//             extern "C" fn dispose_helper(src: *mut core::ffi::c_void) {
 //                 unsafe {
 //                     ptr::drop_in_place(src as *mut BlockLiteral);
 //                 }
@@ -506,9 +506,9 @@ pub fn load_mouse_cursor(cursor: CursorIcon) -> ObjcId {
 
 //             #[repr(C)]
 //             struct BlockLiteral {
-//                 isa: *const std::os::raw::c_void,
-//                 flags: std::os::raw::c_int,
-//                 reserved: std::os::raw::c_int,
+//                 isa: *const core::ffi::c_void,
+//                 flags: core::ffi::c_int,
+//                 reserved: core::ffi::c_int,
 //                 invoke: extern "C" fn(*mut BlockLiteral, $ ( $ arg_ty), *) $ ( -> $ return_ty) ?,
 //                 descriptor: *const BlockDescriptor,
 //                 inner: ::std::sync::Arc<::std::sync::Mutex<dyn Fn( $ ( $ arg_ty), *) $ ( -> $ return_ty) ? >>,
@@ -516,7 +516,7 @@ pub fn load_mouse_cursor(cursor: CursorIcon) -> ObjcId {
 
 //             #[allow(unused_unsafe)]
 //             BlockLiteral {
-//                 isa: unsafe {_NSConcreteStackBlock.as_ptr() as *const std::os::raw::c_void},
+//                 isa: unsafe {_NSConcreteStackBlock.as_ptr() as *const core::ffi::c_void},
 //                 flags: 1 << 25,
 //                 reserved: 0,
 //                 invoke,
@@ -534,9 +534,9 @@ pub fn load_mouse_cursor(cursor: CursorIcon) -> ObjcId {
 //         {
 //             #[repr(C)]
 //             struct BlockLiteral {
-//                 isa: *const std::os::raw::c_void,
-//                 flags: std::os::raw::c_int,
-//                 reserved: std::os::raw::c_int,
+//                 isa: *const core::ffi::c_void,
+//                 flags: core::ffi::c_int,
+//                 reserved: core::ffi::c_int,
 //                 invoke: extern "C" fn(*mut BlockLiteral, $ ( $ arg_ty), *) $ ( -> $ return_ty) ?,
 //             }
 

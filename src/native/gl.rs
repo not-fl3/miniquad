@@ -1,22 +1,22 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
-pub type GLenum = ::std::os::raw::c_uint;
-pub type GLboolean = ::std::os::raw::c_uchar;
-pub type GLbitfield = ::std::os::raw::c_uint;
-pub type GLvoid = ::std::os::raw::c_void;
-pub type GLbyte = ::std::os::raw::c_schar;
-pub type GLshort = ::std::os::raw::c_short;
-pub type GLint = ::std::os::raw::c_int;
-pub type GLubyte = ::std::os::raw::c_uchar;
-pub type GLushort = ::std::os::raw::c_ushort;
-pub type GLuint = ::std::os::raw::c_uint;
-pub type GLuint64 = ::std::os::raw::c_ulonglong;
-pub type GLsizei = ::std::os::raw::c_int;
-pub type GLchar = ::std::os::raw::c_char;
+pub type GLenum = ::core::ffi::c_uint;
+pub type GLboolean = ::core::ffi::c_uchar;
+pub type GLbitfield = ::core::ffi::c_uint;
+pub type GLvoid = ::core::ffi::c_void;
+pub type GLbyte = ::core::ffi::c_schar;
+pub type GLshort = ::core::ffi::c_short;
+pub type GLint = ::core::ffi::c_int;
+pub type GLubyte = ::core::ffi::c_uchar;
+pub type GLushort = ::core::ffi::c_ushort;
+pub type GLuint = ::core::ffi::c_uint;
+pub type GLuint64 = ::core::ffi::c_ulonglong;
+pub type GLsizei = ::core::ffi::c_int;
+pub type GLchar = ::core::ffi::c_char;
 
-pub type khronos_ssize_t = ::std::os::raw::c_long;
-pub type khronos_usize_t = ::std::os::raw::c_ulong;
-pub type khronos_intptr_t = ::std::os::raw::c_long;
+pub type khronos_ssize_t = ::core::ffi::c_long;
+pub type khronos_usize_t = ::core::ffi::c_ulong;
+pub type khronos_intptr_t = ::core::ffi::c_long;
 
 pub type GLsizeiptr = khronos_ssize_t;
 pub type GLintptr = khronos_intptr_t;
@@ -405,7 +405,7 @@ gl_loader!(
         target: GLenum,
         offset: GLintptr,
         size: GLsizeiptr,
-        data: *const ::std::os::raw::c_void
+        data: *const ::core::ffi::c_void
     ) -> (),
     fn glGenBuffers(n: GLsizei, buffers: *mut GLuint) -> (),
     fn glCheckFramebufferStatus(target: GLenum) -> GLenum,
@@ -532,7 +532,7 @@ gl_loader!(
         mode: GLenum,
         count: GLsizei,
         type_: GLenum,
-        indices: *const ::std::os::raw::c_void,
+        indices: *const ::core::ffi::c_void,
         instancecount: GLsizei
     ) -> (),
     fn glVertexAttribPointer(
@@ -541,14 +541,14 @@ gl_loader!(
         type_: GLenum,
         normalized: GLboolean,
         stride: GLsizei,
-        pointer: *const ::std::os::raw::c_void
+        pointer: *const ::core::ffi::c_void
     ) -> (),
     fn glVertexAttribIPointer(
         index: GLuint,
         size: GLint,
         type_: GLenum,
         stride: GLsizei,
-        pointer: *const ::std::os::raw::c_void
+        pointer: *const ::core::ffi::c_void
     ) -> (),
     fn glDisable(cap: GLenum) -> (),
     fn glColorMask(red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean) -> (),
@@ -568,7 +568,7 @@ gl_loader!(
     fn glBufferData(
         target: GLenum,
         size: GLsizeiptr,
-        data: *const ::std::os::raw::c_void,
+        data: *const ::core::ffi::c_void,
         usage: GLenum
     ) -> (),
     fn glBlendFuncSeparate(
