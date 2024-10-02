@@ -185,7 +185,7 @@ pub const WL_SUBSURFACE_PLACE_BELOW_SINCE_VERSION: u32 = 1;
 pub const WL_SUBSURFACE_SET_SYNC_SINCE_VERSION: u32 = 1;
 pub const WL_SUBSURFACE_SET_DESYNC_SINCE_VERSION: u32 = 1;
 
-pub type wl_shm_format = ::std::os::raw::c_uint;
+pub type wl_shm_format = ::core::ffi::c_uint;
 
 pub const wl_shm_format_WL_SHM_FORMAT_ARGB8888: wl_shm_format = 0;
 
@@ -202,7 +202,7 @@ pub struct wl_object {
 pub struct wl_array {
     pub size: libc::size_t,
     pub alloc: libc::size_t,
-    pub data: *mut ::std::os::raw::c_void,
+    pub data: *mut ::core::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -210,7 +210,7 @@ pub union wl_argument {
     pub i: i32,
     pub u: u32,
     pub f: wl_fixed_t,
-    pub s: *const ::std::os::raw::c_char,
+    pub s: *const ::core::ffi::c_char,
     pub o: *mut wl_object,
     pub n: u32,
     pub a: *mut wl_array,
@@ -341,19 +341,19 @@ pub struct wl_touch {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_message {
-    pub name: *const ::std::os::raw::c_char,
-    pub signature: *const ::std::os::raw::c_char,
+    pub name: *const ::core::ffi::c_char,
+    pub signature: *const ::core::ffi::c_char,
     pub types: *mut *const wl_interface,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_interface {
-    pub name: *const ::std::os::raw::c_char,
-    pub version: ::std::os::raw::c_int,
-    pub method_count: ::std::os::raw::c_int,
+    pub name: *const ::core::ffi::c_char,
+    pub version: ::core::ffi::c_int,
+    pub method_count: ::core::ffi::c_int,
     pub methods: *const wl_message,
-    pub event_count: ::std::os::raw::c_int,
+    pub event_count: ::core::ffi::c_int,
     pub events: *const wl_message,
 }
 
@@ -362,16 +362,16 @@ pub struct wl_interface {
 pub struct wl_registry_listener {
     pub global: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_registry: *mut wl_registry,
             name: u32,
-            interface: *const ::std::os::raw::c_char,
+            interface: *const ::core::ffi::c_char,
             version: u32,
         ),
     >,
     pub global_remove: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_registry: *mut wl_registry,
             name: u32,
         ),
@@ -383,7 +383,7 @@ pub struct wl_registry_listener {
 pub struct wl_callback_listener {
     pub done: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_callback: *mut wl_callback,
             callback_data: u32,
         ),
@@ -392,22 +392,22 @@ pub struct wl_callback_listener {
 pub const wl_seat_capability_WL_SEAT_CAPABILITY_POINTER: wl_seat_capability = 1;
 pub const wl_seat_capability_WL_SEAT_CAPABILITY_KEYBOARD: wl_seat_capability = 2;
 pub const wl_seat_capability_WL_SEAT_CAPABILITY_TOUCH: wl_seat_capability = 4;
-pub type wl_seat_capability = ::std::os::raw::c_uint;
+pub type wl_seat_capability = ::core::ffi::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct wl_seat_listener {
     pub capabilities: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_seat: *mut wl_seat,
             capabilities: u32,
         ),
     >,
     pub name: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_seat: *mut wl_seat,
-            name: *const ::std::os::raw::c_char,
+            name: *const ::core::ffi::c_char,
         ),
     >,
 }
@@ -417,7 +417,7 @@ pub struct wl_seat_listener {
 pub struct wl_keyboard_listener {
     pub keymap: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_keyboard: *mut wl_keyboard,
             format: u32,
             fd: i32,
@@ -426,7 +426,7 @@ pub struct wl_keyboard_listener {
     >,
     pub enter: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_keyboard: *mut wl_keyboard,
             serial: u32,
             surface: *mut wl_surface,
@@ -435,7 +435,7 @@ pub struct wl_keyboard_listener {
     >,
     pub leave: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_keyboard: *mut wl_keyboard,
             serial: u32,
             surface: *mut wl_surface,
@@ -443,7 +443,7 @@ pub struct wl_keyboard_listener {
     >,
     pub key: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_keyboard: *mut wl_keyboard,
             serial: u32,
             time: u32,
@@ -453,7 +453,7 @@ pub struct wl_keyboard_listener {
     >,
     pub modifiers: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_keyboard: *mut wl_keyboard,
             serial: u32,
             mods_depressed: u32,
@@ -464,7 +464,7 @@ pub struct wl_keyboard_listener {
     >,
     pub repeat_info: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_keyboard: *mut wl_keyboard,
             rate: i32,
             delay: i32,
@@ -477,7 +477,7 @@ pub struct wl_keyboard_listener {
 pub struct wl_pointer_listener {
     pub enter: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_pointer: *mut wl_pointer,
             serial: u32,
             surface: *mut wl_surface,
@@ -487,7 +487,7 @@ pub struct wl_pointer_listener {
     >,
     pub leave: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_pointer: *mut wl_pointer,
             serial: u32,
             surface: *mut wl_surface,
@@ -495,7 +495,7 @@ pub struct wl_pointer_listener {
     >,
     pub motion: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_pointer: *mut wl_pointer,
             time: u32,
             surface_x: i32,
@@ -504,7 +504,7 @@ pub struct wl_pointer_listener {
     >,
     pub button: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_pointer: *mut wl_pointer,
             serial: u32,
             time: u32,
@@ -514,7 +514,7 @@ pub struct wl_pointer_listener {
     >,
     pub axis: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_pointer: *mut wl_pointer,
             time: u32,
             axis: u32,
@@ -522,18 +522,18 @@ pub struct wl_pointer_listener {
         ),
     >,
     pub frame: ::std::option::Option<
-        unsafe extern "C" fn(data: *mut ::std::os::raw::c_void, wl_pointer: *mut wl_pointer),
+        unsafe extern "C" fn(data: *mut ::core::ffi::c_void, wl_pointer: *mut wl_pointer),
     >,
     pub axis_source: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_pointer: *mut wl_pointer,
             axis_source: u32,
         ),
     >,
     pub axis_stop: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_pointer: *mut wl_pointer,
             time: u32,
             axis: u32,
@@ -541,7 +541,7 @@ pub struct wl_pointer_listener {
     >,
     pub axis_discrete: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_pointer: *mut wl_pointer,
             axis: u32,
             discrete: i32,
@@ -549,7 +549,7 @@ pub struct wl_pointer_listener {
     >,
     pub axis_value120: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_pointer: *mut wl_pointer,
             axis: u32,
             value120: i32,
@@ -557,7 +557,7 @@ pub struct wl_pointer_listener {
     >,
     pub axis_relative_direction: ::std::option::Option<
         unsafe extern "C" fn(
-            data: *mut ::std::os::raw::c_void,
+            data: *mut ::core::ffi::c_void,
             wl_pointer: *mut wl_pointer,
             axis: u32,
             direction: u32,
@@ -566,7 +566,7 @@ pub struct wl_pointer_listener {
 }
 
 pub type wl_display_connect =
-    unsafe extern "C" fn(name: *const ::std::os::raw::c_char) -> *mut wl_display;
+    unsafe extern "C" fn(name: *const ::core::ffi::c_char) -> *mut wl_display;
 pub type wl_proxy_destroy = unsafe extern "C" fn(proxy: *mut wl_proxy);
 pub type wl_proxy_marshal = unsafe extern "C" fn(p: *mut wl_proxy, opcode: u32, ...);
 pub type wl_proxy_marshal_constructor = unsafe extern "C" fn(
@@ -585,13 +585,13 @@ pub type wl_proxy_marshal_constructor_versioned = unsafe extern "C" fn(
 pub type wl_proxy_add_listener = unsafe extern "C" fn(
     proxy: *mut wl_proxy,
     implementation: *mut ::std::option::Option<unsafe extern "C" fn()>,
-    data: *mut ::std::os::raw::c_void,
-) -> ::std::os::raw::c_int;
+    data: *mut ::core::ffi::c_void,
+) -> ::core::ffi::c_int;
 
 pub type wl_display_roundtrip =
-    unsafe extern "C" fn(display: *mut wl_display) -> ::std::os::raw::c_int;
+    unsafe extern "C" fn(display: *mut wl_display) -> ::core::ffi::c_int;
 pub type wl_display_dispatch_pending =
-    unsafe extern "C" fn(display: *mut wl_display) -> ::std::os::raw::c_int;
+    unsafe extern "C" fn(display: *mut wl_display) -> ::core::ffi::c_int;
 
 #[derive(Clone)]
 pub struct LibWaylandClient {

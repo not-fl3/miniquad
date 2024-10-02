@@ -16,14 +16,14 @@ pub struct xkb_state {
     _unused: [u8; 0],
 }
 
-pub type xkb_context_new = unsafe extern "C" fn(flags: ::std::os::raw::c_int) -> *mut xkb_context;
+pub type xkb_context_new = unsafe extern "C" fn(flags: ::core::ffi::c_int) -> *mut xkb_context;
 pub type xkb_context_unref = unsafe extern "C" fn(context: *mut xkb_context);
 
 pub type xkb_keymap_new_from_string = unsafe extern "C" fn(
     context: *mut xkb_context,
     file: *mut libc::FILE,
-    format: ::std::os::raw::c_int,
-    flags: ::std::os::raw::c_int,
+    format: ::core::ffi::c_int,
+    flags: ::core::ffi::c_int,
 ) -> *mut xkb_keymap;
 pub type xkb_keymap_unref = unsafe extern "C" fn(keymap: *mut xkb_keymap);
 
@@ -38,7 +38,7 @@ pub type xkb_state_update_mask = unsafe extern "C" fn(
     depressed_layout: u32,
     latched_layout: u32,
     locked_layout: u32,
-) -> ::std::os::raw::c_int;
+) -> ::core::ffi::c_int;
 
 pub type xkb_keysym_to_utf32 = unsafe extern "C" fn(_: u32) -> u32;
 

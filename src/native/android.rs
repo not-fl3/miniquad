@@ -86,7 +86,7 @@ fn send_message(message: Message) {
 static mut ACTIVITY: ndk_sys::jobject = std::ptr::null_mut();
 static mut VM: *mut ndk_sys::JavaVM = std::ptr::null_mut();
 
-pub unsafe fn console_debug(msg: *const ::std::os::raw::c_char) {
+pub unsafe fn console_debug(msg: *const ::core::ffi::c_char) {
     ndk_sys::__android_log_write(
         ndk_sys::android_LogPriority_ANDROID_LOG_DEBUG as _,
         b"SAPP\0".as_ptr() as _,
@@ -94,7 +94,7 @@ pub unsafe fn console_debug(msg: *const ::std::os::raw::c_char) {
     );
 }
 
-pub unsafe fn console_info(msg: *const ::std::os::raw::c_char) {
+pub unsafe fn console_info(msg: *const ::core::ffi::c_char) {
     ndk_sys::__android_log_write(
         ndk_sys::android_LogPriority_ANDROID_LOG_INFO as _,
         b"SAPP\0".as_ptr() as _,
@@ -102,7 +102,7 @@ pub unsafe fn console_info(msg: *const ::std::os::raw::c_char) {
     );
 }
 
-pub unsafe fn console_warn(msg: *const ::std::os::raw::c_char) {
+pub unsafe fn console_warn(msg: *const ::core::ffi::c_char) {
     ndk_sys::__android_log_write(
         ndk_sys::android_LogPriority_ANDROID_LOG_WARN as _,
         b"SAPP\0".as_ptr() as _,
@@ -110,7 +110,7 @@ pub unsafe fn console_warn(msg: *const ::std::os::raw::c_char) {
     );
 }
 
-pub unsafe fn console_error(msg: *const ::std::os::raw::c_char) {
+pub unsafe fn console_error(msg: *const ::core::ffi::c_char) {
     ndk_sys::__android_log_write(
         ndk_sys::android_LogPriority_ANDROID_LOG_ERROR as _,
         b"SAPP\0".as_ptr() as _,
@@ -631,8 +631,8 @@ unsafe fn set_full_screen(env: *mut ndk_sys::JNIEnv, fullscreen: bool) {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct android_asset {
-    pub content: *mut ::std::os::raw::c_char,
-    pub content_length: ::std::os::raw::c_int,
+    pub content: *mut ::core::ffi::c_char,
+    pub content_length: ::core::ffi::c_int,
 }
 
 // According to documentation, AAssetManager_fromJava is as available as an
@@ -645,7 +645,7 @@ extern "C" {
     ) -> *mut ndk_sys::AAssetManager;
 }
 
-pub(crate) unsafe fn load_asset(filepath: *const ::std::os::raw::c_char, out: *mut android_asset) {
+pub(crate) unsafe fn load_asset(filepath: *const ::core::ffi::c_char, out: *mut android_asset) {
     let env = attach_jni_env();
 
     let get_method_id = (**env).GetMethodID.unwrap();
