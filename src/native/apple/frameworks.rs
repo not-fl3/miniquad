@@ -79,7 +79,7 @@ extern "C" {
     pub static NSProcessInfo: ObjcId;
     pub fn NSStringFromClass(class: ObjcId) -> ObjcId;
 
-    pub fn __CFStringMakeConstantString(cStr: *const ::std::os::raw::c_char) -> CFStringRef;
+    pub fn __CFStringMakeConstantString(cStr: *const ::core::ffi::c_char) -> CFStringRef;
 
     pub fn CFStringGetLength(theString: CFStringRef) -> u64;
     pub fn CFStringGetBytes(
@@ -1039,7 +1039,7 @@ pub struct SMPTETime {
 pub struct _AudioBuffer {
     pub mNumberChannels: u32,
     pub mDataByteSize: u32,
-    pub mData: *mut ::std::os::raw::c_void,
+    pub mData: *mut ::core::ffi::c_void,
 }
 
 pub const MAX_AUDIO_BUFFERS: usize = 8;

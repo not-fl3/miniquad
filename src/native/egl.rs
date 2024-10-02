@@ -12,9 +12,9 @@ pub type EGLNativeWindowType = crate::native::linux_x11::libx11::Window;
 #[cfg(target_os = "android")]
 pub type EGLNativeDisplayType = *mut ();
 #[cfg(target_os = "android")]
-pub type EGLNativePixmapType = ::std::os::raw::c_ulong;
+pub type EGLNativePixmapType = ::core::ffi::c_ulong;
 #[cfg(target_os = "android")]
-pub type EGLNativeWindowType = ::std::os::raw::c_ulong;
+pub type EGLNativeWindowType = ::core::ffi::c_ulong;
 
 pub use core::ptr::null_mut;
 
@@ -40,11 +40,11 @@ pub type NativeDisplayType = EGLNativeDisplayType;
 pub type NativePixmapType = EGLNativePixmapType;
 pub type NativeWindowType = EGLNativeWindowType;
 pub type EGLint = i32;
-pub type EGLBoolean = ::std::os::raw::c_uint;
-pub type EGLDisplay = *mut ::std::os::raw::c_void;
-pub type EGLConfig = *mut ::std::os::raw::c_void;
-pub type EGLSurface = *mut ::std::os::raw::c_void;
-pub type EGLContext = *mut ::std::os::raw::c_void;
+pub type EGLBoolean = ::core::ffi::c_uint;
+pub type EGLDisplay = *mut ::core::ffi::c_void;
+pub type EGLConfig = *mut ::core::ffi::c_void;
+pub type EGLSurface = *mut ::core::ffi::c_void;
+pub type EGLContext = *mut ::core::ffi::c_void;
 pub type __eglMustCastToProperFunctionPointerType = ::std::option::Option<unsafe extern "C" fn()>;
 pub type PFNEGLCHOOSECONFIGPROC = ::std::option::Option<
     unsafe extern "C" fn(
@@ -121,7 +121,7 @@ pub type PFNEGLGETDISPLAYPROC =
 pub type PFNEGLGETERRORPROC = ::std::option::Option<unsafe extern "C" fn() -> EGLint>;
 pub type PFNEGLGETPROCADDRESSPROC = ::std::option::Option<
     unsafe extern "C" fn(
-        procname: *const ::std::os::raw::c_char,
+        procname: *const ::core::ffi::c_char,
     ) -> __eglMustCastToProperFunctionPointerType,
 >;
 pub type PFNEGLINITIALIZEPROC = ::std::option::Option<
@@ -144,7 +144,7 @@ pub type PFNEGLQUERYCONTEXTPROC = ::std::option::Option<
     ) -> EGLBoolean,
 >;
 pub type PFNEGLQUERYSTRINGPROC = ::std::option::Option<
-    unsafe extern "C" fn(dpy: EGLDisplay, name: EGLint) -> *const ::std::os::raw::c_char,
+    unsafe extern "C" fn(dpy: EGLDisplay, name: EGLint) -> *const ::core::ffi::c_char,
 >;
 pub type PFNEGLQUERYSURFACEPROC = ::std::option::Option<
     unsafe extern "C" fn(

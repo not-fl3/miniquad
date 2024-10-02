@@ -30,19 +30,19 @@ pub const GLX_CONTEXT_CORE_PROFILE_BIT_ARB: libc::c_int = 0x1 as libc::c_int;
 pub const GLX_CONTEXT_FLAGS_ARB: libc::c_int = 0x2094 as libc::c_int;
 pub const GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB: libc::c_int = 0x2 as libc::c_int;
 
-pub type GLenum = ::std::os::raw::c_uint;
-pub type GLboolean = ::std::os::raw::c_uchar;
-pub type GLbitfield = ::std::os::raw::c_uint;
-pub type GLvoid = ::std::os::raw::c_void;
-pub type GLbyte = ::std::os::raw::c_schar;
-pub type GLshort = ::std::os::raw::c_short;
-pub type GLint = ::std::os::raw::c_int;
-pub type GLubyte = ::std::os::raw::c_uchar;
-pub type GLushort = ::std::os::raw::c_ushort;
-pub type GLuint = ::std::os::raw::c_uint;
-pub type GLuint64 = ::std::os::raw::c_ulonglong;
-pub type GLsizei = ::std::os::raw::c_int;
-pub type GLchar = ::std::os::raw::c_char;
+pub type GLenum = ::core::ffi::c_uint;
+pub type GLboolean = ::core::ffi::c_uchar;
+pub type GLbitfield = ::core::ffi::c_uint;
+pub type GLvoid = ::core::ffi::c_void;
+pub type GLbyte = ::core::ffi::c_schar;
+pub type GLshort = ::core::ffi::c_short;
+pub type GLint = ::core::ffi::c_int;
+pub type GLubyte = ::core::ffi::c_uchar;
+pub type GLushort = ::core::ffi::c_ushort;
+pub type GLuint = ::core::ffi::c_uint;
+pub type GLuint64 = ::core::ffi::c_ulonglong;
+pub type GLsizei = ::core::ffi::c_int;
+pub type GLchar = ::core::ffi::c_char;
 
 pub type PFNGLXDESTROYCONTEXTPROC =
     Option<unsafe extern "C" fn(_: *mut Display, _: GLXContext) -> ()>;

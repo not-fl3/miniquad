@@ -149,7 +149,7 @@ static mut KEYBOARD_LISTENER: wl_keyboard_listener = wl_keyboard_listener {
 };
 
 unsafe extern "C" fn keyboard_handle_keymap(
-    data: *mut ::std::os::raw::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _format: u32,
     fd: i32,
@@ -178,7 +178,7 @@ unsafe extern "C" fn keyboard_handle_keymap(
     display.xkb_state = (display.xkb.xkb_state_new)(display.keymap);
 }
 unsafe extern "C" fn keyboard_handle_enter(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _serial: u32,
     _surface: *mut wl_surface,
@@ -186,14 +186,14 @@ unsafe extern "C" fn keyboard_handle_enter(
 ) {
 }
 unsafe extern "C" fn keyboard_handle_leave(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _serial: u32,
     _surface: *mut wl_surface,
 ) {
 }
 unsafe extern "C" fn keyboard_handle_key(
-    data: *mut ::std::os::raw::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _serial: u32,
     _time: u32,
@@ -207,7 +207,7 @@ unsafe extern "C" fn keyboard_handle_key(
     EVENTS.push(WaylandEvent::KeyboardKey(keysym, state == 1));
 }
 unsafe extern "C" fn keyboard_handle_modifiers(
-    data: *mut ::std::os::raw::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _serial: u32,
     mods_depressed: u32,
@@ -227,7 +227,7 @@ unsafe extern "C" fn keyboard_handle_modifiers(
     );
 }
 unsafe extern "C" fn keyboard_handle_repeat_info(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _rate: i32,
     _delay: i32,
@@ -249,7 +249,7 @@ static mut POINTER_LISTENER: wl_pointer_listener = wl_pointer_listener {
 };
 
 unsafe extern "C" fn pointer_handle_enter(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _serial: u32,
     _surface: *mut wl_surface,
@@ -258,14 +258,14 @@ unsafe extern "C" fn pointer_handle_enter(
 ) {
 }
 unsafe extern "C" fn pointer_handle_leave(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _serial: u32,
     _surface: *mut wl_surface,
 ) {
 }
 unsafe extern "C" fn pointer_handle_motion(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _time: u32,
     surface_x: i32,
@@ -276,7 +276,7 @@ unsafe extern "C" fn pointer_handle_motion(
     EVENTS.push(WaylandEvent::PointerMotion(x, y));
 }
 unsafe extern "C" fn pointer_handle_button(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _serial: u32,
     _time: u32,
@@ -293,7 +293,7 @@ unsafe extern "C" fn pointer_handle_button(
     EVENTS.push(WaylandEvent::PointerButton(button, state == 1));
 }
 unsafe extern "C" fn pointer_handle_axis(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _time: u32,
     axis: u32,
@@ -315,39 +315,39 @@ unsafe extern "C" fn pointer_handle_axis(
     }
 }
 unsafe extern "C" fn pointer_handle_frame(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
 ) {
 }
 unsafe extern "C" fn pointer_handle_axis_source(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _axis_source: u32,
 ) {
 }
 unsafe extern "C" fn pointer_handle_axis_stop(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _time: u32,
     _axis: u32,
 ) {
 }
 unsafe extern "C" fn pointer_handle_axis_discrete(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _axis: u32,
     _discrete: i32,
 ) {
 }
 unsafe extern "C" fn pointer_handle_axis_value120(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _axis: u32,
     _value120: i32,
 ) {
 }
 unsafe extern "C" fn pointer_handle_axis_relative_direction(
-    _data: *mut ::std::os::raw::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _axis: u32,
     _direction: u32,
@@ -357,7 +357,7 @@ unsafe extern "C" fn pointer_handle_axis_relative_direction(
 extern "C" fn seat_handle_name(
     _data: *mut std::ffi::c_void,
     _seat: *mut wl_seat,
-    _name: *const ::std::os::raw::c_char,
+    _name: *const ::core::ffi::c_char,
 ) {
 }
 
@@ -365,7 +365,7 @@ unsafe extern "C" fn registry_add_object(
     data: *mut std::ffi::c_void,
     registry: *mut wl_registry,
     name: u32,
-    interface: *const ::std::os::raw::c_char,
+    interface: *const ::core::ffi::c_char,
     version: u32,
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
