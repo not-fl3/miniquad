@@ -565,3 +565,39 @@ pub extern "C" fn yes(_: &Object, _: Sel) -> BOOL {
 pub extern "C" fn yes1(_: &Object, _: Sel, _: ObjcId) -> BOOL {
     YES
 }
+
+static mut HACKED: bool = false;
+
+pub fn define_app_delegate_class() -> *const Class {
+    let superclass = class!(NSObject);
+    let mut decl = ClassDecl::new("MyAppDelegate", superclass).unwrap();
+
+    unsafe {
+        decl.add_method(
+            sel!(applicationDidUpdate:),
+            application_did_update as extern "C" fn(&Object, Sel, ObjcId),
+        );
+    }
+
+    extern "C" fn application_did_update(_this: &Object, _: Sel, _: ObjcId) {
+        unsafe {
+            if !HACKED {
+                HACKED = true;
+                let current_application: ObjcId =
+                    msg_send![class!(NSRunningApplication), currentApplication];
+                let _: BOOL = msg_send![current_application, activateWithOptions: nil];
+            }
+        }
+    }
+
+    return decl.register();
+}
+
+pub fn prevent_double_click_bug_on_macos() {
+    unsafe {
+        let app_delegate_class = define_app_delegate_class();
+        let app_delegate_instance: ObjcId = msg_send![app_delegate_class, new];
+        let ns_app: ObjcId = msg_send![class!(NSApplication), sharedApplication];
+        let () = msg_send![ns_app, setDelegate: app_delegate_instance];
+    }
+}

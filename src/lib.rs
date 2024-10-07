@@ -389,3 +389,7 @@ where
         native::ios::run(conf, f);
     }
 }
+
+pub fn prevent_double_click_bug_on_macos() {
+    crate::native::apple::apple_util::prevent_double_click_bug_on_macos();
+}
