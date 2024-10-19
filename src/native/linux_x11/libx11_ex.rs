@@ -85,7 +85,7 @@ impl LibX11 {
             window,
             self.extensions.net_wm_name,
             self.extensions.utf8_string,
-            8 as libc::c_int,
+            8,
             PropModeReplace,
             c_title.as_ptr() as *mut libc::c_uchar,
             libc::strlen(c_title.as_ptr()) as libc::c_int,
@@ -101,6 +101,53 @@ impl LibX11 {
             libc::strlen(c_title.as_ptr()) as libc::c_int,
         );
         (self.XFlush)(display);
+    }
+
+    pub unsafe fn update_window_icon(
+        &mut self,
+        display: *mut Display,
+        window: Window,
+        icon: &crate::conf::Icon,
+    ) {
+        let bytes_length = (icon.small.len() + icon.medium.len() + icon.big.len()) / 4 + 3 * 2;
+
+        // "This is an array of 32bit packed CARDINAL ARGB" (c) freedesktop
+        // While, in fact, X11 expect this to be 64bit on 64bit systems, which is proved
+        // by quite a few "unsigned long icon[]" I've seen in quite a few real-life programs.
+        // Leaving this comment nn case of icon-related bugs in the future.
+        let mut icon_bytes: Vec<usize> = vec![0; bytes_length];
+        let icons = [
+            (16, &icon.small[..]),
+            (32, &icon.medium[..]),
+            (65, &icon.big[..]),
+        ];
+
+        {
+            let mut target = icon_bytes.iter_mut();
+            for (dim, pixels) in icons {
+                *target.next().unwrap() = dim;
+                *target.next().unwrap() = dim;
+                for pixels in pixels.chunks(4) {
+                    let r = pixels[0] as u32;
+                    let g = pixels[1] as u32;
+                    let b = pixels[2] as u32;
+                    let a = pixels[3] as u32;
+
+                    *target.next().unwrap() = ((r << 16) | (g << 8) | (b << 0) | (a << 24)) as usize;
+                }
+            }
+        }
+
+        (self.XChangeProperty)(
+            display,
+            window,
+            self.extensions.net_wm_icon,
+            self.extensions.cardinal,
+            32,
+            PropModeReplace,
+            icon_bytes.as_mut_ptr() as *mut _ as *mut _,
+            icon_bytes.len() as _,
+        );
     }
 
     pub unsafe fn create_window(
@@ -186,6 +233,11 @@ impl LibX11 {
         (self.XSetWMNormalHints)(display, window, hints);
         (self.XFree)(hints as *mut libc::c_void);
 
+        if let Some(ref icon) = conf.icon {
+            self.update_window_icon(display, window, icon);
+        }
+        // For an unknown reason, this should happen after update_window_icon,
+        // otherwise X11 will skip ChangeProperty(WM_ICON)
         self.update_window_title(display, window, &conf.window_title);
 
         window

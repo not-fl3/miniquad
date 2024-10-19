@@ -989,6 +989,8 @@ pub struct X11Extensions {
     pub _wm_state: Atom,
     pub net_wm_name: Atom,
     pub net_wm_icon_name: Atom,
+    pub net_wm_icon: Atom,
+    pub cardinal: Atom,
 }
 
 #[derive(Clone)]
@@ -1131,6 +1133,16 @@ impl LibX11 {
             net_wm_icon_name: (self.XInternAtom)(
                 display,
                 b"_NET_WM_ICON_NAME\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            net_wm_icon: (self.XInternAtom)(
+                display,
+                b"_NET_WM_ICON\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            cardinal: (self.XInternAtom)(
+                display,
+                b"CARDINAL\x00" as *const u8 as *const libc::c_char,
                 false as _,
             ),
         };
