@@ -133,7 +133,8 @@ impl LibX11 {
                     let b = pixels[2] as u32;
                     let a = pixels[3] as u32;
 
-                    *target.next().unwrap() = ((r << 16) | (g << 8) | (b << 0) | (a << 24)) as usize;
+                    *target.next().unwrap() =
+                        ((r << 16) | (g << 8) | (b << 0) | (a << 24)) as usize;
                 }
             }
         }
