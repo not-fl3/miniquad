@@ -392,7 +392,6 @@ pub struct TextureParams {
     /// On OpenGL, for a `sample_count > 1` render texture, render buffer object will
     /// be created instead of a regulat texture.
     ///
-    /// The only way to use
     pub sample_count: i32,
 }
 
@@ -408,7 +407,7 @@ impl Default for TextureParams {
             width: 0,
             height: 0,
             allocate_mipmaps: false,
-            sample_count: 0,
+            sample_count: 1,
         }
     }
 }
@@ -1150,7 +1149,7 @@ pub trait RenderingBackend {
                 mag_filter: FilterMode::Linear,
                 mipmap_filter: MipmapFilterMode::None,
                 allocate_mipmaps: false,
-                sample_count: 0,
+                sample_count: 1,
             },
         )
     }

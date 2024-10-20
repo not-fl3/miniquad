@@ -165,13 +165,13 @@ impl Texture {
         }
         if access != TextureAccess::RenderTarget {
             assert!(
-                params.sample_count == 0,
+                params.sample_count <= 1,
                 "Multisampling is only supported for render textures"
             );
         }
         let (internal_format, format, pixel_type) = params.format.into();
 
-        if access == TextureAccess::RenderTarget && params.sample_count != 0 {
+        if access == TextureAccess::RenderTarget && params.sample_count > 1 {
             let mut renderbuffer: u32 = 0;
             unsafe {
                 glGenRenderbuffers(1, &mut renderbuffer as *mut _);
@@ -1013,7 +1013,7 @@ impl RenderingBackend for GlContext {
             glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
             for (i, color_img) in color_img.iter().enumerate() {
                 let texture = self.textures.get(*color_img);
-                if texture.params.sample_count != 0 {
+                if texture.params.sample_count > 1 {
                     glFramebufferRenderbuffer(
                         GL_FRAMEBUFFER,
                         GL_COLOR_ATTACHMENT0 + i as u32,
@@ -1032,7 +1032,7 @@ impl RenderingBackend for GlContext {
             }
             if let Some(depth_img) = depth_img {
                 let texture = self.textures.get(depth_img);
-                if texture.params.sample_count != 0 {
+                if texture.params.sample_count > 1 {
                     glFramebufferRenderbuffer(
                         GL_FRAMEBUFFER,
                         GL_DEPTH_ATTACHMENT,
