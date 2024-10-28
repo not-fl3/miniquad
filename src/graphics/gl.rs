@@ -46,8 +46,28 @@ struct ShaderInternal {
 }
 
 #[derive(Clone, Copy, Debug)]
+enum TextureOrRenderbuffer {
+    Texture(GLuint),
+    Renderbuffer(GLuint),
+}
+impl TextureOrRenderbuffer {
+    fn texture(&self) -> Option<GLuint> {
+        match self {
+            TextureOrRenderbuffer::Texture(id) => Some(*id),
+            _ => None,
+        }
+    }
+    fn renderbuffer(&self) -> Option<GLuint> {
+        match self {
+            TextureOrRenderbuffer::Renderbuffer(id) => Some(*id),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Texture {
-    raw: GLuint,
+    raw: TextureOrRenderbuffer,
     params: TextureParams,
 }
 
@@ -186,7 +206,7 @@ impl Texture {
                 );
             }
             return Texture {
-                raw: renderbuffer,
+                raw: TextureOrRenderbuffer::Renderbuffer(renderbuffer),
                 params,
             };
         }
@@ -297,14 +317,18 @@ impl Texture {
         ctx.cache.restore_texture_binding(0);
 
         Texture {
-            raw: texture,
+            raw: TextureOrRenderbuffer::Texture(texture),
             params,
         }
     }
 
     pub fn resize(&mut self, ctx: &mut GlContext, width: u32, height: u32, source: Option<&[u8]>) {
+        let raw = self
+            .raw
+            .texture()
+            .expect("Resize not yet implemented for RenderBuffer(multisampled) textures");
         ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.params.kind.into(), self.raw);
+        ctx.cache.bind_texture(0, self.params.kind.into(), raw);
 
         let (internal_format, format, pixel_type) = self.params.format.into();
 
@@ -343,9 +367,12 @@ impl Texture {
         assert_eq!(self.size(width as _, height as _), source.len());
         assert!(x_offset + width <= self.params.width as _);
         assert!(y_offset + height <= self.params.height as _);
+        let raw = self.raw.texture().expect(
+            "update_texture_part not yet implemented for RenderBuffer(multisampled) textures",
+        );
 
         ctx.cache.store_texture_binding(0);
-        ctx.cache.bind_texture(0, self.params.kind.into(), self.raw);
+        ctx.cache.bind_texture(0, self.params.kind.into(), raw);
 
         let (_, format, pixel_type) = self.params.format.into();
 
@@ -382,6 +409,11 @@ impl Texture {
 
     /// Read texture data into CPU memory
     pub fn read_pixels(&self, bytes: &mut [u8]) {
+        let raw = self
+            .raw
+            .texture()
+            .expect("read_pixels not yet implemented for RenderBuffer(multisampled) textures");
+
         let (_, format, pixel_type) = self.params.format.into();
 
         let mut fbo = 0;
@@ -394,7 +426,7 @@ impl Texture {
                 gl::GL_FRAMEBUFFER,
                 gl::GL_COLOR_ATTACHMENT0,
                 gl::GL_TEXTURE_2D,
-                self.raw,
+                raw,
                 0,
             );
 
@@ -469,7 +501,7 @@ impl Textures {
     fn get(&self, texture: TextureId) -> Texture {
         match texture.0 {
             TextureIdInner::Raw(RawId::OpenGl(texture)) => Texture {
-                raw: texture,
+                raw: TextureOrRenderbuffer::Texture(texture),
                 params: Default::default(),
             },
             #[cfg(target_vendor = "apple")]
@@ -877,8 +909,13 @@ impl RenderingBackend for GlContext {
         //self.cache.clear_texture_bindings();
 
         let t = self.textures.get(texture);
-        unsafe {
-            glDeleteTextures(1, &t.raw as *const _);
+        match &t.raw {
+            TextureOrRenderbuffer::Texture(raw) => unsafe {
+                glDeleteTextures(1, raw as *const _);
+            },
+            TextureOrRenderbuffer::Renderbuffer(raw) => unsafe {
+                glDeleteRenderbuffers(1, raw as *const _);
+            },
         }
     }
 
@@ -894,9 +931,13 @@ impl RenderingBackend for GlContext {
 
     fn texture_set_wrap(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap) {
         let t = self.textures.get(texture);
+        let raw = t
+            .raw
+            .texture()
+            .expect("texture_set_wrap not yet implemented for RenderBuffer(multisampled) textures");
 
         self.cache.store_texture_binding(0);
-        self.cache.bind_texture(0, t.params.kind.into(), t.raw);
+        self.cache.bind_texture(0, t.params.kind.into(), raw);
         let wrap_x = match wrap_x {
             TextureWrap::Repeat => GL_REPEAT,
             TextureWrap::Mirror => GL_MIRRORED_REPEAT,
@@ -923,8 +964,12 @@ impl RenderingBackend for GlContext {
         mipmap_filter: MipmapFilterMode,
     ) {
         let t = self.textures.get(texture);
+        let raw = t.raw.texture().expect(
+            "texture_set_min_filter not yet implemented for RenderBuffer(multisampled) textures",
+        );
+
         self.cache.store_texture_binding(0);
-        self.cache.bind_texture(0, t.params.kind.into(), t.raw);
+        self.cache.bind_texture(0, t.params.kind.into(), raw);
 
         let filter = Texture::gl_filter(filter, mipmap_filter);
         unsafe {
@@ -934,8 +979,13 @@ impl RenderingBackend for GlContext {
     }
     fn texture_set_mag_filter(&mut self, texture: TextureId, filter: FilterMode) {
         let t = self.textures.get(texture);
+        let raw = t
+            .raw
+            .texture()
+            .expect("texture_set_wrap not yet implemented for RenderBuffer(multisampled) textures");
+
         self.cache.store_texture_binding(0);
-        self.cache.bind_texture(0, t.params.kind.into(), t.raw);
+        self.cache.bind_texture(0, t.params.kind.into(), raw);
 
         let filter = match filter {
             FilterMode::Nearest => GL_NEAREST,
@@ -968,8 +1018,12 @@ impl RenderingBackend for GlContext {
     }
     fn texture_generate_mipmaps(&mut self, texture: TextureId) {
         let t = self.textures.get(texture);
+        let raw = t.raw.texture().expect(
+            "texture_generate_mipmaps not yet implemented for RenderBuffer(multisampled) textures",
+        );
+
         self.cache.store_texture_binding(0);
-        self.cache.bind_texture(0, t.params.kind.into(), t.raw);
+        self.cache.bind_texture(0, t.params.kind.into(), raw);
         unsafe {
             glGenerateMipmap(t.params.kind.into());
         }
@@ -993,7 +1047,12 @@ impl RenderingBackend for GlContext {
     }
     unsafe fn texture_raw_id(&self, texture: TextureId) -> RawId {
         let texture = self.textures.get(texture);
-        RawId::OpenGl(texture.raw)
+        let raw = texture
+            .raw
+            .texture()
+            .expect("For multisampled texture raw_id is not supported");
+
+        RawId::OpenGl(raw)
     }
 
     fn new_render_pass_mrt(
@@ -1014,18 +1073,20 @@ impl RenderingBackend for GlContext {
             for (i, color_img) in color_img.iter().enumerate() {
                 let texture = self.textures.get(*color_img);
                 if texture.params.sample_count > 1 {
+                    let raw = texture.raw.renderbuffer().unwrap();
                     glFramebufferRenderbuffer(
                         GL_FRAMEBUFFER,
                         GL_COLOR_ATTACHMENT0 + i as u32,
                         GL_RENDERBUFFER,
-                        texture.raw,
+                        raw,
                     );
                 } else {
+                    let raw = texture.raw.texture().unwrap();
                     glFramebufferTexture2D(
                         GL_FRAMEBUFFER,
                         GL_COLOR_ATTACHMENT0 + i as u32,
                         GL_TEXTURE_2D,
-                        texture.raw,
+                        raw,
                         0,
                     );
                 }
@@ -1033,18 +1094,20 @@ impl RenderingBackend for GlContext {
             if let Some(depth_img) = depth_img {
                 let texture = self.textures.get(depth_img);
                 if texture.params.sample_count > 1 {
+                    let raw = texture.raw.texture().unwrap();
                     glFramebufferRenderbuffer(
                         GL_FRAMEBUFFER,
                         GL_DEPTH_ATTACHMENT,
                         GL_RENDERBUFFER,
-                        texture.raw,
+                        raw,
                     );
                 } else {
+                    let raw = texture.raw.texture().unwrap();
                     glFramebufferTexture2D(
                         GL_FRAMEBUFFER,
                         GL_DEPTH_ATTACHMENT,
                         GL_TEXTURE_2D,
-                        texture.raw,
+                        raw,
                         0,
                     );
                 }
@@ -1067,11 +1130,12 @@ impl RenderingBackend for GlContext {
                     glBindFramebuffer(GL_FRAMEBUFFER, resolve_fb);
                     resolves.push((resolve_fb, *resolve_img));
                     let texture = self.textures.get(*resolve_img);
+                    let raw = texture.raw.texture().unwrap();
                     glFramebufferTexture2D(
                         GL_FRAMEBUFFER,
                         GL_COLOR_ATTACHMENT0 + i as u32,
                         GL_TEXTURE_2D,
-                        texture.raw,
+                        raw,
                         0,
                     );
                     let fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -1386,9 +1450,13 @@ impl RenderingBackend for GlContext {
                 .unwrap_or_else(|| panic!("Image count in bindings and shader did not match!"));
             if let Some(gl_loc) = shader_image.gl_loc {
                 let texture = self.textures.get(*bindings_image);
+                let raw = match texture.raw {
+                    TextureOrRenderbuffer::Texture(id) => id,
+                    TextureOrRenderbuffer::Renderbuffer(id) => id,
+                };
                 unsafe {
                     self.cache
-                        .bind_texture(n, texture.params.kind.into(), texture.raw);
+                        .bind_texture(n, texture.params.kind.into(), raw);
                     glUniform1i(gl_loc, n as i32);
                 }
             }
