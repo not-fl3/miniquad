@@ -196,6 +196,22 @@ impl WindowsDisplay {
             ShowWindow(self.wnd, SW_SHOW);
         };
     }
+
+    fn set_borderless(&mut self, borderless: bool) {
+        self.borderless = borderless as _;
+
+        let win_style: DWORD =
+            get_win_style(self.fullscreen, self.borderless, self.window_resizable);
+
+        unsafe {
+            #[cfg(target_arch = "x86_64")]
+            SetWindowLongPtrA(self.wnd, GWL_STYLE, win_style as _);
+            #[cfg(target_arch = "i686")]
+            SetWindowLong(self.wnd, GWL_STYLE, win_style as _);
+
+            ShowWindow(self.wnd, SW_SHOW);
+        };
+    }
 }
 
 fn get_win_style(is_fullscreen: bool, is_borderless: bool, is_resizable: bool) -> DWORD {
@@ -833,6 +849,7 @@ impl WindowsDisplay {
                 } => self.set_window_size(new_width as _, new_height as _),
                 SetWindowPosition { new_x, new_y } => self.set_window_position(new_x, new_y),
                 SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
+                SetBorderless(borderless) => self.set_borderless(borderless),
                 ShowKeyboard(show) => {
                     eprintln!("Not implemented for windows")
                 }
