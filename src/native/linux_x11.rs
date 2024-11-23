@@ -270,7 +270,7 @@ impl X11Display {
 
         let mut hints: MWMHints = mem::zeroed();
 
-        hints.flags = hints_atom;
+        hints.flags = 2; // MWM_HINTS_DECORATIONS
         hints.decorations = if borderless { 0 } else { 1 };
 
         (self.libx11.XChangeProperty)(
