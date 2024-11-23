@@ -3,7 +3,7 @@ pub mod conf;
 mod event;
 pub mod fs;
 pub mod graphics;
-mod native;
+pub mod native;
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
