@@ -180,6 +180,8 @@ class QuadSurface
     // For some reason it only works if placed here and not in the parent layout.
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        //% QUAD_SURFACE_ON_CREATE_INPUT_CONNECTION
+
         InputConnection connection = super.onCreateInputConnection(outAttrs);
         outAttrs.imeOptions |= EditorInfo.IME_FLAG_NO_FULLSCREEN;
         return connection;
