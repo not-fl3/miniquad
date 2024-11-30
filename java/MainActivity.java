@@ -210,13 +210,18 @@ class ResizingLayout
             Insets imeInsets = insets.getInsets(WindowInsets.Type.ime());
             Insets sysInsets = insets.getInsets(WindowInsets.Type.systemBars());
 
+            int bottomPadding = sysInsets.bottom;
+            if (imeInsets.bottom > 0) {
+                bottomPadding = imeInsets.bottom;
+            }
+
             // The sys insets change when orientation changes and sys bars
             // change position.
             v.setPadding(
                 sysInsets.left,
                 sysInsets.top,
                 sysInsets.right,
-                imeInsets.bottom + sysInsets.bottom
+                bottomPadding
             );
         }
         return insets;
