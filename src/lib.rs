@@ -259,6 +259,12 @@ pub mod window {
         d.screen_position
     }
 
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    pub fn get_screen_mouse_position() -> (i32, i32) {
+        let d = native_display().lock().unwrap();
+        d.screen_mouse_position
+    }
+
     pub fn set_fullscreen(fullscreen: bool) {
         let d = native_display().lock().unwrap();
         d.native_requests
