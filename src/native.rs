@@ -70,6 +70,7 @@ pub(crate) enum Request {
     SetWindowSize { new_width: u32, new_height: u32 },
     SetWindowPosition { new_x: u32, new_y: u32 },
     SetFullscreen(bool),
+    SetBorderless(bool),
     ShowKeyboard(bool),
 }
 
