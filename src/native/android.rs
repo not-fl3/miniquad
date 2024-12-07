@@ -83,7 +83,7 @@ fn send_message(message: Message) {
     })
 }
 
-static mut ACTIVITY: ndk_sys::jobject = std::ptr::null_mut();
+pub static mut ACTIVITY: ndk_sys::jobject = std::ptr::null_mut();
 static mut VM: *mut ndk_sys::JavaVM = std::ptr::null_mut();
 
 pub unsafe fn console_debug(msg: *const ::core::ffi::c_char) {
