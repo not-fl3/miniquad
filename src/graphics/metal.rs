@@ -747,14 +747,24 @@ impl RenderingBackend for MetalContext {
         let texture = unsafe {
             let sampler_descriptor = msg_send_![class!(MTLSamplerDescriptor), new];
             msg_send_![sampler_descriptor, retain];
-            msg_send_![
-                sampler_descriptor,
-                setMinFilter: MTLSamplerMinMagFilter::Linear
-            ];
-            msg_send_![
-                sampler_descriptor,
-                setMagFilter: MTLSamplerMinMagFilter::Linear
-            ];
+            let min_filter = match params.min_filter {
+                FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
+                FilterMode::Linear => MTLSamplerMinMagFilter::Linear,
+            };
+
+            let mag_filter = match params.mag_filter {
+                FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
+                FilterMode::Linear => MTLSamplerMinMagFilter::Linear,
+            };
+
+            let mipmap_filter = match params.mipmap_filter {
+                MipmapFilterMode::None => MTLSamplerMipFilter::NotMipmapped,
+                MipmapFilterMode::Nearest => MTLSamplerMipFilter::Nearest,
+                MipmapFilterMode::Linear => MTLSamplerMipFilter::Linear,
+            };
+            msg_send_![sampler_descriptor, setMinFilter: min_filter];
+            msg_send_![sampler_descriptor, setMagFilter: mag_filter];
+            msg_send_![sampler_descriptor, setMipFilter: mipmap_filter];
 
             let sampler_state = msg_send_![
                 self.device,
