@@ -771,7 +771,7 @@ where
 
                     let chr = keycodes::keysym_to_unicode(&mut display.xkb, *keysym);
                     if chr > 0 {
-                        if let Some(chr) = std::char::from_u32(chr as u32) {
+                        if let Some(chr) = char::from_u32(chr as u32) {
                             event_handler.char_event(chr, keymods, true);
                         }
                     }
@@ -821,7 +821,7 @@ where
 
                                 let chr = keycodes::keysym_to_unicode(&mut display.xkb, keysym);
                                 if chr > 0 {
-                                    if let Some(chr) = std::char::from_u32(chr as u32) {
+                                    if let Some(chr) = char::from_u32(chr as u32) {
                                         event_handler.char_event(chr, keymods, false);
                                     }
                                 }
