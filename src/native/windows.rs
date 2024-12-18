@@ -462,7 +462,7 @@ unsafe extern "system" fn win32_wndproc(
             let repeat = !!(lparam & 0x40000000) != 0;
             let mods = key_mods();
             if chr > 0 {
-                if let Some(chr) = std::char::from_u32(chr as u32) {
+                if let Some(chr) = char::from_u32(chr as u32) {
                     event_handler.char_event(chr, mods, repeat);
                 }
             }

@@ -67,7 +67,7 @@ impl X11Display {
                 );
                 let chr = keycodes::keysym_to_unicode(&mut self.libxkbcommon, keysym);
                 if chr > 0 {
-                    if let Some(chr) = std::char::from_u32(chr as u32) {
+                    if let Some(chr) = char::from_u32(chr as u32) {
                         event_handler.char_event(chr, mods, repeat);
                     }
                 }
