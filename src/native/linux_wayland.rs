@@ -533,14 +533,22 @@ impl crate::native::Clipboard for WaylandClipboard {
     fn set(&mut self, _data: &str) {}
 }
 
+
+pub fn eprint_iferr<T>(lib_name: &'static str, opt_lib: Option<T>) -> Option<T> {
+    if opt_lib.is_none() {
+        eprintln!("failed to load library {}", lib_name);
+    }
+    return opt_lib
+}
+
 pub fn run<F>(conf: &crate::conf::Conf, f: &mut Option<F>) -> Option<()>
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     unsafe {
-        let client = LibWaylandClient::try_load()?;
-        let egl = LibWaylandEgl::try_load()?;
-        let xkb = LibXkbCommon::try_load()?;
+        let client = eprint_iferr("libwayland-client", LibWaylandClient::try_load())?;
+        let egl = eprint_iferr("libwayland-egl", LibWaylandEgl::try_load())?;
+        let xkb = eprint_iferr("libxkbcommon", LibXkbCommon::try_load())?;
 
         let wdisplay = (client.wl_display_connect)(std::ptr::null_mut());
         if wdisplay.is_null() {
@@ -622,7 +630,7 @@ where
             eprintln!("Decoration manager not found, will draw fallback decorations");
         }
 
-        let mut libegl = egl::LibEgl::try_load()?;
+        let mut libegl = eprint_iferr("libEGL", egl::LibEgl::try_load())?;
         let (context, config, egl_display) = egl::create_egl_context(
             &mut libegl,
             wdisplay as *mut _,
