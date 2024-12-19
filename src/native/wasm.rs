@@ -310,7 +310,7 @@ pub extern "C" fn key_up(key: u32, modifiers: u32) {
 #[no_mangle]
 pub extern "C" fn resize(width: i32, height: i32) {
     {
-        let mut d = crate::native_display().lock().unwrap();
+        let mut d = crate::native_display_blocking();
         d.screen_width = width as _;
         d.screen_height = height as _;
     }
@@ -340,7 +340,7 @@ pub extern "C" fn focus(has_focus: bool) {
 
 #[no_mangle]
 pub extern "C" fn on_files_dropped_start() {
-    let mut d = crate::native_display().lock().unwrap();
+    let mut d = crate::native_display_blocking();
     d.dropped_files = Default::default();
 }
 
@@ -356,7 +356,7 @@ pub extern "C" fn on_file_dropped(
     bytes: *mut u8,
     bytes_len: usize,
 ) {
-    let mut d = crate::native_display().lock().unwrap();
+    let mut d = crate::native_display_blocking();
     let path = PathBuf::from(unsafe { String::from_raw_parts(path, path_len, path_len) });
     let bytes = unsafe { Vec::from_raw_parts(bytes, bytes_len, bytes_len) };
 
