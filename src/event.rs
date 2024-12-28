@@ -4,7 +4,22 @@ pub enum MouseButton {
     Left = 0,
     Middle = 1,
     Right = 2,
+    MB4 = 3,
+    MB5 = 4,
     Unknown = 255,
+}
+
+impl MouseButton {
+    pub fn from_u8(value: u8) -> MouseButton {
+        match value {
+            0 => MouseButton::Left,
+            1 => MouseButton::Middle,
+            2 => MouseButton::Right,
+            3 => MouseButton::MB4,
+            4 => MouseButton::MB5,
+            _ => MouseButton::Unknown,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
