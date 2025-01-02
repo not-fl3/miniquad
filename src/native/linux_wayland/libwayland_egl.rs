@@ -41,14 +41,18 @@ impl LibWaylandEgl {
     pub fn try_load() -> Option<LibWaylandEgl> {
         crate::native::module::Module::load("libwayland-egl.so")
             .or_else(|_| crate::native::module::Module::load("libwayland-egl.so.1"))
-            .map(|module| LibWaylandEgl {
-                wl_egl_window_create: module.get_symbol("wl_egl_window_create").unwrap(),
-                wl_egl_window_destroy: module.get_symbol("wl_egl_window_destroy").unwrap(),
-                wl_egl_window_resize: module.get_symbol("wl_egl_window_resize").unwrap(),
+            .and_then(|module| Ok(LibWaylandEgl {
+                wl_egl_window_create: module.get_symbol("wl_egl_window_create")?,
+                wl_egl_window_destroy: module.get_symbol("wl_egl_window_destroy")?,
+                wl_egl_window_resize: module.get_symbol("wl_egl_window_resize")?,
                 wl_egl_window_get_attached_size: module
                     .get_symbol("wl_egl_window_get_attached_size")
-                    .unwrap(),
+                    ?,
                 _module: module,
+            })) 
+            .map_err(|err| {
+                eprintln!("failed loading libwayland-egl: {err}");
+                err
             })
             .ok()
     }

@@ -62,21 +62,25 @@ impl LibXkbCommon {
             .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0"))
             .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0.0.0"))
             .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0.0.0.0"))
-            .map(|module| LibXkbCommon {
-                xkb_context_new: module.get_symbol("xkb_context_new").unwrap(),
-                xkb_context_unref: module.get_symbol("xkb_context_unref").unwrap(),
+            .and_then(|module| Ok(LibXkbCommon {
+                xkb_context_new: module.get_symbol("xkb_context_new")?,
+                xkb_context_unref: module.get_symbol("xkb_context_unref")?,
                 xkb_keymap_new_from_string: module
                     .get_symbol("xkb_keymap_new_from_string")
-                    .unwrap(),
-                xkb_keymap_unref: module.get_symbol("xkb_keymap_unref").unwrap(),
-                xkb_state_new: module.get_symbol("xkb_state_new").unwrap(),
-                xkb_state_unref: module.get_symbol("xkb_state_unref").unwrap(),
-                xkb_state_key_get_one_sym: module.get_symbol("xkb_state_key_get_one_sym").unwrap(),
-                xkb_state_update_mask: module.get_symbol("xkb_state_update_mask").unwrap(),
-                xkb_keysym_to_utf32: module.get_symbol("xkb_keysym_to_utf32").unwrap(),
+                    ?,
+                xkb_keymap_unref: module.get_symbol("xkb_keymap_unref")?,
+                xkb_state_new: module.get_symbol("xkb_state_new")?,
+                xkb_state_unref: module.get_symbol("xkb_state_unref")?,
+                xkb_state_key_get_one_sym: module.get_symbol("xkb_state_key_get_one_sym")?,
+                xkb_state_update_mask: module.get_symbol("xkb_state_update_mask")?,
+                xkb_keysym_to_utf32: module.get_symbol("xkb_keysym_to_utf32")?,
 
                 _module: std::rc::Rc::new(module),
+            }))
+            .map_err(|err| {
+                eprintln!("failed loading libxkbcommon: {err}");
+                err
             })
             .ok()
-    }
+        }
 }

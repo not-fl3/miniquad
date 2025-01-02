@@ -621,38 +621,42 @@ impl LibWaylandClient {
     pub fn try_load() -> Option<LibWaylandClient> {
         crate::native::module::Module::load("libwayland-client.so")
             .or_else(|_| crate::native::module::Module::load("libwayland-client.so.0"))
-            .map(|module| LibWaylandClient {
-                wl_display_connect: module.get_symbol("wl_display_connect").unwrap(),
-                wl_proxy_add_listener: module.get_symbol("wl_proxy_add_listener").unwrap(),
+            .and_then(|module| Ok(LibWaylandClient {
+                wl_display_connect: module.get_symbol("wl_display_connect")?,
+                wl_proxy_add_listener: module.get_symbol("wl_proxy_add_listener")?,
                 wl_display_dispatch_pending: module
                     .get_symbol("wl_display_dispatch_pending")
-                    .unwrap(),
+                    ?,
 
-                wl_proxy_destroy: module.get_symbol("wl_proxy_destroy").unwrap(),
-                wl_proxy_marshal: module.get_symbol("wl_proxy_marshal").unwrap(),
+                wl_proxy_destroy: module.get_symbol("wl_proxy_destroy")?,
+                wl_proxy_marshal: module.get_symbol("wl_proxy_marshal")?,
                 wl_proxy_marshal_constructor: module
                     .get_symbol("wl_proxy_marshal_constructor")
-                    .unwrap(),
+                    ?,
                 wl_proxy_marshal_constructor_versioned: module
                     .get_symbol("wl_proxy_marshal_constructor_versioned")
-                    .unwrap(),
-                wl_display_roundtrip: module.get_symbol("wl_display_roundtrip").unwrap(),
+                    ?,
+                wl_display_roundtrip: module.get_symbol("wl_display_roundtrip")?,
 
-                wl_registry_interface: module.get_symbol("wl_registry_interface").unwrap(),
-                wl_compositor_interface: module.get_symbol("wl_compositor_interface").unwrap(),
+                wl_registry_interface: module.get_symbol("wl_registry_interface")?,
+                wl_compositor_interface: module.get_symbol("wl_compositor_interface")?,
                 wl_subcompositor_interface: module
                     .get_symbol("wl_subcompositor_interface")
-                    .unwrap(),
-                wl_surface_interface: module.get_symbol("wl_surface_interface").unwrap(),
-                wl_subsurface_interface: module.get_symbol("wl_subsurface_interface").unwrap(),
-                wl_buffer_interface: module.get_symbol("wl_buffer_interface").unwrap(),
-                wl_seat_interface: module.get_symbol("wl_seat_interface").unwrap(),
-                wl_shm_interface: module.get_symbol("wl_shm_interface").unwrap(),
-                wl_shm_pool_interface: module.get_symbol("wl_shm_pool_interface").unwrap(),
-                wl_keyboard_interface: module.get_symbol("wl_keyboard_interface").unwrap(),
-                wl_pointer_interface: module.get_symbol("wl_pointer_interface").unwrap(),
+                    ?,
+                wl_surface_interface: module.get_symbol("wl_surface_interface")?,
+                wl_subsurface_interface: module.get_symbol("wl_subsurface_interface")?,
+                wl_buffer_interface: module.get_symbol("wl_buffer_interface")?,
+                wl_seat_interface: module.get_symbol("wl_seat_interface")?,
+                wl_shm_interface: module.get_symbol("wl_shm_interface")?,
+                wl_shm_pool_interface: module.get_symbol("wl_shm_pool_interface")?,
+                wl_keyboard_interface: module.get_symbol("wl_keyboard_interface")?,
+                wl_pointer_interface: module.get_symbol("wl_pointer_interface")?,
 
                 _module: std::rc::Rc::new(module),
+            }))
+            .map_err(|err| {
+                eprintln!("failed loading libwayland-client: {err}");
+                err
             })
             .ok()
     }
