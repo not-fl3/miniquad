@@ -478,6 +478,7 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
     height: i32,
     _states: *mut wl_array,
 ) -> () {
+    println!("xdg_toplevel_handle_configure");
     assert!(!data.is_null());
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
     let mut d = crate::native_display().lock().unwrap();
@@ -497,9 +498,9 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
 
         d.screen_width = width;
         d.screen_height = height;
+        drop(d);
 
         if let Some(ref decorations) = payload.decorations {
-            drop(d);
             decorations.resize(&mut payload.client, width, height);
         }
 
