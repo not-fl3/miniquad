@@ -478,7 +478,6 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
     height: i32,
     _states: *mut wl_array,
 ) -> () {
-    println!("xdg_toplevel_handle_configure");
     assert!(!data.is_null());
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
     let mut d = crate::native_display().lock().unwrap();
