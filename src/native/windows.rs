@@ -795,6 +795,14 @@ impl WindowsDisplay {
         false
     }
 
+    unsafe fn update_screen_mouse_position(&mut self) {
+        let mut point: POINT = std::mem::zeroed();
+        if GetCursorPos(&mut point as *mut _) != 0 {
+            let mut d = crate::native_display().lock().unwrap();
+            d.screen_mouse_position = (point.x, point.y);
+        }
+    }
+
     unsafe fn init_dpi(&mut self, high_dpi: bool) {
         self.dpi_aware = high_dpi;
         // get dpi scale factor for main monitor
@@ -925,6 +933,8 @@ where
             while let Ok(request) = rx.try_recv() {
                 display.process_request(request);
             }
+
+            display.update_screen_mouse_position();
 
             let mut dispatch_message = |mut msg: MSG| {
                 if msg.message == WM_QUIT {
