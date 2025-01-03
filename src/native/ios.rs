@@ -14,7 +14,7 @@ use {
             },
             NativeDisplayData,
         },
-        native_display,
+        native_display_blocking,
     },
     std::{
         cell::RefCell,
@@ -143,7 +143,7 @@ pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
                 let ios_touch: ObjcId = msg_send![enumerator, nextObject];
                 let mut ios_pos: NSPoint = msg_send![ios_touch, locationInView: this];
 
-                if native_display().lock().unwrap().high_dpi {
+                if native_display_blocking().high_dpi {
                     ios_pos.x *= 2.;
                     ios_pos.y *= 2.;
                 } else {
@@ -317,7 +317,7 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
 
         let main_screen: ObjcId = unsafe { msg_send![class!(UIScreen), mainScreen] };
         let screen_rect: NSRect = unsafe { msg_send![main_screen, bounds] };
-        let high_dpi = native_display().lock().unwrap().high_dpi;
+        let high_dpi = native_display_blocking().high_dpi;
 
         let (screen_width, screen_height) = if high_dpi {
             (
@@ -332,11 +332,11 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
             )
         };
 
-        if native_display().lock().unwrap().screen_width != screen_width
-            || native_display().lock().unwrap().screen_height != screen_height
+        if native_display_blocking().screen_width != screen_width
+            || native_display_blocking().screen_height != screen_height
         {
             {
-                let mut d = native_display().lock().unwrap();
+                let mut d = native_display_blocking();
                 d.screen_width = screen_width;
                 d.screen_height = screen_height;
             }

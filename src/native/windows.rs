@@ -175,7 +175,7 @@ impl WindowsDisplay {
                 );
             } else {
                 let (w, h) = {
-                    let d = crate::native_display().lock().unwrap();
+                    let d = crate::native_display_blocking();
                     (d.screen_width, d.screen_height)
                 };
 
@@ -284,7 +284,7 @@ unsafe extern "system" fn win32_wndproc(
 
     match umsg {
         WM_CLOSE => {
-            let mut d = crate::native_display().lock().unwrap();
+            let mut d = crate::native_display_blocking();
             // only give user a chance to intervene when sapp_quit() wasn't already called
             if !d.quit_ordered {
                 // if window should be closed and event handling is enabled, give user code
@@ -294,7 +294,7 @@ unsafe extern "system" fn win32_wndproc(
                 // the prevent event may require access to native_display
                 event_handler.quit_requested_event();
                 // Re-acquire native_display
-                d = crate::native_display().lock().unwrap();
+                d = crate::native_display_blocking();
                 // if user code hasn't intervened, quit the app
                 if d.quit_requested {
                     d.quit_ordered = true;
@@ -431,7 +431,7 @@ unsafe extern "system" fn win32_wndproc(
             // convert from normalised absolute coordinates
             if (data.data.mouse().usFlags & MOUSE_MOVE_ABSOLUTE) == MOUSE_MOVE_ABSOLUTE {
                 let (width, height) = {
-                    let d = crate::native_display().lock().unwrap();
+                    let d = crate::native_display_blocking();
                     (d.screen_width as f32, d.screen_height as f32)
                 };
 
@@ -496,7 +496,7 @@ unsafe extern "system" fn win32_wndproc(
                 SwapBuffers(payload.dc);
 
                 if payload.update_dimensions(hwnd) {
-                    let d = crate::native_display().lock().unwrap();
+                    let d = crate::native_display_blocking();
                     let width = d.screen_width as f32;
                     let height = d.screen_height as f32;
                     drop(d);
@@ -752,7 +752,7 @@ impl WindowsDisplay {
     /// and window position from the window's rect.
     /// returns true if size or position has changed
     unsafe fn update_dimensions(&mut self, hwnd: HWND) -> bool {
-        let mut d = crate::native_display().lock().unwrap();
+        let mut d = crate::native_display_blocking();
         let mut rect: RECT = std::mem::zeroed();
 
         // Get the outer rectangle of the window in screen coordinates
@@ -921,7 +921,7 @@ where
         SetWindowLong(wnd, GWLP_USERDATA, &mut display as *mut _ as isize);
 
         let mut done = false;
-        while !(done || crate::native_display().lock().unwrap().quit_ordered) {
+        while !(done || crate::native_display_blocking().quit_ordered) {
             while let Ok(request) = rx.try_recv() {
                 display.process_request(request);
             }
@@ -954,7 +954,7 @@ where
             }
 
             if display.update_dimensions(wnd) {
-                let d = crate::native_display().lock().unwrap();
+                let d = crate::native_display_blocking();
                 let width = d.screen_width as f32;
                 let height = d.screen_height as f32;
                 drop(d);
@@ -964,7 +964,7 @@ where
                     .unwrap()
                     .resize_event(width, height);
             }
-            if crate::native_display().lock().unwrap().quit_requested {
+            if crate::native_display_blocking().quit_requested {
                 PostMessageW(display.wnd, WM_CLOSE, 0, 0);
             }
         }
