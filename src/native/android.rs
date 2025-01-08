@@ -331,10 +331,41 @@ impl AndroidClipboard {
 }
 impl crate::native::Clipboard for AndroidClipboard {
     fn get(&mut self) -> Option<String> {
-        None
+        unsafe {
+            let env = attach_jni_env();
+
+            let text = ndk_utils::call_object_method!(
+                env,
+                ACTIVITY,
+                "getClipboardText",
+                "()Ljava/lang/String;"
+            );
+            if text.is_null() {
+                return None;
+            }
+
+            let text = ndk_utils::get_utf_str!(env, text).to_string();
+            Some(text)
+        }
     }
 
-    fn set(&mut self, data: &str) {}
+    fn set(&mut self, data: &str) {
+        let data = std::ffi::CString::new(data).unwrap();
+        unsafe {
+            let env = attach_jni_env();
+
+            let new_string_utf = (**env).NewStringUTF.unwrap();
+            let jtext = new_string_utf(env, data.as_ptr());
+
+            ndk_utils::call_void_method!(
+                env,
+                ACTIVITY,
+                "setClipboardText",
+                "(Ljava/lang/String;)V",
+                jtext
+            );
+        }
+    }
 }
 
 pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
