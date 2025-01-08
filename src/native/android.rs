@@ -346,7 +346,7 @@ where
         use std::panic;
 
         panic::set_hook(Box::new(|info| {
-            let msg = CString::new(format!("{:?}", info)).unwrap_or_else(|_| {
+            let msg = CString::new(format!("{info}")).unwrap_or_else(|_| {
                 CString::new(format!("MALFORMED ERROR MESSAGE {:?}", info.location())).unwrap()
             });
             console_error(msg.as_ptr());
