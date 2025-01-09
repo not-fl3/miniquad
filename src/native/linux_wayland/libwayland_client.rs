@@ -68,6 +68,7 @@ pub const WL_DATA_DEVICE_MANAGER_CREATE_DATA_SOURCE: u32 = 0;
 pub const WL_DATA_DEVICE_MANAGER_GET_DATA_DEVICE: u32 = 1;
 pub const WL_DATA_DEVICE_MANAGER_CREATE_DATA_SOURCE_SINCE_VERSION: u32 = 1;
 pub const WL_DATA_DEVICE_MANAGER_GET_DATA_DEVICE_SINCE_VERSION: u32 = 1;
+pub const WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY: u32 = 1;
 pub const WL_SHELL_GET_SHELL_SURFACE: u32 = 0;
 pub const WL_SHELL_GET_SHELL_SURFACE_SINCE_VERSION: u32 = 1;
 pub const WL_SHELL_SURFACE_PONG: u32 = 0;
@@ -382,6 +383,7 @@ pub type wl_pointer_button_state = c_uint;
 pub type wl_pointer_axis = c_uint;
 pub type wl_pointer_axis_source = c_uint;
 pub type wl_pointer_axis_relative_direction = c_uint;
+pub type wl_data_device_manager_dnd_action = c_uint;
 
 wl_listener!(
     wl_registry_listener,
@@ -449,6 +451,42 @@ wl_listener!(
     ),
 );
 
+wl_listener!(
+    wl_data_device_listener,
+    wl_data_device,
+    fn data_offer(id: *mut wl_data_offer),
+    fn enter(
+        serial: c_uint,
+        surface: *mut wl_surface,
+        x: wl_fixed_t,
+        y: wl_fixed_t,
+        id: *mut wl_data_offer,
+    ),
+    fn leave(),
+    fn motion(time: c_uint, x: wl_fixed_t, y: wl_fixed_t),
+    fn drop(),
+    fn selection(id: *mut wl_data_offer),
+);
+
+wl_listener!(
+    wl_data_offer_listener,
+    wl_data_offer,
+    fn offer(mime_type: *const c_char),
+    fn source_actions(source_actions: wl_data_device_manager_dnd_action),
+    fn action(dnd_action: wl_data_device_manager_dnd_action),
+);
+
+wl_listener!(
+    wl_data_source_listener,
+    wl_data_source,
+    fn target(mime_type: *const c_char),
+    fn send(mime_type: *const c_char, fd: c_int),
+    fn cancelled(),
+    fn dnd_drop_performed(),
+    fn dnd_finished(),
+    fn action(dnd_action: wl_data_device_manager_dnd_action),
+);
+
 crate::declare_module!(
     LibWaylandClient,
     "libwayland-client.so",
@@ -491,10 +529,12 @@ crate::declare_module!(
     pub fn wl_proxy_get_queue(*mut wl_proxy) -> *mut wl_event_queue,
     pub fn wl_proxy_add_listener(*mut wl_proxy, *mut Option<unsafe extern "C" fn()>, *mut c_void) -> c_int,
     pub fn wl_proxy_destroy(*mut wl_proxy),
+    pub fn wl_proxy_get_version(*mut wl_proxy) -> c_uint,
     ...
     pub fn wl_proxy_marshal(*mut wl_proxy, c_uint, ...),
     pub fn wl_proxy_marshal_constructor(*mut wl_proxy, c_uint, *const wl_interface, ...) -> *mut wl_proxy,
     pub fn wl_proxy_marshal_constructor_versioned(*mut wl_proxy, c_uint, *const wl_interface, c_uint, ...) -> *mut wl_proxy,
+    pub fn wl_proxy_marshal_flags(*mut wl_proxy, c_uint, *const wl_interface, c_uint, c_uint, ...) -> *mut wl_proxy,
     ...
 );
 
@@ -517,5 +557,11 @@ impl LibWaylandClient {
             std::ptr::null_mut::<std::ffi::c_void>(),
         );
         id as *mut _
+    }
+
+    pub unsafe fn wl_proxy_get_version<T>(&self, proxy: *mut T) -> u32 {
+        let proxy: *mut wl_proxy = proxy as _;
+        assert!(!proxy.is_null());
+        (self.wl_proxy_get_version)(proxy)
     }
 }
