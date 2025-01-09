@@ -98,6 +98,8 @@ fn native_display() -> &'static Mutex<native::NativeDisplayData> {
 /// Window and associated to window rendering context related functions.
 /// in macroquad <= 0.3, it was ctx.screen_size(). Now it is window::screen_size()
 pub mod window {
+    use conf::Icon;
+
     use super::*;
 
     /// The same as
@@ -248,6 +250,13 @@ pub mod window {
         let d = native_display().lock().unwrap();
         d.native_requests
             .send(native::Request::SetWindowPosition { new_x, new_y })
+            .unwrap();
+    }
+
+    pub fn set_window_icon(new_icon: Icon) {
+        let d = native_display().lock().unwrap();
+        d.native_requests
+            .send(native::Request::SetWindowIcon { new_icon })
             .unwrap();
     }
 
