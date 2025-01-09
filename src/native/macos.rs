@@ -204,7 +204,7 @@ impl MacosDisplay {
             SetWindowPosition { .. } => {
                 eprintln!("Not implemented for macos");
             }
-            SetWindowIcon {new_icon} => self.set_icon(self.window, new_icon),
+            SetWindowIcon {new_icon} => set_icon(self.window, new_icon),
             _ => {}
         }
     }
