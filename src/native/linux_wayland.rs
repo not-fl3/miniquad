@@ -20,6 +20,19 @@ use crate::{
 
 use std::collections::HashSet;
 
+const WL_DATA_OFFER_RECEIVE: u32 = 1;
+const WL_DATA_OFFER_DESTROY: u32 = 2;
+
+const WL_DATA_SOURCE_OFFER: u32 = 0;
+const WL_DATA_SOURCE_DESTROY: u32 = 1;
+
+const WL_MARSHAL_FLAG_DESTROY: u32 = (1 << 0);
+
+const WL_DATA_DEVICE_MANAGER_CREATE_DATA_SOURCE: u32 = 0;
+const WL_DATA_DEVICE_MANAGER_GET_DATA_DEVICE: u32 = 1;
+
+const WL_DATA_DEVICE_SET_SELECTION: u32 = 1;
+
 fn wl_fixed_to_double(f: i32) -> f32 {
     (f as f32) / 256.0
 }
@@ -40,6 +53,8 @@ struct WaylandPayload {
     viewporter: *mut extensions::viewporter::wp_viewporter,
     shm: *mut wl_shm,
     seat: *mut wl_seat,
+    data_device_manager: *mut wl_data_device_manager,
+    data_device: *mut wl_data_device,
     xkb_context: *mut xkb_context,
     keymap: *mut xkb_keymap,
     xkb_state: *mut xkb_state,
@@ -48,6 +63,7 @@ struct WaylandPayload {
     pointer: *mut wl_pointer,
     keyboard: *mut wl_keyboard,
     focused_window: *mut wl_surface,
+    keyb_serial: u32,
     //xkb_state: xkb::XkbState,
     decorations: Option<decorations::Decorations>,
 
@@ -86,6 +102,24 @@ macro_rules! wl_request {
         ($libwayland.wl_proxy_marshal)(
             $instance as _,
             $request_name,
+            $($arg,)*
+        )
+    }};
+}
+
+#[macro_export]
+macro_rules! wl_request_flags {
+    ($libwayland:expr, $instance:expr, $request_name:expr, $interface:expr, $version:expr, $flags:expr) => {
+        wl_request_flags!($libwayland, $instance, $request_name, $interface, $version, $flags, ())
+    };
+
+    ($libwayland:expr, $instance:expr, $request_name:expr, $interface:expr, $version:expr, $flags:expr, $($arg:expr),*) => {{
+        ($libwayland.wl_proxy_marshal_flags)(
+            $instance as _,
+            $request_name,
+            $interface as *const _,
+            $version,
+            $flags,
             $($arg,)*
         )
     }};
@@ -179,14 +213,15 @@ unsafe extern "C" fn keyboard_handle_keymap(
     display.xkb_state = (display.xkb.xkb_state_new)(display.keymap);
 }
 unsafe extern "C" fn keyboard_handle_enter(
-    _data: *mut ::core::ffi::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
-    _serial: u32,
+    serial: u32,
     _surface: *mut wl_surface,
     _keys: *mut wl_array,
 ) {
-    // We can capture held keys when window is refocused.
-    // Ignore this for now.
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    // Needed for setting the clipboard
+    display.keyb_serial = serial;
 }
 unsafe extern "C" fn keyboard_handle_leave(
     data: *mut ::core::ffi::c_void,
@@ -436,6 +471,15 @@ unsafe extern "C" fn registry_add_object(
                 data,
             );
         }
+        "wl_data_device_manager" => {
+            display.data_device_manager = display.client.wl_registry_bind(
+                registry,
+                name,
+                display.client.wl_data_device_manager_interface,
+                3,
+            ) as _;
+            assert!(!display.data_device_manager.is_null());
+        }
 
         _ => {}
     }
@@ -528,13 +572,241 @@ unsafe extern "C" fn xdg_wm_base_handle_ping(
     );
 }
 
-struct WaylandClipboard;
+static mut DATA_DEVICE_LISTENER: wl_data_device_listener = wl_data_device_listener {
+    data_offer: Some(data_device_handle_data_offer),
+    enter: None,
+    leave: None,
+    motion: None,
+    drop: None,
+    selection: Some(data_device_handle_selection),
+};
+
+static mut DATA_OFFER_LISTENER: wl_data_offer_listener = wl_data_offer_listener {
+    offer: Some(data_offer_handle_offer),
+    source_actions: None,
+    action: None,
+};
+
+unsafe extern "C" fn data_offer_handle_offer(
+    _data: *mut ::core::ffi::c_void,
+    _offer: *mut wl_data_offer,
+    mime_type: *const ::core::ffi::c_char,
+) {
+    let mime_type = std::ffi::CStr::from_ptr(mime_type).to_str().unwrap();
+    println!("Clipboard receive mime: {mime_type}");
+}
+
+unsafe extern "C" fn data_device_handle_data_offer(
+    data: *mut ::core::ffi::c_void,
+    _data_device: *mut wl_data_device,
+    offer: *mut wl_data_offer,
+) {
+    println!("data_device_handle_data_offer()");
+    //let display: &mut WaylandPayload = &mut *(data as *mut _);
+    //(display.client.wl_proxy_add_listener)(offer as _, &DATA_OFFER_LISTENER as *const _ as _, data);
+}
+
+unsafe extern "C" fn data_device_handle_selection(
+    data: *mut ::core::ffi::c_void,
+    data_device: *mut wl_data_device,
+    offer: *mut wl_data_offer,
+) {
+    // An application has set the clipboard contents
+
+    if offer.is_null() {
+        // Clipboard is empty
+        println!("Clipboard is empty");
+        return;
+    }
+
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+
+    println!("Clipboard is set");
+    /*
+    let mut fds: [i32; 2] = [0, 0];
+    libc::pipe(fds.as_mut_ptr());
+    libc::close(fds[1]);
+
+    // wl_data_offer_receive(offer, "text/plain", fds[1]);
+    let mime = std::ffi::CString::new("text/plain;charset=utf-8").unwrap();
+    let version = display.client.wl_proxy_get_version(offer);
+    wl_request_flags!(
+        display.client,
+        offer,
+        WL_DATA_OFFER_RECEIVE,
+        std::ptr::null::<std::ffi::c_void>(),
+        version,
+        0,
+        mime,
+        fds[1]
+    );
+
+    // To read in this thread, we would need: wl_display_roundtrip(display);
+
+    let fd = fds[0];
+    std::thread::spawn(move || {
+        let mut content = String::new();
+        let mut buf = [0u8; 1024];
+        loop {
+            let n = libc::read(fd, buf.as_mut_ptr() as *mut std::ffi::c_void, buf.len());
+            if n <= 0 {
+                break;
+            }
+            assert!(n <= 1024);
+            content.push_str(std::str::from_utf8(&buf[..n as usize]).unwrap());
+        }
+        libc::close(fd);
+
+        /*
+        // wl_data_offer_destroy(offer);
+        wl_request_flags!(
+            display.client,
+            offer,
+            WL_DATA_OFFER_DESTROY,
+            std::ptr::null::<std::ffi::c_void>(),
+            version,
+            WL_MARSHAL_FLAG_DESTROY
+        );
+        */
+    });
+    */
+}
+
+static mut DATA_SOURCE_LISTENER: wl_data_source_listener = wl_data_source_listener {
+    target: None,
+    send: Some(data_source_handle_send),
+    cancelled: Some(data_source_handle_cancelled),
+    dnd_drop_performed: None,
+    dnd_finished: None,
+    action: None,
+};
+
+unsafe extern "C" fn data_source_handle_send(
+    data: *mut std::ffi::c_void,
+    source: *mut wl_data_source,
+    mime_type: *const std::ffi::c_char,
+    fd: i32,
+) {
+    let text: &String = &*(data as *mut _);
+
+    let mime_type = std::ffi::CStr::from_ptr(mime_type).to_str().unwrap();
+    match mime_type {
+        "text/plain" => {
+            libc::write(fd, text.as_bytes().as_ptr() as *const _, text.len());
+        }
+        _ => {}
+    }
+    libc::close(fd);
+}
+
+unsafe extern "C" fn data_source_handle_cancelled(
+    data: *mut std::ffi::c_void,
+    source: *mut wl_data_source,
+) {
+    println!("data_source_handle_cancelled()");
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+
+    //assert!(!source.is_null());
+    //let proxy: *mut wl_proxy = source as *mut _;
+    //let version = (display.client.wl_proxy_get_version)(proxy);
+    let version = display.client.wl_proxy_get_version(source);
+
+    let id = (display.client.wl_proxy_marshal_flags)(
+        source as _,
+        WL_DATA_SOURCE_DESTROY,
+        std::ptr::null::<std::ffi::c_void>() as *const _,
+        3,
+        WL_MARSHAL_FLAG_DESTROY,
+    );
+    assert!(!id.is_null());
+}
+
+struct WaylandClipboard {
+    display: *mut WaylandPayload,
+    text: String,
+}
+
+impl WaylandClipboard {
+    fn new(display: *mut WaylandPayload) -> Self {
+        Self {
+            display,
+            text: String::new(),
+        }
+    }
+}
+
 impl crate::native::Clipboard for WaylandClipboard {
     fn get(&mut self) -> Option<String> {
         None
     }
-    fn set(&mut self, _data: &str) {}
+    fn set(&mut self, data: &str) {
+        println!("wayland set clip {data}");
+        self.text.clear();
+        self.text.push_str(data);
+        //self.text = data.to_string();
+
+        unsafe {
+            let display: &mut WaylandPayload = &mut *self.display;
+
+            //let proxy: *mut wl_proxy = display.data_device_manager as _;
+            //assert!(!proxy.is_null());
+            //let version = (display.client.wl_proxy_get_version)(proxy);
+            let version = display
+                .client
+                .wl_proxy_get_version(display.data_device_manager);
+
+            // wl_data_device_manager_create_data_source
+            let source = wl_request_flags!(
+                display.client,
+                display.data_device_manager,
+                WL_DATA_DEVICE_MANAGER_CREATE_DATA_SOURCE,
+                display.client.wl_data_source_interface,
+                version,
+                0,
+                std::ptr::null_mut::<std::ffi::c_void>()
+            );
+            assert!(!source.is_null());
+
+            // Setup a listener to receive wl_data_source events.
+            // wl_data_source_add_listener
+            (display.client.wl_proxy_add_listener)(
+                source,
+                &DATA_SOURCE_LISTENER as *const _ as _,
+                &self.text as *const _ as _,
+            );
+
+            // Advertise a few MIME types
+            // wl_data_source_offer(source, "text/plain");
+            let mime = std::ffi::CString::new("text/plain;charset=utf-8").unwrap();
+            let version = display.client.wl_proxy_get_version(source);
+            wl_request_flags!(
+                display.client,
+                source,
+                WL_DATA_SOURCE_OFFER,
+                std::ptr::null::<std::ffi::c_void>(),
+                version,
+                0,
+                mime.as_ptr()
+            );
+
+            // wl_data_device_set_selection
+            let version = display.client.wl_proxy_get_version(display.data_device);
+            wl_request_flags!(
+                display.client,
+                display.data_device,
+                WL_DATA_DEVICE_SET_SELECTION,
+                std::ptr::null::<std::ffi::c_void>(),
+                version,
+                0,
+                source,
+                display.keyb_serial
+            );
+        }
+    }
 }
+
+unsafe impl Send for WaylandClipboard {}
+unsafe impl Sync for WaylandClipboard {}
 
 pub fn run<F>(conf: &crate::conf::Conf, f: &mut Option<F>) -> Option<()>
 where
@@ -579,6 +851,8 @@ where
             viewporter: std::ptr::null_mut(),
             shm: std::ptr::null_mut(),
             seat: std::ptr::null_mut(),
+            data_device_manager: std::ptr::null_mut(),
+            data_device: std::ptr::null_mut(),
             xkb_context,
             keymap: std::ptr::null_mut(),
             xkb_state: std::ptr::null_mut(),
@@ -586,13 +860,14 @@ where
             pointer: std::ptr::null_mut(),
             keyboard: std::ptr::null_mut(),
             focused_window: std::ptr::null_mut(),
+            keyb_serial: 0,
             decorations: None,
             event_handler: None,
             closed: false,
         };
 
         let (tx, rx) = std::sync::mpsc::channel();
-        let clipboard = Box::new(WaylandClipboard);
+        let clipboard = Box::new(WaylandClipboard::new(&mut display as *mut _));
         crate::set_display(NativeDisplayData {
             ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
         });
@@ -603,6 +878,36 @@ where
             &mut display as *mut _ as _,
         );
         (display.client.wl_display_roundtrip)(wdisplay);
+
+        assert!(!display.data_device_manager.is_null());
+        assert!(!display.seat.is_null());
+        display.data_device = wl_request_flags!(
+            display.client,
+            display.data_device_manager,
+            WL_DATA_DEVICE_MANAGER_GET_DATA_DEVICE,
+            display.client.wl_data_device_interface,
+            display
+                .client
+                .wl_proxy_get_version(display.data_device_manager),
+            0,
+            std::ptr::null::<std::ffi::c_void>(),
+            display.seat
+        ) as _;
+        //display.data_device = wl_request_constructor!(
+        //    display.client,
+        //    display.data_device_manager,
+        //    1,
+        //    display.client.wl_data_device_interface,
+        //    display.seat
+        //) as _;
+        assert!(!display.data_device.is_null());
+
+        // wl_data_device_add_listener(data_device, &data_device_listener, NULL);
+        (display.client.wl_proxy_add_listener)(
+            display.data_device as _,
+            &DATA_DEVICE_LISTENER as *const _ as _,
+            &mut display as *mut _ as _,
+        );
 
         assert!(!display.compositor.is_null());
         assert!(!display.xdg_wm_base.is_null());
