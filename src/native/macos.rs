@@ -1049,10 +1049,13 @@ where
 
     initialize_menu_bar(ns_app);
 
-    let window_masks = NSWindowStyleMask::NSTitledWindowMask as u64
+    let mut window_masks = NSWindowStyleMask::NSTitledWindowMask as u64
         | NSWindowStyleMask::NSClosableWindowMask as u64
-        | NSWindowStyleMask::NSMiniaturizableWindowMask as u64
-        | NSWindowStyleMask::NSResizableWindowMask as u64;
+        | NSWindowStyleMask::NSMiniaturizableWindowMask as u64;
+
+    if conf.window_resizable {
+        window_masks |= NSWindowStyleMask::NSResizableWindowMask as u64;
+    }
 
     let window_frame = NSRect {
         origin: NSPoint { x: 0., y: 0. },
