@@ -4,6 +4,15 @@ pub enum Error {
     DlSymError(String),
 }
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Self::DlOpenError(dll_name) => write!(f, "failed opening library {}", dll_name),
+            Self::DlSymError(dll_symbol) => write!(f, "missing symbol {}", dll_symbol),
+        }
+    }
+}
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod linux {
     use super::Error;
