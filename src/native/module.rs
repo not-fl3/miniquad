@@ -4,6 +4,15 @@ pub enum Error {
     DlSymError(String),
 }
 
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DlOpenError(msg) => write!(f, "Shared library open error:\n{msg}"),
+            Self::DlSymError(msg) => write!(f, "Shared library symlink error:\n{msg}"),
+        }
+    }
+}
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod linux {
     use super::Error;
@@ -78,6 +87,8 @@ mod windows {
         }
     }
 }
+
+use std::fmt::Display;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use linux::*;

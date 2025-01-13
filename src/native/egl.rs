@@ -17,6 +17,7 @@ pub type EGLNativePixmapType = ::core::ffi::c_ulong;
 pub type EGLNativeWindowType = ::core::ffi::c_ulong;
 
 pub use core::ptr::null_mut;
+use std::fmt::Display;
 
 pub const EGL_SUCCESS: u32 = 12288;
 
@@ -255,6 +256,18 @@ pub enum EglError {
     InitializeFailed,
     CreateContextFailed,
 }
+
+impl Display for EglError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoDisplay => write!(f, "No display"),
+            Self::InitializeFailed => write!(f, "Failed to initialize context"),
+            Self::CreateContextFailed => write!(f, "Faild to create context"),
+        }
+    }
+}
+
+impl std::error::Error for EglError {}
 
 pub struct Egl {}
 

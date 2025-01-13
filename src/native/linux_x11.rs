@@ -25,7 +25,10 @@ pub enum X11Error {
 }
 impl std::fmt::Display for X11Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Self::LibraryNotFound(e) => write!(f, "Library not found error: {e}"),
+            Self::GLXError(msg) => write!(f, "GLX error:\n{msg}"),
+        }
     }
 }
 impl From<module::Error> for X11Error {
