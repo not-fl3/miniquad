@@ -278,6 +278,15 @@ pub enum ShaderType {
     Fragment,
 }
 
+impl Display for ShaderType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Vertex => write!(f, "Vertex"),
+            Self::Fragment => write!(f, "Fragment"),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ShaderError {
     CompilationError {
@@ -297,15 +306,18 @@ impl From<std::ffi::NulError> for ShaderError {
 
 impl Display for ShaderError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self) // Display the same way as Debug
+        match self {
+            Self::CompilationError {
+                shader_type,
+                error_message,
+            } => write!(f, "{shader_type} shader error:\n{error_message}"),
+            Self::LinkError(msg) => write!(f, "Link shader error:\n{msg}"),
+            Self::FFINulError(e) => write!(f, "{e}"),
+        }
     }
 }
 
-impl Error for ShaderError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
-}
+impl Error for ShaderError {}
 
 /// List of all the possible formats of input data when uploading to texture.
 /// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
