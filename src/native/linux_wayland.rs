@@ -200,11 +200,7 @@ unsafe extern "C" fn keyboard_handle_key(
     key: u32,
     state: u32,
 ) {
-    let display: &mut WaylandPayload = &mut *(data as *mut _);
-    // https://wayland-book.com/seat/keyboard.html
-    // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
-    let keysym = (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
-    EVENTS.push(WaylandEvent::KeyboardKey(keysym, state == 1));
+    EVENTS.push(WaylandEvent::KeyboardKey(key, state == 1));
 }
 unsafe extern "C" fn keyboard_handle_modifiers(
     data: *mut ::core::ffi::c_void,
@@ -765,11 +761,14 @@ where
             (client.wl_display_dispatch_pending)(wdisplay);
 
             if let Some(ref mut event_handler) = display.event_handler {
-                for keysym in &repeated_keys {
-                    let keycode = keycodes::translate(*keysym);
+                for key in &repeated_keys {
+                    let keysym =
+                        (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
+                    let keycode = keycodes::translate(keysym);
+
                     event_handler.key_down_event(keycode.clone(), keymods, true);
 
-                    let chr = keycodes::keysym_to_unicode(&mut display.xkb, *keysym);
+                    let chr = keycodes::keysym_to_unicode(&mut display.xkb, keysym);
                     if chr > 0 {
                         if let Some(chr) = char::from_u32(chr as u32) {
                             event_handler.char_event(chr, keymods, true);
@@ -803,8 +802,13 @@ where
 
                 for event in EVENTS.drain(..) {
                     match event {
-                        WaylandEvent::KeyboardKey(keysym, state) => {
+                        WaylandEvent::KeyboardKey(key, state) => {
+                            // https://wayland-book.com/seat/keyboard.html
+                            // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
+                            let keysym =
+                                (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
                             let keycode = keycodes::translate(keysym);
+
                             match keycode {
                                 KeyCode::LeftShift | KeyCode::RightShift => keymods.shift = state,
                                 KeyCode::LeftControl | KeyCode::RightControl => {
@@ -817,7 +821,7 @@ where
 
                             if state {
                                 event_handler.key_down_event(keycode, keymods, false);
-                                repeated_keys.insert(keysym);
+                                repeated_keys.insert(key);
 
                                 let chr = keycodes::keysym_to_unicode(&mut display.xkb, keysym);
                                 if chr > 0 {
@@ -827,7 +831,7 @@ where
                                 }
                             } else {
                                 event_handler.key_up_event(keycode, keymods);
-                                repeated_keys.remove(&keysym);
+                                repeated_keys.remove(&key);
                             }
                         }
                         WaylandEvent::PointerMotion(x, y) => {
