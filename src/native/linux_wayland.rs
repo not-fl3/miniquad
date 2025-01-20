@@ -131,6 +131,7 @@ unsafe extern "C" fn seat_handle_capabilities(
 }
 
 enum WaylandEvent {
+    KeyboardLeave,
     KeyboardKey(u32, bool),
     PointerMotion(f32, f32),
     PointerButton(MouseButton, bool),
@@ -184,6 +185,8 @@ unsafe extern "C" fn keyboard_handle_enter(
     _surface: *mut wl_surface,
     _keys: *mut wl_array,
 ) {
+    // We can capture held keys when window is refocused.
+    // Ignore this for now.
 }
 unsafe extern "C" fn keyboard_handle_leave(
     _data: *mut ::core::ffi::c_void,
@@ -191,6 +194,7 @@ unsafe extern "C" fn keyboard_handle_leave(
     _serial: u32,
     _surface: *mut wl_surface,
 ) {
+    EVENTS.push(WaylandEvent::KeyboardLeave);
 }
 unsafe extern "C" fn keyboard_handle_key(
     data: *mut ::core::ffi::c_void,
@@ -802,6 +806,9 @@ where
 
                 for event in EVENTS.drain(..) {
                     match event {
+                        WaylandEvent::KeyboardLeave => {
+                            repeated_keys.clear();
+                        }
                         WaylandEvent::KeyboardKey(key, state) => {
                             // https://wayland-book.com/seat/keyboard.html
                             // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
