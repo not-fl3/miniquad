@@ -34,6 +34,7 @@ winapi = { version = "0.3", features = [
     "windowsx",
     "winbase",
     "hidusage",
+    "shellapi",
 ] }
 
 [target.'cfg(target_os = "android")'.dependencies]
