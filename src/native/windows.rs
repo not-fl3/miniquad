@@ -1,3 +1,5 @@
+use std::{ffi::OsString, os::windows::ffi::OsStringExt, path::PathBuf};
+
 use crate::{
     conf::{Conf, Icon},
     event::{KeyMods, MouseButton},
@@ -8,13 +10,14 @@ use crate::{
 use winapi::{
     shared::{
         hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_PAGE_GENERIC},
-        minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
+        minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, MAX_PATH, TRUE, UINT, WPARAM},
         ntdef::NULL,
         windef::{HBRUSH, HCURSOR, HDC, HICON, HWND, POINT, RECT},
         windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
     },
     um::{
         libloaderapi::{GetModuleHandleW, GetProcAddress},
+        shellapi::{DragAcceptFiles, DragQueryFileW, HDROP},
         shellscalingapi::*,
         wingdi::*,
         winuser::*,
@@ -511,6 +514,22 @@ unsafe extern "system" fn win32_wndproc(
         WM_EXITSIZEMOVE | WM_EXITMENULOOP => {
             KillTimer(hwnd, &mut payload.modal_resizing_timer as *mut _ as usize);
         }
+        WM_DROPFILES => {
+            let hdrop = wparam as HDROP;
+            let mut path: [u16; MAX_PATH] = std::mem::uninitialized();
+            let num_drops = DragQueryFileW(hdrop, u32::MAX, std::ptr::null_mut(), 0);
+
+            let mut d = crate::native_display().lock().unwrap();
+            for i in 0..num_drops {
+                let path_len =
+                    DragQueryFileW(hdrop, i, path.as_mut_ptr(), MAX_PATH as u32) as usize;
+                if path_len > 0 {
+                    let path: PathBuf = OsString::from_wide(&path[0..path_len]).into();
+                    d.dropped_files.bytes.push(std::fs::read(&path).unwrap());
+                    d.dropped_files.paths.push(path);
+                }
+            }
+        }
         _ => {}
     }
 
@@ -692,6 +711,8 @@ unsafe fn create_window(
     ShowWindow(hwnd, SW_SHOW);
     let dc = GetDC(hwnd);
     assert!(dc.is_null() == false);
+
+    DragAcceptFiles(hwnd, TRUE);
 
     (hwnd, dc)
 }
