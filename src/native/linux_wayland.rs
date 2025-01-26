@@ -189,11 +189,14 @@ unsafe extern "C" fn keyboard_handle_enter(
     // Ignore this for now.
 }
 unsafe extern "C" fn keyboard_handle_leave(
-    _data: *mut ::core::ffi::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _serial: u32,
     _surface: *mut wl_surface,
 ) {
+    // Clear modifiers
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    (display.xkb.xkb_state_update_mask)(display.xkb_state, 0, 0, 0, 0, 0, 0);
     EVENTS.push(WaylandEvent::KeyboardLeave);
 }
 unsafe extern "C" fn keyboard_handle_key(
@@ -808,6 +811,10 @@ where
                     match event {
                         WaylandEvent::KeyboardLeave => {
                             repeated_keys.clear();
+                            keymods.shift = false;
+                            keymods.ctrl = false;
+                            keymods.logo = false;
+                            keymods.alt = false;
                         }
                         WaylandEvent::KeyboardKey(key, state) => {
                             // https://wayland-book.com/seat/keyboard.html
