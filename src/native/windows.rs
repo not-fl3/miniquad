@@ -858,6 +858,7 @@ impl WindowsDisplay {
                     new_height,
                 } => self.set_window_size(new_width as _, new_height as _),
                 SetWindowPosition { new_x, new_y } => self.set_window_position(new_x, new_y),
+                SetWindowIcon { new_icon } => set_icon(self.wnd, &new_icon),
                 SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
                 ShowKeyboard(show) => {
                     eprintln!("Not implemented for windows")

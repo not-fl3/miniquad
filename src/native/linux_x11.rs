@@ -274,6 +274,7 @@ impl X11Display {
         (self.libx11.XMoveWindow)(self.display, window, new_x, new_y);
     }
 
+
     fn show_mouse(&mut self, shown: bool) {
         unsafe {
             if shown {
@@ -360,6 +361,9 @@ impl X11Display {
                 } => self.set_window_size(self.window, new_width as _, new_height as _),
                 SetWindowPosition { new_x, new_y } => {
                     self.set_window_position(self.window, new_x as _, new_y as _)
+                }
+                SetWindowIcon { new_icon } => {
+                    eprintln!("Not implemented for X11") 
                 }
                 SetFullscreen(fullscreen) => self.set_fullscreen(self.window, fullscreen),
                 ShowKeyboard(..) => {
