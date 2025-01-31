@@ -767,7 +767,7 @@ impl Default for PipelineParams {
     }
 }
 
-/// Geometry bindings
+/// Geometry buffers bindings
 #[derive(Clone, Debug)]
 pub struct Bindings {
     /// Vertex buffers. Data contained in the buffer must match layout
@@ -781,9 +781,6 @@ pub struct Bindings {
     /// from a vertex buffer, with each subsequent 3 indices forming a
     /// triangle.
     pub index_buffer: BufferId,
-    /// Textures to be used with when drawing the geometry in the fragment
-    /// shader.
-    pub images: Vec<TextureId>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1322,19 +1319,15 @@ pub trait RenderingBackend {
     /// Should be applied after begin_pass.
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32);
 
-    fn apply_bindings_from_slice(
-        &mut self,
-        vertex_buffers: &[BufferId],
-        index_buffer: BufferId,
-        textures: &[TextureId],
-    );
-
+    fn apply_bindings_from_slice(&mut self, vertex_buffers: &[BufferId], index_buffer: BufferId);
     fn apply_bindings(&mut self, bindings: &Bindings) {
-        self.apply_bindings_from_slice(
-            &bindings.vertex_buffers,
-            bindings.index_buffer,
-            &bindings.images,
-        );
+        self.apply_bindings_from_slice(&bindings.vertex_buffers, bindings.index_buffer);
+    }
+
+    fn apply_images(&mut self, images: &[TextureId]);
+    /// Same as [RenderingBackend::apply_images], but applies only one image
+    fn apply_image(&mut self, image: &TextureId) {
+        self.apply_images(std::slice::from_ref(image));
     }
 
     fn apply_uniforms(&mut self, uniforms: UniformsSource) {

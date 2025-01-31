@@ -37,8 +37,7 @@ impl Stage {
 
         let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
-            index_buffer: index_buffer,
-            images: vec![],
+            index_buffer,
         };
 
         let shader = ctx

@@ -1435,33 +1435,7 @@ impl RenderingBackend for GlContext {
         }
     }
 
-    fn apply_bindings_from_slice(
-        &mut self,
-        vertex_buffers: &[BufferId],
-        index_buffer: BufferId,
-        textures: &[TextureId],
-    ) {
-        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
-        let shader = &self.shaders[pip.shader.0];
-
-        for (n, shader_image) in shader.images.iter().enumerate() {
-            let bindings_image = textures
-                .get(n)
-                .unwrap_or_else(|| panic!("Image count in bindings and shader did not match!"));
-            if let Some(gl_loc) = shader_image.gl_loc {
-                let texture = self.textures.get(*bindings_image);
-                let raw = match texture.raw {
-                    TextureOrRenderbuffer::Texture(id) => id,
-                    TextureOrRenderbuffer::Renderbuffer(id) => id,
-                };
-                unsafe {
-                    self.cache
-                        .bind_texture(n, texture.params.kind.into(), raw);
-                    glUniform1i(gl_loc, n as i32);
-                }
-            }
-        }
-
+    fn apply_bindings_from_slice(&mut self, vertex_buffers: &[BufferId], index_buffer: BufferId) {
         self.cache.bind_buffer(
             GL_ELEMENT_ARRAY_BUFFER,
             self.buffers[index_buffer.0].gl_buf,
@@ -1530,6 +1504,29 @@ impl RenderingBackend for GlContext {
                         glDisableVertexAttribArray(attr_index as GLuint);
                     }
                     *cached_attr = None;
+                }
+            }
+        }
+    }
+
+    fn apply_images(&mut self, images: &[TextureId]) {
+        let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
+        let shader = &self.shaders[pip.shader.0];
+
+        for (n, shader_image) in shader.images.iter().enumerate() {
+            let Some(bindings_image) = images.get(n) else {
+                panic!("Image count in bindings and shader did not match!");
+            };
+
+            if let Some(gl_loc) = shader_image.gl_loc {
+                let texture = self.textures.get(*bindings_image);
+                let raw = match texture.raw {
+                    TextureOrRenderbuffer::Texture(id) => id,
+                    TextureOrRenderbuffer::Renderbuffer(id) => id,
+                };
+                unsafe {
+                    self.cache.bind_texture(n, texture.params.kind.into(), raw);
+                    glUniform1i(gl_loc, n as i32);
                 }
             }
         }

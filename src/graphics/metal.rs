@@ -1057,12 +1057,7 @@ impl RenderingBackend for MetalContext {
         }
     }
 
-    fn apply_bindings_from_slice(
-        &mut self,
-        vertex_buffers: &[BufferId],
-        index_buffer: BufferId,
-        textures: &[TextureId],
-    ) {
+    fn apply_bindings_from_slice(&mut self, vertex_buffers: &[BufferId], index_buffer: BufferId) {
         assert!(
             self.render_encoder.is_some(),
             "apply_bindings before begin_pass"
@@ -1078,13 +1073,20 @@ impl RenderingBackend for MetalContext {
                                    atIndex:(index + 1) as u64];
                 buffer.next_value = buffer.value + 1;
             }
+
             let index_buffer = &mut self.buffers[index_buffer.0];
             self.index_buffer = Some(index_buffer.raw[index_buffer.value]);
             index_buffer.next_value = index_buffer.value + 1;
+        }
+    }
 
-            let img_count = textures.len();
+    fn apply_images(&mut self, images: &[TextureId]) {
+        unsafe {
+            let render_encoder = self.render_encoder.unwrap();
+
+            let img_count = images.len();
             if img_count > 0 {
-                for (n, img) in textures.iter().enumerate() {
+                for (n, img) in images.iter().enumerate() {
                     let Texture {
                         sampler, texture, ..
                     } = self.textures.get(*img);
