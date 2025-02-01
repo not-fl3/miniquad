@@ -16,6 +16,7 @@ struct Stage {
 
     pipeline: Pipeline,
     bindings: Bindings,
+    texture: TextureId,
 }
 
 impl Stage {
@@ -53,8 +54,7 @@ impl Stage {
 
         let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
-            index_buffer: index_buffer,
-            images: vec![texture],
+            index_buffer,
         };
 
         let shader = ctx
@@ -85,6 +85,7 @@ impl Stage {
         Stage {
             pipeline,
             bindings,
+            texture,
             ctx,
         }
     }
@@ -100,6 +101,7 @@ impl EventHandler for Stage {
 
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
+        self.ctx.apply_image(&self.texture);
         for i in 0..10 {
             let t = t + i as f64 * 0.3;
 
