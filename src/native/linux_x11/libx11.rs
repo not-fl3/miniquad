@@ -722,6 +722,15 @@ pub mod Xutil_h {
     }
     #[derive(Copy, Clone)]
     #[repr(C)]
+    pub struct MWMHints {
+        pub flags: libc::c_ulong,
+        pub functions: libc::c_ulong,
+        pub decorations: libc::c_ulong,
+        pub input_mode: libc::c_long,
+        pub status: libc::c_ulong,
+    }
+    #[derive(Copy, Clone)]
+    #[repr(C)]
     pub struct XWMHints {
         pub flags: libc::c_long,
         pub input: libc::c_int,
