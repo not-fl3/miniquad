@@ -69,6 +69,7 @@ pub(crate) enum Request {
     SetMouseCursor(crate::CursorIcon),
     SetWindowSize { new_width: u32, new_height: u32 },
     SetWindowPosition { new_x: u32, new_y: u32 },
+    SetWindowIcon {new_icon: Icon},
     SetFullscreen(bool),
     ShowKeyboard(bool),
 }
@@ -117,5 +118,7 @@ pub mod gl;
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm::webgl as gl;
+
+use crate::conf::Icon;
 
 pub mod query_stab;
