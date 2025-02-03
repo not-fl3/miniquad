@@ -24,7 +24,7 @@ jobs:
             packages: libx11-dev libxi-dev libgl1-mesa-dev gcc-mingw-w64
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install packages (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -70,3 +70,15 @@ jobs:
       - name: cargo quad-apk
         run: |
           cargo quad-apk build 
+
+  msrv:
+    name: MSRV Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: '1.70.0'
+          override: true
+      - name: Verify MSRV
+        run: cargo build --all-targets
