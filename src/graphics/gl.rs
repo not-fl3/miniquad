@@ -520,6 +520,11 @@ pub struct GlContext {
     pub(crate) cache: GlCache,
     pub(crate) info: ContextInfo,
 }
+impl Drop for GlContext {
+    fn drop(&mut self) {
+        crate::drop_display();
+    }
+}
 
 impl GlContext {
     pub fn new() -> GlContext {
@@ -1455,8 +1460,7 @@ impl RenderingBackend for GlContext {
                     TextureOrRenderbuffer::Renderbuffer(id) => id,
                 };
                 unsafe {
-                    self.cache
-                        .bind_texture(n, texture.params.kind.into(), raw);
+                    self.cache.bind_texture(n, texture.params.kind.into(), raw);
                     glUniform1i(gl_loc, n as i32);
                 }
             }
