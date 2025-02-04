@@ -163,7 +163,7 @@ impl WindowsDisplay {
         unsafe {
             #[cfg(target_arch = "x86_64")]
             SetWindowLongPtrA(self.wnd, GWL_STYLE, win_style as _);
-            #[cfg(target_arch = "i686")]
+            #[cfg(target_arch = "x86")]
             SetWindowLong(self.wnd, GWL_STYLE, win_style as _);
 
             if self.fullscreen {
@@ -516,15 +516,20 @@ unsafe extern "system" fn win32_wndproc(
         }
         WM_DROPFILES => {
             let hdrop = wparam as HDROP;
-            let mut path: [u16; MAX_PATH] = std::mem::uninitialized();
+            let mut path = core::mem::MaybeUninit::<[u16; MAX_PATH]>::uninit();
             let num_drops = DragQueryFileW(hdrop, u32::MAX, std::ptr::null_mut(), 0);
 
             let mut d = crate::native_display().lock().unwrap();
             for i in 0..num_drops {
-                let path_len =
-                    DragQueryFileW(hdrop, i, path.as_mut_ptr(), MAX_PATH as u32) as usize;
+                let path_ptr = path.as_mut_ptr() as *mut u16;
+                let path_len = DragQueryFileW(hdrop, i, path_ptr, MAX_PATH as u32) as usize;
                 if path_len > 0 {
-                    let path: PathBuf = OsString::from_wide(&path[0..path_len]).into();
+                    // SAFETY: `DragQueryFileW` initializes `path_ptr` up to `path_len`
+                    // elements before use, and we only access the initialized portion.
+                    let path = unsafe {
+                        let path = path.assume_init();
+                        PathBuf::from(OsString::from_wide(&path[0..path_len]))
+                    };
                     d.dropped_files.bytes.push(std::fs::read(&path).unwrap());
                     d.dropped_files.paths.push(path);
                 }
@@ -845,23 +850,21 @@ impl WindowsDisplay {
 
     fn process_request(&mut self, request: Request) {
         use Request::*;
-        unsafe {
-            match request {
-                ScheduleUpdate => {
-                    self.update_requested = true;
-                }
-                SetCursorGrab(grab) => self.set_cursor_grab(grab),
-                ShowMouse(show) => self.show_mouse(show),
-                SetMouseCursor(icon) => self.set_mouse_cursor(icon),
-                SetWindowSize {
-                    new_width,
-                    new_height,
-                } => self.set_window_size(new_width as _, new_height as _),
-                SetWindowPosition { new_x, new_y } => self.set_window_position(new_x, new_y),
-                SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
-                ShowKeyboard(show) => {
-                    eprintln!("Not implemented for windows")
-                }
+        match request {
+            ScheduleUpdate => {
+                self.update_requested = true;
+            }
+            SetCursorGrab(grab) => self.set_cursor_grab(grab),
+            ShowMouse(show) => self.show_mouse(show),
+            SetMouseCursor(icon) => self.set_mouse_cursor(icon),
+            SetWindowSize {
+                new_width,
+                new_height,
+            } => self.set_window_size(new_width as _, new_height as _),
+            SetWindowPosition { new_x, new_y } => self.set_window_position(new_x, new_y),
+            SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
+            ShowKeyboard(_show) => {
+                eprintln!("Not implemented for windows")
             }
         }
     }
@@ -938,7 +941,7 @@ where
 
         #[cfg(target_arch = "x86_64")]
         SetWindowLongPtrA(wnd, GWLP_USERDATA, &mut display as *mut _ as isize);
-        #[cfg(target_arch = "i686")]
+        #[cfg(target_arch = "x86")]
         SetWindowLong(wnd, GWLP_USERDATA, &mut display as *mut _ as isize);
 
         let mut done = false;
