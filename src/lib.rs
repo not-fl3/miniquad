@@ -1,4 +1,6 @@
 #![doc = include_str!("../README.md")]
+#![cfg_attr(feature = "_docsrs", feature(doc_cfg))]
+
 pub mod conf;
 mod event;
 pub mod fs;
@@ -8,6 +10,7 @@ use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
 #[cfg(feature = "log-impl")]
+#[cfg_attr(feature = "_docsrs", doc(cfg(feature = "log-impl")))]
 pub mod log;
 
 pub use event::*;
