@@ -280,6 +280,11 @@ pub struct MetalContext {
     current_pipeline: Option<Pipeline>,
     current_ub_offset: u64,
 }
+impl Drop for MetalContext {
+    fn drop(&mut self) {
+        crate::drop_display();
+    }
+}
 
 impl MetalContext {
     pub fn new() -> MetalContext {

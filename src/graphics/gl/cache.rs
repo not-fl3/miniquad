@@ -135,9 +135,7 @@ impl GlCache {
             let cached_attr = &mut self.attributes[attr_index];
 
             if cached_attr.is_some() {
-                unsafe {
-                    glDisableVertexAttribArray(attr_index as GLuint)
-                };
+                unsafe { glDisableVertexAttribArray(attr_index as GLuint) };
             }
             *cached_attr = None;
         }

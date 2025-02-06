@@ -10,7 +10,7 @@ use {
             apple::{apple_util::*, frameworks::*},
             gl, NativeDisplayData, Request,
         },
-        native_display, CursorIcon,
+        native_display_blocking, CursorIcon,
     },
     std::{
         collections::HashMap,
@@ -135,7 +135,7 @@ impl MacosDisplay {
 
 impl MacosDisplay {
     fn transform_mouse_point(&self, point: &NSPoint) -> (f32, f32) {
-        let d = native_display().lock().unwrap();
+        let d = native_display_blocking();
         let new_x = point.x as f32 * d.dpi_scale;
         let new_y = d.screen_height as f32 - (point.y as f32 * d.dpi_scale) - 1.;
 
@@ -155,7 +155,7 @@ impl MacosDisplay {
     }
 
     unsafe fn update_dimensions(&mut self) -> Option<(i32, i32)> {
-        let mut d = native_display().lock().unwrap();
+        let mut d = native_display_blocking();
         unsafe {
             if self.gl_context != nil {
                 msg_send_![self.gl_context, update];
@@ -270,20 +270,20 @@ pub fn define_cocoa_window_delegate() -> *const Class {
         }
 
         // only give user-code a chance to intervene when sapp_quit() wasn't already called
-        if !native_display().lock().unwrap().quit_ordered {
+        if !native_display_blocking().quit_ordered {
             // if window should be closed and event handling is enabled, give user code
             // a chance to intervene via sapp_cancel_quit()
-            native_display().lock().unwrap().quit_requested = true;
+            native_display_blocking().quit_requested = true;
             if let Some(event_handler) = payload.context() {
                 event_handler.quit_requested_event();
             }
 
             // user code hasn't intervened, quit the app
-            if native_display().lock().unwrap().quit_requested {
-                native_display().lock().unwrap().quit_ordered = true;
+            if native_display_blocking().quit_requested {
+                native_display_blocking().quit_ordered = true;
             }
         }
-        if native_display().lock().unwrap().quit_ordered {
+        if native_display_blocking().quit_ordered {
             return YES;
         } else {
             return NO;
@@ -965,7 +965,7 @@ unsafe fn perform_redraw(
     }
 
     {
-        let d = native_display().lock().unwrap();
+        let d = native_display_blocking();
         if d.quit_requested || d.quit_ordered {
             drop(d);
             let () = msg_send![display.window, performClose: nil];
@@ -1092,7 +1092,7 @@ where
         AppleGfxApi::Metal => create_metal_view(&mut display, conf.sample_count, conf.high_dpi),
     };
     {
-        let mut d = native_display().lock().unwrap();
+        let mut d = native_display_blocking();
         d.view = view;
     }
     (*view).set_ivar("display_ptr", &mut display as *mut _ as *mut c_void);
@@ -1150,13 +1150,13 @@ where
     let distant_future: ObjcId = msg_send![class!(NSDate), distantFuture];
     let distant_past: ObjcId = msg_send![class!(NSDate), distantPast];
     let mut done = false;
-    while !(done || crate::native_display().lock().unwrap().quit_ordered) {
+    while !(done || native_display_blocking().quit_ordered) {
         while let Ok(request) = display.native_requests.try_recv() {
             display.process_request(request);
         }
 
         {
-            let d = native_display().lock().unwrap();
+            let d = native_display_blocking();
             if d.quit_requested || d.quit_ordered {
                 done = true;
             }
