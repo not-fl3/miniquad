@@ -664,9 +664,7 @@ impl LibWaylandClient {
         interface: *const wl_interface,
         version: u32,
     ) -> *mut std::ffi::c_void {
-        let id: *mut wl_proxy;
-
-        id = (self.wl_proxy_marshal_constructor_versioned)(
+        let id: *mut wl_proxy = (self.wl_proxy_marshal_constructor_versioned)(
             wl_registry as _,
             WL_REGISTRY_BIND,
             interface as _,
@@ -676,7 +674,6 @@ impl LibWaylandClient {
             version,
             std::ptr::null_mut::<std::ffi::c_void>(),
         );
-
         id as *mut _
     }
 }

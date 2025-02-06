@@ -1,7 +1,9 @@
 #![allow(non_upper_case_globals, non_snake_case)]
 
 //! Clipboard implementation for X11
-//! Clipboard API on X11 is pretty weird https://www.uninformativ.de/blog/postings/2017-04-02/0/POSTING-en.html
+//!
+//! Clipboard API on X11 is pretty weird
+//! <https://www.uninformativ.de/blog/postings/2017-04-02/0/POSTING-en.html>
 //! so use this with caution.
 
 use super::libx11::*;
@@ -20,7 +22,7 @@ unsafe fn get_clipboard(
     bufname: *const libc::c_char,
     fmtname: *const libc::c_char,
 ) -> Option<String> {
-    let mut result = 0 as *mut libc::c_char;
+    let mut result = std::ptr::null_mut::<libc::c_char>();
     let mut ressize: libc::c_ulong = 0;
     let mut restail: libc::c_ulong = 0;
     let mut resbits: libc::c_int = 0;
@@ -59,7 +61,7 @@ unsafe fn get_clipboard(
         }
     }
     if event.xselection.property != 0 {
-        let read_size = (100 as u32 * std::mem::size_of::<Atom>() as u32) as libc::c_long;
+        let read_size = (100_u32 * std::mem::size_of::<Atom>() as u32) as libc::c_long;
         let mut bytes: Vec<u8> = vec![];
         let mut offset: libc::c_long = 0 as libc::c_long;
         loop {
@@ -94,8 +96,7 @@ unsafe fn get_clipboard(
             }
         }
     }
-
-    return None;
+    None
 }
 
 // Next message for clipboard request
@@ -161,8 +162,8 @@ pub(crate) unsafe fn respond_to_clipboard_request(
             UTF8,
             8 as libc::c_int,
             PropModeReplace,
-            message.as_bytes().as_ptr() as *const u8 as *const _,
-            message.as_bytes().len() as _,
+            message.as_bytes().as_ptr(),
+            message.len() as _,
         );
 
         (libx11.XSendEvent)(

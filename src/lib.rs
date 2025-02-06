@@ -1,4 +1,11 @@
 #![doc = include_str!("../README.md")]
+#![allow(
+    clippy::collapsible_if,
+    clippy::unused_unit,
+    clippy::identity_op,
+    clippy::missing_safety_doc
+)]
+
 pub mod conf;
 mod event;
 pub mod fs;

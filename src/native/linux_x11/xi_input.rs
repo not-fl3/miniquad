@@ -147,7 +147,7 @@ impl LibXi {
 
         (self.XGetEventData)(display, xcookie);
 
-        let raw_event = (*xcookie).data as *mut xi_input::XIRawEvent;
+        let raw_event = xcookie.data as *mut xi_input::XIRawEvent;
 
         let dx = *(*raw_event).raw_values;
         let dy = *(*raw_event).raw_values.offset(1);
