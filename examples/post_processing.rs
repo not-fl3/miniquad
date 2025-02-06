@@ -8,6 +8,7 @@ struct Stage {
     offscreen_pipeline: Pipeline,
     offscreen_bind: Bindings,
     offscreen_pass: RenderPass,
+    color_img: TextureId,
     rx: f32,
     ry: f32,
 
@@ -90,9 +91,8 @@ impl Stage {
         );
 
         let offscreen_bind = Bindings {
-            vertex_buffers: vec![vertex_buffer.clone()],
-            index_buffer: index_buffer.clone(),
-            images: vec![],
+            vertex_buffers: vec![vertex_buffer],
+            index_buffer,
         };
 
         #[rustfmt::skip]
@@ -120,8 +120,7 @@ impl Stage {
 
         let post_processing_bind = Bindings {
             vertex_buffers: vec![vertex_buffer],
-            index_buffer: index_buffer,
-            images: vec![color_img],
+            index_buffer,
         };
 
         let default_shader = ctx
@@ -180,6 +179,7 @@ impl Stage {
             offscreen_pipeline,
             offscreen_bind,
             offscreen_pass,
+            color_img,
             rx: 0.,
             ry: 0.,
             ctx,
@@ -208,7 +208,7 @@ impl EventHandler for Stage {
 
         self.ctx.delete_render_pass(self.offscreen_pass);
         self.offscreen_pass = offscreen_pass;
-        self.post_processing_bind.images[0] = color_img;
+        self.color_img = color_img;
     }
 
     fn draw(&mut self) {
@@ -247,6 +247,7 @@ impl EventHandler for Stage {
         self.ctx.begin_default_pass(PassAction::Nothing);
         self.ctx.apply_pipeline(&self.post_processing_pipeline);
         self.ctx.apply_bindings(&self.post_processing_bind);
+        self.ctx.apply_image(&self.color_img);
         self.ctx
             .apply_uniforms(UniformsSource::table(&post_processing_shader::Uniforms {
                 resolution: glam::vec2(w, h),

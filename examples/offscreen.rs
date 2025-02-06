@@ -8,6 +8,7 @@ struct Stage {
     offscreen_pipeline: Pipeline,
     offscreen_bind: Bindings,
     offscreen_pass: RenderPass,
+    color_img: TextureId,
     rx: f32,
     ry: f32,
     ctx: Box<dyn RenderingBackend>,
@@ -89,15 +90,13 @@ impl Stage {
         );
 
         let offscreen_bind = Bindings {
-            vertex_buffers: vec![vertex_buffer.clone()],
-            index_buffer: index_buffer.clone(),
-            images: vec![],
+            vertex_buffers: vec![vertex_buffer],
+            index_buffer,
         };
 
         let display_bind = Bindings {
             vertex_buffers: vec![vertex_buffer],
-            index_buffer: index_buffer,
-            images: vec![color_img],
+            index_buffer,
         };
 
         let source = match ctx.info().backend {
@@ -160,6 +159,7 @@ impl Stage {
             offscreen_pipeline,
             offscreen_bind,
             offscreen_pass,
+            color_img,
             rx: 0.,
             ry: 0.,
             ctx,
@@ -205,6 +205,7 @@ impl EventHandler for Stage {
             .begin_default_pass(PassAction::clear_color(0.0, 0., 0.45, 1.));
         self.ctx.apply_pipeline(&self.display_pipeline);
         self.ctx.apply_bindings(&self.display_bind);
+        self.ctx.apply_image(&self.color_img);
         self.ctx.apply_uniforms(UniformsSource::table(&vs_params));
         self.ctx.draw(0, 36, 1);
         self.ctx.end_render_pass();
