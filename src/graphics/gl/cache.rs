@@ -80,11 +80,9 @@ impl GlCache {
                 self.bind_buffer(target, self.stored_vertex_buffer, None);
                 self.stored_vertex_buffer = 0;
             }
-        } else {
-            if self.stored_index_buffer != 0 {
-                self.bind_buffer(target, self.stored_index_buffer, self.stored_index_type);
-                self.stored_index_buffer = 0;
-            }
+        } else if self.stored_index_buffer != 0 {
+            self.bind_buffer(target, self.stored_index_buffer, self.stored_index_type);
+            self.stored_index_buffer = 0;
         }
     }
 
@@ -135,9 +133,7 @@ impl GlCache {
             let cached_attr = &mut self.attributes[attr_index];
 
             if cached_attr.is_some() {
-                unsafe {
-                    glDisableVertexAttribArray(attr_index as GLuint)
-                };
+                unsafe { glDisableVertexAttribArray(attr_index as GLuint) };
             }
             *cached_attr = None;
         }

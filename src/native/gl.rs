@@ -319,6 +319,7 @@ macro_rules! gl_loader {
         }
 
         $(
+            #[allow(clippy::too_many_arguments)]
             pub unsafe fn $fn($($arg: $t),*) -> $res {
                 __pfns::$fn.unwrap()( $($arg),* )
             }

@@ -278,7 +278,8 @@ pub unsafe fn create_egl_context(
     sample_count: i32,
 ) -> Result<(EGLContext, EGLConfig, EGLDisplay), EglError> {
     let display = (egl.eglGetDisplay.unwrap())(display as _);
-    if display == /* EGL_NO_DISPLAY */ null_mut() {
+    if display.is_null() {
+        // == EGL_NO_DISPLAY
         return Err(EglError::NoDisplay);
     }
 
@@ -288,7 +289,7 @@ pub unsafe fn create_egl_context(
 
     let alpha_size = if alpha { 8 } else { 0 };
     #[rustfmt::skip]
-    let cfg_attributes = vec![
+    let cfg_attributes = [
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_RED_SIZE, 8,
         EGL_GREEN_SIZE, 8,
@@ -340,7 +341,7 @@ pub unsafe fn create_egl_context(
     if !exact_cfg_found {
         config = available_cfgs[0];
     }
-    let ctx_attributes = vec![EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE];
+    let ctx_attributes = [EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE];
     let context = (egl.eglCreateContext.unwrap())(
         display,
         config,
@@ -351,5 +352,5 @@ pub unsafe fn create_egl_context(
         return Err(EglError::CreateContextFailed);
     }
 
-    return Ok((context, config, display));
+    Ok((context, config, display))
 }

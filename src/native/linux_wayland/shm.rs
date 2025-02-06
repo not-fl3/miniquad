@@ -14,7 +14,7 @@ unsafe extern "C" fn create_tmpfile_cloexec(tmpname: *mut libc::c_char) -> libc:
     if fd >= 0 {
         libc::unlink(tmpname);
     }
-    return fd;
+    fd
 }
 
 unsafe extern "C" fn create_anonymous_file(size: usize) -> libc::c_int {
@@ -33,7 +33,7 @@ unsafe extern "C" fn create_anonymous_file(size: usize) -> libc::c_int {
         libc::close(fd);
         panic!("Cant create temp file")
     }
-    return fd;
+    fd
 }
 
 pub unsafe fn create_shm_buffer(
@@ -94,5 +94,5 @@ pub unsafe fn create_shm_buffer(
     libc::munmap(data, length as _);
 
     wl_shm_pool_destroy(libwayland, pool);
-    return buffer;
+    buffer
 }

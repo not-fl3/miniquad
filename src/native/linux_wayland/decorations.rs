@@ -31,6 +31,7 @@ pub(crate) struct Decorations {
     pub right_decoration: Decoration,
 }
 
+#[allow(clippy::too_many_arguments)]
 unsafe fn create_decoration(
     display: &mut WaylandPayload,
     compositor: *mut wl_compositor,

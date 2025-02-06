@@ -1,4 +1,4 @@
-#![allow(dead_code, non_snake_case)]
+#![allow(dead_code, non_snake_case, clippy::upper_case_acronyms)]
 
 use super::{libx11::*, X11Error};
 
@@ -403,20 +403,18 @@ unsafe fn choose_fbconfig(
     multisample: bool,
     desired_sample_count: i32,
 ) -> GLXFBConfig {
-    let native_configs: *mut GLXFBConfig;
-    let closest: *const GLFBConfig;
     let mut native_count: libc::c_int = 0;
     let mut usable_count;
-    let vendor;
     let mut trust_window_bit = true;
-    vendor = (libgl.glxGetClientString.unwrap())(display, GLX_VENDOR);
+    let vendor = (libgl.glxGetClientString.unwrap())(display, GLX_VENDOR);
     if !vendor.is_null()
         && libc::strcmp(vendor, b"Chromium\x00" as *const u8 as *const libc::c_char)
             == 0 as libc::c_int
     {
         trust_window_bit = false
     }
-    native_configs = (libgl.glxGetFBConfigs.unwrap())(display, screen, &mut native_count);
+    let native_configs: *mut GLXFBConfig =
+        (libgl.glxGetFBConfigs.unwrap())(display, screen, &mut native_count);
 
     if native_configs.is_null() || native_count == 0 {
         panic!("GLX: No GLXFBConfigs returned");
@@ -432,7 +430,7 @@ unsafe fn choose_fbconfig(
         let glx_attrib = |fbconfig, attrib| {
             let mut value: libc::c_int = 0;
             (libgl.glxGetFBConfigAttrib.unwrap())(display, fbconfig, attrib, &mut value);
-            return value;
+            value
         };
 
         if 0 == glx_attrib(n, GLX_RENDER_TYPE) & GLX_RGBA_BIT {
@@ -461,30 +459,34 @@ unsafe fn choose_fbconfig(
         usable_count += 1
     }
 
-    let mut desired = GLFBConfig::default();
-    desired.red_bits = 8;
-    desired.green_bits = 8;
-    desired.blue_bits = 8;
-    desired.alpha_bits = 8;
-    desired.depth_bits = 24;
-    desired.stencil_bits = 8;
-    desired.doublebuffer = true;
-    desired.samples = if desired_sample_count > 1 {
-        desired_sample_count
-    } else {
-        0
-    };
-    closest = gl_choose_fbconfig(
-        &mut desired,
-        usable_configs.as_mut_ptr(),
-        usable_count as libc::c_uint,
-    );
     let mut result = 0 as GLXFBConfig;
-    if !closest.is_null() {
-        result = (*closest).handle as GLXFBConfig
+    #[allow(clippy::field_reassign_with_default)]
+    {
+        let mut desired = GLFBConfig::default();
+        desired.red_bits = 8;
+        desired.green_bits = 8;
+        desired.blue_bits = 8;
+        desired.alpha_bits = 8;
+        desired.depth_bits = 24;
+        desired.stencil_bits = 8;
+        desired.doublebuffer = true;
+        desired.samples = if desired_sample_count > 1 {
+            desired_sample_count
+        } else {
+            0
+        };
+
+        let closest: *const GLFBConfig = gl_choose_fbconfig(
+            &desired,
+            usable_configs.as_mut_ptr(),
+            usable_count as libc::c_uint,
+        );
+        if !closest.is_null() {
+            result = (*closest).handle as GLXFBConfig
+        }
+        (libx11.XFree)(native_configs as *mut libc::c_void);
     }
-    (libx11.XFree)(native_configs as *mut libc::c_void);
-    return result;
+    result
 }
 
 pub unsafe extern "C" fn gl_choose_fbconfig(
@@ -559,6 +561,7 @@ pub unsafe extern "C" fn gl_choose_fbconfig(
                 extra_diff += ((*desired).samples - (*current).samples)
                     * ((*desired).samples - (*current).samples);
             }
+            #[allow(clippy::comparison_chain)]
             if missing < least_missing {
                 closest = current
             } else if missing == least_missing {
@@ -580,5 +583,5 @@ pub unsafe extern "C" fn gl_choose_fbconfig(
             }
         }
     }
-    return closest;
+    closest
 }

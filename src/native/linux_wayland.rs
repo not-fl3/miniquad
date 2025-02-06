@@ -200,7 +200,7 @@ unsafe extern "C" fn keyboard_handle_leave(
     EVENTS.push(WaylandEvent::KeyboardLeave);
 }
 unsafe extern "C" fn keyboard_handle_key(
-    data: *mut ::core::ffi::c_void,
+    _data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _serial: u32,
     _time: u32,
@@ -480,7 +480,7 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
     width: i32,
     height: i32,
     _states: *mut wl_array,
-) -> () {
+) {
     assert!(!data.is_null());
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
     let mut d = crate::native_display().lock().unwrap();
@@ -516,7 +516,7 @@ unsafe extern "C" fn xdg_wm_base_handle_ping(
     data: *mut std::ffi::c_void,
     toplevel: *mut extensions::xdg_shell::xdg_wm_base,
     serial: u32,
-) -> () {
+) {
     assert!(!data.is_null());
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
 
@@ -604,12 +604,12 @@ where
         );
         (display.client.wl_display_roundtrip)(wdisplay);
 
-        assert!(display.compositor.is_null() == false);
-        assert!(display.xdg_wm_base.is_null() == false);
-        assert!(display.subcompositor.is_null() == false);
-        assert!(display.seat.is_null() == false);
-        //assert!(display.keymap.is_null() == false);
-        //assert!(display.xkb_state.is_null() == false);
+        assert!(!display.compositor.is_null());
+        assert!(!display.xdg_wm_base.is_null());
+        assert!(!display.subcompositor.is_null());
+        assert!(!display.seat.is_null());
+        //assert!(!display.keymap.is_null());
+        //assert!(!display.xkb_state.is_null());
 
         let xdg_wm_base_listener = extensions::xdg_shell::xdg_wm_base_listener {
             ping: Some(xdg_wm_base_handle_ping),
@@ -640,7 +640,7 @@ where
             WL_COMPOSITOR_CREATE_SURFACE,
             display.client.wl_surface_interface
         );
-        assert!(display.surface.is_null() == false);
+        assert!(!display.surface.is_null());
 
         let xdg_surface: *mut extensions::xdg_shell::xdg_surface = wl_request_constructor!(
             display.client,
@@ -649,7 +649,7 @@ where
             &extensions::xdg_shell::xdg_surface_interface,
             display.surface
         );
-        assert!(xdg_surface.is_null() == false);
+        assert!(!xdg_surface.is_null());
 
         let xdg_surface_listener = extensions::xdg_shell::xdg_surface_listener {
             configure: Some(xdg_surface_handle_configure),
@@ -667,7 +667,7 @@ where
             extensions::xdg_shell::xdg_surface::get_toplevel,
             &extensions::xdg_shell::xdg_toplevel_interface
         );
-        assert!(display.xdg_toplevel.is_null() == false);
+        assert!(!display.xdg_toplevel.is_null());
 
         let xdg_toplevel_listener = extensions::xdg_shell::xdg_toplevel_listener {
             configure: Some(xdg_toplevel_handle_configure),
@@ -705,7 +705,8 @@ where
             std::ptr::null_mut(),
         );
 
-        if egl_surface == /* EGL_NO_SURFACE  */ std::ptr::null_mut() {
+        if egl_surface.is_null() {
+            // == EGL_NO_SURFACE
             panic!("surface creation failed");
         }
         if (libegl.eglMakeCurrent.unwrap())(egl_display, egl_surface, egl_surface, context) == 0 {
@@ -728,7 +729,7 @@ where
             libegl.eglGetProcAddress.expect("non-null function pointer")(name.as_ptr() as _)
         });
 
-        if display.decoration_manager.is_null() == false {
+        if !display.decoration_manager.is_null() {
             let server_decoration: *mut extensions::xdg_decoration::zxdg_toplevel_decoration_v1 = wl_request_constructor!(
                 display.client,
                 display.decoration_manager,
@@ -736,7 +737,7 @@ where
                 &extensions::xdg_decoration::zxdg_toplevel_decoration_v1_interface,
                 display.xdg_toplevel
             );
-            assert!(server_decoration.is_null() == false);
+            assert!(!server_decoration.is_null());
 
             wl_request!(
                 display.client,
@@ -764,7 +765,7 @@ where
         let mut repeated_keys: HashSet<u32> = HashSet::new();
         let (mut last_mouse_x, mut last_mouse_y) = (0.0, 0.0);
 
-        while display.closed == false {
+        while !display.closed {
             (client.wl_display_dispatch_pending)(wdisplay);
 
             if let Some(ref mut event_handler) = display.event_handler {
@@ -773,7 +774,7 @@ where
                         (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
                     let keycode = keycodes::translate(keysym);
 
-                    event_handler.key_down_event(keycode.clone(), keymods, true);
+                    event_handler.key_down_event(keycode, keymods, true);
 
                     let chr = keycodes::keysym_to_unicode(&mut display.xkb, keysym);
                     if chr > 0 {
@@ -784,6 +785,7 @@ where
                 }
 
                 while let Ok(request) = rx.try_recv() {
+                    #[allow(clippy::single_match)]
                     match request {
                         Request::SetFullscreen(full) => {
                             if full {
@@ -801,7 +803,6 @@ where
                                 );
                             }
                         }
-
                         // TODO: implement the other events
                         _ => (),
                     }
