@@ -27,7 +27,7 @@ use crate::{
 
 thread_local! {
     static EVENT_HANDLER: RefCell<Option<Box<dyn EventHandler>>> = RefCell::new(None);
-    static REQUESTS: RefCell<Option<Receiver<Request>>> = RefCell::new(None);
+    static REQUESTS: RefCell<Option<Receiver<Request>>> = const { RefCell::new(None) };
 }
 fn tl_event_handler<T, F: FnOnce(&mut dyn EventHandler) -> T>(f: F) -> T {
     EVENT_HANDLER.with(|globals| {

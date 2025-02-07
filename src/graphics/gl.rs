@@ -868,9 +868,8 @@ fn gl_info() -> ContextInfo {
         glsl_support.v150 = true; // MacOS is defaulting to 3.2 and GLSL 150
     } else if gl_version_string.starts_with("4") || gl_version_string.starts_with("3.3") {
         glsl_support.v330 = true;
-    } else
     // gl 3.0, 3.1, 3.2 maps to 1.30, 1.40, 1.50 glsl versions
-    if gl_version_string.starts_with("3") {
+    } else if gl_version_string.starts_with("3") {
         glsl_support.v130 = true;
     }
 

@@ -83,6 +83,7 @@ mod wasm {
     use std::{cell::RefCell, collections::HashMap, thread_local};
 
     thread_local! {
+        #[allow(clippy::type_complexity)]
         static FILES: RefCell<HashMap<u32, Box<dyn Fn(Response)>>> = RefCell::new(HashMap::new());
     }
 
