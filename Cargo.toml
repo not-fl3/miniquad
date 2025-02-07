@@ -17,9 +17,11 @@ categories = ["rendering::graphics-api"]
 
 [features]
 
-# Optional log-rs like macros implementation
-# disabled by default
+# Optional log-rs like macros implementation. Disabled by default
 log-impl = []
+
+# Documentation for docs.rs. Enables `doc_cfg` nightly feature
+_docsrs = ["log-impl"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
@@ -59,3 +61,6 @@ incremental = false
 rpath = false
 codegen-units = 1
 strip = true
+
+[package.metadata.docs.rs]
+features = ["_docsrs"]
