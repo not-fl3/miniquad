@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![allow(
     clippy::collapsible_if,
+    clippy::collapsible_else_if,
     clippy::unused_unit,
     clippy::identity_op,
     clippy::missing_safety_doc

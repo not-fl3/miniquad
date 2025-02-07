@@ -43,7 +43,7 @@ libc = "0.2"
 ndk-sys = "0.2"
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
-objc = "0.2"
+objc = { package = "objc-rs", version = "0.2" }
 
 [dev-dependencies]
 glam = { version = "0.24", features = ["scalar-math"] }

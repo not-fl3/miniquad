@@ -853,7 +853,7 @@ pub enum NSDragOperation {
 
 unsafe impl Encode for NSDragOperation {
     fn encode() -> Encoding {
-        let encoding = format!("Q");
+        let encoding = "Q".to_string();
         unsafe { Encoding::from_str(&encoding) }
     }
 }
