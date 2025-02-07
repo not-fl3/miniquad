@@ -442,7 +442,7 @@ unsafe extern "system" fn win32_wndproc(
                 dy = dy / 65535.0 * height;
             }
 
-            event_handler.raw_mouse_motion(dx as f32, dy as f32);
+            event_handler.raw_mouse_motion(dx, dy);
         }
 
         WM_MOUSELEAVE => {
@@ -465,7 +465,7 @@ unsafe extern "system" fn win32_wndproc(
             let repeat = !!(lparam & 0x40000000) != 0;
             let mods = key_mods();
             if chr > 0 {
-                if let Some(chr) = char::from_u32(chr as u32) {
+                if let Some(chr) = char::from_u32(chr) {
                     event_handler.char_event(chr, mods, repeat);
                 }
             }
@@ -571,7 +571,7 @@ unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: &[u8]) -> 
     if color.is_null() {
         return None;
     }
-    assert!(target.is_null() == false);
+    assert!(!target.is_null());
 
     let mask = CreateBitmap(width as _, height as _, 1, 1, std::ptr::null());
     if mask.is_null() {
@@ -697,7 +697,7 @@ unsafe fn create_window(
         GetModuleHandleW(NULL as _), // hInstance
         NULL as _,                   // lparam
     );
-    assert!(hwnd.is_null() == false);
+    assert!(!hwnd.is_null());
 
     let mut rawinputdevice: RAWINPUTDEVICE = std::mem::zeroed();
     rawinputdevice.usUsagePage = HID_USAGE_PAGE_GENERIC;
@@ -715,7 +715,7 @@ unsafe fn create_window(
 
     ShowWindow(hwnd, SW_SHOW);
     let dc = GetDC(hwnd);
-    assert!(dc.is_null() == false);
+    assert!(!dc.is_null());
 
     DragAcceptFiles(hwnd, TRUE);
 
@@ -742,7 +742,7 @@ unsafe fn create_msg_window() -> (HWND, HDC) {
         NULL,
     );
     assert!(
-        msg_hwnd.is_null() == false,
+        !msg_hwnd.is_null(),
         "Win32: failed to create helper window!"
     );
     ShowWindow(msg_hwnd, SW_HIDE);
@@ -753,7 +753,7 @@ unsafe fn create_msg_window() -> (HWND, HDC) {
     }
     let msg_dc = GetDC(msg_hwnd);
     assert!(
-        msg_dc.is_null() == false,
+        !msg_dc.is_null(),
         "Win32: failed to obtain helper window DC!"
     );
 
@@ -771,7 +771,10 @@ impl WindowsDisplay {
             eprintln!("Load GL func {:?} failed.", proc);
             return None;
         }
-        Some(std::mem::transmute(proc_ptr))
+        Some(std::mem::transmute::<
+            *mut winapi::shared::minwindef::__some_function,
+            unsafe extern "C" fn(),
+        >(proc_ptr))
     }
 
     /// updates current window and framebuffer size from the window's client rect,
