@@ -281,6 +281,12 @@ pub struct MetalContext {
     current_ub_offset: u64,
 }
 
+impl Default for MetalContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MetalContext {
     pub fn new() -> MetalContext {
         unsafe {
@@ -589,6 +595,7 @@ impl RenderingBackend for MetalContext {
             BufferSource::Slice(data) => data.size,
             BufferSource::Empty { size, .. } => *size,
         };
+        #[allow(clippy::needless_range_loop)]
         for i in 0..BUFFERS_IN_ROTATION {
             let buffer: ObjcId = if let BufferSource::Slice(data) = &data {
                 debug_assert!(data.is_slice);
@@ -619,7 +626,7 @@ impl RenderingBackend for MetalContext {
         }
         let buffer = Buffer {
             raw,
-            size: size as usize,
+            size,
             value: 0,
             next_value: 0,
         };
@@ -804,8 +811,8 @@ impl RenderingBackend for MetalContext {
                         let raw_texture = self.textures.get(texture).texture;
                         let region = MTLRegion {
                             origin: MTLOrigin {
-                                x: 0 as u64,
-                                y: 0 as u64,
+                                x: 0_u64,
+                                y: 0_u64,
                                 z: 0,
                             },
                             size: MTLSize {
@@ -1155,11 +1162,7 @@ impl RenderingBackend for MetalContext {
                 None => {
                     let (screen_width, screen_height) = crate::window::screen_size();
                     (
-                        {
-                            let a = msg_send_![self.view, currentRenderPassDescriptor];
-                            //msg_send_![a, retain];
-                            a
-                        },
+                        msg_send_![self.view, currentRenderPassDescriptor],
                         screen_width as f64,
                         screen_height as f64,
                     )
