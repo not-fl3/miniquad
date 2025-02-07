@@ -162,6 +162,7 @@ pub unsafe fn gl_choose_fbconfig(
                 extra_diff +=
                     (desired.samples - current.samples) * (desired.samples - current.samples);
             }
+            #[allow(clippy::comparison_chain)]
             if missing < least_missing {
                 closest = Some(i);
             } else if missing == least_missing {
@@ -176,7 +177,7 @@ pub unsafe fn gl_choose_fbconfig(
             //  Least number of missing buffers is the most important heuristic,
             //  then color buffer size match and lastly size match for other buffers
 
-            if closest.map_or(false, |closest| closest == i) {
+            if closest == Some(i) {
                 least_missing = missing;
                 least_color_diff = color_diff;
                 least_extra_diff = extra_diff
@@ -207,7 +208,7 @@ unsafe fn get_wgl_proc_address<T>(libopengl32: &mut LibOpengl32, proc: &str) -> 
     if proc.is_null() {
         return None;
     }
-    return Some(std::mem::transmute_copy(&proc));
+    Some(std::mem::transmute_copy(&proc))
 }
 
 impl Wgl {
@@ -230,7 +231,7 @@ impl Wgl {
         if rc.is_null() {
             panic!("WGL: Failed to create dummy context");
         }
-        if (display.libopengl32.wglMakeCurrent)(display.msg_dc, rc) == false {
+        if !(display.libopengl32.wglMakeCurrent)(display.msg_dc, rc) {
             panic!("WGL: Failed to make context current");
         }
 
@@ -249,7 +250,7 @@ impl Wgl {
             if let Some(getExtensionsStringEXT) = GetExtensionsStringEXT {
                 let extensions = getExtensionsStringEXT();
 
-                if extensions.is_null() == false {
+                if !extensions.is_null() {
                     let extensions_string = std::ffi::CStr::from_ptr(extensions).to_string_lossy();
                     if extensions_string.contains(ext) {
                         return true;
@@ -259,7 +260,7 @@ impl Wgl {
 
             if let Some(getExtensionsStringARB) = GetExtensionsStringARB {
                 let extensions = getExtensionsStringARB((display.libopengl32.wglGetCurrentDC)());
-                if extensions.is_null() == false {
+                if !extensions.is_null() {
                     let extensions_string = std::ffi::CStr::from_ptr(extensions).to_string_lossy();
 
                     if extensions_string.contains(ext) {
@@ -267,7 +268,7 @@ impl Wgl {
                     }
                 }
             }
-            return false;
+            false
         };
 
         let arb_multisample = wgl_ext_supported("WGL_ARB_multisample");
@@ -311,7 +312,7 @@ impl Wgl {
         ) {
             panic!("WGL: Failed to retrieve pixel format attribute");
         }
-        return value;
+        value
     }
 
     unsafe fn wgl_find_pixel_format(&self, display: &mut WindowsDisplay, sample_count: i32) -> u32 {
@@ -353,19 +354,22 @@ impl Wgl {
         }
         assert!(usable_count > 0);
 
-        let mut desired = GlFbconfig::default();
-        desired.red_bits = 8;
-        desired.green_bits = 8;
-        desired.blue_bits = 8;
-        desired.alpha_bits = 8;
-        desired.depth_bits = 24;
-        desired.stencil_bits = 8;
-        desired.doublebuffer = true;
-        desired.samples = sample_count;
-        let closest = gl_choose_fbconfig(&mut desired, &usable_configs[..]);
         let mut pixel_format = 0;
-        if let Some(closest) = closest {
-            pixel_format = usable_configs[closest].handle;
+        #[allow(clippy::field_reassign_with_default)]
+        {
+            let mut desired = GlFbconfig::default();
+            desired.red_bits = 8;
+            desired.green_bits = 8;
+            desired.blue_bits = 8;
+            desired.alpha_bits = 8;
+            desired.depth_bits = 24;
+            desired.stencil_bits = 8;
+            desired.doublebuffer = true;
+            desired.samples = sample_count;
+            let closest = gl_choose_fbconfig(&mut desired, &usable_configs[..]);
+            if let Some(closest) = closest {
+                pixel_format = usable_configs[closest].handle;
+            }
         }
         pixel_format
     }
