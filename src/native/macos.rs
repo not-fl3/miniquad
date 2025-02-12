@@ -1079,8 +1079,6 @@ where
     let title = str_to_nsstring(&conf.window_title);
     //let () = msg_send![window, setReleasedWhenClosed: NO];
     let () = msg_send![window, setTitle: title];
-    let () = msg_send![window, center];
-    let () = msg_send![window, setAcceptsMouseMovedEvents: YES];
 
     let view = match conf.platform.apple_gfx_api {
         AppleGfxApi::OpenGl => create_opengl_view(&mut display, conf.sample_count, conf.high_dpi),
@@ -1095,8 +1093,6 @@ where
     display.window = window;
     display.view = view;
 
-    let () = msg_send![window, setContentView: view];
-
     // cannot place it to create_opengl_view, because it should be called after setContentView
     if conf.platform.apple_gfx_api == AppleGfxApi::OpenGl {
         msg_send_![display.gl_context, setView:view];
@@ -1109,11 +1105,15 @@ where
         });
     }
 
+    let () = msg_send![window, setContentView: view];
+    let () = msg_send![window, makeFirstResponder: view];
+
     let _ = display.update_dimensions();
 
     assert!(!view.is_null());
 
-    let () = msg_send![window, makeFirstResponder: view];
+    let () = msg_send![window, center];
+    let () = msg_send![window, setAcceptsMouseMovedEvents: YES];
 
     if conf.fullscreen {
         let () = msg_send![window, toggleFullScreen: nil];
