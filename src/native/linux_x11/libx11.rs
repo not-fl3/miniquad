@@ -669,6 +669,7 @@ pub mod X_h {
     pub const StructureNotifyMask: libc::c_long = (1 as libc::c_long) << 17 as libc::c_int;
     pub const SubstructureNotifyMask: libc::c_long = (1 as libc::c_long) << 19 as libc::c_int;
     pub const SubstructureRedirectMask: libc::c_long = (1 as libc::c_long) << 20 as libc::c_int;
+    pub const NoEventMask: libc::c_long = 0 as libc::c_long;
     pub const KeyPressMask: libc::c_long = (1 as libc::c_long) << 0 as libc::c_int;
     pub const KeyReleaseMask: libc::c_long = (1 as libc::c_long) << 1 as libc::c_int;
     pub const PointerMotionMask: libc::c_long = (1 as libc::c_long) << 6 as libc::c_int;
@@ -703,6 +704,15 @@ pub mod X_h {
     pub const ControlMask: libc::c_int = (1 as libc::c_int) << 2 as libc::c_int;
     pub const Mod1Mask: libc::c_int = (1 as libc::c_int) << 3 as libc::c_int;
     pub const Mod4Mask: libc::c_int = (1 as libc::c_int) << 6 as libc::c_int;
+
+    pub const AnyPropertyType: libc::c_ulong = 0 as libc::c_ulong;
+    pub const CurrentTime: libc::c_long = 0 as libc::c_long;
+
+    pub const PropertyNotify: libc::c_int = 28 as libc::c_int;
+    pub const SelectionRequest: libc::c_int = 30 as libc::c_int;
+    pub const SelectionNotify: libc::c_int = 31 as libc::c_int;
+    pub const ClientMessage: libc::c_int = 33 as libc::c_int;
+
     pub const PropertyNewValue: libc::c_int = 0 as libc::c_int;
 }
 
@@ -821,6 +831,7 @@ pub type XOpenDisplay = unsafe extern "C" fn(_: *const libc::c_char) -> *mut Dis
 pub type XResourceManagerString = unsafe extern "C" fn(_: *mut Display) -> *mut libc::c_char;
 pub type XInternAtom =
     unsafe extern "C" fn(_: *mut Display, _: *const libc::c_char, _: libc::c_int) -> Atom;
+pub type XGetAtomName = unsafe extern "C" fn(_: *mut Display, _: Atom) -> *mut libc::c_char;
 pub type XCreateColormap =
     unsafe extern "C" fn(_: *mut Display, _: Window, _: *mut Visual, _: libc::c_int) -> Colormap;
 pub type XCreateWindow = unsafe extern "C" fn(
@@ -882,6 +893,7 @@ pub type XGetWindowProperty = unsafe extern "C" fn(
     _: *mut libc::c_ulong,
     _: *mut *mut libc::c_uchar,
 ) -> libc::c_int;
+pub type XDeleteProperty = unsafe extern "C" fn(_: *mut Display, _: Window, _: Atom) -> libc::c_int;
 pub type XFree = unsafe extern "C" fn(_: *mut libc::c_void) -> libc::c_int;
 pub type XUnmapWindow = unsafe extern "C" fn(_: *mut Display, _: Window) -> libc::c_int;
 pub type XDestroyWindow = unsafe extern "C" fn(_: *mut Display, _: Window) -> libc::c_int;
@@ -991,6 +1003,20 @@ pub struct X11Extensions {
     pub net_wm_icon_name: Atom,
     pub net_wm_icon: Atom,
     pub cardinal: Atom,
+    // clipboard
+    pub clipboard: Atom,
+    pub xsel_data: Atom,
+    pub incr: Atom,
+    // drag_n_drop related
+    pub xdnd_action_copy: Atom,
+    pub xdnd_aware: Atom,
+    pub xdnd_drop: Atom,
+    pub xdnd_enter: Atom,
+    pub xdnd_finished: Atom,
+    pub xdnd_position: Atom,
+    pub xdnd_selection: Atom,
+    pub xdnd_status: Atom,
+    pub xdnd_type_list: Atom,
 }
 
 #[derive(Clone)]
@@ -1006,6 +1032,7 @@ pub struct LibX11 {
     pub XOpenDisplay: XOpenDisplay,
     pub XResourceManagerString: XResourceManagerString,
     pub XInternAtom: XInternAtom,
+    pub XGetAtomName: XGetAtomName,
     pub XCreateColormap: XCreateColormap,
     pub XCreateWindow: XCreateWindow,
     pub XSetWMProtocols: XSetWMProtocols,
@@ -1022,6 +1049,7 @@ pub struct LibX11 {
     pub XNextEvent: XNextEvent,
     pub XGetKeyboardMapping: XGetKeyboardMapping,
     pub XGetWindowProperty: XGetWindowProperty,
+    pub XDeleteProperty: XDeleteProperty,
     pub XFree: XFree,
     pub XUnmapWindow: XUnmapWindow,
     pub XDestroyWindow: XDestroyWindow,
@@ -1059,6 +1087,7 @@ impl LibX11 {
                 XOpenDisplay: module.get_symbol("XOpenDisplay").unwrap(),
                 XResourceManagerString: module.get_symbol("XResourceManagerString").unwrap(),
                 XInternAtom: module.get_symbol("XInternAtom").unwrap(),
+                XGetAtomName: module.get_symbol("XGetAtomName").unwrap(),
                 XCreateColormap: module.get_symbol("XCreateColormap").unwrap(),
                 XCreateWindow: module.get_symbol("XCreateWindow").unwrap(),
                 XSetWMProtocols: module.get_symbol("XSetWMProtocols").unwrap(),
@@ -1075,6 +1104,7 @@ impl LibX11 {
                 XNextEvent: module.get_symbol("XNextEvent").unwrap(),
                 XGetKeyboardMapping: module.get_symbol("XGetKeyboardMapping").unwrap(),
                 XGetWindowProperty: module.get_symbol("XGetWindowProperty").unwrap(),
+                XDeleteProperty: module.get_symbol("XDeleteProperty").unwrap(),
                 XFree: module.get_symbol("XFree").unwrap(),
                 XUnmapWindow: module.get_symbol("XUnmapWindow").unwrap(),
                 XDestroyWindow: module.get_symbol("XDestroyWindow").unwrap(),
@@ -1143,6 +1173,66 @@ impl LibX11 {
             cardinal: (self.XInternAtom)(
                 display,
                 b"CARDINAL\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            clipboard: (self.XInternAtom)(
+                display,
+                b"CLIPBOARD\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            xsel_data: (self.XInternAtom)(
+                display,
+                b"XSEL_DATA\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            incr: (self.XInternAtom)(
+                display,
+                b"INCR\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            xdnd_action_copy: (self.XInternAtom)(
+                display,
+                b"XdndActionCopy\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            xdnd_aware: (self.XInternAtom)(
+                display,
+                b"XdndAware\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            xdnd_drop: (self.XInternAtom)(
+                display,
+                b"XdndDrop\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            xdnd_enter: (self.XInternAtom)(
+                display,
+                b"XdndEnter\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            xdnd_finished: (self.XInternAtom)(
+                display,
+                b"XdndFinished\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            xdnd_position: (self.XInternAtom)(
+                display,
+                b"XdndPosition\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            xdnd_selection: (self.XInternAtom)(
+                display,
+                b"XdndSelection\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            xdnd_status: (self.XInternAtom)(
+                display,
+                b"XdndStatus\x00" as *const u8 as *const libc::c_char,
+                false as _,
+            ),
+            xdnd_type_list: (self.XInternAtom)(
+                display,
+                b"XdndTypeList\x00" as *const u8 as *const libc::c_char,
                 false as _,
             ),
         };

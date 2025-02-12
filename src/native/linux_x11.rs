@@ -1,6 +1,7 @@
 // Spiritual successor of an X11 part of https://github.com/floooh/sokol/blob/master/sokol_app.h
 
 mod clipboard;
+mod drag_n_drop;
 mod glx;
 mod keycodes;
 pub mod libx11;
@@ -49,6 +50,7 @@ pub struct X11Display {
     empty_cursor: libx11::Cursor,
     cursor_cache: HashMap<CursorIcon, libx11::Cursor>,
     update_requested: bool,
+    drag_n_drop: drag_n_drop::X11DnD,
 }
 
 impl X11Display {
@@ -150,15 +152,68 @@ impl X11Display {
                     event_handler.resize_event(width as _, height as _);
                 }
             }
-            33 => {
-                let mut d = crate::native_display().try_lock().unwrap();
-                if event.xclient.message_type == self.libx11.extensions.wm_protocols {
+            // ClientMessage
+            33 => match event.xclient.message_type {
+                t if t == self.libx11.extensions.wm_protocols => {
+                    let mut d = crate::native_display().try_lock().unwrap();
                     let protocol = event.xclient.data.l[0 as libc::c_int as usize] as Atom;
                     if protocol == self.libx11.extensions.wm_delete_window {
                         d.quit_requested = true;
                     }
                 }
-            }
+                t if t == self.libx11.extensions.xdnd_enter => {
+                    self.drag_n_drop.on_enter(
+                        &mut self.libx11,
+                        self.display,
+                        self.window,
+                        event.xclient.data,
+                    );
+                }
+                t if t == self.libx11.extensions.xdnd_position => {
+                    self.drag_n_drop.on_position(
+                        &mut self.libx11,
+                        self.display,
+                        self.window,
+                        event.xclient.data,
+                    );
+                }
+                t if t == self.libx11.extensions.xdnd_drop => {
+                    self.drag_n_drop.on_drop(
+                        &mut self.libx11,
+                        self.display,
+                        self.window,
+                        event.xclient.data,
+                    );
+                }
+
+                _ => (),
+            },
+            // SelectionNotify
+            31 => match event.xselection.property {
+                p if p == self.libx11.extensions.xdnd_selection => {
+                    let bytes = clipboard::get_property_bytes(
+                        &mut self.libx11,
+                        self.display,
+                        self.window,
+                        p,
+                    );
+                    if let Ok(filenames) = std::str::from_utf8(&bytes) {
+                        let mut d = crate::native_display().try_lock().unwrap();
+                        d.dropped_files = Default::default();
+                        for filename in filenames.lines() {
+                            let path = std::path::PathBuf::from(filename);
+                            if let Ok(bytes) = std::fs::read(&path) {
+                                d.dropped_files.paths.push(path);
+                                d.dropped_files.bytes.push(bytes);
+                            }
+                        }
+                        // drop d since files_dropped_event is likely to need access to it
+                        drop(d);
+                        event_handler.files_dropped_event();
+                    }
+                }
+                _ => (),
+            },
             // SelectionRequest
             30 => {
                 // // some other app is waiting for clibpoard content
@@ -399,6 +454,7 @@ where
     );
     gl::load_gl_funcs(|proc| glx.libgl.get_procaddr(proc));
 
+    display.init_drag_n_drop();
     display.libx11.show_window(display.display, display.window);
 
     (display.libx11.XFlush)(display.display);
@@ -513,6 +569,7 @@ where
             .expect("non-null function pointer")(name.as_ptr() as _)
     });
 
+    display.init_drag_n_drop();
     display.libx11.show_window(display.display, display.window);
     let (w, h) = display
         .libx11
@@ -618,6 +675,7 @@ where
             repeated_keycodes: [false; 256],
             cursor_cache: HashMap::new(),
             update_requested: true,
+            drag_n_drop: Default::default(),
         };
 
         display
