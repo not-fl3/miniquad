@@ -145,6 +145,12 @@ pub struct Platform {
 
     /// When using Wayland, this controls whether to draw the default window decorations.
     pub wayland_use_fallback_decorations: bool,
+
+    /// Set the `WM_CLASS` window property on X11
+    // in fact `WM_CLASS` contains two strings "instance name" and "class name"
+    // for most purposes they are the same so we just use class name for simplicity
+    // https://unix.stackexchange.com/questions/494169/
+    pub linux_x11_wm_class: &'static str,
 }
 
 impl Default for Platform {
@@ -158,6 +164,7 @@ impl Default for Platform {
             swap_interval: None,
             framebuffer_alpha: false,
             wayland_use_fallback_decorations: true,
+            linux_x11_wm_class: "miniquad-application",
         }
     }
 }
@@ -196,6 +203,8 @@ pub struct Conf {
     /// - On macOS, Dock/title bar icon
     /// - TODO: Favicon on HTML5
     /// - TODO: Taskbar/title bar icon on Linux (depends on WM)
+    /// - Note: on gnome (with X11), icon is determined using `WM_CLASS` (can be set under
+    /// `Platform`) and an external `.desktop` file
     pub icon: Option<Icon>,
 
     /// Platform-specific hints (e.g., context creation, driver settings).
