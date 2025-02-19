@@ -806,6 +806,8 @@ pub mod Xresource_h {
 
 pub type XSetWMNormalHints = unsafe extern "C" fn(_: *mut Display, _: Window, _: *mut XSizeHints);
 pub type XAllocSizeHints = unsafe extern "C" fn() -> *mut XSizeHints;
+pub type XAllocClassHint = unsafe extern "C" fn() -> *mut XClassHint;
+pub type XSetClassHint = unsafe extern "C" fn(_: *mut Display, _: Window, _: *mut XClassHint);
 pub type Xutf8SetWMProperties = unsafe extern "C" fn(
     _: *mut Display,
     _: Window,
@@ -1025,6 +1027,8 @@ pub struct LibX11 {
     pub extensions: X11Extensions,
     pub XSetWMNormalHints: XSetWMNormalHints,
     pub XAllocSizeHints: XAllocSizeHints,
+    pub XAllocClassHint: XAllocClassHint,
+    pub XSetClassHint: XSetClassHint,
     pub Xutf8SetWMProperties: Xutf8SetWMProperties,
     pub XLookupString: XLookupString,
     pub XInitThreads: XInitThreads,
@@ -1080,6 +1084,8 @@ impl LibX11 {
             .map(|module| LibX11 {
                 XSetWMNormalHints: module.get_symbol("XSetWMNormalHints").unwrap(),
                 XAllocSizeHints: module.get_symbol("XAllocSizeHints").unwrap(),
+                XAllocClassHint: module.get_symbol("XAllocClassHint").unwrap(),
+                XSetClassHint: module.get_symbol("XSetClassHint").unwrap(),
                 Xutf8SetWMProperties: module.get_symbol("Xutf8SetWMProperties").unwrap(),
                 XLookupString: module.get_symbol("XLookupString").unwrap(),
                 XInitThreads: module.get_symbol("XInitThreads").unwrap(),
