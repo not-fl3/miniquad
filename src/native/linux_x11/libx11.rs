@@ -4,8 +4,6 @@ pub use Xlib_h::*;
 pub use Xresource_h::*;
 pub use Xutil_h::*;
 
-use crate::native::module;
-
 pub mod Xlib_h {
     pub type Display = _XDisplay;
     pub type XEvent = _XEvent;
@@ -804,152 +802,6 @@ pub mod Xresource_h {
     use super::Xlib_h::{XPointer, _XrmHashBucketRec};
 }
 
-pub type XSetWMNormalHints = unsafe extern "C" fn(_: *mut Display, _: Window, _: *mut XSizeHints);
-pub type XAllocSizeHints = unsafe extern "C" fn() -> *mut XSizeHints;
-pub type XAllocClassHint = unsafe extern "C" fn() -> *mut XClassHint;
-pub type XSetClassHint = unsafe extern "C" fn(_: *mut Display, _: Window, _: *mut XClassHint);
-pub type Xutf8SetWMProperties = unsafe extern "C" fn(
-    _: *mut Display,
-    _: Window,
-    _: *const libc::c_char,
-    _: *const libc::c_char,
-    _: *mut *mut libc::c_char,
-    _: libc::c_int,
-    _: *mut XSizeHints,
-    _: *mut XWMHints,
-    _: *mut XClassHint,
-);
-pub type XLookupString = unsafe extern "C" fn(
-    _: *mut XKeyEvent,
-    _: *mut libc::c_char,
-    _: libc::c_int,
-    _: *mut KeySym,
-    _: *mut XComposeStatus,
-) -> libc::c_int;
-
-pub type XInitThreads = unsafe extern "C" fn() -> libc::c_int;
-pub type XrmInitialize = unsafe extern "C" fn();
-pub type XOpenDisplay = unsafe extern "C" fn(_: *const libc::c_char) -> *mut Display;
-pub type XResourceManagerString = unsafe extern "C" fn(_: *mut Display) -> *mut libc::c_char;
-pub type XInternAtom =
-    unsafe extern "C" fn(_: *mut Display, _: *const libc::c_char, _: libc::c_int) -> Atom;
-pub type XGetAtomName = unsafe extern "C" fn(_: *mut Display, _: Atom) -> *mut libc::c_char;
-pub type XCreateColormap =
-    unsafe extern "C" fn(_: *mut Display, _: Window, _: *mut Visual, _: libc::c_int) -> Colormap;
-pub type XCreateWindow = unsafe extern "C" fn(
-    _: *mut Display,
-    _: Window,
-    _: libc::c_int,
-    _: libc::c_int,
-    _: libc::c_uint,
-    _: libc::c_uint,
-    _: libc::c_uint,
-    _: libc::c_int,
-    _: libc::c_uint,
-    _: *mut Visual,
-    _: libc::c_ulong,
-    _: *mut XSetWindowAttributes,
-) -> Window;
-pub type XSetWMProtocols =
-    unsafe extern "C" fn(_: *mut Display, _: Window, _: *mut Atom, _: libc::c_int) -> libc::c_int;
-pub type XChangeProperty = unsafe extern "C" fn(
-    _: *mut Display,
-    _: Window,
-    _: Atom,
-    _: Atom,
-    _: libc::c_int,
-    _: libc::c_int,
-    _: *const libc::c_uchar,
-    _: libc::c_int,
-) -> libc::c_int;
-pub type XSync = unsafe extern "C" fn(_: *mut Display, _: libc::c_int) -> libc::c_int;
-pub type XSetErrorHandler = unsafe extern "C" fn(_: XErrorHandler) -> XErrorHandler;
-pub type XGetWindowAttributes =
-    unsafe extern "C" fn(_: *mut Display, _: Window, _: *mut XWindowAttributes) -> libc::c_int;
-pub type XMapWindow = unsafe extern "C" fn(_: *mut Display, _: Window) -> libc::c_int;
-pub type XLowerWindow = unsafe extern "C" fn(_: *mut Display, _: Window) -> libc::c_int;
-pub type XRaiseWindow = unsafe extern "C" fn(_: *mut Display, _: Window) -> libc::c_int;
-pub type XResizeWindow =
-    unsafe extern "C" fn(_: *mut Display, _: Window, _: libc::c_int, _: libc::c_int) -> libc::c_int;
-pub type XMoveWindow =
-    unsafe extern "C" fn(_: *mut Display, _: Window, _: libc::c_int, _: libc::c_int) -> libc::c_int;
-pub type XPending = unsafe extern "C" fn(_: *mut Display) -> libc::c_int;
-pub type XNextEvent = unsafe extern "C" fn(_: *mut Display, _: *mut XEvent) -> libc::c_int;
-pub type XGetKeyboardMapping = unsafe extern "C" fn(
-    _: *mut Display,
-    _: KeyCode,
-    _: libc::c_int,
-    _: *mut libc::c_int,
-) -> *mut KeySym;
-pub type XGetWindowProperty = unsafe extern "C" fn(
-    _: *mut Display,
-    _: Window,
-    _: Atom,
-    _: libc::c_long,
-    _: libc::c_long,
-    _: libc::c_int,
-    _: Atom,
-    _: *mut Atom,
-    _: *mut libc::c_int,
-    _: *mut libc::c_ulong,
-    _: *mut libc::c_ulong,
-    _: *mut *mut libc::c_uchar,
-) -> libc::c_int;
-pub type XDeleteProperty = unsafe extern "C" fn(_: *mut Display, _: Window, _: Atom) -> libc::c_int;
-pub type XFree = unsafe extern "C" fn(_: *mut libc::c_void) -> libc::c_int;
-pub type XUnmapWindow = unsafe extern "C" fn(_: *mut Display, _: Window) -> libc::c_int;
-pub type XDestroyWindow = unsafe extern "C" fn(_: *mut Display, _: Window) -> libc::c_int;
-pub type XFreeColormap = unsafe extern "C" fn(_: *mut Display, _: Colormap) -> libc::c_int;
-pub type XFlush = unsafe extern "C" fn(_: *mut Display) -> libc::c_int;
-pub type XCloseDisplay = unsafe extern "C" fn(_: *mut Display) -> libc::c_int;
-pub type XGrabPointer = unsafe extern "C" fn(
-    _: *mut Display,
-    _: Window,
-    _: libc::c_int,
-    _: libc::c_uint,
-    _: libc::c_int,
-    _: libc::c_int,
-    _: Window,
-    _: Cursor,
-    _: Time,
-) -> libc::c_int;
-pub type XUngrabPointer = unsafe extern "C" fn(_: *mut Display, _: Time) -> libc::c_int;
-pub type XSendEvent = unsafe extern "C" fn(
-    _: *mut Display,
-    _: Window,
-    _: libc::c_int,
-    _: libc::c_long,
-    _: *mut XEvent,
-) -> libc::c_int;
-pub type XrmGetResource = unsafe extern "C" fn(
-    _: XrmDatabase,
-    _: *const libc::c_char,
-    _: *const libc::c_char,
-    _: *mut *mut libc::c_char,
-    _: *mut XrmValue,
-) -> libc::c_int;
-pub type XrmDestroyDatabase = unsafe extern "C" fn(_: XrmDatabase);
-pub type XrmGetStringDatabase = unsafe extern "C" fn(_: *const libc::c_char) -> XrmDatabase;
-pub type XkbSetDetectableAutoRepeat =
-    unsafe extern "C" fn(_: *mut Display, _: libc::c_int, _: *mut libc::c_int) -> libc::c_int;
-pub type XQueryExtension = unsafe extern "C" fn(
-    _: *mut Display,
-    _: *const libc::c_char,
-    _: *mut libc::c_int,
-    _: *mut libc::c_int,
-    _: *mut libc::c_int,
-) -> libc::c_int;
-pub type XConvertSelection = unsafe extern "C" fn(
-    _: *mut Display,
-    _: Atom,
-    _: Atom,
-    _: Atom,
-    _: Window,
-    _: Time,
-) -> libc::c_int;
-pub type XSetSelectionOwner =
-    unsafe extern "C" fn(_: *mut Display, _: Atom, _: Window, _: Time) -> libc::c_int;
-
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct XColor {
@@ -975,293 +827,127 @@ pub const XC_top_right_corner: libc::c_ushort = 136;
 pub const XC_watch: libc::c_ushort = 150;
 pub const XC_xterm: libc::c_ushort = 152;
 
-pub type XCreateFontCursor = unsafe extern "C" fn(_: *mut Display, _: libc::c_ushort) -> Cursor;
-pub type XCreateBitmapFromData = unsafe extern "C" fn(
-    _: *mut Display,
-    _: Drawable,
-    _: *const libc::c_char,
-    _: libc::c_uint,
-    _: libc::c_uint,
-) -> Pixmap;
-pub type XCreatePixmapCursor = unsafe extern "C" fn(
-    _: *mut Display,
-    _: Pixmap,
-    _: Pixmap,
-    _: *mut XColor,
-    _: *mut XColor,
-    _: libc::c_uint,
-    _: libc::c_uint,
-) -> Cursor;
-pub type XFreePixmap = unsafe extern "C" fn(_: *mut Display, _: Pixmap) -> libc::c_int;
-pub type XDefineCursor = unsafe extern "C" fn(_: *mut Display, _: Window, _: Cursor) -> libc::c_int;
+macro_rules! declare_atoms {
+    ($($name:ident: $atom:literal),*$(,)?) => {
+        #[derive(Clone, Default)]
+        pub struct X11Extensions {
+            $(pub $name: Atom,)*
+        }
+        impl X11Extensions {
+            pub unsafe fn load(libx11: &mut LibX11, display: *mut Display) -> Self {
+                Self {
+                    $($name: {
+                        let atom = std::ffi::CString::new($atom).unwrap();
+                        (libx11.XInternAtom)(display, atom.as_ptr(), false as _)
+                    },)*
+                }
+            }
+        }
+    }
+}
 
-#[derive(Clone, Default)]
-pub struct X11Extensions {
-    pub utf8_string: Atom,
-    pub wm_protocols: Atom,
-    pub wm_delete_window: Atom,
-    pub _wm_state: Atom,
-    pub net_wm_name: Atom,
-    pub net_wm_icon_name: Atom,
-    pub net_wm_icon: Atom,
-    pub cardinal: Atom,
+declare_atoms!(
+    utf8_string: "UTF8_STRING",
+    wm_protocols: "WM_PROTOCOLS",
+    wm_delete_window: "WM_DELETE_WINDOW",
+    _wm_state: "WM_STATE",
+    net_wm_name: "_NET_WM_NAME",
+    net_wm_icon_name: "_NET_WM_ICON_NAME",
+    net_wm_icon: "_NET_WM_ICON",
+    cardinal: "CARDINAL",
     // clipboard
-    pub clipboard: Atom,
-    pub xsel_data: Atom,
-    pub incr: Atom,
+    clipboard: "CLIPBOARD",
+    xsel_data: "XSEL_DATA",
+    incr: "INCR",
     // drag_n_drop related
-    pub xdnd_action_copy: Atom,
-    pub xdnd_aware: Atom,
-    pub xdnd_drop: Atom,
-    pub xdnd_enter: Atom,
-    pub xdnd_finished: Atom,
-    pub xdnd_position: Atom,
-    pub xdnd_selection: Atom,
-    pub xdnd_status: Atom,
-    pub xdnd_type_list: Atom,
-}
+    xdnd_action_copy: "XdndActionCopy",
+    xdnd_aware: "XdndAware",
+    xdnd_drop: "XdndDrop",
+    xdnd_enter: "XdndEnter",
+    xdnd_finished: "XdndFinished",
+    xdnd_position: "XdndPosition",
+    xdnd_selection: "XdndSelection",
+    xdnd_status: "XdndStatus",
+    xdnd_type_list: "XdndTypeList",
+);
 
-#[derive(Clone)]
-pub struct LibX11 {
-    pub module: std::rc::Rc<module::Module>,
+use core::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
+crate::declare_module!(
+    LibX11,
+    "libX11.so",
+    "libX11.so.6",
+    ...
+    ...
+    pub fn XSetWMNormalHints(*mut Display, Window, *mut XSizeHints),
+    pub fn XAllocSizeHints() -> *mut XSizeHints,
+    pub fn XAllocClassHint() -> *mut XClassHint,
+    pub fn XSetClassHint(*mut Display, Window, *mut XClassHint),
+    pub fn Xutf8SetWMProperties(*mut Display, Window, *const c_char, *const c_char, *mut *mut c_char, c_int, *mut XSizeHints, *mut XWMHints, *mut XClassHint),
+    pub fn XLookupString(*mut XKeyEvent, *mut c_char, c_int, *mut KeySym, *mut XComposeStatus) -> c_int,
+    pub fn XInitThreads() -> c_int,
+    pub fn XrmInitialize(),
+    pub fn XOpenDisplay(*const c_char) -> *mut Display,
+    pub fn XResourceManagerString(*mut Display) -> *mut c_char,
+    pub fn XInternAtom(*mut Display, *const c_char, c_int) -> Atom,
+    pub fn XGetAtomName(*mut Display, Atom) -> *mut c_char,
+    pub fn XCreateColormap (*mut Display, Window, *mut Visual, c_int) -> Colormap,
+    pub fn XCreateWindow(*mut Display, Window, c_int, c_int, c_uint, c_uint, c_uint, c_int, c_uint, *mut Visual, c_ulong, *mut XSetWindowAttributes) -> Window,
+    pub fn XSetWMProtocols (*mut Display, Window, *mut Atom, c_int) -> c_int,
+    pub fn XChangeProperty(*mut Display, Window, Atom, Atom, c_int, c_int, *const c_uchar, c_int) -> c_int,
+    pub fn XSync(*mut Display, c_int) -> c_int,
+    pub fn XSetErrorHandler(XErrorHandler) -> XErrorHandler,
+    pub fn XGetWindowAttributes(*mut Display, Window, *mut XWindowAttributes) -> c_int,
+    pub fn XMapWindow(*mut Display, Window) -> c_int,
+    pub fn XLowerWindow(*mut Display, Window) -> c_int,
+    pub fn XRaiseWindow(*mut Display, Window) -> c_int,
+    pub fn XResizeWindow(*mut Display, Window, c_int, c_int) -> c_int,
+    pub fn XMoveWindow(*mut Display, Window, c_int, c_int) -> c_int,
+    pub fn XPending(*mut Display) -> c_int,
+    pub fn XNextEvent(*mut Display, *mut XEvent) -> c_int,
+    pub fn XGetKeyboardMapping(*mut Display, KeyCode, c_int, *mut c_int) -> *mut KeySym,
+    pub fn XGetWindowProperty(*mut Display, Window, Atom, c_long, c_long, c_int, Atom, *mut Atom, *mut c_int, *mut c_ulong, *mut c_ulong, *mut *mut c_uchar) -> c_int,
+    pub fn XDeleteProperty(*mut Display, Window, Atom) -> c_int,
+    pub fn XFree(*mut c_void) -> c_int,
+    pub fn XUnmapWindow(*mut Display, Window) -> c_int,
+    pub fn XDestroyWindow(*mut Display, Window) -> c_int,
+    pub fn XFreeColormap(*mut Display, Colormap) -> c_int,
+    pub fn XFlush(*mut Display) -> c_int,
+    pub fn XCloseDisplay(*mut Display) -> c_int,
+    pub fn XGrabPointer(*mut Display, Window, c_int, c_uint, c_int, c_int, Window, Cursor, Time) -> c_int,
+    pub fn XUngrabPointer(*mut Display, Time) -> c_int,
+    pub fn XSendEvent(*mut Display, Window, c_int, c_long, *mut XEvent) -> c_int,
+    pub fn XrmGetResource(XrmDatabase, *const c_char, *const c_char, *mut *mut c_char, *mut XrmValue) -> c_int,
+    pub fn XrmDestroyDatabase(XrmDatabase),
+    pub fn XrmGetStringDatabase(*const c_char) -> XrmDatabase,
+    pub fn XkbSetDetectableAutoRepeat(*mut Display, c_int, *mut c_int) -> c_int,
+    pub fn XQueryExtension(*mut Display, *const c_char, *mut c_int, *mut c_int, *mut c_int) -> c_int,
+    pub fn XConvertSelection(*mut Display, Atom, Atom, Atom, Window, Time) -> c_int,
+    pub fn XSetSelectionOwner(*mut Display, Atom, Window, Time) -> c_int,
+    pub fn XCreateFontCursor(*mut Display, c_ushort) -> Cursor,
+    pub fn XCreateBitmapFromData(*mut Display, Drawable, *const c_char, c_uint, c_uint) -> Pixmap,
+    pub fn XCreatePixmapCursor(*mut Display, Pixmap, Pixmap, *mut XColor, *mut XColor, c_uint, c_uint) -> Cursor,
+    pub fn XFreePixmap(*mut Display, Pixmap) -> c_int,
+    pub fn XDefineCursor(*mut Display, Window, Cursor) -> c_int,
+    ...
+    ...
     pub extensions: X11Extensions,
-    pub XSetWMNormalHints: XSetWMNormalHints,
-    pub XAllocSizeHints: XAllocSizeHints,
-    pub XAllocClassHint: XAllocClassHint,
-    pub XSetClassHint: XSetClassHint,
-    pub Xutf8SetWMProperties: Xutf8SetWMProperties,
-    pub XLookupString: XLookupString,
-    pub XInitThreads: XInitThreads,
-    pub XrmInitialize: XrmInitialize,
-    pub XOpenDisplay: XOpenDisplay,
-    pub XResourceManagerString: XResourceManagerString,
-    pub XInternAtom: XInternAtom,
-    pub XGetAtomName: XGetAtomName,
-    pub XCreateColormap: XCreateColormap,
-    pub XCreateWindow: XCreateWindow,
-    pub XSetWMProtocols: XSetWMProtocols,
-    pub XChangeProperty: XChangeProperty,
-    pub XSync: XSync,
-    pub XSetErrorHandler: XSetErrorHandler,
-    pub XGetWindowAttributes: XGetWindowAttributes,
-    pub XMapWindow: XMapWindow,
-    pub XLowerWindow: XLowerWindow,
-    pub XRaiseWindow: XRaiseWindow,
-    pub XResizeWindow: XResizeWindow,
-    pub XMoveWindow: XMoveWindow,
-    pub XPending: XPending,
-    pub XNextEvent: XNextEvent,
-    pub XGetKeyboardMapping: XGetKeyboardMapping,
-    pub XGetWindowProperty: XGetWindowProperty,
-    pub XDeleteProperty: XDeleteProperty,
-    pub XFree: XFree,
-    pub XUnmapWindow: XUnmapWindow,
-    pub XDestroyWindow: XDestroyWindow,
-    pub XFreeColormap: XFreeColormap,
-    pub XFlush: XFlush,
-    pub XCloseDisplay: XCloseDisplay,
-    pub XGrabPointer: XGrabPointer,
-    pub XUngrabPointer: XUngrabPointer,
-    pub XSendEvent: XSendEvent,
-    pub XrmGetResource: XrmGetResource,
-    pub XrmDestroyDatabase: XrmDestroyDatabase,
-    pub XrmGetStringDatabase: XrmGetStringDatabase,
-    pub XkbSetDetectableAutoRepeat: XkbSetDetectableAutoRepeat,
-    pub XQueryExtension: XQueryExtension,
-    pub XConvertSelection: XConvertSelection,
-    pub XSetSelectionOwner: XSetSelectionOwner,
-    pub XCreateFontCursor: XCreateFontCursor,
-    pub XCreateBitmapFromData: XCreateBitmapFromData,
-    pub XCreatePixmapCursor: XCreatePixmapCursor,
-    pub XFreePixmap: XFreePixmap,
-    pub XDefineCursor: XDefineCursor,
-}
+);
 
 impl LibX11 {
-    pub fn try_load() -> Result<LibX11, module::Error> {
-        crate::native::module::Module::load("libX11.so")
-            .or_else(|_| crate::native::module::Module::load("libX11.so.6"))
-            .map(|module| LibX11 {
-                XSetWMNormalHints: module.get_symbol("XSetWMNormalHints").unwrap(),
-                XAllocSizeHints: module.get_symbol("XAllocSizeHints").unwrap(),
-                XAllocClassHint: module.get_symbol("XAllocClassHint").unwrap(),
-                XSetClassHint: module.get_symbol("XSetClassHint").unwrap(),
-                Xutf8SetWMProperties: module.get_symbol("Xutf8SetWMProperties").unwrap(),
-                XLookupString: module.get_symbol("XLookupString").unwrap(),
-                XInitThreads: module.get_symbol("XInitThreads").unwrap(),
-                XrmInitialize: module.get_symbol("XrmInitialize").unwrap(),
-                XOpenDisplay: module.get_symbol("XOpenDisplay").unwrap(),
-                XResourceManagerString: module.get_symbol("XResourceManagerString").unwrap(),
-                XInternAtom: module.get_symbol("XInternAtom").unwrap(),
-                XGetAtomName: module.get_symbol("XGetAtomName").unwrap(),
-                XCreateColormap: module.get_symbol("XCreateColormap").unwrap(),
-                XCreateWindow: module.get_symbol("XCreateWindow").unwrap(),
-                XSetWMProtocols: module.get_symbol("XSetWMProtocols").unwrap(),
-                XChangeProperty: module.get_symbol("XChangeProperty").unwrap(),
-                XSync: module.get_symbol("XSync").unwrap(),
-                XSetErrorHandler: module.get_symbol("XSetErrorHandler").unwrap(),
-                XGetWindowAttributes: module.get_symbol("XGetWindowAttributes").unwrap(),
-                XMapWindow: module.get_symbol("XMapWindow").unwrap(),
-                XLowerWindow: module.get_symbol("XLowerWindow").unwrap(),
-                XRaiseWindow: module.get_symbol("XRaiseWindow").unwrap(),
-                XResizeWindow: module.get_symbol("XResizeWindow").unwrap(),
-                XMoveWindow: module.get_symbol("XMoveWindow").unwrap(),
-                XPending: module.get_symbol("XPending").unwrap(),
-                XNextEvent: module.get_symbol("XNextEvent").unwrap(),
-                XGetKeyboardMapping: module.get_symbol("XGetKeyboardMapping").unwrap(),
-                XGetWindowProperty: module.get_symbol("XGetWindowProperty").unwrap(),
-                XDeleteProperty: module.get_symbol("XDeleteProperty").unwrap(),
-                XFree: module.get_symbol("XFree").unwrap(),
-                XUnmapWindow: module.get_symbol("XUnmapWindow").unwrap(),
-                XDestroyWindow: module.get_symbol("XDestroyWindow").unwrap(),
-                XFreeColormap: module.get_symbol("XFreeColormap").unwrap(),
-                XFlush: module.get_symbol("XFlush").unwrap(),
-                XCloseDisplay: module.get_symbol("XCloseDisplay").unwrap(),
-                XGrabPointer: module.get_symbol("XGrabPointer").unwrap(),
-                XUngrabPointer: module.get_symbol("XUngrabPointer").unwrap(),
-                XSendEvent: module.get_symbol("XSendEvent").unwrap(),
-                XrmGetResource: module.get_symbol("XrmGetResource").unwrap(),
-                XrmDestroyDatabase: module.get_symbol("XrmDestroyDatabase").unwrap(),
-                XrmGetStringDatabase: module.get_symbol("XrmGetStringDatabase").unwrap(),
-                XkbSetDetectableAutoRepeat: module
-                    .get_symbol("XkbSetDetectableAutoRepeat")
-                    .unwrap(),
-                XQueryExtension: module.get_symbol("XQueryExtension").unwrap(),
-                XConvertSelection: module.get_symbol("XConvertSelection").unwrap(),
-                XSetSelectionOwner: module.get_symbol("XSetSelectionOwner").unwrap(),
-                XCreateFontCursor: module.get_symbol("XCreateFontCursor").unwrap(),
-                XCreateBitmapFromData: module.get_symbol("XCreateBitmapFromData").unwrap(),
-                XCreatePixmapCursor: module.get_symbol("XCreatePixmapCursor").unwrap(),
-                XFreePixmap: module.get_symbol("XFreePixmap").unwrap(),
-                XDefineCursor: module.get_symbol("XDefineCursor").unwrap(),
-                extensions: X11Extensions::default(),
-                module: std::rc::Rc::new(module),
-            })
-    }
-
     pub unsafe fn load_extensions(&mut self, display: *mut Display) {
-        self.extensions = X11Extensions {
-            utf8_string: (self.XInternAtom)(
-                display,
-                b"UTF8_STRING\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            wm_protocols: (self.XInternAtom)(
-                display,
-                b"WM_PROTOCOLS\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            wm_delete_window: (self.XInternAtom)(
-                display,
-                b"WM_DELETE_WINDOW\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            _wm_state: (self.XInternAtom)(
-                display,
-                b"WM_STATE\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            net_wm_name: (self.XInternAtom)(
-                display,
-                b"_NET_WM_NAME\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            net_wm_icon_name: (self.XInternAtom)(
-                display,
-                b"_NET_WM_ICON_NAME\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            net_wm_icon: (self.XInternAtom)(
-                display,
-                b"_NET_WM_ICON\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            cardinal: (self.XInternAtom)(
-                display,
-                b"CARDINAL\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            clipboard: (self.XInternAtom)(
-                display,
-                b"CLIPBOARD\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            xsel_data: (self.XInternAtom)(
-                display,
-                b"XSEL_DATA\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            incr: (self.XInternAtom)(
-                display,
-                b"INCR\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            xdnd_action_copy: (self.XInternAtom)(
-                display,
-                b"XdndActionCopy\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            xdnd_aware: (self.XInternAtom)(
-                display,
-                b"XdndAware\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            xdnd_drop: (self.XInternAtom)(
-                display,
-                b"XdndDrop\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            xdnd_enter: (self.XInternAtom)(
-                display,
-                b"XdndEnter\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            xdnd_finished: (self.XInternAtom)(
-                display,
-                b"XdndFinished\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            xdnd_position: (self.XInternAtom)(
-                display,
-                b"XdndPosition\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            xdnd_selection: (self.XInternAtom)(
-                display,
-                b"XdndSelection\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            xdnd_status: (self.XInternAtom)(
-                display,
-                b"XdndStatus\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-            xdnd_type_list: (self.XInternAtom)(
-                display,
-                b"XdndTypeList\x00" as *const u8 as *const libc::c_char,
-                false as _,
-            ),
-        };
+        self.extensions = X11Extensions::load(self, display);
     }
 }
 
-pub type XKbKeySymToUtf32 = unsafe extern "C" fn(_: u32) -> u32;
-
-#[derive(Clone)]
-pub struct LibXkbCommon {
-    pub module: std::rc::Rc<module::Module>,
-    pub xkb_keysym_to_utf32: XKbKeySymToUtf32,
-}
-
-impl LibXkbCommon {
-    pub fn try_load() -> Result<Self, module::Error> {
-        crate::native::module::Module::load("libxkbcommon.so")
-            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0"))
-            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0.0.0"))
-            .or_else(|_| crate::native::module::Module::load("libxkbcommon.so.0.0.0.0"))
-            .map(|module| LibXkbCommon {
-                xkb_keysym_to_utf32: module.get_symbol("xkb_keysym_to_utf32").unwrap(),
-                module: std::rc::Rc::new(module),
-            })
-    }
-}
+crate::declare_module!(
+    LibXkbCommon,
+    "libxkbcommon.so",
+    "libxkbcommon.so.0",
+    "libxkbcommon.so.0.0.0",
+    "libxkbcommon.so.0.0.0.0",
+    ...
+    ...
+    pub fn xkb_keysym_to_utf32(u32) -> u32,
+    ...
+    ...
+);

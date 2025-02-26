@@ -95,3 +95,45 @@ pub use linux::*;
 
 #[cfg(target_os = "windows")]
 pub use windows::Module;
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[macro_export]
+macro_rules! declare_module {
+    ($name:ident,
+    $path:literal$(, $fallback:literal)*$(,)?
+    ...
+    // static
+    $($s_vis:vis $s_name:ident: $s_type:ty,)*
+    ...
+    // function
+    $($f_vis:vis fn $f_name:ident($($f_arg:ty),*$(,)?)$( -> $f_ret:ty )?,)*
+    ...
+    // function with variadic arguments
+    $($v_vis:vis fn $v_name:ident($($v_arg:ty),*, ...)$( -> $v_ret:ty )?,)*
+    ...
+    // extra field (should be `Default` so `try_load` can construct it)
+    $($vis:vis $field:ident: $field_ty:ty,)*) => {
+        #[derive(Clone)]
+        pub struct $name {
+            _module: std::rc::Rc<$crate::native::module::Module>,
+            $($s_vis $s_name: $s_type,)*
+            $($f_vis $f_name: unsafe extern "C" fn ($($f_arg),*)$( -> $f_ret)?,)*
+            $($v_vis $v_name: unsafe extern "C" fn ($($v_arg),*, ...)$( -> $v_ret)?,)*
+            $($vis $field: $field_ty)*
+        }
+        impl $name {
+            pub fn try_load() -> Result<Self, $crate::native::module::Error> {
+                $crate::native::module::Module::load($path)$(.or_else(|_| $crate::native::module::Module::load($fallback)))*
+                .map(|module|
+                    $name {
+                        $($s_name: module.get_symbol::<$s_type>(stringify!($s_name)).unwrap(),)*
+                        $($f_name: module.get_symbol::<unsafe extern "C" fn ($($f_arg),*)$( -> $f_ret)?>(stringify!($f_name)).unwrap(),)*
+                        $($v_name: module.get_symbol::<unsafe extern "C" fn ($($v_arg),*, ...)$( -> $v_ret)?>(stringify!($v_name)).unwrap(),)*
+                        $($field: Default::default(),)*
+                        _module: module.into(),
+                    }
+                )
+            }
+        }
+    }
+}
