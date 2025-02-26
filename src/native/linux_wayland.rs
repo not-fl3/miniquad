@@ -58,10 +58,10 @@ struct WaylandPayload {
     //xkb_state: xkb::XkbState,
     decorations: Option<decorations::Decorations>,
 
+    events: Vec<WaylandEvent>,
     keyboard_context: KeyboardContext,
     drag_n_drop: drag_n_drop::WaylandDnD,
     update_requested: bool,
-    event_handler: Option<Box<dyn EventHandler>>,
     closed: bool,
 }
 
@@ -106,34 +106,17 @@ impl WaylandPayload {
                     ),
                     n_bits as _
                 );
-                if let Some(key) = self.keyboard_context.repeated_key {
-                    for _ in 0..count[0] {
-                        EVENTS.push(WaylandEvent::KeyboardKey {
-                            key,
-                            state: WaylandKeyState::Repeat,
-                        });
-                    }
+                for _ in 0..count[0] {
+                    self.keyboard_context.generate_events(
+                        &mut self.xkb,
+                        self.xkb_state,
+                        true,
+                        &mut self.events,
+                    );
                 }
             }
         } else {
             (self.client.wl_display_cancel_read)(self.display);
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum WaylandKeyState {
-    Released = 0,
-    Pressed = 1,
-    Repeat = 2,
-}
-
-impl From<WaylandKeyState> for bool {
-    fn from(value: WaylandKeyState) -> bool {
-        match value {
-            WaylandKeyState::Released => false,
-            WaylandKeyState::Pressed | WaylandKeyState::Repeat => true,
         }
     }
 }
@@ -162,6 +145,7 @@ struct KeyboardContext {
     repeat_info: RepeatInfo,
     repeated_key: Option<core::ffi::c_uint>,
     timerfd: core::ffi::c_int,
+    keymods: KeyMods,
 }
 
 fn new_itimerspec() -> libc::itimerspec {
@@ -184,9 +168,10 @@ impl KeyboardContext {
             repeat_info: Default::default(),
             repeated_key: None,
             timerfd: unsafe { libc::timerfd_create(libc::CLOCK_MONOTONIC, libc::TFD_CLOEXEC) },
+            keymods: Default::default(),
         }
     }
-    fn key_down(&mut self, key: core::ffi::c_uint) {
+    fn track_key_down(&mut self, key: core::ffi::c_uint) {
         let mut timer = new_itimerspec();
         match self.repeat_info {
             RepeatInfo::Repeat { delay, gap } => {
@@ -202,11 +187,30 @@ impl KeyboardContext {
             libc::timerfd_settime(self.timerfd, 0, &timer, core::ptr::null_mut());
         }
     }
-    fn key_up(&mut self, key: core::ffi::c_uint) {
+    fn track_key_up(&mut self, key: core::ffi::c_uint) {
         if self.repeated_key == Some(key) {
             self.repeated_key = None;
             unsafe {
                 libc::timerfd_settime(self.timerfd, 0, &new_itimerspec(), core::ptr::null_mut());
+            }
+        }
+    }
+    unsafe fn generate_events(
+        &self,
+        xkb: &mut LibXkbCommon,
+        xkb_state: *mut xkb_state,
+        repeat: bool,
+        events: &mut Vec<WaylandEvent>,
+    ) {
+        if let Some(key) = self.repeated_key {
+            let keysym = (xkb.xkb_state_key_get_one_sym)(xkb_state, key + 8);
+            let keycode = keycodes::translate(keysym);
+            events.push(WaylandEvent::KeyDown(keycode, self.keymods, repeat));
+            let chr = keycodes::keysym_to_unicode(xkb, keysym);
+            if chr > 0 {
+                if let Some(chr) = char::from_u32(chr as u32) {
+                    events.push(WaylandEvent::Char(chr, self.keymods, repeat));
+                }
             }
         }
     }
@@ -292,18 +296,15 @@ unsafe extern "C" fn seat_handle_capabilities(
 }
 
 enum WaylandEvent {
-    KeyboardLeave,
-    KeyboardKey {
-        key: core::ffi::c_uint,
-        state: WaylandKeyState,
-    },
+    KeyDown(KeyCode, KeyMods, bool),
+    KeyUp(KeyCode, KeyMods),
+    Char(char, KeyMods, bool),
     PointerMotion(f32, f32),
     PointerButton(MouseButton, bool),
     PointerAxis(f32, f32),
     FilesDropped(String),
+    Resize(f32, f32),
 }
-
-static mut EVENTS: Vec<WaylandEvent> = Vec::new();
 
 static mut KEYBOARD_LISTENER: wl_keyboard_listener = wl_keyboard_listener {
     keymap: Some(keyboard_handle_keymap),
@@ -363,11 +364,12 @@ unsafe extern "C" fn keyboard_handle_leave(
     // Clear modifiers
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     (display.xkb.xkb_state_update_mask)(display.xkb_state, 0, 0, 0, 0, 0, 0);
-    // keyboard leave event must be handled here to stop key repeat, otherwise repeat events could
-    // be pushed into EVENTS before the leave event is handled by the `event_handler`
     display.keyboard_context.repeated_key = None;
     display.keyboard_context.enter_serial = None;
-    EVENTS.push(WaylandEvent::KeyboardLeave);
+    display.keyboard_context.keymods.shift = false;
+    display.keyboard_context.keymods.ctrl = false;
+    display.keyboard_context.keymods.logo = false;
+    display.keyboard_context.keymods.alt = false;
 }
 unsafe extern "C" fn keyboard_handle_key(
     data: *mut ::core::ffi::c_void,
@@ -377,22 +379,45 @@ unsafe extern "C" fn keyboard_handle_key(
     key: u32,
     state: wl_keyboard_key_state,
 ) {
-    let state = match state {
-        0 => WaylandKeyState::Released,
-        1 => WaylandKeyState::Pressed,
-        2 => WaylandKeyState::Repeat,
+    use KeyCode::*;
+    let is_down = state == 1 || state == 2;
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    // https://wayland-book.com/seat/keyboard.html
+    // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
+    let keysym = (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
+    let should_repeat = (display.xkb.xkb_keymap_key_repeats)(display.keymap, key + 8) == 1;
+    let keycode = keycodes::translate(keysym);
+    match keycode {
+        LeftShift | RightShift => display.keyboard_context.keymods.shift = is_down,
+        LeftControl | RightControl => display.keyboard_context.keymods.ctrl = is_down,
+        LeftAlt | RightAlt => display.keyboard_context.keymods.alt = is_down,
+        LeftSuper | RightSuper => display.keyboard_context.keymods.logo = is_down,
+        _ => {}
+    }
+    match state {
+        0 => {
+            display.keyboard_context.track_key_up(key);
+            display.events.push(WaylandEvent::KeyUp(
+                keycode,
+                display.keyboard_context.keymods,
+            ));
+        }
+        1 | 2 => {
+            let repeat = state == 2;
+            if !repeat && should_repeat {
+                display.keyboard_context.track_key_down(key);
+            }
+            display.keyboard_context.generate_events(
+                &mut display.xkb,
+                display.xkb_state,
+                repeat,
+                &mut display.events,
+            );
+        }
         _ => {
             eprintln!("Unknown wl_keyboard::key_state");
-            return;
         }
     };
-    let display: &mut WaylandPayload = &mut *(data as *mut _);
-    // release event must be handled here to stop key repeat, otherwise repeat events could be
-    // pushed into EVENTS before the release event is handled by the `event_handler`
-    if state == WaylandKeyState::Released {
-        display.keyboard_context.key_up(key);
-    }
-    EVENTS.push(WaylandEvent::KeyboardKey { key, state });
 }
 unsafe extern "C" fn keyboard_handle_modifiers(
     data: *mut ::core::ffi::c_void,
@@ -446,13 +471,15 @@ static mut POINTER_LISTENER: wl_pointer_listener = wl_pointer_listener {
 };
 
 unsafe extern "C" fn pointer_handle_enter(
-    _data: *mut ::core::ffi::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _serial: u32,
-    _surface: *mut wl_surface,
+    surface: *mut wl_surface,
     _surface_x: i32,
     _surface_y: i32,
 ) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    display.focused_window = surface;
 }
 unsafe extern "C" fn pointer_handle_leave(
     _data: *mut ::core::ffi::c_void,
@@ -462,40 +489,49 @@ unsafe extern "C" fn pointer_handle_leave(
 ) {
 }
 unsafe extern "C" fn pointer_handle_motion(
-    _data: *mut ::core::ffi::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _time: u32,
     surface_x: i32,
     surface_y: i32,
 ) {
-    // From wl_fixed_to_double(), it simply divides by 256
-    let (x, y) = (wl_fixed_to_double(surface_x), wl_fixed_to_double(surface_y));
-    EVENTS.push(WaylandEvent::PointerMotion(x, y));
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    if display.focused_window == display.surface {
+        // From wl_fixed_to_double(), it simply divides by 256
+        let (x, y) = (wl_fixed_to_double(surface_x), wl_fixed_to_double(surface_y));
+        display.events.push(WaylandEvent::PointerMotion(x, y));
+    }
 }
 unsafe extern "C" fn pointer_handle_button(
-    _data: *mut ::core::ffi::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _serial: u32,
     _time: u32,
     button: u32,
     state: u32,
 ) {
-    // The code is defined in the kernel's linux/input-event-codes.h header file, e.g. BTN_LEFT
-    let button = match button {
-        272 => MouseButton::Left,
-        273 => MouseButton::Right,
-        274 => MouseButton::Middle,
-        _ => MouseButton::Unknown,
-    };
-    EVENTS.push(WaylandEvent::PointerButton(button, state == 1));
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    if display.focused_window == display.surface {
+        // The code is defined in the kernel's linux/input-event-codes.h header file, e.g. BTN_LEFT
+        let button = match button {
+            272 => MouseButton::Left,
+            273 => MouseButton::Right,
+            274 => MouseButton::Middle,
+            _ => MouseButton::Unknown,
+        };
+        display
+            .events
+            .push(WaylandEvent::PointerButton(button, state == 1));
+    }
 }
 unsafe extern "C" fn pointer_handle_axis(
-    _data: *mut ::core::ffi::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
     _time: u32,
     axis: u32,
     value: i32,
 ) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
     let mut value = wl_fixed_to_double(value);
     // Normalize the value to {-1, 0, 1}
     value /= value.abs();
@@ -505,10 +541,10 @@ unsafe extern "C" fn pointer_handle_axis(
         // Vertical scroll
         // Wayland defines the direction differently to miniquad so lets flip it
         value = -value;
-        EVENTS.push(WaylandEvent::PointerAxis(0.0, value));
+        display.events.push(WaylandEvent::PointerAxis(0.0, value));
     } else if axis == 1 {
         // Horizontal scroll
-        EVENTS.push(WaylandEvent::PointerAxis(value, 0.0));
+        display.events.push(WaylandEvent::PointerAxis(value, 0.0));
     }
 }
 unsafe extern "C" fn pointer_handle_frame(
@@ -713,9 +749,9 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
             decorations.resize(&mut payload.client, width, height);
         }
 
-        if let Some(ref mut event_handler) = payload.event_handler {
-            event_handler.resize_event(width as _, height as _);
-        }
+        payload
+            .events
+            .push(WaylandEvent::Resize(width as _, height as _));
     }
 }
 
@@ -825,10 +861,10 @@ where
             keyboard: std::ptr::null_mut(),
             focused_window: std::ptr::null_mut(),
             decorations: None,
+            events: Vec::new(),
             keyboard_context: KeyboardContext::new(),
             drag_n_drop: Default::default(),
             update_requested: true,
-            event_handler: None,
             closed: false,
         };
 
@@ -1003,15 +1039,8 @@ where
             ));
         }
 
-        let event_handler = (f.take().unwrap())();
-        display.event_handler = Some(event_handler);
+        let mut event_handler = (f.take().unwrap())();
 
-        let mut keymods = KeyMods {
-            shift: false,
-            ctrl: false,
-            alt: false,
-            logo: false,
-        };
         let (mut last_mouse_x, mut last_mouse_y) = (0.0, 0.0);
 
         display.data_device = wl_request_constructor!(
@@ -1064,111 +1093,70 @@ where
 
             display.block_on_new_event();
 
-            if let Some(ref mut event_handler) = display.event_handler {
-                for event in EVENTS.drain(..) {
-                    match event {
-                        WaylandEvent::KeyboardLeave => {
-                            keymods.shift = false;
-                            keymods.ctrl = false;
-                            keymods.logo = false;
-                            keymods.alt = false;
-                        }
-                        WaylandEvent::KeyboardKey { key, state } => {
-                            // https://wayland-book.com/seat/keyboard.html
-                            // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
-                            let keysym =
-                                (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
-                            let keycode = keycodes::translate(keysym);
-                            let should_repeat =
-                                (display.xkb.xkb_keymap_key_repeats)(display.keymap, key + 8) == 1;
-
-                            match keycode {
-                                KeyCode::LeftShift | KeyCode::RightShift => {
-                                    keymods.shift = state.into()
-                                }
-                                KeyCode::LeftControl | KeyCode::RightControl => {
-                                    keymods.ctrl = state.into()
-                                }
-                                KeyCode::LeftAlt | KeyCode::RightAlt => keymods.alt = state.into(),
-                                KeyCode::LeftSuper | KeyCode::RightSuper => {
-                                    keymods.logo = state.into()
-                                }
-                                _ => {}
-                            }
-
-                            if state.into() {
-                                let repeat = matches!(state, WaylandKeyState::Repeat);
-                                if !repeat && should_repeat {
-                                    display.keyboard_context.key_down(key);
-                                }
-
-                                event_handler.key_down_event(keycode, keymods, repeat);
-
-                                let chr = keycodes::keysym_to_unicode(&mut display.xkb, keysym);
-                                if chr > 0 {
-                                    if let Some(chr) = char::from_u32(chr as u32) {
-                                        event_handler.char_event(chr, keymods, repeat);
-                                    }
-                                }
-                            } else {
-                                event_handler.key_up_event(keycode, keymods);
-                            }
-                        }
-                        WaylandEvent::PointerMotion(x, y) => {
-                            event_handler.mouse_motion_event(x, y);
-                            (last_mouse_x, last_mouse_y) = (x, y);
-                        }
-                        WaylandEvent::PointerButton(button, state) => {
-                            if state {
-                                event_handler.mouse_button_down_event(
-                                    button,
-                                    last_mouse_x,
-                                    last_mouse_y,
-                                );
-                            } else {
-                                event_handler.mouse_button_up_event(
-                                    button,
-                                    last_mouse_x,
-                                    last_mouse_y,
-                                );
-                            }
-                        }
-                        WaylandEvent::PointerAxis(x, y) => event_handler.mouse_wheel_event(x, y),
-                        WaylandEvent::FilesDropped(filenames) => {
-                            let mut d = crate::native_display().try_lock().unwrap();
-                            d.dropped_files = Default::default();
-                            for filename in filenames.lines() {
-                                let path = std::path::PathBuf::from(filename);
-                                if let Ok(bytes) = std::fs::read(&path) {
-                                    d.dropped_files.paths.push(path);
-                                    d.dropped_files.bytes.push(bytes);
-                                }
-                            }
-                            // drop d since files_dropped_event is likely to need access to it
-                            drop(d);
-                            event_handler.files_dropped_event();
+            for event in display.events.drain(..) {
+                match event {
+                    WaylandEvent::KeyDown(keycode, keymods, repeat) => {
+                        event_handler.key_down_event(keycode, keymods, repeat)
+                    }
+                    WaylandEvent::KeyUp(keycode, keymods) => {
+                        event_handler.key_up_event(keycode, keymods)
+                    }
+                    WaylandEvent::Char(chr, keymods, repeat) => {
+                        event_handler.char_event(chr, keymods, repeat)
+                    }
+                    WaylandEvent::PointerMotion(x, y) => {
+                        event_handler.mouse_motion_event(x, y);
+                        (last_mouse_x, last_mouse_y) = (x, y);
+                    }
+                    WaylandEvent::PointerButton(button, state) => {
+                        if state {
+                            event_handler.mouse_button_down_event(
+                                button,
+                                last_mouse_x,
+                                last_mouse_y,
+                            );
+                        } else {
+                            event_handler.mouse_button_up_event(button, last_mouse_x, last_mouse_y);
                         }
                     }
-                }
-
-                {
-                    let d = crate::native_display().try_lock().unwrap();
-                    if d.quit_requested && !d.quit_ordered {
-                        drop(d);
-                        event_handler.quit_requested_event();
+                    WaylandEvent::PointerAxis(x, y) => event_handler.mouse_wheel_event(x, y),
+                    WaylandEvent::Resize(width, height) => {
+                        event_handler.resize_event(width, height)
+                    }
+                    WaylandEvent::FilesDropped(filenames) => {
                         let mut d = crate::native_display().try_lock().unwrap();
-                        if d.quit_requested {
-                            d.quit_ordered = true
+                        d.dropped_files = Default::default();
+                        for filename in filenames.lines() {
+                            let path = std::path::PathBuf::from(filename);
+                            if let Ok(bytes) = std::fs::read(&path) {
+                                d.dropped_files.paths.push(path);
+                                d.dropped_files.bytes.push(bytes);
+                            }
                         }
+                        // drop d since files_dropped_event is likely to need access to it
+                        drop(d);
+                        event_handler.files_dropped_event();
                     }
                 }
+            }
 
-                if !conf.platform.blocking_event_loop || display.update_requested {
-                    display.update_requested = false;
-                    event_handler.update();
-                    event_handler.draw();
-                    (libegl.eglSwapBuffers)(egl_display, egl_surface);
+            {
+                let d = crate::native_display().try_lock().unwrap();
+                if d.quit_requested && !d.quit_ordered {
+                    drop(d);
+                    event_handler.quit_requested_event();
+                    let mut d = crate::native_display().try_lock().unwrap();
+                    if d.quit_requested {
+                        d.quit_ordered = true
+                    }
                 }
+            }
+
+            if !conf.platform.blocking_event_loop || display.update_requested {
+                display.update_requested = false;
+                event_handler.update();
+                event_handler.draw();
+                (libegl.eglSwapBuffers)(egl_display, egl_surface);
             }
         }
     }
