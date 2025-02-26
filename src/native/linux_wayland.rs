@@ -4,7 +4,9 @@ mod libwayland_client;
 mod libwayland_egl;
 mod libxkbcommon;
 
+mod clipboard;
 mod decorations;
+mod drag_n_drop;
 mod extensions;
 mod keycodes;
 mod shm;
@@ -18,20 +20,7 @@ use crate::{
     native::{egl, NativeDisplayData, Request},
 };
 
-use std::collections::HashSet;
-
-const WL_DATA_OFFER_RECEIVE: u32 = 1;
-const WL_DATA_OFFER_DESTROY: u32 = 2;
-
-const WL_DATA_SOURCE_OFFER: u32 = 0;
-const WL_DATA_SOURCE_DESTROY: u32 = 1;
-
-const WL_MARSHAL_FLAG_DESTROY: u32 = (1 << 0);
-
-const WL_DATA_DEVICE_MANAGER_CREATE_DATA_SOURCE: u32 = 0;
-const WL_DATA_DEVICE_MANAGER_GET_DATA_DEVICE: u32 = 1;
-
-const WL_DATA_DEVICE_SET_SELECTION: u32 = 1;
+use core::time::Duration;
 
 fn wl_fixed_to_double(f: i32) -> f32 {
     (f as f32) / 256.0
@@ -40,6 +29,8 @@ fn wl_fixed_to_double(f: i32) -> f32 {
 /// A thing to pass around within *void pointer of wayland's event handler
 struct WaylandPayload {
     client: LibWaylandClient,
+    display: *mut wl_display,
+    registry: *mut wl_registry,
     // this is libwayland-egl.so, a library with ~4 functions
     // not the libEGL.so(which will be loaded, but not here)
     egl: LibWaylandEgl,
@@ -48,6 +39,7 @@ struct WaylandPayload {
     subcompositor: *mut wl_subcompositor,
     xdg_toplevel: *mut extensions::xdg_shell::xdg_toplevel,
     xdg_wm_base: *mut extensions::xdg_shell::xdg_wm_base,
+    xdg_surface: *mut extensions::xdg_shell::xdg_surface,
     surface: *mut wl_surface,
     decoration_manager: *mut extensions::xdg_decoration::zxdg_decoration_manager_v1,
     viewporter: *mut extensions::viewporter::wp_viewporter,
@@ -63,12 +55,161 @@ struct WaylandPayload {
     pointer: *mut wl_pointer,
     keyboard: *mut wl_keyboard,
     focused_window: *mut wl_surface,
-    keyb_serial: u32,
     //xkb_state: xkb::XkbState,
     decorations: Option<decorations::Decorations>,
 
+    keyboard_context: KeyboardContext,
+    drag_n_drop: drag_n_drop::WaylandDnD,
+    update_requested: bool,
     event_handler: Option<Box<dyn EventHandler>>,
     closed: bool,
+}
+
+impl WaylandPayload {
+    /// block until a new event is available
+    // needs to combine both the Wayland events and the key repeat events
+    // the implementation is translated from glfw
+    unsafe fn block_on_new_event(&mut self) {
+        let mut fds = [
+            libc::pollfd {
+                fd: (self.client.wl_display_get_fd)(self.display),
+                events: libc::POLLIN,
+                revents: 0,
+            },
+            libc::pollfd {
+                fd: self.keyboard_context.timerfd,
+                events: libc::POLLIN,
+                revents: 0,
+            },
+        ];
+        (self.client.wl_display_flush)(self.display);
+        while (self.client.wl_display_prepare_read)(self.display) != 0 {
+            (self.client.wl_display_dispatch_pending)(self.display);
+        }
+        if !self.update_requested && libc::poll(fds.as_mut_ptr(), 2, i32::MAX) > 0 {
+            // if the Wayland display has events available
+            if fds[0].revents & libc::POLLIN == 1 {
+                (self.client.wl_display_read_events)(self.display);
+                (self.client.wl_display_dispatch_pending)(self.display);
+            } else {
+                (self.client.wl_display_cancel_read)(self.display);
+            }
+            // if key repeat takes place
+            if fds[1].revents & libc::POLLIN == 1 {
+                let mut count: [libc::size_t; 1] = [0];
+                let n_bits = core::mem::size_of::<libc::size_t>();
+                assert_eq!(
+                    libc::read(
+                        self.keyboard_context.timerfd,
+                        count.as_mut_ptr() as _,
+                        n_bits
+                    ),
+                    n_bits as _
+                );
+                if let Some(key) = self.keyboard_context.repeated_key {
+                    for _ in 0..count[0] {
+                        EVENTS.push(WaylandEvent::KeyboardKey {
+                            key,
+                            state: WaylandKeyState::Repeat,
+                        });
+                    }
+                }
+            }
+        } else {
+            (self.client.wl_display_cancel_read)(self.display);
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum WaylandKeyState {
+    Released = 0,
+    Pressed = 1,
+    Repeat = 2,
+}
+
+impl From<WaylandKeyState> for bool {
+    fn from(value: WaylandKeyState) -> bool {
+        match value {
+            WaylandKeyState::Released => false,
+            WaylandKeyState::Pressed | WaylandKeyState::Repeat => true,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum RepeatInfo {
+    Repeat { delay: Duration, gap: Duration },
+    NoRepeat,
+}
+
+impl Default for RepeatInfo {
+    // default value copied from winit
+    fn default() -> Self {
+        Self::Repeat {
+            delay: Duration::from_millis(200),
+            gap: Duration::from_millis(40),
+        }
+    }
+}
+
+// key repeat in Wayland needs to be handled by the client
+// `KeyboardContext` is mostly for tracking the currently repeated key
+// Note that apparently `timerfd` is not unix compliant and only available on linux
+struct KeyboardContext {
+    enter_serial: Option<core::ffi::c_uint>,
+    repeat_info: RepeatInfo,
+    repeated_key: Option<core::ffi::c_uint>,
+    timerfd: core::ffi::c_int,
+}
+
+fn new_itimerspec() -> libc::itimerspec {
+    libc::itimerspec {
+        it_interval: libc::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        },
+        it_value: libc::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        },
+    }
+}
+
+impl KeyboardContext {
+    fn new() -> Self {
+        Self {
+            enter_serial: None,
+            repeat_info: Default::default(),
+            repeated_key: None,
+            timerfd: unsafe { libc::timerfd_create(libc::CLOCK_MONOTONIC, libc::TFD_CLOEXEC) },
+        }
+    }
+    fn key_down(&mut self, key: core::ffi::c_uint) {
+        let mut timer = new_itimerspec();
+        match self.repeat_info {
+            RepeatInfo::Repeat { delay, gap } => {
+                self.repeated_key = Some(key);
+                timer.it_interval.tv_sec = gap.as_secs() as _;
+                timer.it_interval.tv_nsec = gap.subsec_nanos() as _;
+                timer.it_value.tv_sec = delay.as_secs() as _;
+                timer.it_value.tv_nsec = delay.subsec_nanos() as _;
+            }
+            RepeatInfo::NoRepeat => self.repeated_key = None,
+        }
+        unsafe {
+            libc::timerfd_settime(self.timerfd, 0, &timer, core::ptr::null_mut());
+        }
+    }
+    fn key_up(&mut self, key: core::ffi::c_uint) {
+        if self.repeated_key == Some(key) {
+            self.repeated_key = None;
+            unsafe {
+                libc::timerfd_settime(self.timerfd, 0, &new_itimerspec(), core::ptr::null_mut());
+            }
+        }
+    }
 }
 
 #[macro_export]
@@ -107,24 +248,6 @@ macro_rules! wl_request {
     }};
 }
 
-#[macro_export]
-macro_rules! wl_request_flags {
-    ($libwayland:expr, $instance:expr, $request_name:expr, $interface:expr, $version:expr, $flags:expr) => {
-        wl_request_flags!($libwayland, $instance, $request_name, $interface, $version, $flags, ())
-    };
-
-    ($libwayland:expr, $instance:expr, $request_name:expr, $interface:expr, $version:expr, $flags:expr, $($arg:expr),*) => {{
-        ($libwayland.wl_proxy_marshal_flags)(
-            $instance as _,
-            $request_name,
-            $interface as *const _,
-            $version,
-            $flags,
-            $($arg,)*
-        )
-    }};
-}
-
 static mut SEAT_LISTENER: wl_seat_listener = wl_seat_listener {
     capabilities: Some(seat_handle_capabilities),
     name: Some(seat_handle_name),
@@ -138,38 +261,46 @@ unsafe extern "C" fn seat_handle_capabilities(
     let display: &mut WaylandPayload = &mut *(data as *mut _);
 
     if caps & wl_seat_capability_WL_SEAT_CAPABILITY_POINTER != 0 {
-        // struct wl_pointer *pointer = wl_seat_get_pointer (seat);
-        let id: *mut wl_proxy = wl_request_constructor!(
+        display.pointer = wl_request_constructor!(
             display.client,
             seat,
             WL_SEAT_GET_POINTER,
             display.client.wl_pointer_interface
         );
-        assert!(!id.is_null());
-        // wl_pointer_add_listener (pointer, &pointer_listener, NULL);
-        (display.client.wl_proxy_add_listener)(id, &POINTER_LISTENER as *const _ as _, data);
+        assert!(!display.pointer.is_null());
+        (display.client.wl_proxy_add_listener)(
+            display.pointer as _,
+            &POINTER_LISTENER as *const _ as _,
+            data,
+        );
     }
 
     if caps & wl_seat_capability_WL_SEAT_CAPABILITY_KEYBOARD != 0 {
-        // struct wl_keyboard *keyboard = wl_seat_get_keyboard(seat);
-        let id: *mut wl_proxy = wl_request_constructor!(
+        display.keyboard = wl_request_constructor!(
             display.client,
             seat,
             WL_SEAT_GET_KEYBOARD,
             display.client.wl_keyboard_interface
         );
-        assert!(!id.is_null());
-        // wl_keyboard_add_listener(keyboard, &keyboard_listener, NULL);
-        (display.client.wl_proxy_add_listener)(id, &KEYBOARD_LISTENER as *const _ as _, data);
+        assert!(!display.keyboard.is_null());
+        (display.client.wl_proxy_add_listener)(
+            display.keyboard as _,
+            &KEYBOARD_LISTENER as *const _ as _,
+            data,
+        );
     }
 }
 
 enum WaylandEvent {
     KeyboardLeave,
-    KeyboardKey(u32, bool),
+    KeyboardKey {
+        key: core::ffi::c_uint,
+        state: WaylandKeyState,
+    },
     PointerMotion(f32, f32),
     PointerButton(MouseButton, bool),
     PointerAxis(f32, f32),
+    FilesDropped(String),
 }
 
 static mut EVENTS: Vec<WaylandEvent> = Vec::new();
@@ -215,13 +346,13 @@ unsafe extern "C" fn keyboard_handle_keymap(
 unsafe extern "C" fn keyboard_handle_enter(
     data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
-    serial: u32,
+    serial: ::core::ffi::c_uint,
     _surface: *mut wl_surface,
     _keys: *mut wl_array,
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     // Needed for setting the clipboard
-    display.keyb_serial = serial;
+    display.keyboard_context.enter_serial = Some(serial);
 }
 unsafe extern "C" fn keyboard_handle_leave(
     data: *mut ::core::ffi::c_void,
@@ -232,17 +363,36 @@ unsafe extern "C" fn keyboard_handle_leave(
     // Clear modifiers
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     (display.xkb.xkb_state_update_mask)(display.xkb_state, 0, 0, 0, 0, 0, 0);
+    // keyboard leave event must be handled here to stop key repeat, otherwise repeat events could
+    // be pushed into EVENTS before the leave event is handled by the `event_handler`
+    display.keyboard_context.repeated_key = None;
+    display.keyboard_context.enter_serial = None;
     EVENTS.push(WaylandEvent::KeyboardLeave);
 }
 unsafe extern "C" fn keyboard_handle_key(
-    _data: *mut ::core::ffi::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
     _serial: u32,
     _time: u32,
     key: u32,
-    state: u32,
+    state: wl_keyboard_key_state,
 ) {
-    EVENTS.push(WaylandEvent::KeyboardKey(key, state == 1));
+    let state = match state {
+        0 => WaylandKeyState::Released,
+        1 => WaylandKeyState::Pressed,
+        2 => WaylandKeyState::Repeat,
+        _ => {
+            eprintln!("Unknown wl_keyboard::key_state");
+            return;
+        }
+    };
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    // release event must be handled here to stop key repeat, otherwise repeat events could be
+    // pushed into EVENTS before the release event is handled by the `event_handler`
+    if state == WaylandKeyState::Released {
+        display.keyboard_context.key_up(key);
+    }
+    EVENTS.push(WaylandEvent::KeyboardKey { key, state });
 }
 unsafe extern "C" fn keyboard_handle_modifiers(
     data: *mut ::core::ffi::c_void,
@@ -265,11 +415,20 @@ unsafe extern "C" fn keyboard_handle_modifiers(
     );
 }
 unsafe extern "C" fn keyboard_handle_repeat_info(
-    _data: *mut ::core::ffi::c_void,
+    data: *mut ::core::ffi::c_void,
     _wl_keyboard: *mut wl_keyboard,
-    _rate: i32,
-    _delay: i32,
+    rate: i32,
+    delay: i32,
 ) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    display.keyboard_context.repeat_info = if rate == 0 {
+        RepeatInfo::NoRepeat
+    } else {
+        RepeatInfo::Repeat {
+            delay: Duration::from_millis(delay as u64),
+            gap: Duration::from_micros(1_000_000 / rate as u64),
+        }
+    };
 }
 
 static mut POINTER_LISTENER: wl_pointer_listener = wl_pointer_listener {
@@ -417,6 +576,7 @@ unsafe extern "C" fn registry_add_object(
                 display.client.wl_compositor_interface,
                 1,
             ) as _;
+            assert!(!display.compositor.is_null());
         }
         "wl_subcompositor" => {
             display.subcompositor = display.client.wl_registry_bind(
@@ -425,6 +585,7 @@ unsafe extern "C" fn registry_add_object(
                 display.client.wl_subcompositor_interface,
                 1,
             ) as _;
+            assert!(!display.subcompositor.is_null());
         }
         "xdg_wm_base" => {
             display.xdg_wm_base = display.client.wl_registry_bind(
@@ -433,6 +594,7 @@ unsafe extern "C" fn registry_add_object(
                 &extensions::xdg_shell::xdg_wm_base_interface,
                 1,
             ) as _;
+            assert!(!display.xdg_wm_base.is_null());
         }
         "zxdg_decoration_manager" | "zxdg_decoration_manager_v1" => {
             display.decoration_manager = display.client.wl_registry_bind(
@@ -465,6 +627,7 @@ unsafe extern "C" fn registry_add_object(
                 display.client.wl_seat_interface,
                 seat_version,
             ) as _;
+            assert!(!display.seat.is_null());
             (display.client.wl_proxy_add_listener)(
                 display.seat as _,
                 &SEAT_LISTENER as *const _ as _,
@@ -572,241 +735,39 @@ unsafe extern "C" fn xdg_wm_base_handle_ping(
     );
 }
 
-static mut DATA_DEVICE_LISTENER: wl_data_device_listener = wl_data_device_listener {
-    data_offer: Some(data_device_handle_data_offer),
-    enter: None,
-    leave: None,
-    motion: None,
-    drop: None,
-    selection: Some(data_device_handle_selection),
-};
-
 static mut DATA_OFFER_LISTENER: wl_data_offer_listener = wl_data_offer_listener {
     offer: Some(data_offer_handle_offer),
-    source_actions: None,
-    action: None,
+    source_actions: Some(drag_n_drop::data_offer_handle_source_actions),
+    action: Some(data_offer_handle_action),
 };
 
 unsafe extern "C" fn data_offer_handle_offer(
     _data: *mut ::core::ffi::c_void,
-    _offer: *mut wl_data_offer,
-    mime_type: *const ::core::ffi::c_char,
+    _data_offer: *mut wl_data_offer,
+    _mime_type: *const ::core::ffi::c_char,
 ) {
-    let mime_type = std::ffi::CStr::from_ptr(mime_type).to_str().unwrap();
-    println!("Clipboard receive mime: {mime_type}");
+}
+
+unsafe extern "C" fn data_offer_handle_action(
+    _data: *mut ::core::ffi::c_void,
+    _data_offer: *mut wl_data_offer,
+    _action: ::core::ffi::c_uint,
+) {
 }
 
 unsafe extern "C" fn data_device_handle_data_offer(
     data: *mut ::core::ffi::c_void,
-    _data_device: *mut wl_data_device,
-    offer: *mut wl_data_offer,
-) {
-    println!("data_device_handle_data_offer()");
-    //let display: &mut WaylandPayload = &mut *(data as *mut _);
-    //(display.client.wl_proxy_add_listener)(offer as _, &DATA_OFFER_LISTENER as *const _ as _, data);
-}
-
-unsafe extern "C" fn data_device_handle_selection(
-    data: *mut ::core::ffi::c_void,
     data_device: *mut wl_data_device,
-    offer: *mut wl_data_offer,
+    data_offer: *mut wl_data_offer,
 ) {
-    // An application has set the clipboard contents
-
-    if offer.is_null() {
-        // Clipboard is empty
-        println!("Clipboard is empty");
-        return;
-    }
-
     let display: &mut WaylandPayload = &mut *(data as *mut _);
-
-    println!("Clipboard is set");
-    /*
-    let mut fds: [i32; 2] = [0, 0];
-    libc::pipe(fds.as_mut_ptr());
-    libc::close(fds[1]);
-
-    // wl_data_offer_receive(offer, "text/plain", fds[1]);
-    let mime = std::ffi::CString::new("text/plain;charset=utf-8").unwrap();
-    let version = display.client.wl_proxy_get_version(offer);
-    wl_request_flags!(
-        display.client,
-        offer,
-        WL_DATA_OFFER_RECEIVE,
-        std::ptr::null::<std::ffi::c_void>(),
-        version,
-        0,
-        mime,
-        fds[1]
+    assert_eq!(data_device, display.data_device);
+    (display.client.wl_proxy_add_listener)(
+        data_offer as _,
+        &DATA_OFFER_LISTENER as *const _ as _,
+        data,
     );
-
-    // To read in this thread, we would need: wl_display_roundtrip(display);
-
-    let fd = fds[0];
-    std::thread::spawn(move || {
-        let mut content = String::new();
-        let mut buf = [0u8; 1024];
-        loop {
-            let n = libc::read(fd, buf.as_mut_ptr() as *mut std::ffi::c_void, buf.len());
-            if n <= 0 {
-                break;
-            }
-            assert!(n <= 1024);
-            content.push_str(std::str::from_utf8(&buf[..n as usize]).unwrap());
-        }
-        libc::close(fd);
-
-        /*
-        // wl_data_offer_destroy(offer);
-        wl_request_flags!(
-            display.client,
-            offer,
-            WL_DATA_OFFER_DESTROY,
-            std::ptr::null::<std::ffi::c_void>(),
-            version,
-            WL_MARSHAL_FLAG_DESTROY
-        );
-        */
-    });
-    */
 }
-
-static mut DATA_SOURCE_LISTENER: wl_data_source_listener = wl_data_source_listener {
-    target: None,
-    send: Some(data_source_handle_send),
-    cancelled: Some(data_source_handle_cancelled),
-    dnd_drop_performed: None,
-    dnd_finished: None,
-    action: None,
-};
-
-unsafe extern "C" fn data_source_handle_send(
-    data: *mut std::ffi::c_void,
-    source: *mut wl_data_source,
-    mime_type: *const std::ffi::c_char,
-    fd: i32,
-) {
-    let text: &String = &*(data as *mut _);
-
-    let mime_type = std::ffi::CStr::from_ptr(mime_type).to_str().unwrap();
-    match mime_type {
-        "text/plain" => {
-            libc::write(fd, text.as_bytes().as_ptr() as *const _, text.len());
-        }
-        _ => {}
-    }
-    libc::close(fd);
-}
-
-unsafe extern "C" fn data_source_handle_cancelled(
-    data: *mut std::ffi::c_void,
-    source: *mut wl_data_source,
-) {
-    println!("data_source_handle_cancelled()");
-    let display: &mut WaylandPayload = &mut *(data as *mut _);
-
-    //assert!(!source.is_null());
-    //let proxy: *mut wl_proxy = source as *mut _;
-    //let version = (display.client.wl_proxy_get_version)(proxy);
-    let version = display.client.wl_proxy_get_version(source);
-
-    let id = (display.client.wl_proxy_marshal_flags)(
-        source as _,
-        WL_DATA_SOURCE_DESTROY,
-        std::ptr::null::<std::ffi::c_void>() as *const _,
-        3,
-        WL_MARSHAL_FLAG_DESTROY,
-    );
-    assert!(!id.is_null());
-}
-
-struct WaylandClipboard {
-    display: *mut WaylandPayload,
-    text: String,
-}
-
-impl WaylandClipboard {
-    fn new(display: *mut WaylandPayload) -> Self {
-        Self {
-            display,
-            text: String::new(),
-        }
-    }
-}
-
-impl crate::native::Clipboard for WaylandClipboard {
-    fn get(&mut self) -> Option<String> {
-        None
-    }
-    fn set(&mut self, data: &str) {
-        println!("wayland set clip {data}");
-        self.text.clear();
-        self.text.push_str(data);
-        //self.text = data.to_string();
-
-        unsafe {
-            let display: &mut WaylandPayload = &mut *self.display;
-
-            //let proxy: *mut wl_proxy = display.data_device_manager as _;
-            //assert!(!proxy.is_null());
-            //let version = (display.client.wl_proxy_get_version)(proxy);
-            let version = display
-                .client
-                .wl_proxy_get_version(display.data_device_manager);
-
-            // wl_data_device_manager_create_data_source
-            let source = wl_request_flags!(
-                display.client,
-                display.data_device_manager,
-                WL_DATA_DEVICE_MANAGER_CREATE_DATA_SOURCE,
-                display.client.wl_data_source_interface,
-                version,
-                0,
-                std::ptr::null_mut::<std::ffi::c_void>()
-            );
-            assert!(!source.is_null());
-
-            // Setup a listener to receive wl_data_source events.
-            // wl_data_source_add_listener
-            (display.client.wl_proxy_add_listener)(
-                source,
-                &DATA_SOURCE_LISTENER as *const _ as _,
-                &self.text as *const _ as _,
-            );
-
-            // Advertise a few MIME types
-            // wl_data_source_offer(source, "text/plain");
-            let mime = std::ffi::CString::new("text/plain;charset=utf-8").unwrap();
-            let version = display.client.wl_proxy_get_version(source);
-            wl_request_flags!(
-                display.client,
-                source,
-                WL_DATA_SOURCE_OFFER,
-                std::ptr::null::<std::ffi::c_void>(),
-                version,
-                0,
-                mime.as_ptr()
-            );
-
-            // wl_data_device_set_selection
-            let version = display.client.wl_proxy_get_version(display.data_device);
-            wl_request_flags!(
-                display.client,
-                display.data_device,
-                WL_DATA_DEVICE_SET_SELECTION,
-                std::ptr::null::<std::ffi::c_void>(),
-                version,
-                0,
-                source,
-                display.keyb_serial
-            );
-        }
-    }
-}
-
-unsafe impl Send for WaylandClipboard {}
-unsafe impl Sync for WaylandClipboard {}
 
 pub fn run<F>(conf: &crate::conf::Conf, f: &mut Option<F>) -> Option<()>
 where
@@ -823,7 +784,7 @@ where
             return None;
         }
 
-        let registry: *mut wl_proxy = wl_request_constructor!(
+        let registry: *mut wl_registry = wl_request_constructor!(
             client,
             wdisplay,
             WL_DISPLAY_GET_REGISTRY,
@@ -839,13 +800,16 @@ where
         let xkb_context = (xkb.xkb_context_new)(0);
 
         let mut display = WaylandPayload {
-            client: client.clone(),
+            client,
+            display: wdisplay,
+            registry,
             egl,
             xkb,
             compositor: std::ptr::null_mut(),
             subcompositor: std::ptr::null_mut(),
             xdg_toplevel: std::ptr::null_mut(),
             xdg_wm_base: std::ptr::null_mut(),
+            xdg_surface: std::ptr::null_mut(),
             surface: std::ptr::null_mut(),
             decoration_manager: std::ptr::null_mut(),
             viewporter: std::ptr::null_mut(),
@@ -860,59 +824,27 @@ where
             pointer: std::ptr::null_mut(),
             keyboard: std::ptr::null_mut(),
             focused_window: std::ptr::null_mut(),
-            keyb_serial: 0,
             decorations: None,
+            keyboard_context: KeyboardContext::new(),
+            drag_n_drop: Default::default(),
+            update_requested: true,
             event_handler: None,
             closed: false,
         };
 
         let (tx, rx) = std::sync::mpsc::channel();
-        let clipboard = Box::new(WaylandClipboard::new(&mut display as *mut _));
+        let clipboard = Box::new(clipboard::WaylandClipboard::new(&mut display as *mut _));
         crate::set_display(NativeDisplayData {
             ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
         });
 
         (display.client.wl_proxy_add_listener)(
-            registry,
+            display.registry as _,
             &registry_listener as *const _ as _,
             &mut display as *mut _ as _,
         );
-        (display.client.wl_display_roundtrip)(wdisplay);
+        (display.client.wl_display_dispatch)(display.display);
 
-        assert!(!display.data_device_manager.is_null());
-        assert!(!display.seat.is_null());
-        display.data_device = wl_request_flags!(
-            display.client,
-            display.data_device_manager,
-            WL_DATA_DEVICE_MANAGER_GET_DATA_DEVICE,
-            display.client.wl_data_device_interface,
-            display
-                .client
-                .wl_proxy_get_version(display.data_device_manager),
-            0,
-            std::ptr::null::<std::ffi::c_void>(),
-            display.seat
-        ) as _;
-        //display.data_device = wl_request_constructor!(
-        //    display.client,
-        //    display.data_device_manager,
-        //    1,
-        //    display.client.wl_data_device_interface,
-        //    display.seat
-        //) as _;
-        assert!(!display.data_device.is_null());
-
-        // wl_data_device_add_listener(data_device, &data_device_listener, NULL);
-        (display.client.wl_proxy_add_listener)(
-            display.data_device as _,
-            &DATA_DEVICE_LISTENER as *const _ as _,
-            &mut display as *mut _ as _,
-        );
-
-        assert!(!display.compositor.is_null());
-        assert!(!display.xdg_wm_base.is_null());
-        assert!(!display.subcompositor.is_null());
-        assert!(!display.seat.is_null());
         //assert!(!display.keymap.is_null());
         //assert!(!display.xkb_state.is_null());
 
@@ -947,28 +879,28 @@ where
         );
         assert!(!display.surface.is_null());
 
-        let xdg_surface: *mut extensions::xdg_shell::xdg_surface = wl_request_constructor!(
+        display.xdg_surface = wl_request_constructor!(
             display.client,
             display.xdg_wm_base,
             extensions::xdg_shell::xdg_wm_base::get_xdg_surface,
             &extensions::xdg_shell::xdg_surface_interface,
             display.surface
         );
-        assert!(!xdg_surface.is_null());
+        assert!(!display.xdg_surface.is_null());
 
         let xdg_surface_listener = extensions::xdg_shell::xdg_surface_listener {
             configure: Some(xdg_surface_handle_configure),
         };
 
         (display.client.wl_proxy_add_listener)(
-            xdg_surface as _,
+            display.xdg_surface as _,
             &xdg_surface_listener as *const _ as _,
             &mut display as *mut _ as _,
         );
 
         display.xdg_toplevel = wl_request_constructor!(
             display.client,
-            xdg_surface,
+            display.xdg_surface,
             extensions::xdg_shell::xdg_surface::get_toplevel,
             &extensions::xdg_shell::xdg_toplevel_interface
         );
@@ -994,8 +926,17 @@ where
             title.as_ptr()
         );
 
+        let wm_class = std::ffi::CString::new(conf.platform.linux_wm_class).unwrap();
+
+        wl_request!(
+            display.client,
+            display.xdg_toplevel,
+            extensions::xdg_shell::xdg_toplevel::set_app_id,
+            wm_class.as_ptr()
+        );
+
         wl_request!(display.client, display.surface, WL_SURFACE_COMMIT);
-        (display.client.wl_display_roundtrip)(wdisplay);
+        (display.client.wl_display_dispatch)(display.display);
 
         display.egl_window = (display.egl.wl_egl_window_create)(
             display.surface as _,
@@ -1016,6 +957,10 @@ where
         }
         if (libegl.eglMakeCurrent)(egl_display, egl_surface, egl_surface, context) == 0 {
             panic!("eglMakeCurrent failed");
+        }
+
+        if (libegl.eglSwapInterval)(egl_display, conf.platform.swap_interval.unwrap_or(1)) == 0 {
+            eprintln!("eglSwapInterval failed");
         }
 
         // For some reason, setting fullscreen before egl_window is created leads
@@ -1067,91 +1012,106 @@ where
             alt: false,
             logo: false,
         };
-        let mut repeated_keys: HashSet<u32> = HashSet::new();
         let (mut last_mouse_x, mut last_mouse_y) = (0.0, 0.0);
 
-        while !display.closed {
-            (client.wl_display_dispatch_pending)(wdisplay);
+        display.data_device = wl_request_constructor!(
+            display.client,
+            display.data_device_manager,
+            WL_DATA_DEVICE_MANAGER_GET_DATA_DEVICE,
+            display.client.wl_data_device_interface,
+            display.seat
+        ) as _;
+        assert!(!display.data_device.is_null());
+
+        let data_device_listener = wl_data_device_listener {
+            data_offer: Some(data_device_handle_data_offer),
+            enter: Some(drag_n_drop::data_device_handle_enter),
+            leave: Some(drag_n_drop::data_device_handle_leave),
+            motion: Some(drag_n_drop::data_device_handle_motion),
+            drop: Some(drag_n_drop::data_device_handle_drop),
+            selection: Some(clipboard::data_device_handle_selection),
+        };
+        (display.client.wl_proxy_add_listener)(
+            display.data_device as _,
+            &data_device_listener as *const _ as _,
+            &mut display as *mut _ as _,
+        );
+
+        while !(display.closed || crate::native_display().try_lock().unwrap().quit_ordered) {
+            while let Ok(request) = rx.try_recv() {
+                match request {
+                    Request::SetFullscreen(full) => {
+                        if full {
+                            wl_request!(
+                                display.client,
+                                display.xdg_toplevel,
+                                extensions::xdg_shell::xdg_toplevel::set_fullscreen,
+                                std::ptr::null_mut::<*mut wl_output>()
+                            );
+                        } else {
+                            wl_request!(
+                                display.client,
+                                display.xdg_toplevel,
+                                extensions::xdg_shell::xdg_toplevel::unset_fullscreen
+                            );
+                        }
+                    }
+                    Request::ScheduleUpdate => display.update_requested = true,
+                    // TODO: implement the other events
+                    _ => (),
+                }
+            }
+
+            display.block_on_new_event();
 
             if let Some(ref mut event_handler) = display.event_handler {
-                for key in &repeated_keys {
-                    let keysym =
-                        (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
-                    let keycode = keycodes::translate(keysym);
-
-                    event_handler.key_down_event(keycode, keymods, true);
-
-                    let chr = keycodes::keysym_to_unicode(&mut display.xkb, keysym);
-                    if chr > 0 {
-                        if let Some(chr) = char::from_u32(chr as u32) {
-                            event_handler.char_event(chr, keymods, true);
-                        }
-                    }
-                }
-
-                while let Ok(request) = rx.try_recv() {
-                    #[allow(clippy::single_match)]
-                    match request {
-                        Request::SetFullscreen(full) => {
-                            if full {
-                                wl_request!(
-                                    display.client,
-                                    display.xdg_toplevel,
-                                    extensions::xdg_shell::xdg_toplevel::set_fullscreen,
-                                    std::ptr::null_mut::<*mut wl_output>()
-                                );
-                            } else {
-                                wl_request!(
-                                    display.client,
-                                    display.xdg_toplevel,
-                                    extensions::xdg_shell::xdg_toplevel::unset_fullscreen
-                                );
-                            }
-                        }
-                        // TODO: implement the other events
-                        _ => (),
-                    }
-                }
-
                 for event in EVENTS.drain(..) {
                     match event {
                         WaylandEvent::KeyboardLeave => {
-                            repeated_keys.clear();
                             keymods.shift = false;
                             keymods.ctrl = false;
                             keymods.logo = false;
                             keymods.alt = false;
                         }
-                        WaylandEvent::KeyboardKey(key, state) => {
+                        WaylandEvent::KeyboardKey { key, state } => {
                             // https://wayland-book.com/seat/keyboard.html
                             // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
                             let keysym =
                                 (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
                             let keycode = keycodes::translate(keysym);
+                            let should_repeat =
+                                (display.xkb.xkb_keymap_key_repeats)(display.keymap, key + 8) == 1;
 
                             match keycode {
-                                KeyCode::LeftShift | KeyCode::RightShift => keymods.shift = state,
-                                KeyCode::LeftControl | KeyCode::RightControl => {
-                                    keymods.ctrl = state
+                                KeyCode::LeftShift | KeyCode::RightShift => {
+                                    keymods.shift = state.into()
                                 }
-                                KeyCode::LeftAlt | KeyCode::RightAlt => keymods.alt = state,
-                                KeyCode::LeftSuper | KeyCode::RightSuper => keymods.logo = state,
+                                KeyCode::LeftControl | KeyCode::RightControl => {
+                                    keymods.ctrl = state.into()
+                                }
+                                KeyCode::LeftAlt | KeyCode::RightAlt => keymods.alt = state.into(),
+                                KeyCode::LeftSuper | KeyCode::RightSuper => {
+                                    keymods.logo = state.into()
+                                }
                                 _ => {}
                             }
 
-                            if state {
-                                event_handler.key_down_event(keycode, keymods, false);
-                                repeated_keys.insert(key);
+                            if state.into() {
+                                let repeat = matches!(state, WaylandKeyState::Repeat);
+                                if !repeat && should_repeat {
+                                    display.keyboard_context.key_down(key);
+                                }
+
+                                event_handler.key_down_event(keycode, keymods, repeat);
 
                                 let chr = keycodes::keysym_to_unicode(&mut display.xkb, keysym);
                                 if chr > 0 {
                                     if let Some(chr) = char::from_u32(chr as u32) {
-                                        event_handler.char_event(chr, keymods, false);
+                                        event_handler.char_event(chr, keymods, repeat);
                                     }
                                 }
                             } else {
                                 event_handler.key_up_event(keycode, keymods);
-                                repeated_keys.remove(&key);
                             }
                         }
                         WaylandEvent::PointerMotion(x, y) => {
@@ -1174,14 +1134,42 @@ where
                             }
                         }
                         WaylandEvent::PointerAxis(x, y) => event_handler.mouse_wheel_event(x, y),
+                        WaylandEvent::FilesDropped(filenames) => {
+                            let mut d = crate::native_display().try_lock().unwrap();
+                            d.dropped_files = Default::default();
+                            for filename in filenames.lines() {
+                                let path = std::path::PathBuf::from(filename);
+                                if let Ok(bytes) = std::fs::read(&path) {
+                                    d.dropped_files.paths.push(path);
+                                    d.dropped_files.bytes.push(bytes);
+                                }
+                            }
+                            // drop d since files_dropped_event is likely to need access to it
+                            drop(d);
+                            event_handler.files_dropped_event();
+                        }
                     }
                 }
 
-                event_handler.update();
-                event_handler.draw();
-            }
+                {
+                    let d = crate::native_display().try_lock().unwrap();
+                    if d.quit_requested && !d.quit_ordered {
+                        drop(d);
+                        event_handler.quit_requested_event();
+                        let mut d = crate::native_display().try_lock().unwrap();
+                        if d.quit_requested {
+                            d.quit_ordered = true
+                        }
+                    }
+                }
 
-            (libegl.eglSwapBuffers)(egl_display, egl_surface);
+                if !conf.platform.blocking_event_loop || display.update_requested {
+                    display.update_requested = false;
+                    event_handler.update();
+                    event_handler.draw();
+                    (libegl.eglSwapBuffers)(egl_display, egl_surface);
+                }
+            }
         }
     }
 

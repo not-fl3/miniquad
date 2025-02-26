@@ -235,7 +235,7 @@ impl LibX11 {
         (self.XFree)(hints as *mut libc::c_void);
 
         let class_hint = (self.XAllocClassHint)();
-        let wm_class = std::ffi::CString::new(conf.platform.linux_x11_wm_class).unwrap();
+        let wm_class = std::ffi::CString::new(conf.platform.linux_wm_class).unwrap();
         (*class_hint).res_name = wm_class.as_ptr() as _;
         (*class_hint).res_class = wm_class.as_ptr() as _;
         (self.XSetClassHint)(display, window, class_hint);
