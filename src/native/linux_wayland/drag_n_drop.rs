@@ -81,7 +81,7 @@ pub(super) unsafe extern "C" fn data_device_handle_drop(
                 .data_offer_receive(display.display, data_offer, mime_type.as_ptr());
         wl_request!(display.client, data_offer, WL_DATA_OFFER_FINISH);
         if let Ok(filenames) = String::from_utf8(bytes) {
-            EVENTS.push(WaylandEvent::FilesDropped(filenames));
+            display.events.push(WaylandEvent::FilesDropped(filenames));
         }
     }
 }
