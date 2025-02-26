@@ -554,14 +554,30 @@ impl LibWaylandClient {
             name,
             (*interface).name,
             version,
-            std::ptr::null_mut::<std::ffi::c_void>(),
         );
         id as *mut _
     }
-
-    pub unsafe fn wl_proxy_get_version<T>(&self, proxy: *mut T) -> u32 {
-        let proxy: *mut wl_proxy = proxy as _;
-        assert!(!proxy.is_null());
-        (self.wl_proxy_get_version)(proxy)
+    pub unsafe fn data_offer_receive(
+        &mut self,
+        display: *mut wl_display,
+        data_offer: *mut wl_data_offer,
+        mime_type: *const c_char,
+    ) -> Vec<u8> {
+        let mut fds: [c_int; 2] = [0; 2];
+        assert_eq!(libc::pipe(fds.as_mut_ptr()), 0);
+        (self.wl_proxy_marshal)(data_offer as _, WL_DATA_OFFER_RECEIVE, mime_type, fds[1]);
+        libc::close(fds[1]);
+        (self.wl_display_roundtrip)(display);
+        let mut bytes = Vec::new();
+        loop {
+            let mut buf = [0_u8; 1024];
+            let n = libc::read(fds[0], buf.as_mut_ptr() as _, buf.len());
+            if n <= 0 {
+                break;
+            }
+            bytes.extend_from_slice(&buf[..n as usize]);
+        }
+        libc::close(fds[0]);
+        bytes
     }
 }

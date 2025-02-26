@@ -558,6 +558,10 @@ where
         panic!("eglMakeCurrent failed");
     }
 
+    if (egl_lib.eglSwapInterval)(egl_display, conf.platform.swap_interval.unwrap_or(1)) == 0 {
+        eprintln!("eglSwapInterval failed");
+    }
+
     crate::native::gl::load_gl_funcs(|proc| {
         let name = std::ffi::CString::new(proc).unwrap();
         (egl_lib.eglGetProcAddress)(name.as_ptr() as _)

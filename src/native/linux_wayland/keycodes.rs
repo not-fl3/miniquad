@@ -5,6 +5,7 @@ pub fn translate(keysym: u32) -> KeyCode {
     // See xkbcommon/xkbcommon-keysyms.h
     match keysym {
         65307 => KeyCode::Escape,
+        65056 => KeyCode::Tab, // LeftTab
         65289 => KeyCode::Tab,
         65505 => KeyCode::LeftShift,
         65506 => KeyCode::RightShift,
