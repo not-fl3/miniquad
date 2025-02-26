@@ -541,9 +541,9 @@ where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     unsafe {
-        let client = LibWaylandClient::try_load()?;
-        let egl = LibWaylandEgl::try_load()?;
-        let xkb = LibXkbCommon::try_load()?;
+        let client = LibWaylandClient::try_load().ok()?;
+        let egl = LibWaylandEgl::try_load().ok()?;
+        let xkb = LibXkbCommon::try_load().ok()?;
 
         let wdisplay = (client.wl_display_connect)(std::ptr::null_mut());
         if wdisplay.is_null() {

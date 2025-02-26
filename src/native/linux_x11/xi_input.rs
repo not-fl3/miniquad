@@ -4,7 +4,6 @@ use super::{
     libx11::{self, Display, Window, _XPrivDisplay},
     xi_input,
 };
-use crate::native::module;
 
 pub const XIAllDevices: libc::c_int = 0 as libc::c_int;
 pub const XI_RawMotion: libc::c_int = 17 as libc::c_int;
@@ -46,49 +45,24 @@ pub struct XIRawEvent {
     pub raw_values: *mut libc::c_double,
 }
 
-type XQueryExtension = fn(
-    _: *mut Display,
-    _: *const libc::c_char,
-    _: *mut libc::c_int,
-    _: *mut libc::c_int,
-    _: *mut libc::c_int,
-) -> libc::c_int;
-type XIQueryVersion = fn(
-    dpy: *mut Display,
-    major_version_inout: *mut libc::c_int,
-    minor_version_inout: *mut libc::c_int,
-) -> libc::c_int;
-type XISelectEvents =
-    fn(dpy: *mut Display, win: Window, masks: *mut XIEventMask, num_masks: libc::c_int);
-type XGetEventData = fn(_: *mut Display, _: *mut libx11::XGenericEventCookie) -> libc::c_int;
-type XFreeEventData = fn(_: *mut Display, _: *mut libx11::XGenericEventCookie);
-
-#[derive(Clone)]
-pub struct LibXi {
-    _module: std::rc::Rc<module::Module>,
-    _XQueryExtension: XQueryExtension,
-    XIQueryVersion: XIQueryVersion,
-    XISelectEvents: XISelectEvents,
-    XGetEventData: XGetEventData,
-    XFreeEventData: XFreeEventData,
+use core::ffi::{c_char, c_int};
+crate::declare_module!(
+    LibXi,
+    "libXi.so",
+    "libXi.so.6",
+    ...
+    ...
+    pub fn XQueryExtension(*mut Display, *const c_char, *mut c_int, *mut c_int, *mut c_int) -> c_int,
+    pub fn XIQueryVersion(*mut Display, *mut c_int, *mut c_int) -> c_int,
+    pub fn XISelectEvents(*mut Display, Window, *mut XIEventMask, c_int),
+    pub fn XGetEventData(*mut Display, *mut libx11::XGenericEventCookie) -> c_int,
+    pub fn XFreeEventData(*mut Display, *mut libx11::XGenericEventCookie),
+    ...
+    ...
     pub xi_extension_opcode: Option<i32>,
-}
+);
 
 impl LibXi {
-    pub fn try_load() -> Result<LibXi, module::Error> {
-        module::Module::load("libXi.so")
-            .or_else(|_| module::Module::load("libXi.so.6"))
-            .map(|module| LibXi {
-                _XQueryExtension: module.get_symbol("XQueryExtension").unwrap(),
-                XIQueryVersion: module.get_symbol("XIQueryVersion").unwrap(),
-                XISelectEvents: module.get_symbol("XISelectEvents").unwrap(),
-                XGetEventData: module.get_symbol("XGetEventData").unwrap(),
-                XFreeEventData: module.get_symbol("XFreeEventData").unwrap(),
-                xi_extension_opcode: None,
-                _module: std::rc::Rc::new(module),
-            })
-    }
-
     pub unsafe fn query_xi_extension(
         &mut self,
         libx11: &mut libx11::LibX11,
