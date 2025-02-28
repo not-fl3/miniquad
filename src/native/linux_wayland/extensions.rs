@@ -1,5 +1,6 @@
 #![allow(unused_variables, dead_code, non_upper_case_globals, static_mut_refs)]
 
+pub mod cursor;
 pub mod libdecor;
 // pub mod viewporter;
 pub mod xdg_decoration;

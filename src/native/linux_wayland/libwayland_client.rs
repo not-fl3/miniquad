@@ -643,3 +643,39 @@ impl LibWaylandClient {
         bytes
     }
 }
+
+#[macro_export]
+macro_rules! wl_request_constructor {
+    ($libwayland:expr, $instance:expr, $request_name:expr, $interface:expr) => {
+        wl_request_constructor!($libwayland, $instance, $request_name, $interface, ())
+    };
+
+    ($libwayland:expr, $instance:expr, $request_name:expr, $interface:expr, $($arg:expr),*) => {{
+        let id: *mut wl_proxy;
+
+        id = ($libwayland.wl_proxy_marshal_constructor)(
+            $instance as _,
+            $request_name,
+            $interface as _,
+            std::ptr::null_mut::<std::ffi::c_void>(),
+            $($arg,)*
+        );
+
+        id as *mut _
+    }};
+}
+
+#[macro_export]
+macro_rules! wl_request {
+    ($libwayland:expr, $instance:expr, $request_name:expr) => {
+        wl_request!($libwayland, $instance, $request_name, ())
+    };
+
+    ($libwayland:expr, $instance:expr, $request_name:expr, $($arg:expr),*) => {{
+        ($libwayland.wl_proxy_marshal)(
+            $instance as _,
+            $request_name,
+            $($arg,)*
+        )
+    }};
+}

@@ -11,6 +11,7 @@ mod extensions;
 mod keycodes;
 mod shm;
 
+use crate::{wl_request, wl_request_constructor};
 use libwayland_client::*;
 use libwayland_egl::*;
 use libxkbcommon::*;
@@ -39,7 +40,6 @@ struct WaylandPayload {
     xdg_toplevel: *mut extensions::xdg_shell::xdg_toplevel,
     xdg_wm_base: *mut extensions::xdg_shell::xdg_wm_base,
     surface: *mut wl_surface,
-    decoration_manager: *mut extensions::xdg_decoration::zxdg_decoration_manager_v1,
     shm: *mut wl_shm,
     seat: *mut wl_seat,
     data_device_manager: *mut wl_data_device_manager,
@@ -49,9 +49,10 @@ struct WaylandPayload {
     keymap: XkbKeymap,
 
     egl_window: *mut wl_egl_window,
-    pointer: *mut wl_pointer,
+    pointer_context: PointerContext,
     keyboard: *mut wl_keyboard,
     focused_window: *mut wl_surface,
+    decoration_manager: *mut extensions::xdg_decoration::zxdg_decoration_manager_v1,
     decorations: Option<decorations::Decorations>,
 
     events: Vec<WaylandEvent>,
@@ -112,6 +113,55 @@ impl WaylandPayload {
             }
         } else {
             (self.client.wl_display_cancel_read)(self.display);
+        }
+    }
+    unsafe fn init_data_device(&mut self) {
+        self.data_device = wl_request_constructor!(
+            self.client,
+            self.data_device_manager,
+            WL_DATA_DEVICE_MANAGER_GET_DATA_DEVICE,
+            self.client.wl_data_device_interface,
+            self.seat
+        );
+        assert!(!self.data_device.is_null());
+        DATA_DEVICE_LISTENER.data_offer = data_device_handle_data_offer;
+        DATA_DEVICE_LISTENER.enter = drag_n_drop::data_device_handle_enter;
+        DATA_DEVICE_LISTENER.leave = drag_n_drop::data_device_handle_leave;
+        DATA_DEVICE_LISTENER.drop = drag_n_drop::data_device_handle_drop;
+        DATA_DEVICE_LISTENER.selection = clipboard::data_device_handle_selection;
+        (self.client.wl_proxy_add_listener)(
+            self.data_device as _,
+            &DATA_DEVICE_LISTENER as *const _ as _,
+            self as *mut _ as _,
+        );
+    }
+    unsafe fn init_pointer_context(&mut self) {
+        if !self.pointer_context.cursor_shape_manager.is_null() {
+            self.pointer_context.cursor_shape_device = wl_request_constructor!(
+                self.client,
+                self.pointer_context.cursor_shape_manager,
+                extensions::cursor::CURSOR_SHAPE_MANAGER_GET_POINTER,
+                &extensions::cursor::wp_cursor_shape_device_v1_interface,
+                self.pointer_context.pointer
+            );
+            assert!(!self.pointer_context.cursor_shape_device.is_null());
+        } else {
+            eprintln!("Wayland compositor does not support cursor shape");
+        }
+    }
+    unsafe fn set_fullscreen(&mut self, full: bool) {
+        if full {
+            wl_request!(
+                self.client,
+                self.xdg_toplevel,
+                extensions::xdg_shell::xdg_toplevel::set_fullscreen,
+            );
+        } else {
+            wl_request!(
+                self.client,
+                self.xdg_toplevel,
+                extensions::xdg_shell::xdg_toplevel::unset_fullscreen
+            );
         }
     }
 }
@@ -227,40 +277,142 @@ impl KeyboardContext {
     }
 }
 
-#[macro_export]
-macro_rules! wl_request_constructor {
-    ($libwayland:expr, $instance:expr, $request_name:expr, $interface:expr) => {
-        wl_request_constructor!($libwayland, $instance, $request_name, $interface, ())
-    };
-
-    ($libwayland:expr, $instance:expr, $request_name:expr, $interface:expr, $($arg:expr),*) => {{
-        let id: *mut wl_proxy;
-
-        id = ($libwayland.wl_proxy_marshal_constructor)(
-            $instance as _,
-            $request_name,
-            $interface as _,
-            std::ptr::null_mut::<std::ffi::c_void>(),
-            $($arg,)*
-        );
-
-        id as *mut _
-    }};
+struct PointerContext {
+    pointer: *mut wl_pointer,
+    enter_serial: Option<core::ffi::c_uint>,
+    position: (f32, f32),
+    /// Wayland does not remember what cursor icon a window has; if the cursor leaves and comes
+    /// back, it will not be reset to what icon it had unless we keep track of it.
+    cursor_icon: Option<crate::CursorIcon>,
+    /// Wayland requires that only the window with focus can set the cursor. So if we don't have
+    /// the focus yet, we queue the cursor icon and apply it once we regain focus.
+    queued_cursor_icon: Option<Option<crate::CursorIcon>>,
+    cursor_shape_manager: *mut extensions::cursor::wp_cursor_shape_manager_v1,
+    cursor_shape_device: *mut extensions::cursor::wp_cursor_shape_device_v1,
+    pointer_constraints: *mut extensions::cursor::zwp_pointer_constraints_v1,
+    locked_pointer: *mut extensions::cursor::zwp_locked_pointer_v1,
+    relative_pointer_manager: *mut extensions::cursor::zwp_relative_pointer_manager_v1,
+    relative_pointer: *mut extensions::cursor::zwp_relative_pointer_v1,
 }
+impl PointerContext {
+    fn new() -> Self {
+        Self {
+            pointer: std::ptr::null_mut(),
+            enter_serial: None,
+            position: (0., 0.),
+            cursor_icon: Some(crate::CursorIcon::Default),
+            queued_cursor_icon: None,
+            cursor_shape_manager: std::ptr::null_mut(),
+            cursor_shape_device: std::ptr::null_mut(),
+            pointer_constraints: std::ptr::null_mut(),
+            locked_pointer: std::ptr::null_mut(),
+            relative_pointer_manager: std::ptr::null_mut(),
+            relative_pointer: std::ptr::null_mut(),
+        }
+    }
+    unsafe fn set_cursor_with_serial(
+        &mut self,
+        client: &mut LibWaylandClient,
+        icon: Option<crate::CursorIcon>,
+        serial: core::ffi::c_uint,
+    ) {
+        self.cursor_icon = icon;
+        if let Some(icon) = icon {
+            if !self.cursor_shape_device.is_null() {
+                wl_request!(
+                    client,
+                    self.cursor_shape_device,
+                    extensions::cursor::CURSOR_SHAPE_DEVICE_SET_SHAPE,
+                    serial,
+                    extensions::cursor::translate_cursor(icon)
+                );
+            }
+        } else {
+            wl_request!(
+                client,
+                self.pointer,
+                WL_POINTER_SET_CURSOR,
+                serial,
+                std::ptr::null_mut::<wl_surface>(),
+                0,
+                0
+            );
+        }
+    }
+    fn handle_enter(&mut self, client: &mut LibWaylandClient, serial: core::ffi::c_uint) {
+        self.enter_serial = Some(serial);
+        let change = self.queued_cursor_icon.take().unwrap_or(self.cursor_icon);
+        unsafe {
+            self.set_cursor_with_serial(client, change, serial);
+        }
+    }
+    /// Change the cursor to the given icon (or hide it if `None` is passed)
+    /// If the window currently does not have focus, the change will be queued and applied once the
+    /// window regains focus
+    fn set_cursor(&mut self, client: &mut LibWaylandClient, icon: Option<crate::CursorIcon>) {
+        if let Some(serial) = self.enter_serial {
+            unsafe {
+                self.set_cursor_with_serial(client, icon, serial);
+            }
+        } else {
+            self.queued_cursor_icon = Some(icon);
+        }
+    }
+    unsafe fn set_grab(&mut self, data: *mut std::ffi::c_void, grab: bool) {
+        let display: &mut WaylandPayload = &mut *(data as *mut _);
+        if grab {
+            if self.locked_pointer.is_null() {
+                if !self.pointer_constraints.is_null() {
+                    self.locked_pointer = wl_request_constructor!(
+                        display.client,
+                        self.pointer_constraints,
+                        extensions::cursor::POINTER_CONSTRAINTS_LOCK_POINTER,
+                        &extensions::cursor::zwp_locked_pointer_v1_interface,
+                        display.surface,
+                        self.pointer,
+                        std::ptr::null_mut::<wl_region>(),
+                        extensions::cursor::zwp_pointer_constraints_v1_lifetime_PERSISTENT
+                    );
+                    assert!(!self.locked_pointer.is_null());
+                } else {
+                    eprintln!("Wayland compositor does not support locked pointer");
+                }
+            }
 
-#[macro_export]
-macro_rules! wl_request {
-    ($libwayland:expr, $instance:expr, $request_name:expr) => {
-        wl_request!($libwayland, $instance, $request_name, ())
-    };
-
-    ($libwayland:expr, $instance:expr, $request_name:expr, $($arg:expr),*) => {{
-        ($libwayland.wl_proxy_marshal)(
-            $instance as _,
-            $request_name,
-            $($arg,)*
-        )
-    }};
+            if self.relative_pointer.is_null() {
+                if !self.relative_pointer_manager.is_null() {
+                    self.relative_pointer = wl_request_constructor!(
+                        display.client,
+                        self.relative_pointer_manager,
+                        extensions::cursor::RELATIVE_POINTER_MANAGER_GET_RELATIVE_POINTER,
+                        &extensions::cursor::zwp_relative_pointer_v1_interface,
+                        self.pointer
+                    );
+                    assert!(!self.relative_pointer.is_null());
+                    (RELATIVE_POINTER_LISTENER.relative_motion) =
+                        relative_pointer_handle_relative_motion;
+                    (display.client.wl_proxy_add_listener)(
+                        self.relative_pointer as _,
+                        &RELATIVE_POINTER_LISTENER as *const _ as _,
+                        data,
+                    );
+                } else {
+                    eprintln!("Wayland compositor does not support relative pointer");
+                }
+            }
+        } else {
+            if !self.locked_pointer.is_null() {
+                wl_request!(display.client, self.locked_pointer, 0);
+                (display.client.wl_proxy_destroy)(self.locked_pointer as _);
+                self.locked_pointer = std::ptr::null_mut();
+            }
+            if !self.relative_pointer.is_null() {
+                wl_request!(display.client, self.relative_pointer, 0);
+                (display.client.wl_proxy_destroy)(self.relative_pointer as _);
+                self.relative_pointer = std::ptr::null_mut();
+            }
+        }
+    }
 }
 
 static mut SEAT_LISTENER: wl_seat_listener = wl_seat_listener::dummy();
@@ -271,6 +423,8 @@ static mut DATA_DEVICE_LISTENER: wl_data_device_listener = wl_data_device_listen
 static mut DATA_OFFER_LISTENER: wl_data_offer_listener = wl_data_offer_listener::dummy();
 static mut XDG_WM_BASE_LISTENER: extensions::xdg_shell::xdg_wm_base_listener =
     extensions::xdg_shell::xdg_wm_base_listener::dummy();
+static mut RELATIVE_POINTER_LISTENER: extensions::cursor::zwp_relative_pointer_v1_listener =
+    extensions::cursor::zwp_relative_pointer_v1_listener::dummy();
 
 unsafe extern "C" fn seat_handle_capabilities(
     data: *mut std::ffi::c_void,
@@ -280,19 +434,20 @@ unsafe extern "C" fn seat_handle_capabilities(
     let display: &mut WaylandPayload = &mut *(data as *mut _);
 
     if caps & wl_seat_capability_WL_SEAT_CAPABILITY_POINTER != 0 {
-        display.pointer = wl_request_constructor!(
+        display.pointer_context.pointer = wl_request_constructor!(
             display.client,
             seat,
             WL_SEAT_GET_POINTER,
             display.client.wl_pointer_interface
         );
-        assert!(!display.pointer.is_null());
+        assert!(!display.pointer_context.pointer.is_null());
         POINTER_LISTENER.enter = pointer_handle_enter;
         POINTER_LISTENER.axis = pointer_handle_axis;
         POINTER_LISTENER.motion = pointer_handle_motion;
         POINTER_LISTENER.button = pointer_handle_button;
+        POINTER_LISTENER.leave = pointer_handle_leave;
         (display.client.wl_proxy_add_listener)(
-            display.pointer as _,
+            display.pointer_context.pointer as _,
             &POINTER_LISTENER as *const _ as _,
             data,
         );
@@ -325,6 +480,7 @@ enum WaylandEvent {
     KeyUp(KeyCode, KeyMods),
     Char(char, KeyMods, bool),
     PointerMotion(f32, f32),
+    RawMotion(f32, f32),
     PointerButton(MouseButton, bool),
     PointerAxis(f32, f32),
     FilesDropped(String),
@@ -468,14 +624,28 @@ unsafe extern "C" fn keyboard_handle_repeat_info(
 unsafe extern "C" fn pointer_handle_enter(
     data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
-    _serial: u32,
+    serial: u32,
     surface: *mut wl_surface,
     _surface_x: i32,
     _surface_y: i32,
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     display.focused_window = surface;
+    display
+        .pointer_context
+        .handle_enter(&mut display.client, serial);
 }
+
+unsafe extern "C" fn pointer_handle_leave(
+    data: *mut ::core::ffi::c_void,
+    _wl_pointer: *mut wl_pointer,
+    _serial: u32,
+    _surface: *mut wl_surface,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    display.pointer_context.enter_serial = None;
+}
+
 unsafe extern "C" fn pointer_handle_motion(
     data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
@@ -489,6 +659,7 @@ unsafe extern "C" fn pointer_handle_motion(
         let d = crate::native_display().lock().unwrap();
         let x = wl_fixed_to_double(surface_x) * d.dpi_scale;
         let y = wl_fixed_to_double(surface_y) * d.dpi_scale;
+        display.pointer_context.position = (x, y);
         display.events.push(WaylandEvent::PointerMotion(x, y));
     }
 }
@@ -538,9 +709,28 @@ unsafe extern "C" fn pointer_handle_axis(
     }
 }
 
+unsafe extern "C" fn relative_pointer_handle_relative_motion(
+    data: *mut ::core::ffi::c_void,
+    _relative_pointer: *mut extensions::cursor::zwp_relative_pointer_v1,
+    _utime_hi: core::ffi::c_uint,
+    _utime_lo: core::ffi::c_uint,
+    dx: wl_fixed_t,
+    dy: wl_fixed_t,
+    _dx_unaccel: wl_fixed_t,
+    _dy_unaccel: wl_fixed_t,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    if display.focused_window == display.surface {
+        // From wl_fixed_to_double(), it simply divides by 256
+        let dx = wl_fixed_to_double(dx);
+        let dy = wl_fixed_to_double(dy);
+        display.events.push(WaylandEvent::RawMotion(dx, dy));
+    }
+}
+
 unsafe extern "C" fn output_handle_scale(
     data: *mut std::ffi::c_void,
-    _: *mut wl_output,
+    _output: *mut wl_output,
     factor: core::ffi::c_int,
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
@@ -618,6 +808,30 @@ unsafe extern "C" fn registry_add_object(
                 registry,
                 name,
                 &extensions::xdg_decoration::zxdg_decoration_manager_v1_interface,
+                1,
+            ) as _;
+        }
+        "wp_cursor_shape_manager_v1" => {
+            display.pointer_context.cursor_shape_manager = display.client.wl_registry_bind(
+                registry,
+                name,
+                &extensions::cursor::wp_cursor_shape_manager_v1_interface as _,
+                1,
+            ) as _;
+        }
+        "zwp_pointer_constraints_v1" => {
+            display.pointer_context.pointer_constraints = display.client.wl_registry_bind(
+                registry,
+                name,
+                &extensions::cursor::zwp_pointer_constraints_v1_interface as _,
+                1,
+            ) as _;
+        }
+        "zwp_relative_pointer_manager_v1" => {
+            display.pointer_context.relative_pointer_manager = display.client.wl_registry_bind(
+                registry,
+                name,
+                &extensions::cursor::zwp_relative_pointer_manager_v1_interface as _,
                 1,
             ) as _;
         }
@@ -724,7 +938,6 @@ where
             xdg_toplevel: std::ptr::null_mut(),
             xdg_wm_base: std::ptr::null_mut(),
             surface: std::ptr::null_mut(),
-            decoration_manager: std::ptr::null_mut(),
             shm: std::ptr::null_mut(),
             seat: std::ptr::null_mut(),
             data_device_manager: std::ptr::null_mut(),
@@ -733,11 +946,12 @@ where
             keymap: Default::default(),
             xkb_state: std::ptr::null_mut(),
             egl_window: std::ptr::null_mut(),
-            pointer: std::ptr::null_mut(),
             keyboard: std::ptr::null_mut(),
             focused_window: std::ptr::null_mut(),
+            decoration_manager: std::ptr::null_mut(),
             decorations: None,
             events: Vec::new(),
+            pointer_context: PointerContext::new(),
             keyboard_context: KeyboardContext::new(),
             drag_n_drop: Default::default(),
             update_requested: true,
@@ -750,28 +964,6 @@ where
             &registry_listener as *const _ as _,
             &mut display as *mut _ as _,
         );
-        (display.client.wl_display_dispatch)(display.display);
-
-        // Construct the `wl_data_device` here, as it needs both the `wl_seat` and the
-        // `wl_data_device_manager`, and they may be constructed in different orders
-        display.data_device = wl_request_constructor!(
-            display.client,
-            display.data_device_manager,
-            WL_DATA_DEVICE_MANAGER_GET_DATA_DEVICE,
-            display.client.wl_data_device_interface,
-            display.seat
-        ) as _;
-        assert!(!display.data_device.is_null());
-        DATA_DEVICE_LISTENER.data_offer = data_device_handle_data_offer;
-        DATA_DEVICE_LISTENER.enter = drag_n_drop::data_device_handle_enter;
-        DATA_DEVICE_LISTENER.leave = drag_n_drop::data_device_handle_leave;
-        DATA_DEVICE_LISTENER.drop = drag_n_drop::data_device_handle_drop;
-        DATA_DEVICE_LISTENER.selection = clipboard::data_device_handle_selection;
-        (display.client.wl_proxy_add_listener)(
-            display.data_device as _,
-            &DATA_DEVICE_LISTENER as *const _ as _,
-            &mut display as *mut _ as _,
-        );
 
         let (tx, rx) = std::sync::mpsc::channel();
         let clipboard = Box::new(clipboard::WaylandClipboard::new(&mut display as *mut _));
@@ -781,8 +973,12 @@ where
             blocking_event_loop: conf.platform.blocking_event_loop,
             ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
         });
-        //assert!(!display.keymap.is_null());
-        //assert!(!display.xkb_state.is_null());
+
+        (display.client.wl_display_dispatch)(display.display);
+        (display.client.wl_display_dispatch)(display.display);
+
+        display.init_data_device();
+        display.init_pointer_context();
 
         let mut libegl = egl::LibEgl::try_load().ok()?;
         let (context, config, egl_display) = egl::create_egl_context(
@@ -845,11 +1041,7 @@ where
         // For some reason, setting fullscreen before egl_window is created leads
         // to segfault because wl_egl_window_create returns NULL.
         if conf.fullscreen {
-            wl_request!(
-                display.client,
-                display.xdg_toplevel,
-                extensions::xdg_shell::xdg_toplevel::set_fullscreen,
-            )
+            display.set_fullscreen(true);
         }
 
         wl_request!(display.client, display.surface, WL_SURFACE_COMMIT);
@@ -858,27 +1050,28 @@ where
 
         let mut event_handler = (f.take().unwrap())();
 
-        let (mut last_mouse_x, mut last_mouse_y) = (0.0, 0.0);
-
         while !crate::native_display().try_lock().unwrap().quit_ordered {
             while let Ok(request) = rx.try_recv() {
                 match request {
                     Request::SetFullscreen(full) => {
-                        if full {
-                            wl_request!(
-                                display.client,
-                                display.xdg_toplevel,
-                                extensions::xdg_shell::xdg_toplevel::set_fullscreen,
-                            );
-                        } else {
-                            wl_request!(
-                                display.client,
-                                display.xdg_toplevel,
-                                extensions::xdg_shell::xdg_toplevel::unset_fullscreen
-                            );
-                        }
+                        display.set_fullscreen(full);
                     }
                     Request::ScheduleUpdate => display.update_requested = true,
+                    Request::SetMouseCursor(icon) => {
+                        display
+                            .pointer_context
+                            .set_cursor(&mut display.client, Some(icon));
+                    }
+                    Request::SetCursorGrab(grab) => {
+                        let payload = &mut display as *mut _ as _;
+                        display.pointer_context.set_grab(payload, grab);
+                    }
+                    Request::ShowMouse(show) => {
+                        display.pointer_context.set_cursor(
+                            &mut display.client,
+                            show.then_some(crate::CursorIcon::Default),
+                        );
+                    }
                     // TODO: implement the other events
                     _ => (),
                 }
@@ -899,17 +1092,16 @@ where
                     }
                     WaylandEvent::PointerMotion(x, y) => {
                         event_handler.mouse_motion_event(x, y);
-                        (last_mouse_x, last_mouse_y) = (x, y);
+                    }
+                    WaylandEvent::RawMotion(dx, dy) => {
+                        event_handler.raw_mouse_motion(dx, dy);
                     }
                     WaylandEvent::PointerButton(button, state) => {
+                        let (x, y) = display.pointer_context.position;
                         if state {
-                            event_handler.mouse_button_down_event(
-                                button,
-                                last_mouse_x,
-                                last_mouse_y,
-                            );
+                            event_handler.mouse_button_down_event(button, x, y);
                         } else {
-                            event_handler.mouse_button_up_event(button, last_mouse_x, last_mouse_y);
+                            event_handler.mouse_button_up_event(button, x, y);
                         }
                     }
                     WaylandEvent::PointerAxis(x, y) => event_handler.mouse_wheel_event(x, y),
