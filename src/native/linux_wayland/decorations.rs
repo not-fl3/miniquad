@@ -18,6 +18,7 @@ use extensions::xdg_shell::*;
 /// In the later case we use `libdecor` so it needs to be loaded.
 /// If it's not available then no decorations will be drawn at all.
 pub(super) enum Decorations {
+    None,
     Server,
     Client {
         libdecor: LibDecor,
@@ -58,12 +59,14 @@ unsafe fn create_xdg_toplevel(display: &mut WaylandPayload) {
 }
 
 impl Decorations {
-    pub(super) fn new(display: &mut WaylandPayload) -> Option<Self> {
+    pub(super) fn new(display: &mut WaylandPayload, borderless: bool) -> Self {
         unsafe {
-            if display.decoration_manager.is_null() {
+            if borderless {
+                Decorations::none(display)
+            } else if display.decoration_manager.is_null() {
                 Decorations::try_client(display)
             } else {
-                Some(Decorations::server(display))
+                Decorations::server(display)
             }
         }
     }
@@ -76,7 +79,7 @@ impl Decorations {
     ) {
         let title = std::ffi::CString::new(title).unwrap();
         match self {
-            Decorations::Server => {
+            Decorations::None | Decorations::Server => {
                 wl_request!(
                     client,
                     xdg_toplevel,
@@ -90,6 +93,11 @@ impl Decorations {
                 (libdecor.libdecor_frame_set_title)(*frame, title.as_ptr());
             }
         }
+    }
+
+    unsafe fn none(display: &mut WaylandPayload) -> Self {
+        create_xdg_toplevel(display);
+        Decorations::None
     }
 
     unsafe fn server(display: &mut WaylandPayload) -> Self {
@@ -113,7 +121,7 @@ impl Decorations {
         Decorations::Server
     }
 
-    unsafe fn try_client(display: &mut WaylandPayload) -> Option<Self> {
+    unsafe fn try_client(display: &mut WaylandPayload) -> Self {
         if let Ok(libdecor) = LibDecor::try_load() {
             let context = (libdecor.libdecor_new)(display.display, &mut LIBDECOR_INTERFACE as _);
             let frame = (libdecor.libdecor_decorate)(
@@ -124,16 +132,13 @@ impl Decorations {
             );
             (libdecor.libdecor_frame_map)(frame);
             display.xdg_toplevel = (libdecor.libdecor_frame_get_xdg_toplevel)(frame);
-            assert!(!display.xdg_toplevel.is_null());
-            Some(Decorations::Client {
+            Decorations::Client {
                 libdecor,
                 context,
                 frame,
-            })
+            }
         } else {
-            // If we can't load `libdecor` we just create the `xdg_toplevel` and return `None`
-            create_xdg_toplevel(display);
-            None
+            Decorations::none(display)
         }
     }
 
@@ -199,7 +204,7 @@ unsafe extern "C" fn libdecor_frame_handle_configure(
     data: *mut c_void,
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
-    let libdecor = display.decorations.as_mut().unwrap().libdecor().unwrap();
+    let libdecor = display.decorations.libdecor().unwrap();
 
     let mut width: c_int = 0;
     let mut height: c_int = 0;

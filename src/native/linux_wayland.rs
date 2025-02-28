@@ -53,7 +53,7 @@ struct WaylandPayload {
     keyboard: *mut wl_keyboard,
     focused_window: *mut wl_surface,
     decoration_manager: *mut extensions::xdg_decoration::zxdg_decoration_manager_v1,
-    decorations: Option<decorations::Decorations>,
+    decorations: decorations::Decorations,
 
     events: Vec<WaylandEvent>,
     keyboard_context: KeyboardContext,
@@ -949,7 +949,7 @@ where
             keyboard: std::ptr::null_mut(),
             focused_window: std::ptr::null_mut(),
             decoration_manager: std::ptr::null_mut(),
-            decorations: None,
+            decorations: decorations::Decorations::None,
             events: Vec::new(),
             pointer_context: PointerContext::new(),
             keyboard_context: KeyboardContext::new(),
@@ -1019,16 +1019,15 @@ where
             (libegl.eglGetProcAddress)(name.as_ptr() as _)
         });
 
-        display.decorations = decorations::Decorations::new(&mut display);
+        let borderless = false;
+        display.decorations = decorations::Decorations::new(&mut display, borderless);
         assert!(!display.xdg_toplevel.is_null());
 
-        if let Some(ref mut decorations) = display.decorations {
-            decorations.set_title(
-                &mut display.client,
-                display.xdg_toplevel,
-                conf.window_title.as_str(),
-            );
-        }
+        display.decorations.set_title(
+            &mut display.client,
+            display.xdg_toplevel,
+            conf.window_title.as_str(),
+        );
 
         let wm_class = std::ffi::CString::new(conf.platform.linux_wm_class).unwrap();
         wl_request!(
