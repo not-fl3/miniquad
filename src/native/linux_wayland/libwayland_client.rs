@@ -360,13 +360,27 @@ pub struct wl_interface {
 
 #[macro_export]
 macro_rules! wl_listener {
-    ($name_listener:ident, $name:ident,
-    $(fn $event_name:ident($($arg_name:ident: $arg_ty:ty),*$(,)?)),*$(,)?
+    ($name_listener:ident, $name:ident, $name_dummy:ident,
+    $(fn $event:ident($($arg_name:ident: $arg_ty:ty),*$(,)?)),*$(,)?
     ) => {
         #[repr(C)]
         #[derive(Debug, Copy, Clone)]
+        /// Wayland event listener
         pub struct $name_listener {
-            $(pub $event_name: Option<unsafe extern "C" fn(data: *mut c_void, $name: *mut $name, $($arg_name: $arg_ty),*)>),*
+            $(pub $event: unsafe extern "C" fn(data: *mut core::ffi::c_void, $name: *mut $name, $($arg_name: $arg_ty),*)),*
+        }
+        /// Implementation for the dummy event handlers
+        mod $name_dummy {
+            use super::*;
+            $(pub unsafe extern "C" fn $event(_: *mut core::ffi::c_void, _: *mut $name, $(_: $arg_ty),*) {})*
+        }
+        impl $name_listener {
+            /// Create a listener with dummy event handlers
+            pub const fn dummy() -> Self {
+                Self {
+                    $($event: $name_dummy::$event),*
+                }
+            }
         }
     };
 }
@@ -377,6 +391,9 @@ pub type wl_seat_capability = ::core::ffi::c_uint;
 
 use core::ffi::{c_char, c_int, c_uint, c_void};
 
+pub type wl_output_subpixel = c_int;
+pub type wl_output_transform = c_int;
+pub type wl_output_mode = c_uint;
 pub type wl_keyboard_keymap_format = c_uint;
 pub type wl_keyboard_key_state = c_uint;
 pub type wl_pointer_button_state = c_uint;
@@ -388,6 +405,7 @@ pub type wl_data_device_manager_dnd_action = c_uint;
 wl_listener!(
     wl_registry_listener,
     wl_registry,
+    wl_registry_dummy,
     fn global(name: c_uint, interface: *const c_char, version: c_uint),
     fn global_remove(name: c_uint),
 );
@@ -395,19 +413,58 @@ wl_listener!(
 wl_listener!(
     wl_callback_listener,
     wl_callback,
+    wl_callback_dummy,
     fn done(callback_data: c_uint),
 );
 
 wl_listener!(
     wl_seat_listener,
     wl_seat,
+    wl_seat_dummy,
     fn capabilities(capabilities: wl_seat_capability),
     fn name(name: *const c_char),
 );
 
 wl_listener!(
+    wl_output_listener,
+    wl_output,
+    wl_output_dummy,
+    fn geometry(
+        x: c_int,
+        y: c_int,
+        physical_width: c_int,
+        physical_height: c_int,
+        subpixel: wl_output_subpixel,
+        make: *const c_char,
+        model: *const c_char,
+        transform: wl_output_transform,
+    ),
+    fn mode(
+        flags: wl_output_mode,
+        width: c_int,
+        height: c_int,
+        refresh: c_int,
+    ),
+    fn done(),
+    fn scale(factor: c_int),
+    fn name(name: *const c_char),
+    fn description(description: *const c_char),
+);
+
+wl_listener!(
+    wl_surface_listener,
+    wl_surface,
+    wl_surface_dummy,
+    fn enter(output: *mut wl_output),
+    fn leave(output: *mut wl_output),
+    fn preferred_buffer_scale(factor: c_int),
+    fn preferred_buffer_transform(transform: wl_output_transform),
+);
+
+wl_listener!(
     wl_keyboard_listener,
     wl_keyboard,
+    wl_keyboard_dummy,
     fn keymap(format: wl_keyboard_keymap_format, fd: c_int, size: c_uint),
     fn enter(serial: c_uint, surface: *mut wl_surface, keys: *mut wl_array),
     fn leave(serial: c_uint, surface: *mut wl_surface),
@@ -425,6 +482,7 @@ wl_listener!(
 wl_listener!(
     wl_pointer_listener,
     wl_pointer,
+    wl_pointer_dummy,
     fn enter(
         serial: c_uint,
         surface: *mut wl_surface,
@@ -454,6 +512,7 @@ wl_listener!(
 wl_listener!(
     wl_data_device_listener,
     wl_data_device,
+    wl_data_device_dummy,
     fn data_offer(id: *mut wl_data_offer),
     fn enter(
         serial: c_uint,
@@ -471,6 +530,7 @@ wl_listener!(
 wl_listener!(
     wl_data_offer_listener,
     wl_data_offer,
+    wl_data_offer_dummy,
     fn offer(mime_type: *const c_char),
     fn source_actions(source_actions: wl_data_device_manager_dnd_action),
     fn action(dnd_action: wl_data_device_manager_dnd_action),
@@ -479,6 +539,7 @@ wl_listener!(
 wl_listener!(
     wl_data_source_listener,
     wl_data_source,
+    wl_data_source_dummy,
     fn target(mime_type: *const c_char),
     fn send(mime_type: *const c_char, fd: c_int),
     fn cancelled(),
@@ -501,6 +562,7 @@ crate::declare_module!(
     pub wl_seat_interface: *mut wl_interface,
     pub wl_shm_interface: *mut wl_interface,
     pub wl_shm_pool_interface: *mut wl_interface,
+    pub wl_output_interface: *mut wl_interface,
     pub wl_keyboard_interface: *mut wl_interface,
     pub wl_pointer_interface: *mut wl_interface,
     pub wl_data_device_manager_interface: *mut wl_interface,

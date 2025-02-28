@@ -36,12 +36,10 @@ struct WaylandPayload {
     egl: LibWaylandEgl,
     xkb: LibXkbCommon,
     compositor: *mut wl_compositor,
-    subcompositor: *mut wl_subcompositor,
     xdg_toplevel: *mut extensions::xdg_shell::xdg_toplevel,
     xdg_wm_base: *mut extensions::xdg_shell::xdg_wm_base,
     surface: *mut wl_surface,
     decoration_manager: *mut extensions::xdg_decoration::zxdg_decoration_manager_v1,
-    viewporter: *mut extensions::viewporter::wp_viewporter,
     shm: *mut wl_shm,
     seat: *mut wl_seat,
     data_device_manager: *mut wl_data_device_manager,
@@ -265,10 +263,14 @@ macro_rules! wl_request {
     }};
 }
 
-static mut SEAT_LISTENER: wl_seat_listener = wl_seat_listener {
-    capabilities: Some(seat_handle_capabilities),
-    name: Some(seat_handle_name),
-};
+static mut SEAT_LISTENER: wl_seat_listener = wl_seat_listener::dummy();
+static mut KEYBOARD_LISTENER: wl_keyboard_listener = wl_keyboard_listener::dummy();
+static mut POINTER_LISTENER: wl_pointer_listener = wl_pointer_listener::dummy();
+static mut OUTPUT_LISTENER: wl_output_listener = wl_output_listener::dummy();
+static mut DATA_DEVICE_LISTENER: wl_data_device_listener = wl_data_device_listener::dummy();
+static mut DATA_OFFER_LISTENER: wl_data_offer_listener = wl_data_offer_listener::dummy();
+static mut XDG_WM_BASE_LISTENER: extensions::xdg_shell::xdg_wm_base_listener =
+    extensions::xdg_shell::xdg_wm_base_listener::dummy();
 
 unsafe extern "C" fn seat_handle_capabilities(
     data: *mut std::ffi::c_void,
@@ -285,6 +287,10 @@ unsafe extern "C" fn seat_handle_capabilities(
             display.client.wl_pointer_interface
         );
         assert!(!display.pointer.is_null());
+        POINTER_LISTENER.enter = pointer_handle_enter;
+        POINTER_LISTENER.axis = pointer_handle_axis;
+        POINTER_LISTENER.motion = pointer_handle_motion;
+        POINTER_LISTENER.button = pointer_handle_button;
         (display.client.wl_proxy_add_listener)(
             display.pointer as _,
             &POINTER_LISTENER as *const _ as _,
@@ -300,6 +306,12 @@ unsafe extern "C" fn seat_handle_capabilities(
             display.client.wl_keyboard_interface
         );
         assert!(!display.keyboard.is_null());
+        KEYBOARD_LISTENER.enter = keyboard_handle_enter;
+        KEYBOARD_LISTENER.keymap = keyboard_handle_keymap;
+        KEYBOARD_LISTENER.repeat_info = keyboard_handle_repeat_info;
+        KEYBOARD_LISTENER.key = keyboard_handle_key;
+        KEYBOARD_LISTENER.modifiers = keyboard_handle_modifiers;
+        KEYBOARD_LISTENER.leave = keyboard_handle_leave;
         (display.client.wl_proxy_add_listener)(
             display.keyboard as _,
             &KEYBOARD_LISTENER as *const _ as _,
@@ -318,15 +330,6 @@ enum WaylandEvent {
     FilesDropped(String),
     Resize(f32, f32),
 }
-
-static mut KEYBOARD_LISTENER: wl_keyboard_listener = wl_keyboard_listener {
-    keymap: Some(keyboard_handle_keymap),
-    enter: Some(keyboard_handle_enter),
-    leave: Some(keyboard_handle_leave),
-    key: Some(keyboard_handle_key),
-    modifiers: Some(keyboard_handle_modifiers),
-    repeat_info: Some(keyboard_handle_repeat_info),
-};
 
 unsafe extern "C" fn keyboard_handle_keymap(
     data: *mut ::core::ffi::c_void,
@@ -462,20 +465,6 @@ unsafe extern "C" fn keyboard_handle_repeat_info(
     };
 }
 
-static mut POINTER_LISTENER: wl_pointer_listener = wl_pointer_listener {
-    enter: Some(pointer_handle_enter),
-    leave: Some(pointer_handle_leave),
-    motion: Some(pointer_handle_motion),
-    button: Some(pointer_handle_button),
-    axis: Some(pointer_handle_axis),
-    frame: Some(pointer_handle_frame),
-    axis_source: Some(pointer_handle_axis_source),
-    axis_stop: Some(pointer_handle_axis_stop),
-    axis_discrete: Some(pointer_handle_axis_discrete),
-    axis_value120: Some(pointer_handle_axis_value120),
-    axis_relative_direction: Some(pointer_handle_axis_relative_direction),
-};
-
 unsafe extern "C" fn pointer_handle_enter(
     data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
@@ -487,13 +476,6 @@ unsafe extern "C" fn pointer_handle_enter(
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     display.focused_window = surface;
 }
-unsafe extern "C" fn pointer_handle_leave(
-    _data: *mut ::core::ffi::c_void,
-    _wl_pointer: *mut wl_pointer,
-    _serial: u32,
-    _surface: *mut wl_surface,
-) {
-}
 unsafe extern "C" fn pointer_handle_motion(
     data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
@@ -504,7 +486,9 @@ unsafe extern "C" fn pointer_handle_motion(
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     if display.focused_window == display.surface {
         // From wl_fixed_to_double(), it simply divides by 256
-        let (x, y) = (wl_fixed_to_double(surface_x), wl_fixed_to_double(surface_y));
+        let d = crate::native_display().lock().unwrap();
+        let x = wl_fixed_to_double(surface_x) * d.dpi_scale;
+        let y = wl_fixed_to_double(surface_y) * d.dpi_scale;
         display.events.push(WaylandEvent::PointerMotion(x, y));
     }
 }
@@ -553,51 +537,23 @@ unsafe extern "C" fn pointer_handle_axis(
         display.events.push(WaylandEvent::PointerAxis(value, 0.0));
     }
 }
-unsafe extern "C" fn pointer_handle_frame(
-    _data: *mut ::core::ffi::c_void,
-    _wl_pointer: *mut wl_pointer,
-) {
-}
-unsafe extern "C" fn pointer_handle_axis_source(
-    _data: *mut ::core::ffi::c_void,
-    _wl_pointer: *mut wl_pointer,
-    _axis_source: u32,
-) {
-}
-unsafe extern "C" fn pointer_handle_axis_stop(
-    _data: *mut ::core::ffi::c_void,
-    _wl_pointer: *mut wl_pointer,
-    _time: u32,
-    _axis: u32,
-) {
-}
-unsafe extern "C" fn pointer_handle_axis_discrete(
-    _data: *mut ::core::ffi::c_void,
-    _wl_pointer: *mut wl_pointer,
-    _axis: u32,
-    _discrete: i32,
-) {
-}
-unsafe extern "C" fn pointer_handle_axis_value120(
-    _data: *mut ::core::ffi::c_void,
-    _wl_pointer: *mut wl_pointer,
-    _axis: u32,
-    _value120: i32,
-) {
-}
-unsafe extern "C" fn pointer_handle_axis_relative_direction(
-    _data: *mut ::core::ffi::c_void,
-    _wl_pointer: *mut wl_pointer,
-    _axis: u32,
-    _direction: u32,
-) {
-}
 
-extern "C" fn seat_handle_name(
-    _data: *mut std::ffi::c_void,
-    _seat: *mut wl_seat,
-    _name: *const ::core::ffi::c_char,
+unsafe extern "C" fn output_handle_scale(
+    data: *mut std::ffi::c_void,
+    _: *mut wl_output,
+    factor: core::ffi::c_int,
 ) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    let mut d = crate::native_display().try_lock().unwrap();
+    if d.high_dpi {
+        d.dpi_scale = factor as _;
+        wl_request!(
+            display.client,
+            display.surface,
+            WL_SURFACE_SET_BUFFER_SCALE,
+            factor
+        );
+    }
 }
 
 unsafe extern "C" fn registry_add_object(
@@ -611,23 +567,36 @@ unsafe extern "C" fn registry_add_object(
 
     let interface = std::ffi::CStr::from_ptr(interface).to_str().unwrap();
     match interface {
+        "wl_output" => {
+            let wl_output: *mut wl_output = display.client.wl_registry_bind(
+                registry,
+                name,
+                display.client.wl_output_interface,
+                3.min(version),
+            ) as _;
+            assert!(!wl_output.is_null());
+            OUTPUT_LISTENER.scale = output_handle_scale;
+            (display.client.wl_proxy_add_listener)(
+                wl_output as _,
+                &OUTPUT_LISTENER as *const _ as _,
+                display as *mut _ as _,
+            );
+        }
         "wl_compositor" => {
             display.compositor = display.client.wl_registry_bind(
                 registry,
                 name,
                 display.client.wl_compositor_interface,
-                1,
+                3.min(version),
             ) as _;
             assert!(!display.compositor.is_null());
-        }
-        "wl_subcompositor" => {
-            display.subcompositor = display.client.wl_registry_bind(
-                registry,
-                name,
-                display.client.wl_subcompositor_interface,
-                1,
-            ) as _;
-            assert!(!display.subcompositor.is_null());
+            display.surface = wl_request_constructor!(
+                display.client,
+                display.compositor,
+                WL_COMPOSITOR_CREATE_SURFACE,
+                display.client.wl_surface_interface
+            );
+            assert!(!display.surface.is_null());
         }
         "xdg_wm_base" => {
             display.xdg_wm_base = display.client.wl_registry_bind(
@@ -637,20 +606,18 @@ unsafe extern "C" fn registry_add_object(
                 1,
             ) as _;
             assert!(!display.xdg_wm_base.is_null());
+            XDG_WM_BASE_LISTENER.ping = xdg_wm_base_handle_ping;
+            (display.client.wl_proxy_add_listener)(
+                display.xdg_wm_base as _,
+                &XDG_WM_BASE_LISTENER as *const _ as _,
+                display as *mut _ as _,
+            );
         }
         "zxdg_decoration_manager" | "zxdg_decoration_manager_v1" => {
             display.decoration_manager = display.client.wl_registry_bind(
                 registry,
                 name,
                 &extensions::xdg_decoration::zxdg_decoration_manager_v1_interface,
-                1,
-            ) as _;
-        }
-        "wp_viewporter" => {
-            display.viewporter = display.client.wl_registry_bind(
-                registry,
-                name,
-                &extensions::viewporter::wp_viewporter_interface,
                 1,
             ) as _;
         }
@@ -670,6 +637,7 @@ unsafe extern "C" fn registry_add_object(
                 seat_version,
             ) as _;
             assert!(!display.seat.is_null());
+            SEAT_LISTENER.capabilities = seat_handle_capabilities;
             (display.client.wl_proxy_add_listener)(
                 display.seat as _,
                 &SEAT_LISTENER as *const _ as _,
@@ -690,13 +658,6 @@ unsafe extern "C" fn registry_add_object(
     }
 }
 
-unsafe extern "C" fn registry_remove_object(
-    _data: *mut std::ffi::c_void,
-    _registry: *mut wl_registry,
-    _name: u32,
-) {
-}
-
 unsafe extern "C" fn xdg_wm_base_handle_ping(
     data: *mut std::ffi::c_void,
     toplevel: *mut extensions::xdg_shell::xdg_wm_base,
@@ -713,31 +674,12 @@ unsafe extern "C" fn xdg_wm_base_handle_ping(
     );
 }
 
-static mut DATA_OFFER_LISTENER: wl_data_offer_listener = wl_data_offer_listener {
-    offer: Some(data_offer_handle_offer),
-    source_actions: Some(drag_n_drop::data_offer_handle_source_actions),
-    action: Some(data_offer_handle_action),
-};
-
-unsafe extern "C" fn data_offer_handle_offer(
-    _data: *mut ::core::ffi::c_void,
-    _data_offer: *mut wl_data_offer,
-    _mime_type: *const ::core::ffi::c_char,
-) {
-}
-
-unsafe extern "C" fn data_offer_handle_action(
-    _data: *mut ::core::ffi::c_void,
-    _data_offer: *mut wl_data_offer,
-    _action: ::core::ffi::c_uint,
-) {
-}
-
 unsafe extern "C" fn data_device_handle_data_offer(
     data: *mut ::core::ffi::c_void,
     data_device: *mut wl_data_device,
     data_offer: *mut wl_data_offer,
 ) {
+    DATA_OFFER_LISTENER.source_actions = drag_n_drop::data_offer_handle_source_actions;
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     assert_eq!(data_device, display.data_device);
     (display.client.wl_proxy_add_listener)(
@@ -770,11 +712,6 @@ where
         );
         assert!(!registry.is_null());
 
-        let registry_listener = wl_registry_listener {
-            global: Some(registry_add_object),
-            global_remove: Some(registry_remove_object),
-        };
-
         let xkb_context = (xkb.xkb_context_new)(0);
 
         let mut display = WaylandPayload {
@@ -784,12 +721,10 @@ where
             egl,
             xkb,
             compositor: std::ptr::null_mut(),
-            subcompositor: std::ptr::null_mut(),
             xdg_toplevel: std::ptr::null_mut(),
             xdg_wm_base: std::ptr::null_mut(),
             surface: std::ptr::null_mut(),
             decoration_manager: std::ptr::null_mut(),
-            viewporter: std::ptr::null_mut(),
             shm: std::ptr::null_mut(),
             seat: std::ptr::null_mut(),
             data_device_manager: std::ptr::null_mut(),
@@ -808,12 +743,8 @@ where
             update_requested: true,
         };
 
-        let (tx, rx) = std::sync::mpsc::channel();
-        let clipboard = Box::new(clipboard::WaylandClipboard::new(&mut display as *mut _));
-        crate::set_display(NativeDisplayData {
-            ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
-        });
-
+        let mut registry_listener = wl_registry_listener::dummy();
+        registry_listener.global = registry_add_object;
         (display.client.wl_proxy_add_listener)(
             display.registry as _,
             &registry_listener as *const _ as _,
@@ -821,6 +752,8 @@ where
         );
         (display.client.wl_display_dispatch)(display.display);
 
+        // Construct the `wl_data_device` here, as it needs both the `wl_seat` and the
+        // `wl_data_device_manager`, and they may be constructed in different orders
         display.data_device = wl_request_constructor!(
             display.client,
             display.data_device_manager,
@@ -829,32 +762,27 @@ where
             display.seat
         ) as _;
         assert!(!display.data_device.is_null());
-
-        let data_device_listener = wl_data_device_listener {
-            data_offer: Some(data_device_handle_data_offer),
-            enter: Some(drag_n_drop::data_device_handle_enter),
-            leave: Some(drag_n_drop::data_device_handle_leave),
-            motion: Some(drag_n_drop::data_device_handle_motion),
-            drop: Some(drag_n_drop::data_device_handle_drop),
-            selection: Some(clipboard::data_device_handle_selection),
-        };
+        DATA_DEVICE_LISTENER.data_offer = data_device_handle_data_offer;
+        DATA_DEVICE_LISTENER.enter = drag_n_drop::data_device_handle_enter;
+        DATA_DEVICE_LISTENER.leave = drag_n_drop::data_device_handle_leave;
+        DATA_DEVICE_LISTENER.drop = drag_n_drop::data_device_handle_drop;
+        DATA_DEVICE_LISTENER.selection = clipboard::data_device_handle_selection;
         (display.client.wl_proxy_add_listener)(
             display.data_device as _,
-            &data_device_listener as *const _ as _,
+            &DATA_DEVICE_LISTENER as *const _ as _,
             &mut display as *mut _ as _,
         );
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let clipboard = Box::new(clipboard::WaylandClipboard::new(&mut display as *mut _));
+        crate::set_display(NativeDisplayData {
+            high_dpi: conf.high_dpi,
+            dpi_scale: 1.,
+            blocking_event_loop: conf.platform.blocking_event_loop,
+            ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
+        });
         //assert!(!display.keymap.is_null());
         //assert!(!display.xkb_state.is_null());
-
-        let xdg_wm_base_listener = extensions::xdg_shell::xdg_wm_base_listener {
-            ping: Some(xdg_wm_base_handle_ping),
-        };
-
-        (display.client.wl_proxy_add_listener)(
-            display.xdg_wm_base as _,
-            &xdg_wm_base_listener as *const _ as _,
-            &mut display as *mut _ as _,
-        );
 
         let mut libegl = egl::LibEgl::try_load().ok()?;
         let (context, config, egl_display) = egl::create_egl_context(
@@ -864,14 +792,6 @@ where
             conf.sample_count,
         )
         .unwrap();
-
-        display.surface = wl_request_constructor!(
-            display.client,
-            display.compositor,
-            WL_COMPOSITOR_CREATE_SURFACE,
-            display.client.wl_surface_interface
-        );
-        assert!(!display.surface.is_null());
 
         display.egl_window = (display.egl.wl_egl_window_create)(
             display.surface as _,
@@ -949,7 +869,6 @@ where
                                 display.client,
                                 display.xdg_toplevel,
                                 extensions::xdg_shell::xdg_toplevel::set_fullscreen,
-                                std::ptr::null_mut::<*mut wl_output>()
                             );
                         } else {
                             wl_request!(
