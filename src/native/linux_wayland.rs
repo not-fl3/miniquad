@@ -47,14 +47,13 @@ struct WaylandPayload {
     data_device_manager: *mut wl_data_device_manager,
     data_device: *mut wl_data_device,
     xkb_context: *mut xkb_context,
-    keymap: *mut xkb_keymap,
     xkb_state: *mut xkb_state,
+    keymap: XkbKeymap,
 
     egl_window: *mut wl_egl_window,
     pointer: *mut wl_pointer,
     keyboard: *mut wl_keyboard,
     focused_window: *mut wl_surface,
-    //xkb_state: xkb::XkbState,
     decorations: Option<decorations::Decorations>,
 
     events: Vec<WaylandEvent>,
@@ -105,10 +104,10 @@ impl WaylandPayload {
                     n_bits as _
                 );
                 for _ in 0..count[0] {
-                    self.keyboard_context.generate_events(
+                    self.keyboard_context.generate_key_repeat_events(
                         &mut self.xkb,
+                        self.keymap.xkb_keymap,
                         self.xkb_state,
-                        true,
                         &mut self.events,
                     );
                 }
@@ -141,6 +140,7 @@ impl Default for RepeatInfo {
 struct KeyboardContext {
     enter_serial: Option<core::ffi::c_uint>,
     repeat_info: RepeatInfo,
+    /// This is the actual key being sent by Wayland, not `keysym` or Miniquad `Keycode`
     repeated_key: Option<core::ffi::c_uint>,
     timerfd: core::ffi::c_int,
     keymods: KeyMods,
@@ -193,22 +193,37 @@ impl KeyboardContext {
             }
         }
     }
-    unsafe fn generate_events(
+    unsafe fn generate_key_repeat_events(
         &self,
-        xkb: &mut LibXkbCommon,
+        libxkb: &mut LibXkbCommon,
+        xkb_keymap: *mut xkb_keymap,
         xkb_state: *mut xkb_state,
-        repeat: bool,
         events: &mut Vec<WaylandEvent>,
     ) {
         if let Some(key) = self.repeated_key {
-            let keysym = (xkb.xkb_state_key_get_one_sym)(xkb_state, key + 8);
-            let keycode = keycodes::translate(keysym);
-            events.push(WaylandEvent::KeyDown(keycode, self.keymods, repeat));
-            let chr = keycodes::keysym_to_unicode(xkb, keysym);
-            if chr > 0 {
-                if let Some(chr) = char::from_u32(chr as u32) {
-                    events.push(WaylandEvent::Char(chr, self.keymods, repeat));
-                }
+            self.generate_key_events(libxkb, xkb_keymap, xkb_state, key, true, events)
+        }
+    }
+    unsafe fn generate_key_events(
+        &self,
+        libxkb: &mut LibXkbCommon,
+        xkb_keymap: *mut xkb_keymap,
+        xkb_state: *mut xkb_state,
+        key: core::ffi::c_uint,
+        repeat: bool,
+        events: &mut Vec<WaylandEvent>,
+    ) {
+        // The keycodes in Miniquad are obtained without modifiers
+        let keysym = libxkb.keymap_key_get_sym_without_mod(xkb_keymap, key + 8);
+        let keycode = keycodes::translate_keysym(keysym);
+        events.push(WaylandEvent::KeyDown(keycode, self.keymods, repeat));
+
+        // To obtain the underlying character, we do need to provide the modifiers
+        let keysym = (libxkb.xkb_state_key_get_one_sym)(xkb_state, key + 8);
+        let chr = (libxkb.xkb_keysym_to_utf32)(keysym);
+        if chr > 0 {
+            if let Some(chr) = char::from_u32(chr) {
+                events.push(WaylandEvent::Char(chr, self.keymods, repeat));
             }
         }
     }
@@ -330,8 +345,8 @@ unsafe extern "C" fn keyboard_handle_keymap(
         0,
     );
     assert!(map_shm != libc::MAP_FAILED);
-    (display.xkb.xkb_keymap_unref)(display.keymap);
-    display.keymap = (display.xkb.xkb_keymap_new_from_string)(
+    (display.xkb.xkb_keymap_unref)(display.keymap.xkb_keymap);
+    display.keymap.xkb_keymap = (display.xkb.xkb_keymap_new_from_string)(
         display.xkb_context,
         map_shm as *mut libc::FILE,
         1,
@@ -339,8 +354,9 @@ unsafe extern "C" fn keyboard_handle_keymap(
     );
     libc::munmap(map_shm, size as usize);
     libc::close(fd);
+    display.keymap.cache_mod_indices(&mut display.xkb);
     (display.xkb.xkb_state_unref)(display.xkb_state);
-    display.xkb_state = (display.xkb.xkb_state_new)(display.keymap);
+    display.xkb_state = (display.xkb.xkb_state_new)(display.keymap.xkb_keymap);
 }
 unsafe extern "C" fn keyboard_handle_enter(
     data: *mut ::core::ffi::c_void,
@@ -362,12 +378,9 @@ unsafe extern "C" fn keyboard_handle_leave(
     // Clear modifiers
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     (display.xkb.xkb_state_update_mask)(display.xkb_state, 0, 0, 0, 0, 0, 0);
+    display.keyboard_context.keymods = KeyMods::default();
     display.keyboard_context.repeated_key = None;
     display.keyboard_context.enter_serial = None;
-    display.keyboard_context.keymods.shift = false;
-    display.keyboard_context.keymods.ctrl = false;
-    display.keyboard_context.keymods.logo = false;
-    display.keyboard_context.keymods.alt = false;
 }
 unsafe extern "C" fn keyboard_handle_key(
     data: *mut ::core::ffi::c_void,
@@ -377,37 +390,32 @@ unsafe extern "C" fn keyboard_handle_key(
     key: u32,
     state: wl_keyboard_key_state,
 ) {
-    use KeyCode::*;
-    let is_down = state == 1 || state == 2;
     let display: &mut WaylandPayload = &mut *(data as *mut _);
+    let libxkb = &mut display.xkb;
+    let xkb_keymap = display.keymap.xkb_keymap;
+    let xkb_state = display.xkb_state;
     // https://wayland-book.com/seat/keyboard.html
     // To translate this to an XKB scancode, you must add 8 to the evdev scancode.
-    let keysym = (display.xkb.xkb_state_key_get_one_sym)(display.xkb_state, key + 8);
-    let should_repeat = (display.xkb.xkb_keymap_key_repeats)(display.keymap, key + 8) == 1;
-    let keycode = keycodes::translate(keysym);
-    match keycode {
-        LeftShift | RightShift => display.keyboard_context.keymods.shift = is_down,
-        LeftControl | RightControl => display.keyboard_context.keymods.ctrl = is_down,
-        LeftAlt | RightAlt => display.keyboard_context.keymods.alt = is_down,
-        LeftSuper | RightSuper => display.keyboard_context.keymods.logo = is_down,
-        _ => {}
-    }
+    let keysym = libxkb.keymap_key_get_sym_without_mod(xkb_keymap, key + 8);
+    let keycode = keycodes::translate_keysym(keysym);
+    let keymods = display.keymap.get_keymods(libxkb, xkb_state);
+    display.keyboard_context.keymods = keymods;
     match state {
         0 => {
             display.keyboard_context.track_key_up(key);
-            display.events.push(WaylandEvent::KeyUp(
-                keycode,
-                display.keyboard_context.keymods,
-            ));
+            display.events.push(WaylandEvent::KeyUp(keycode, keymods));
         }
         1 | 2 => {
             let repeat = state == 2;
+            let should_repeat = (libxkb.xkb_keymap_key_repeats)(xkb_keymap, key + 8) == 1;
             if !repeat && should_repeat {
                 display.keyboard_context.track_key_down(key);
             }
-            display.keyboard_context.generate_events(
-                &mut display.xkb,
-                display.xkb_state,
+            display.keyboard_context.generate_key_events(
+                libxkb,
+                xkb_keymap,
+                xkb_state,
+                key,
                 repeat,
                 &mut display.events,
             );
@@ -787,7 +795,7 @@ where
             data_device_manager: std::ptr::null_mut(),
             data_device: std::ptr::null_mut(),
             xkb_context,
-            keymap: std::ptr::null_mut(),
+            keymap: Default::default(),
             xkb_state: std::ptr::null_mut(),
             egl_window: std::ptr::null_mut(),
             pointer: std::ptr::null_mut(),
