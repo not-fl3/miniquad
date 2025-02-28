@@ -694,9 +694,6 @@ unsafe extern "C" fn pointer_handle_axis(
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     let mut value = wl_fixed_to_double(value);
-    // Normalize the value to {-1, 0, 1}
-    value /= value.abs();
-
     // https://wayland-book.com/seat/pointer.html
     if axis == 0 {
         // Vertical scroll
