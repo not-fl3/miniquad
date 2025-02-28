@@ -1,7 +1,22 @@
+//! There are quite a few different notions for keycodes. And most of them are `u32` so it does get
+//! very confusing...
+//! Basically
+//!   - Wayland server sends a scancode `key` of type `c_uint`
+//!   - `key + 8` becomes a `xkb` scancode of type `xkb_keycode_t`
+//!   - We feed this to `xkb` to get a `keysym` of type `xkb_keysym_t`
+//!     - The `keysym` can be modifier-dependent: `Shift + Key1` can be translated to either `Key1`
+//!       (without modifier) or `Exclam` (with modifier)
+//!   - We then feed the `keysym` to `translate_keysym` to get a Miniquad `Keycode`
+//!
+//! Note that the default Miniquad behavior is without modifier; there is not even a Keycode for
+//! `Exclam`. So we must provide the unmodified `keysym` or we will get a `Keycode::Unknown`.
+//!
+//! On the other hand, the modified `keysym` is useful when we want to translate it into the
+//! underlying character.
 use crate::event::KeyCode;
-use crate::native::linux_wayland::libxkbcommon::LibXkbCommon;
+use crate::native::linux_wayland::libxkbcommon::xkb_keysym_t;
 
-pub fn translate(keysym: u32) -> KeyCode {
+pub fn translate_keysym(keysym: xkb_keysym_t) -> KeyCode {
     // See xkbcommon/xkbcommon-keysyms.h
     match keysym {
         65307 => KeyCode::Escape,
@@ -126,8 +141,4 @@ pub fn translate(keysym: u32) -> KeyCode {
         60 => KeyCode::World1,
         _ => KeyCode::Unknown,
     }
-}
-
-pub unsafe extern "C" fn keysym_to_unicode(libxkbcommon: &mut LibXkbCommon, keysym: u32) -> i32 {
-    (libxkbcommon.xkb_keysym_to_utf32)(keysym) as i32
 }
