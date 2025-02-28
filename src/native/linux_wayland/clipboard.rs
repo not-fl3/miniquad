@@ -96,6 +96,8 @@ impl ClipboardContext {
             display.client.wl_data_source_interface,
         );
         assert!(!data_source.is_null());
+        DATA_SOURCE_LISTENER.send = data_source_handle_send;
+        DATA_SOURCE_LISTENER.cancelled = data_source_handle_cancelled;
         (display.client.wl_proxy_add_listener)(
             data_source as _,
             &DATA_SOURCE_LISTENER as *const _ as _,
@@ -106,14 +108,7 @@ impl ClipboardContext {
     }
 }
 
-static mut DATA_SOURCE_LISTENER: wl_data_source_listener = wl_data_source_listener {
-    target: None,
-    send: Some(data_source_handle_send),
-    cancelled: Some(data_source_handle_cancelled),
-    dnd_drop_performed: None,
-    dnd_finished: None,
-    action: None,
-};
+static mut DATA_SOURCE_LISTENER: wl_data_source_listener = wl_data_source_listener::dummy();
 
 // some app (could be ourself) is requesting the owned clipboard
 unsafe extern "C" fn data_source_handle_send(

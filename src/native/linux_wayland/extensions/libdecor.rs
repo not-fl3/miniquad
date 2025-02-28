@@ -43,10 +43,10 @@ pub struct libdecor_interface {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libdecor_frame_interface {
-    pub frame_configure:
+    pub configure:
         unsafe extern "C" fn(*mut libdecor_frame, *mut libdecor_configuration, *mut c_void),
-    pub frame_close: unsafe extern "C" fn(*mut libdecor_frame, *mut c_void),
-    pub frame_commit: unsafe extern "C" fn(*mut libdecor_frame, *mut c_void),
+    pub close: unsafe extern "C" fn(*mut libdecor_frame, *mut c_void),
+    pub commit: unsafe extern "C" fn(*mut libdecor_frame, *mut c_void),
 }
 
 use core::ffi::{c_char, c_int, c_void};

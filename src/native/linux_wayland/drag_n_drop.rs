@@ -48,15 +48,6 @@ pub(super) unsafe extern "C" fn data_device_handle_enter(
     );
 }
 
-pub(super) unsafe extern "C" fn data_device_handle_motion(
-    _data: *mut ::core::ffi::c_void,
-    _data_device: *mut wl_data_device,
-    _time: core::ffi::c_uint,
-    _surface_x: i32,
-    _surface_y: i32,
-) {
-}
-
 pub(super) unsafe extern "C" fn data_device_handle_leave(
     data: *mut ::core::ffi::c_void,
     data_device: *mut wl_data_device,

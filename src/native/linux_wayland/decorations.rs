@@ -168,16 +168,18 @@ unsafe extern "C" fn handle_configure(data: *mut std::ffi::c_void, width: i32, h
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
 
     if width != 0 && height != 0 {
-        (payload.egl.wl_egl_window_resize)(payload.egl_window, width, height, 0, 0);
-
         let mut d = crate::native_display().lock().unwrap();
-        d.screen_width = width;
-        d.screen_height = height;
+        let screen_width = ((width as f32) * d.dpi_scale) as i32;
+        let screen_height = ((height as f32) * d.dpi_scale) as i32;
+        // screen_width / screen_height are the actual numbers of pixels
+        d.screen_width = screen_width;
+        d.screen_height = screen_height;
         drop(d);
 
+        (payload.egl.wl_egl_window_resize)(payload.egl_window, screen_width, screen_height, 0, 0);
         payload
             .events
-            .push(WaylandEvent::Resize(width as _, height as _));
+            .push(WaylandEvent::Resize(screen_width as _, screen_height as _));
     }
 }
 
@@ -191,7 +193,7 @@ unsafe extern "C" fn xdg_toplevel_handle_configure(
     handle_configure(data, width, height);
 }
 
-unsafe extern "C" fn libdecor_handle_frame_configure(
+unsafe extern "C" fn libdecor_frame_handle_configure(
     frame: *mut libdecor_frame,
     configuration: *mut libdecor_configuration,
     data: *mut c_void,
@@ -229,11 +231,11 @@ unsafe extern "C" fn xdg_toplevel_handle_close(
     crate::native_display().try_lock().unwrap().quit_requested = true;
 }
 
-unsafe extern "C" fn libdecor_handle_frame_close(_frame: *mut libdecor_frame, _data: *mut c_void) {
+unsafe extern "C" fn libdecor_frame_handle_close(_frame: *mut libdecor_frame, _data: *mut c_void) {
     crate::native_display().try_lock().unwrap().quit_requested = true;
 }
 
-unsafe extern "C" fn libdecor_handle_frame_commit(_frame: *mut libdecor_frame, _data: *mut c_void) {
+unsafe extern "C" fn libdecor_frame_handle_commit(_frame: *mut libdecor_frame, _data: *mut c_void) {
 }
 unsafe extern "C" fn libdecor_handle_error(
     _context: *mut libdecor,
@@ -247,14 +249,14 @@ static mut LIBDECOR_INTERFACE: libdecor_interface = libdecor_interface {
     error: libdecor_handle_error,
 };
 static mut LIBDECOR_FRAME_INTERFACE: libdecor_frame_interface = libdecor_frame_interface {
-    frame_configure: libdecor_handle_frame_configure,
-    frame_close: libdecor_handle_frame_close,
-    frame_commit: libdecor_handle_frame_commit,
+    configure: libdecor_frame_handle_configure,
+    close: libdecor_frame_handle_close,
+    commit: libdecor_frame_handle_commit,
 };
 static mut XDG_TOPLEVEL_LISTENER: xdg_toplevel_listener = xdg_toplevel_listener {
-    configure: Some(xdg_toplevel_handle_configure),
-    close: Some(xdg_toplevel_handle_close),
+    configure: xdg_toplevel_handle_configure,
+    close: xdg_toplevel_handle_close,
 };
 static mut XDG_SURFACE_LISTENER: xdg_surface_listener = xdg_surface_listener {
-    configure: Some(xdg_surface_handle_configure),
+    configure: xdg_surface_handle_configure,
 };

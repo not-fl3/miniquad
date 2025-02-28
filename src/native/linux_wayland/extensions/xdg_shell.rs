@@ -87,31 +87,28 @@ wayland_interface!(
     [("configure", "iiii"), ("popup_done", "")]
 );
 
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub(crate) struct xdg_wm_base_listener {
-    pub ping:
-        Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_wm_base, _: u32) -> ()>,
-}
+crate::wl_listener!(
+    xdg_wm_base_listener,
+    xdg_wm_base,
+    xdg_wm_base_dummy,
+    fn ping(serial: core::ffi::c_uint),
+);
 
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub(crate) struct xdg_surface_listener {
-    pub configure:
-        Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_surface, _: u32) -> ()>,
-}
+crate::wl_listener!(
+    xdg_surface_listener,
+    xdg_surface,
+    xdg_surface_dummy,
+    fn configure(serial: core::ffi::c_uint),
+);
 
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub(crate) struct xdg_toplevel_listener {
-    pub configure: Option<
-        unsafe extern "C" fn(
-            _: *mut std::ffi::c_void,
-            _: *mut xdg_toplevel,
-            _: i32,
-            _: i32,
-            _: *mut wl_array,
-        ) -> (),
-    >,
-    pub close: Option<unsafe extern "C" fn(_: *mut std::ffi::c_void, _: *mut xdg_toplevel) -> ()>,
-}
+crate::wl_listener!(
+    xdg_toplevel_listener,
+    xdg_toplevel,
+    xdg_toplevel_dummy,
+    fn configure(
+        width: core::ffi::c_int,
+        height: core::ffi::c_int,
+        states: *mut wl_array,
+    ),
+    fn close(),
+);
