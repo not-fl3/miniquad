@@ -529,7 +529,7 @@ unsafe fn egl_main_loop<F>(
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    let mut egl_lib = match egl::LibEgl::try_load() {
+    let mut egl_lib = match egl::LibEgl::try_load().ok() {
         Some(glx) => glx,
         _ => return Err(display),
     };
@@ -547,26 +547,20 @@ where
     )
     .unwrap();
 
-    let egl_surface = (egl_lib.eglCreateWindowSurface.unwrap())(
-        egl_display,
-        config,
-        display.window,
-        std::ptr::null_mut(),
-    );
+    let egl_surface =
+        (egl_lib.eglCreateWindowSurface)(egl_display, config, display.window, std::ptr::null_mut());
 
     if egl_surface.is_null() {
         // == EGL_NO_SURFACE
         panic!("surface creation failed");
     }
-    if (egl_lib.eglMakeCurrent.unwrap())(egl_display, egl_surface, egl_surface, context) == 0 {
+    if (egl_lib.eglMakeCurrent)(egl_display, egl_surface, egl_surface, context) == 0 {
         panic!("eglMakeCurrent failed");
     }
 
     crate::native::gl::load_gl_funcs(|proc| {
         let name = std::ffi::CString::new(proc).unwrap();
-        egl_lib
-            .eglGetProcAddress
-            .expect("non-null function pointer")(name.as_ptr() as _)
+        (egl_lib.eglGetProcAddress)(name.as_ptr() as _)
     });
 
     display.init_drag_n_drop();
@@ -617,7 +611,7 @@ where
             event_handler.update();
             event_handler.draw();
 
-            (egl_lib.eglSwapBuffers.unwrap())(egl_display, egl_surface);
+            (egl_lib.eglSwapBuffers)(egl_display, egl_surface);
             (display.libx11.XFlush)(display.display);
         }
     }

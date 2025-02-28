@@ -142,13 +142,13 @@ struct MainThreadState {
 
 impl MainThreadState {
     unsafe fn destroy_surface(&mut self) {
-        (self.libegl.eglMakeCurrent.unwrap())(
+        (self.libegl.eglMakeCurrent)(
             self.egl_display,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
         );
-        (self.libegl.eglDestroySurface.unwrap())(self.egl_display, self.surface);
+        (self.libegl.eglDestroySurface)(self.egl_display, self.surface);
         self.surface = std::ptr::null_mut();
     }
 
@@ -161,7 +161,7 @@ impl MainThreadState {
             self.destroy_surface();
         }
 
-        self.surface = (self.libegl.eglCreateWindowSurface.unwrap())(
+        self.surface = (self.libegl.eglCreateWindowSurface)(
             self.egl_display,
             self.egl_config,
             window as _,
@@ -170,7 +170,7 @@ impl MainThreadState {
 
         assert!(!self.surface.is_null());
 
-        let res = (self.libegl.eglMakeCurrent.unwrap())(
+        let res = (self.libegl.eglMakeCurrent)(
             self.egl_display,
             self.surface,
             self.surface,
@@ -264,7 +264,7 @@ impl MainThreadState {
             self.event_handler.draw();
 
             unsafe {
-                (self.libegl.eglSwapBuffers.unwrap())(self.egl_display, self.surface);
+                (self.libegl.eglSwapBuffers)(self.egl_display, self.surface);
             }
         }
     }
@@ -433,17 +433,17 @@ where
 
         crate::native::gl::load_gl_funcs(|proc| {
             let name = std::ffi::CString::new(proc).unwrap();
-            libegl.eglGetProcAddress.expect("non-null function pointer")(name.as_ptr() as _)
+            (libegl.eglGetProcAddress)(name.as_ptr() as _)
         });
 
-        let surface = (libegl.eglCreateWindowSurface.unwrap())(
+        let surface = (libegl.eglCreateWindowSurface)(
             egl_display,
             egl_config,
             window as _,
             std::ptr::null_mut(),
         );
 
-        if (libegl.eglMakeCurrent.unwrap())(egl_display, surface, surface, egl_context) == 0 {
+        if (libegl.eglMakeCurrent)(egl_display, surface, surface, egl_context) == 0 {
             panic!();
         }
 
@@ -502,15 +502,15 @@ where
             thread::yield_now();
         }
 
-        (s.libegl.eglMakeCurrent.unwrap())(
+        (s.libegl.eglMakeCurrent)(
             s.egl_display,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
         );
-        (s.libegl.eglDestroySurface.unwrap())(s.egl_display, s.surface);
-        (s.libegl.eglDestroyContext.unwrap())(s.egl_display, s.egl_context);
-        (s.libegl.eglTerminate.unwrap())(s.egl_display);
+        (s.libegl.eglDestroySurface)(s.egl_display, s.surface);
+        (s.libegl.eglDestroyContext)(s.egl_display, s.egl_context);
+        (s.libegl.eglTerminate)(s.egl_display);
     });
 }
 
