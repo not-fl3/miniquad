@@ -625,7 +625,7 @@ where
             eprintln!("Decoration manager not found, will draw fallback decorations");
         }
 
-        let mut libegl = egl::LibEgl::try_load()?;
+        let mut libegl = egl::LibEgl::try_load().ok()?;
         let (context, config, egl_display) = egl::create_egl_context(
             &mut libegl,
             wdisplay as *mut _,
@@ -698,7 +698,7 @@ where
             conf.window_height as _,
         );
 
-        let egl_surface = (libegl.eglCreateWindowSurface.unwrap())(
+        let egl_surface = (libegl.eglCreateWindowSurface)(
             egl_display,
             config,
             display.egl_window as _,
@@ -709,7 +709,7 @@ where
             // == EGL_NO_SURFACE
             panic!("surface creation failed");
         }
-        if (libegl.eglMakeCurrent.unwrap())(egl_display, egl_surface, egl_surface, context) == 0 {
+        if (libegl.eglMakeCurrent)(egl_display, egl_surface, egl_surface, context) == 0 {
             panic!("eglMakeCurrent failed");
         }
 
@@ -726,7 +726,7 @@ where
 
         crate::native::gl::load_gl_funcs(|proc| {
             let name = std::ffi::CString::new(proc).unwrap();
-            libegl.eglGetProcAddress.expect("non-null function pointer")(name.as_ptr() as _)
+            (libegl.eglGetProcAddress)(name.as_ptr() as _)
         });
 
         if !display.decoration_manager.is_null() {
@@ -876,7 +876,7 @@ where
                 event_handler.draw();
             }
 
-            (libegl.eglSwapBuffers.unwrap())(egl_display, egl_surface);
+            (libegl.eglSwapBuffers)(egl_display, egl_surface);
         }
     }
 
