@@ -62,10 +62,11 @@ struct WaylandPayload {
 }
 
 impl WaylandPayload {
-    /// block until a new event is available
+    /// Poll new events, `blocking` specifies whether it should block until a new event is
+    /// available
     // needs to combine both the Wayland events and the key repeat events
     // the implementation is translated from glfw
-    unsafe fn block_on_new_event(&mut self) {
+    unsafe fn poll_new_event(&mut self, blocking: bool) {
         let mut fds = [
             libc::pollfd {
                 fd: (self.client.wl_display_get_fd)(self.display),
@@ -82,7 +83,7 @@ impl WaylandPayload {
         while (self.client.wl_display_prepare_read)(self.display) != 0 {
             (self.client.wl_display_dispatch_pending)(self.display);
         }
-        if !self.update_requested && libc::poll(fds.as_mut_ptr(), 2, i32::MAX) > 0 {
+        if libc::poll(fds.as_mut_ptr(), 2, if blocking { i32::MAX } else { 0 }) > 0 {
             // if the Wayland display has events available
             if fds[0].revents & libc::POLLIN == 1 {
                 (self.client.wl_display_read_events)(self.display);
@@ -1073,7 +1074,10 @@ where
                 }
             }
 
-            display.block_on_new_event();
+            // If `blocking_event_loop` is set but an update is requested, we should still poll the
+            // new events but continue without blocking
+            let blocking = conf.platform.blocking_event_loop && !display.update_requested;
+            display.poll_new_event(blocking);
 
             for event in display.events.drain(..) {
                 match event {
