@@ -144,8 +144,7 @@ pub struct Platform {
     pub framebuffer_alpha: bool,
 
     /// On Wayland, the decorations are either drawn by the server or via `libdecor`. If neither is
-    /// available then no decorations will be drawn.
-    #[deprecated]
+    /// available, then this flag controls whether fallback window decorations should be used.
     pub wayland_use_fallback_decorations: bool,
 
     /// Set the `WM_CLASS` window property on X11 and the `app_id` on Wayland. This is used
@@ -158,7 +157,6 @@ pub struct Platform {
 
 impl Default for Platform {
     fn default() -> Platform {
-        #[allow(deprecated)]
         Platform {
             linux_x11_gl: LinuxX11Gl::default(),
             linux_backend: LinuxBackend::default(),
