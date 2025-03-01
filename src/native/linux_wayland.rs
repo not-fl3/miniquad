@@ -22,6 +22,7 @@ use crate::{
 };
 
 use core::time::Duration;
+use std::collections::HashMap;
 
 fn wl_fixed_to_double(f: i32) -> f32 {
     (f as f32) / 256.0
@@ -53,6 +54,8 @@ struct WaylandPayload {
     egl_window: *mut wl_egl_window,
     pointer_context: PointerContext,
     keyboard: *mut wl_keyboard,
+    touch: *mut wl_touch,
+    touch_positions: HashMap<core::ffi::c_int, (f32, f32)>,
     focused_window: *mut wl_surface,
     decoration_manager: *mut extensions::xdg_decoration::zxdg_decoration_manager_v1,
     decorations: decorations::Decorations,
@@ -421,6 +424,7 @@ impl PointerContext {
 static mut SEAT_LISTENER: wl_seat_listener = wl_seat_listener::dummy();
 static mut KEYBOARD_LISTENER: wl_keyboard_listener = wl_keyboard_listener::dummy();
 static mut POINTER_LISTENER: wl_pointer_listener = wl_pointer_listener::dummy();
+static mut TOUCH_LISTENER: wl_touch_listener = wl_touch_listener::dummy();
 static mut OUTPUT_LISTENER: wl_output_listener = wl_output_listener::dummy();
 static mut DATA_DEVICE_LISTENER: wl_data_device_listener = wl_data_device_listener::dummy();
 static mut DATA_OFFER_LISTENER: wl_data_offer_listener = wl_data_offer_listener::dummy();
@@ -476,6 +480,25 @@ unsafe extern "C" fn seat_handle_capabilities(
             data,
         );
     }
+
+    if caps & wl_seat_capability_WL_SEAT_CAPABILITY_TOUCH != 0 {
+        display.touch = wl_request_constructor!(
+            display.client,
+            seat,
+            WL_SEAT_GET_TOUCH,
+            display.client.wl_touch_interface
+        );
+        assert!(!display.touch.is_null());
+        TOUCH_LISTENER.down = touch_handle_down;
+        TOUCH_LISTENER.up = touch_handle_up;
+        TOUCH_LISTENER.motion = touch_handle_motion;
+        TOUCH_LISTENER.cancel = touch_handle_cancel;
+        (display.client.wl_proxy_add_listener)(
+            display.touch as _,
+            &TOUCH_LISTENER as *const _ as _,
+            data,
+        );
+    }
 }
 
 enum WaylandEvent {
@@ -486,6 +509,7 @@ enum WaylandEvent {
     RawMotion(f32, f32),
     PointerButton(MouseButton, bool),
     PointerAxis(f32, f32),
+    Touch(crate::TouchPhase, u64, f32, f32),
     FilesDropped(String),
     Resize(f32, f32),
 }
@@ -746,6 +770,81 @@ unsafe extern "C" fn output_handle_scale(
     }
 }
 
+unsafe extern "C" fn touch_handle_down(
+    data: *mut std::ffi::c_void,
+    _touch: *mut wl_touch,
+    _serial: core::ffi::c_uint,
+    _time: core::ffi::c_uint,
+    surface: *mut wl_surface,
+    id: core::ffi::c_int,
+    x: wl_fixed_t,
+    y: wl_fixed_t,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    display.focused_window = surface;
+    if display.focused_window == display.surface {
+        let d = crate::native_display().lock().unwrap();
+        let x = wl_fixed_to_double(x) * d.dpi_scale;
+        let y = wl_fixed_to_double(y) * d.dpi_scale;
+        display.touch_positions.insert(id, (x, y));
+        display.events.push(WaylandEvent::Touch(
+            crate::TouchPhase::Started,
+            id as _,
+            x,
+            y,
+        ));
+    }
+}
+
+unsafe extern "C" fn touch_handle_motion(
+    data: *mut std::ffi::c_void,
+    _touch: *mut wl_touch,
+    _time: core::ffi::c_uint,
+    id: core::ffi::c_int,
+    x: wl_fixed_t,
+    y: wl_fixed_t,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    if display.focused_window == display.surface {
+        let d = crate::native_display().lock().unwrap();
+        let x = wl_fixed_to_double(x) * d.dpi_scale;
+        let y = wl_fixed_to_double(y) * d.dpi_scale;
+        display.touch_positions.insert(id, (x, y));
+        display
+            .events
+            .push(WaylandEvent::Touch(crate::TouchPhase::Moved, id as _, x, y));
+    }
+}
+
+unsafe extern "C" fn touch_handle_up(
+    data: *mut std::ffi::c_void,
+    _touch: *mut wl_touch,
+    _serial: core::ffi::c_uint,
+    _time: core::ffi::c_uint,
+    id: core::ffi::c_int,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    if display.focused_window == display.surface {
+        if let Some((x, y)) = display.touch_positions.remove(&id) {
+            display
+                .events
+                .push(WaylandEvent::Touch(crate::TouchPhase::Ended, id as _, x, y));
+        }
+    }
+}
+
+unsafe extern "C" fn touch_handle_cancel(data: *mut std::ffi::c_void, _touch: *mut wl_touch) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    for (id, (x, y)) in display.touch_positions.drain() {
+        display.events.push(WaylandEvent::Touch(
+            crate::TouchPhase::Cancelled,
+            id as _,
+            x,
+            y,
+        ));
+    }
+}
+
 unsafe extern "C" fn registry_add_object(
     data: *mut std::ffi::c_void,
     registry: *mut wl_registry,
@@ -966,6 +1065,8 @@ where
             xkb_state: std::ptr::null_mut(),
             egl_window: std::ptr::null_mut(),
             keyboard: std::ptr::null_mut(),
+            touch: std::ptr::null_mut(),
+            touch_positions: HashMap::new(),
             focused_window: std::ptr::null_mut(),
             decoration_manager: std::ptr::null_mut(),
             decorations: decorations::Decorations::None,
@@ -1130,6 +1231,9 @@ where
                         }
                     }
                     WaylandEvent::PointerAxis(x, y) => event_handler.mouse_wheel_event(x, y),
+                    WaylandEvent::Touch(phase, id, x, y) => {
+                        event_handler.touch_event(phase, id, x, y)
+                    }
                     WaylandEvent::Resize(width, height) => {
                         event_handler.resize_event(width, height)
                     }
