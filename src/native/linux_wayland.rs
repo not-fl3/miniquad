@@ -37,9 +37,11 @@ struct WaylandPayload {
     egl: LibWaylandEgl,
     xkb: LibXkbCommon,
     compositor: *mut wl_compositor,
+    subcompositor: *mut wl_subcompositor,
     xdg_toplevel: *mut extensions::xdg_shell::xdg_toplevel,
     xdg_wm_base: *mut extensions::xdg_shell::xdg_wm_base,
     surface: *mut wl_surface,
+    viewporter: *mut extensions::viewporter::wp_viewporter,
     shm: *mut wl_shm,
     seat: *mut wl_seat,
     data_device_manager: *mut wl_data_device_manager,
@@ -786,6 +788,15 @@ unsafe extern "C" fn registry_add_object(
             );
             assert!(!display.surface.is_null());
         }
+        "wl_subcompositor" => {
+            display.subcompositor = display.client.wl_registry_bind(
+                registry,
+                name,
+                display.client.wl_subcompositor_interface,
+                1,
+            ) as _;
+            assert!(!display.subcompositor.is_null());
+        }
         "xdg_wm_base" => {
             display.xdg_wm_base = display.client.wl_registry_bind(
                 registry,
@@ -806,6 +817,14 @@ unsafe extern "C" fn registry_add_object(
                 registry,
                 name,
                 &extensions::xdg_decoration::zxdg_decoration_manager_v1_interface,
+                1,
+            ) as _;
+        }
+        "wp_viewporter" => {
+            display.viewporter = display.client.wl_registry_bind(
+                registry,
+                name,
+                &extensions::viewporter::wp_viewporter_interface,
                 1,
             ) as _;
         }
@@ -933,9 +952,11 @@ where
             egl,
             xkb,
             compositor: std::ptr::null_mut(),
+            subcompositor: std::ptr::null_mut(),
             xdg_toplevel: std::ptr::null_mut(),
             xdg_wm_base: std::ptr::null_mut(),
             surface: std::ptr::null_mut(),
+            viewporter: std::ptr::null_mut(),
             shm: std::ptr::null_mut(),
             seat: std::ptr::null_mut(),
             data_device_manager: std::ptr::null_mut(),
@@ -1018,7 +1039,11 @@ where
         });
 
         let borderless = false;
-        display.decorations = decorations::Decorations::new(&mut display, borderless);
+        display.decorations = decorations::Decorations::new(
+            &mut display,
+            borderless,
+            conf.platform.wayland_use_fallback_decorations,
+        );
         assert!(!display.xdg_toplevel.is_null());
 
         display.decorations.set_title(

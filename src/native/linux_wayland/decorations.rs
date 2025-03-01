@@ -25,6 +25,7 @@ pub(super) enum Decorations {
         context: *mut libdecor,
         frame: *mut libdecor_frame,
     },
+    Fallback(fallback::Decorations),
 }
 
 // If we use client decorations, `libdecor` will handle the creation for us.
@@ -59,12 +60,12 @@ unsafe fn create_xdg_toplevel(display: &mut WaylandPayload) {
 }
 
 impl Decorations {
-    pub(super) fn new(display: &mut WaylandPayload, borderless: bool) -> Self {
+    pub(super) fn new(display: &mut WaylandPayload, borderless: bool, use_fallback: bool) -> Self {
         unsafe {
             if borderless {
                 Decorations::none(display)
             } else if display.decoration_manager.is_null() {
-                Decorations::try_client(display)
+                Decorations::try_client(display, use_fallback)
             } else {
                 Decorations::server(display)
             }
@@ -79,7 +80,7 @@ impl Decorations {
     ) {
         let title = std::ffi::CString::new(title).unwrap();
         match self {
-            Decorations::None | Decorations::Server => {
+            Decorations::None | Decorations::Server | Decorations::Fallback(..) => {
                 wl_request!(
                     client,
                     xdg_toplevel,
@@ -98,6 +99,13 @@ impl Decorations {
     unsafe fn none(display: &mut WaylandPayload) -> Self {
         create_xdg_toplevel(display);
         Decorations::None
+    }
+
+    unsafe fn fallback(display: &mut WaylandPayload) -> Self {
+        create_xdg_toplevel(display);
+        let d = crate::native_display().lock().unwrap();
+        let decorations = fallback::Decorations::new(display, d.screen_width, d.screen_height);
+        Decorations::Fallback(decorations)
     }
 
     unsafe fn server(display: &mut WaylandPayload) -> Self {
@@ -121,7 +129,7 @@ impl Decorations {
         Decorations::Server
     }
 
-    unsafe fn try_client(display: &mut WaylandPayload) -> Self {
+    unsafe fn try_client(display: &mut WaylandPayload, use_fallback: bool) -> Self {
         if let Ok(libdecor) = LibDecor::try_load() {
             let context = (libdecor.libdecor_new)(display.display, &mut LIBDECOR_INTERFACE as _);
             let frame = (libdecor.libdecor_decorate)(
@@ -137,6 +145,8 @@ impl Decorations {
                 context,
                 frame,
             }
+        } else if use_fallback {
+            Decorations::fallback(display)
         } else {
             Decorations::none(display)
         }
@@ -181,7 +191,14 @@ unsafe extern "C" fn handle_configure(data: *mut std::ffi::c_void, width: i32, h
         d.screen_height = screen_height;
         drop(d);
 
-        (payload.egl.wl_egl_window_resize)(payload.egl_window, screen_width, screen_height, 0, 0);
+        let mut window_width = screen_width;
+        let mut window_height = screen_height;
+        if let Decorations::Fallback(fallback) = &payload.decorations {
+            window_width -= fallback::Decorations::WIDTH * 2;
+            window_height -= fallback::Decorations::BAR_HEIGHT + fallback::Decorations::WIDTH;
+            fallback.resize(&mut payload.client, width, height);
+        }
+        (payload.egl.wl_egl_window_resize)(payload.egl_window, window_width, window_height, 0, 0);
         payload
             .events
             .push(WaylandEvent::Resize(screen_width as _, screen_height as _));
@@ -265,3 +282,198 @@ static mut XDG_TOPLEVEL_LISTENER: xdg_toplevel_listener = xdg_toplevel_listener 
 static mut XDG_SURFACE_LISTENER: xdg_surface_listener = xdg_surface_listener {
     configure: xdg_surface_handle_configure,
 };
+
+/// This module is drawing some sort of a window border, just for GNOME
+/// looks horrible, doesn't fit OS theme at all, but better than nothing
+mod fallback {
+    use crate::{
+        native::linux_wayland::{
+            extensions::viewporter::{wp_viewport, wp_viewport_interface, wp_viewporter},
+            libwayland_client::*,
+            shm, WaylandPayload,
+        },
+        wl_request, wl_request_constructor,
+    };
+
+    pub struct Decoration {
+        pub surface: *mut wl_surface,
+        pub subsurface: *mut wl_subsurface,
+        pub viewport: *mut wp_viewport,
+    }
+
+    pub(crate) struct Decorations {
+        buffer: *mut wl_buffer,
+        pub top_decoration: Decoration,
+        pub bottom_decoration: Decoration,
+        pub left_decoration: Decoration,
+        pub right_decoration: Decoration,
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    unsafe fn create_decoration(
+        display: &mut WaylandPayload,
+        compositor: *mut wl_compositor,
+        subcompositor: *mut wl_subcompositor,
+        parent: *mut wl_surface,
+        buffer: *mut wl_buffer,
+        x: i32,
+        y: i32,
+        w: i32,
+        h: i32,
+    ) -> Decoration {
+        let surface = wl_request_constructor!(
+            display.client,
+            compositor,
+            WL_COMPOSITOR_CREATE_SURFACE,
+            display.client.wl_surface_interface,
+        );
+
+        let subsurface = wl_request_constructor!(
+            display.client,
+            subcompositor,
+            WL_SUBCOMPOSITOR_GET_SUBSURFACE,
+            display.client.wl_subsurface_interface,
+            surface,
+            parent
+        );
+
+        wl_request!(display.client, subsurface, WL_SUBSURFACE_SET_POSITION, x, y);
+
+        let viewport = wl_request_constructor!(
+            display.client,
+            display.viewporter,
+            wp_viewporter::get_viewport,
+            &wp_viewport_interface,
+            surface
+        );
+
+        wl_request!(display.client, viewport, wp_viewport::set_destination, w, h);
+        wl_request!(display.client, surface, WL_SURFACE_ATTACH, buffer, 0, 0);
+        wl_request!(display.client, surface, WL_SURFACE_COMMIT);
+
+        Decoration {
+            surface,
+            subsurface,
+            viewport,
+        }
+    }
+
+    impl Decorations {
+        pub const WIDTH: i32 = 2;
+        pub const BAR_HEIGHT: i32 = 15;
+
+        pub(super) unsafe fn new(
+            display: &mut WaylandPayload,
+            width: i32,
+            height: i32,
+        ) -> Decorations {
+            let buffer = shm::create_shm_buffer(
+                &mut display.client,
+                display.shm,
+                1,
+                1,
+                &[200, 200, 200, 255],
+            );
+
+            Decorations {
+                buffer,
+                top_decoration: create_decoration(
+                    display,
+                    display.compositor,
+                    display.subcompositor,
+                    display.surface,
+                    buffer,
+                    -Self::WIDTH,
+                    -Self::BAR_HEIGHT,
+                    width + Self::WIDTH * Self::WIDTH,
+                    Self::BAR_HEIGHT,
+                ),
+                left_decoration: create_decoration(
+                    display,
+                    display.compositor,
+                    display.subcompositor,
+                    display.surface,
+                    buffer,
+                    -Self::WIDTH,
+                    -Self::BAR_HEIGHT,
+                    Self::WIDTH,
+                    height + Self::BAR_HEIGHT,
+                ),
+                right_decoration: create_decoration(
+                    display,
+                    display.compositor,
+                    display.subcompositor,
+                    display.surface,
+                    buffer,
+                    width,
+                    -Self::BAR_HEIGHT,
+                    Self::WIDTH,
+                    height + Self::BAR_HEIGHT,
+                ),
+                bottom_decoration: create_decoration(
+                    display,
+                    display.compositor,
+                    display.subcompositor,
+                    display.surface,
+                    buffer,
+                    -Self::WIDTH,
+                    height,
+                    width + Self::WIDTH,
+                    Self::WIDTH,
+                ),
+            }
+        }
+
+        pub unsafe fn resize(&self, client: &mut LibWaylandClient, width: i32, height: i32) {
+            wl_request!(
+                client,
+                self.top_decoration.viewport,
+                wp_viewport::set_destination,
+                width,
+                Self::BAR_HEIGHT
+            );
+            wl_request!(client, self.top_decoration.surface, WL_SURFACE_COMMIT);
+
+            wl_request!(
+                client,
+                self.left_decoration.viewport,
+                wp_viewport::set_destination,
+                Self::WIDTH,
+                height
+            );
+            wl_request!(client, self.left_decoration.surface, WL_SURFACE_COMMIT);
+
+            wl_request!(
+                client,
+                self.right_decoration.subsurface,
+                WL_SUBSURFACE_SET_POSITION,
+                width - Self::WIDTH * 2,
+                -Self::BAR_HEIGHT
+            );
+            wl_request!(
+                client,
+                self.right_decoration.viewport,
+                wp_viewport::set_destination,
+                Self::WIDTH,
+                height
+            );
+            wl_request!(client, self.right_decoration.surface, WL_SURFACE_COMMIT);
+
+            wl_request!(
+                client,
+                self.bottom_decoration.subsurface,
+                WL_SUBSURFACE_SET_POSITION,
+                0,
+                height - Self::BAR_HEIGHT - Self::WIDTH
+            );
+            wl_request!(
+                client,
+                self.bottom_decoration.viewport,
+                wp_viewport::set_destination,
+                width - Self::WIDTH * 2,
+                Self::WIDTH
+            );
+            wl_request!(client, self.bottom_decoration.surface, WL_SURFACE_COMMIT);
+        }
+    }
+}
