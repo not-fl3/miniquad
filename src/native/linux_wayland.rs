@@ -512,6 +512,8 @@ enum WaylandEvent {
     Touch(crate::TouchPhase, u64, f32, f32),
     FilesDropped(String),
     Resize(f32, f32),
+    WindowMinimized,
+    WindowRestored,
 }
 
 unsafe extern "C" fn keyboard_handle_keymap(
@@ -554,6 +556,7 @@ unsafe extern "C" fn keyboard_handle_enter(
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     // Needed for setting the clipboard
     display.keyboard_context.enter_serial = Some(serial);
+    display.events.push(WaylandEvent::WindowRestored);
 }
 unsafe extern "C" fn keyboard_handle_leave(
     data: *mut ::core::ffi::c_void,
@@ -567,6 +570,7 @@ unsafe extern "C" fn keyboard_handle_leave(
     display.keyboard_context.keymods = KeyMods::default();
     display.keyboard_context.repeated_key = None;
     display.keyboard_context.enter_serial = None;
+    display.events.push(WaylandEvent::WindowMinimized);
 }
 unsafe extern "C" fn keyboard_handle_key(
     data: *mut ::core::ffi::c_void,
@@ -1237,6 +1241,8 @@ where
                     WaylandEvent::Resize(width, height) => {
                         event_handler.resize_event(width, height)
                     }
+                    WaylandEvent::WindowMinimized => event_handler.window_minimized_event(),
+                    WaylandEvent::WindowRestored => event_handler.window_restored_event(),
                     WaylandEvent::FilesDropped(filenames) => {
                         let mut d = crate::native_display().try_lock().unwrap();
                         d.dropped_files = Default::default();
