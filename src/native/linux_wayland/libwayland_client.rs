@@ -510,6 +510,26 @@ wl_listener!(
 );
 
 wl_listener!(
+    wl_touch_listener,
+    wl_touch,
+    wl_touch_dummy,
+    fn down(
+        serial: c_uint,
+        time: c_uint,
+        surface: *mut wl_surface,
+        id: c_int,
+        x: wl_fixed_t,
+        y: wl_fixed_t,
+    ),
+    fn up(serial: c_uint, time: c_uint, id: c_int),
+    fn motion(time: c_uint, id: c_int, x: wl_fixed_t, y: wl_fixed_t),
+    fn frame(),
+    fn cancel(),
+    fn shape(id: c_int, major: wl_fixed_t, minor: wl_fixed_t),
+    fn orientation(id: c_int, orientation: wl_fixed_t),
+);
+
+wl_listener!(
     wl_data_device_listener,
     wl_data_device,
     wl_data_device_dummy,
@@ -565,6 +585,7 @@ crate::declare_module!(
     pub wl_output_interface: *mut wl_interface,
     pub wl_keyboard_interface: *mut wl_interface,
     pub wl_pointer_interface: *mut wl_interface,
+    pub wl_touch_interface: *mut wl_interface,
     pub wl_data_device_manager_interface: *mut wl_interface,
     pub wl_data_device_interface: *mut wl_interface,
     pub wl_data_source_interface: *mut wl_interface,
