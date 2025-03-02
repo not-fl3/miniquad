@@ -645,7 +645,7 @@ impl LibWaylandClient {
         display: *mut wl_display,
         data_offer: *mut wl_data_offer,
         mime_type: *const c_char,
-    ) -> Vec<u8> {
+    ) -> Option<Vec<u8>> {
         let mut fds: [c_int; 2] = [0; 2];
         assert_eq!(libc::pipe(fds.as_mut_ptr()), 0);
         (self.wl_proxy_marshal)(data_offer as _, WL_DATA_OFFER_RECEIVE, mime_type, fds[1]);
@@ -655,13 +655,14 @@ impl LibWaylandClient {
         loop {
             let mut buf = [0_u8; 1024];
             let n = libc::read(fds[0], buf.as_mut_ptr() as _, buf.len());
-            if n <= 0 {
-                break;
+            match n {
+                n if n > 0 => bytes.extend_from_slice(&buf[..n as usize]),
+                0 => break,
+                _ => return None,
             }
-            bytes.extend_from_slice(&buf[..n as usize]);
         }
         libc::close(fds[0]);
-        bytes
+        Some(bytes)
     }
 }
 

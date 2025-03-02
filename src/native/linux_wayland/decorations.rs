@@ -104,7 +104,12 @@ impl Decorations {
     unsafe fn fallback(display: &mut WaylandPayload) -> Self {
         create_xdg_toplevel(display);
         let d = crate::native_display().lock().unwrap();
-        let decorations = fallback::Decorations::new(display, d.screen_width, d.screen_height);
+        let dpi_scale = d.dpi_scale as i32;
+        let decorations = fallback::Decorations::new(
+            display,
+            d.screen_width / dpi_scale,
+            d.screen_height / dpi_scale,
+        );
         Decorations::Fallback(decorations)
     }
 
@@ -184,8 +189,10 @@ unsafe extern "C" fn handle_configure(data: *mut std::ffi::c_void, width: i32, h
 
     if width != 0 && height != 0 {
         let mut d = crate::native_display().lock().unwrap();
-        let screen_width = ((width as f32) * d.dpi_scale) as i32;
-        let screen_height = ((height as f32) * d.dpi_scale) as i32;
+        // Currently non-integer scales are not supported
+        let dpi_scale = d.dpi_scale as i32;
+        let screen_width = width * dpi_scale;
+        let screen_height = height * dpi_scale;
         // screen_width / screen_height are the actual numbers of pixels
         d.screen_width = screen_width;
         d.screen_height = screen_height;
@@ -194,8 +201,9 @@ unsafe extern "C" fn handle_configure(data: *mut std::ffi::c_void, width: i32, h
         let mut window_width = screen_width;
         let mut window_height = screen_height;
         if let Decorations::Fallback(fallback) = &payload.decorations {
-            window_width -= fallback::Decorations::WIDTH * 2;
-            window_height -= fallback::Decorations::BAR_HEIGHT + fallback::Decorations::WIDTH;
+            window_width -= fallback::Decorations::WIDTH * 2 * dpi_scale;
+            window_height -=
+                (fallback::Decorations::BAR_HEIGHT + fallback::Decorations::WIDTH) * dpi_scale;
             fallback.resize(&mut payload.client, width, height);
         }
         (payload.egl.wl_egl_window_resize)(payload.egl_window, window_width, window_height, 0, 0);
@@ -233,11 +241,10 @@ unsafe extern "C" fn libdecor_frame_handle_configure(
         &mut height,
     ) == 0
     {
-        // libdecor failed to retrieve the new dimension, so we use the old value
         let d = crate::native_display().lock().unwrap();
-        width = d.screen_width;
-        height = d.screen_height;
-        drop(d);
+        let dpi_scale = d.dpi_scale as i32;
+        width = d.screen_width / dpi_scale;
+        height = d.screen_height / dpi_scale;
     }
     let state = (libdecor.libdecor_state_new)(width, height);
     (libdecor.libdecor_frame_commit)(frame, state, configuration);

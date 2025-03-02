@@ -37,7 +37,7 @@ impl ClipboardContext {
             display
                 .client
                 .data_offer_receive(display.display, data_offer, mime_type.as_ptr())
-        })
+        })?
     }
 
     unsafe fn set(&mut self, data: &str) {
