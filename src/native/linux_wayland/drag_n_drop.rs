@@ -66,13 +66,20 @@ pub(super) unsafe extern "C" fn data_device_handle_drop(
     assert_eq!(data_device, display.data_device);
     if let Some(data_offer) = display.drag_n_drop.data_offer {
         let mime_type = std::ffi::CString::new("UTF8_STRING").unwrap();
-        let bytes =
+        if let Some(bytes) =
             display
                 .client
-                .data_offer_receive(display.display, data_offer, mime_type.as_ptr());
-        wl_request!(display.client, data_offer, WL_DATA_OFFER_FINISH);
-        if let Ok(filenames) = String::from_utf8(bytes) {
-            display.events.push(WaylandEvent::FilesDropped(filenames));
+                .data_offer_receive(display.display, data_offer, mime_type.as_ptr())
+        {
+            // Doing `data_offer.finish` here sometimes causes "premature finish error"
+            // No idea why so we just delete the data_offer directly
+            // wl_request!(display.client, data_offer, WL_DATA_OFFER_FINISH);
+            wl_request!(display.client, data_offer, WL_DATA_OFFER_DESTROY);
+            (display.client.wl_proxy_destroy)(data_offer as _);
+            display.drag_n_drop.data_offer = None;
+            if let Ok(filenames) = String::from_utf8(bytes) {
+                display.events.push(WaylandEvent::FilesDropped(filenames));
+            }
         }
     }
 }

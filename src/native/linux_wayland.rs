@@ -161,6 +161,7 @@ impl WaylandPayload {
                 self.client,
                 self.xdg_toplevel,
                 extensions::xdg_shell::xdg_toplevel::set_fullscreen,
+                std::ptr::null_mut::<wl_output>()
             );
         } else {
             wl_request!(
@@ -764,6 +765,9 @@ unsafe extern "C" fn output_handle_scale(
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     let mut d = crate::native_display().try_lock().unwrap();
     if d.high_dpi {
+        let dpi_scale = d.dpi_scale as i32;
+        d.screen_width = d.screen_width / dpi_scale * factor;
+        d.screen_height = d.screen_height / dpi_scale * factor;
         d.dpi_scale = factor as _;
         wl_request!(
             display.client,
@@ -1113,11 +1117,14 @@ where
         )
         .unwrap();
 
-        display.egl_window = (display.egl.wl_egl_window_create)(
-            display.surface as _,
-            conf.window_width as _,
-            conf.window_height as _,
-        );
+        {
+            let d = crate::native_display().try_lock().unwrap();
+            display.egl_window = (display.egl.wl_egl_window_create)(
+                display.surface as _,
+                d.screen_width,
+                d.screen_height,
+            );
+        }
 
         let egl_surface = (libegl.eglCreateWindowSurface)(
             egl_display,
@@ -1165,8 +1172,6 @@ where
             wm_class.as_ptr()
         );
 
-        // For some reason, setting fullscreen before egl_window is created leads
-        // to segfault because wl_egl_window_create returns NULL.
         if conf.fullscreen {
             display.set_fullscreen(true);
         }
