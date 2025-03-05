@@ -207,9 +207,18 @@ unsafe extern "C" fn handle_configure(data: *mut std::ffi::c_void, width: i32, h
             fallback.resize(&mut payload.client, width, height);
         }
         (payload.egl.wl_egl_window_resize)(payload.egl_window, window_width, window_height, 0, 0);
-        payload
-            .events
-            .push(WaylandEvent::Resize(screen_width as _, screen_height as _));
+        // The compositor can send multiple resizing configure during a single frame, and we
+        // probably don't want to fire the resize event for every one of them
+        // So if we still have a Resize event in the queue, instead of pushing a new one, we batch
+        // them by modifying the dimension
+        if let Some(WaylandEvent::Resize(width, height)) = payload.events.last_mut() {
+            *width = screen_width as _;
+            *height = screen_height as _;
+        } else {
+            payload
+                .events
+                .push(WaylandEvent::Resize(screen_width as _, screen_height as _));
+        }
     }
 }
 
