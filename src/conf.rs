@@ -101,6 +101,22 @@ pub enum WebGLVersion {
     WebGL2,
 }
 
+/// On Wayland, specify how to draw client-side decoration (CSD) if server-side decoration (SSD) is
+/// not supported (e.g., on GNOME).
+///
+/// Defaults to ServerWithLibDecorFallback
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum WaylandDecorations {
+    /// If SSD is not supported, will try to load `libdecor` to draw CSD. This is the default
+    /// choice.
+    #[default]
+    ServerWithLibDecorFallback,
+    /// If SSD is not supported, draw a light gray border.
+    ServerWithMiniquadFallback,
+    /// If SSD is not supported, no CSD will be drawn.
+    ServerOnly,
+}
+
 /// Platform-specific settings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Platform {
@@ -143,9 +159,9 @@ pub struct Platform {
     /// - TODO: Document(and check) what does it actually mean on android. Transparent window?
     pub framebuffer_alpha: bool,
 
-    /// On Wayland, the decorations are either drawn by the server or via `libdecor`. If neither is
-    /// available, then this flag controls whether fallback window decorations should be used.
-    pub wayland_use_fallback_decorations: bool,
+    /// On Wayland, specifies how to draw client-side decoration (CSD) if server-side decoration (SSD) is
+    /// not supported (e.g., on GNOME).
+    pub wayland_decorations: WaylandDecorations,
 
     /// Set the `WM_CLASS` window property on X11 and the `app_id` on Wayland. This is used
     /// by gnome to determine the window icon (together with an external `.desktop` file).
@@ -165,7 +181,7 @@ impl Default for Platform {
             blocking_event_loop: false,
             swap_interval: None,
             framebuffer_alpha: false,
-            wayland_use_fallback_decorations: true,
+            wayland_decorations: WaylandDecorations::default(),
             linux_wm_class: "miniquad-application",
         }
     }

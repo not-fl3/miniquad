@@ -20,7 +20,7 @@ use extensions::xdg_shell::*;
 pub(super) enum Decorations {
     None,
     Server,
-    Client {
+    LibDecor {
         libdecor: LibDecor,
         context: *mut libdecor,
         frame: *mut libdecor_frame,
@@ -60,14 +60,20 @@ unsafe fn create_xdg_toplevel(display: &mut WaylandPayload) {
 }
 
 impl Decorations {
-    pub(super) fn new(display: &mut WaylandPayload, borderless: bool, use_fallback: bool) -> Self {
+    pub(super) fn new(
+        display: &mut WaylandPayload,
+        fallback: crate::conf::WaylandDecorations,
+    ) -> Self {
+        use crate::conf::WaylandDecorations::*;
         unsafe {
-            if borderless {
-                Decorations::none(display)
-            } else if display.decoration_manager.is_null() {
-                Decorations::try_client(display, use_fallback)
-            } else {
+            if !display.decoration_manager.is_null() {
                 Decorations::server(display)
+            } else {
+                match fallback {
+                    ServerOnly => Decorations::none(display),
+                    ServerWithLibDecorFallback => Decorations::try_libdecor(display),
+                    ServerWithMiniquadFallback => Decorations::fallback(display),
+                }
             }
         }
     }
@@ -88,7 +94,7 @@ impl Decorations {
                     title.as_ptr()
                 );
             }
-            Decorations::Client {
+            Decorations::LibDecor {
                 libdecor, frame, ..
             } => {
                 (libdecor.libdecor_frame_set_title)(*frame, title.as_ptr());
@@ -134,7 +140,7 @@ impl Decorations {
         Decorations::Server
     }
 
-    unsafe fn try_client(display: &mut WaylandPayload, use_fallback: bool) -> Self {
+    unsafe fn try_libdecor(display: &mut WaylandPayload) -> Self {
         if let Ok(libdecor) = LibDecor::try_load() {
             let context = (libdecor.libdecor_new)(display.display, &mut LIBDECOR_INTERFACE as _);
             let frame = (libdecor.libdecor_decorate)(
@@ -145,20 +151,18 @@ impl Decorations {
             );
             (libdecor.libdecor_frame_map)(frame);
             display.xdg_toplevel = (libdecor.libdecor_frame_get_xdg_toplevel)(frame);
-            Decorations::Client {
+            Decorations::LibDecor {
                 libdecor,
                 context,
                 frame,
             }
-        } else if use_fallback {
-            Decorations::fallback(display)
         } else {
             Decorations::none(display)
         }
     }
 
     fn libdecor(&mut self) -> Option<&mut LibDecor> {
-        if let Decorations::Client { libdecor, .. } = self {
+        if let Decorations::LibDecor { libdecor, .. } = self {
             Some(libdecor)
         } else {
             None
