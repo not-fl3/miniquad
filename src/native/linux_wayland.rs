@@ -1150,12 +1150,8 @@ where
             (libegl.eglGetProcAddress)(name.as_ptr() as _)
         });
 
-        let borderless = false;
-        display.decorations = decorations::Decorations::new(
-            &mut display,
-            borderless,
-            conf.platform.wayland_use_fallback_decorations,
-        );
+        display.decorations =
+            decorations::Decorations::new(&mut display, conf.platform.wayland_decorations);
         assert!(!display.xdg_toplevel.is_null());
 
         display.decorations.set_title(
