@@ -300,6 +300,10 @@ pub fn define_cocoa_window_delegate() -> *const Class {
 
     extern "C" fn window_did_move(this: &Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
+        if payload.gl_context.is_null() {
+            // Startup: the gl_context has not yet been created.
+            return;
+        }
         unsafe {
             msg_send_![payload.gl_context, update];
         }
