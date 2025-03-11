@@ -120,6 +120,33 @@ impl WaylandPayload {
         } else {
             (self.client.wl_display_cancel_read)(self.display);
         }
+        let errno = (self.client.wl_display_get_error)(self.display);
+        // A non-zero errno means the compositor decided that we need to die.
+        // Nothing more we can do at this point :(
+        // If we want the detailed error message, we need to run with `WAYLAND_DEBUG=client`, since
+        // the message string is not accessible to us.
+        match errno {
+            0 => (),
+            EPROTO => {
+                let mut interface: *const wl_interface = std::ptr::null();
+                let mut id = 0;
+                let code = (self.client.wl_display_get_protocol_error)(
+                    self.display,
+                    &mut interface,
+                    &mut id,
+                );
+                let name = core::ffi::CStr::from_ptr((*interface).name)
+                    .to_str()
+                    .unwrap();
+                panic!(
+                    "Wayland protocol error at {}#{} with code {}",
+                    name, id, code
+                )
+            }
+            _ => {
+                panic!("Wayland display error with code {}", errno)
+            }
+        }
     }
     unsafe fn init_data_device(&mut self) {
         self.data_device = wl_request_constructor!(
