@@ -690,9 +690,11 @@ unsafe extern "C" fn pointer_handle_enter(
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     display.focused_window = surface;
-    display
-        .pointer_context
-        .handle_enter(&mut display.client, serial);
+    if surface == display.surface {
+        display
+            .pointer_context
+            .handle_enter(&mut display.client, serial);
+    }
 }
 
 unsafe extern "C" fn pointer_handle_leave(
