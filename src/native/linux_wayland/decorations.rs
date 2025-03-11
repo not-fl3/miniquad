@@ -211,6 +211,16 @@ unsafe extern "C" fn handle_configure(data: *mut std::ffi::c_void, width: i32, h
             fallback.resize(&mut payload.client, width, height);
         }
         (payload.egl.wl_egl_window_resize)(payload.egl_window, window_width, window_height, 0, 0);
+        // We need to ensure that the buffer has been correctly resized before setting the
+        // dpi_scale, since Wayland would rather crash than letting you have a width that's an
+        // odd number on a display with 2x dpi...
+        (payload.client.wl_display_dispatch_pending)(payload.display);
+        wl_request!(
+            payload.client,
+            payload.surface,
+            WL_SURFACE_SET_BUFFER_SCALE,
+            dpi_scale
+        );
         // The compositor can send multiple resizing configure during a single frame, and we
         // probably don't want to fire the resize event for every one of them
         // So if we still have a Resize event in the queue, instead of pushing a new one, we batch

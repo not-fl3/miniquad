@@ -787,23 +787,16 @@ unsafe extern "C" fn relative_pointer_handle_relative_motion(
 }
 
 unsafe extern "C" fn output_handle_scale(
-    data: *mut std::ffi::c_void,
+    _data: *mut std::ffi::c_void,
     _output: *mut wl_output,
     factor: core::ffi::c_int,
 ) {
-    let display: &mut WaylandPayload = &mut *(data as *mut _);
     let mut d = crate::native_display().try_lock().unwrap();
     if d.high_dpi {
         let dpi_scale = d.dpi_scale as i32;
         d.screen_width = d.screen_width / dpi_scale * factor;
         d.screen_height = d.screen_height / dpi_scale * factor;
         d.dpi_scale = factor as _;
-        wl_request!(
-            display.client,
-            display.surface,
-            WL_SURFACE_SET_BUFFER_SCALE,
-            factor
-        );
     }
 }
 
@@ -1126,7 +1119,7 @@ where
         let clipboard = Box::new(clipboard::WaylandClipboard::new(&mut display as *mut _));
         crate::set_display(NativeDisplayData {
             high_dpi: conf.high_dpi,
-            dpi_scale: 1.,
+            dpi_scale: 1., // At this point dpi_scale is not known to us
             blocking_event_loop: conf.platform.blocking_event_loop,
             ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
         });
@@ -1147,11 +1140,18 @@ where
         .unwrap();
 
         {
+            // At this point we have been told the dpi_scale
             let d = crate::native_display().try_lock().unwrap();
             display.egl_window = (display.egl.wl_egl_window_create)(
                 display.surface as _,
                 d.screen_width,
                 d.screen_height,
+            );
+            wl_request!(
+                display.client,
+                display.surface,
+                WL_SURFACE_SET_BUFFER_SCALE,
+                d.dpi_scale as i32
             );
         }
 
