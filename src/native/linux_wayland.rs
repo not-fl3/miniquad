@@ -127,7 +127,7 @@ impl WaylandPayload {
         // the message string is not accessible to us.
         match errno {
             0 => (),
-            EPROTO => {
+            libc::EPROTO => {
                 let mut interface: *const wl_interface = std::ptr::null();
                 let mut id = 0;
                 let code = (self.client.wl_display_get_protocol_error)(

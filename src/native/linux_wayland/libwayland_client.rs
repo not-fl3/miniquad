@@ -186,11 +186,6 @@ pub const WL_SUBSURFACE_PLACE_BELOW_SINCE_VERSION: u32 = 1;
 pub const WL_SUBSURFACE_SET_SYNC_SINCE_VERSION: u32 = 1;
 pub const WL_SUBSURFACE_SET_DESYNC_SINCE_VERSION: u32 = 1;
 
-pub const ENOMEM: c_int = 12;
-pub const EFAULT: c_int = 14;
-pub const EINVAL: c_int = 22;
-pub const EPROTO: c_int = 71;
-
 pub type wl_shm_format = ::core::ffi::c_uint;
 
 pub const wl_shm_format_WL_SHM_FORMAT_ARGB8888: wl_shm_format = 0;
