@@ -1,6 +1,6 @@
 [package]
 name = "miniquad"
-version = "0.4.7"
+version = "0.4.8"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
 rust-version = "1.70"
