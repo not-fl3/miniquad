@@ -27,7 +27,7 @@ use crate::{
 
 thread_local! {
     static EVENT_HANDLER: RefCell<Option<Box<dyn EventHandler>>> = RefCell::new(None);
-    static REQUESTS: RefCell<Option<Receiver<Request>>> = RefCell::new(None);
+    static REQUESTS: RefCell<Option<Receiver<Request>>> = const { RefCell::new(None) };
 }
 fn tl_event_handler<T, F: FnOnce(&mut dyn EventHandler) -> T>(f: F) -> T {
     EVENT_HANDLER.with(|globals| {
@@ -82,9 +82,11 @@ where
     REQUESTS.with(|r| *r.borrow_mut() = Some(rx));
     let w = unsafe { canvas_width() as _ };
     let h = unsafe { canvas_height() as _ };
+    let dpi_scale = unsafe { dpi_scale() };
     let clipboard = Box::new(Clipboard);
     crate::set_display(NativeDisplayData {
         blocking_event_loop: conf.platform.blocking_event_loop,
+        dpi_scale,
         ..NativeDisplayData::new(w, h, tx, clipboard)
     });
     EVENT_HANDLER.with(|g| {

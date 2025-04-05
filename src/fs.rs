@@ -12,19 +12,25 @@ pub enum Error {
     IOSAssetNoData,
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            _ => write!(f, "Error: {:?}", self),
-        }
-    }
-}
-
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Error {
         Error::IOError(e)
     }
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::IOError(e) => write!(f, "I/O error: {e}"),
+            Self::DownloadFailed => write!(f, "Download failed"),
+            Self::AndroidAssetLoadingError => write!(f, "[android] Failed to load asset"),
+            Self::IOSAssetNoSuchFile => write!(f, "[ios] No such asset file"),
+            Self::IOSAssetNoData => write!(f, "[ios] No data in asset file"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 pub type Response = Result<Vec<u8>, Error>;
 
@@ -77,6 +83,7 @@ mod wasm {
     use std::{cell::RefCell, collections::HashMap, thread_local};
 
     thread_local! {
+        #[allow(clippy::type_complexity)]
         static FILES: RefCell<HashMap<u32, Box<dyn Fn(Response)>>> = RefCell::new(HashMap::new());
     }
 

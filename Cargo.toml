@@ -1,9 +1,10 @@
 [package]
 name = "miniquad"
-version = "0.4.7"
+version = "0.4.8"
 authors = ["not-fl3 <not.fl3@gmail.com>"]
 edition = "2018"
-license = "MIT/Apache-2.0"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
 homepage = "https://github.com/not-fl3/miniquad"
 repository = "https://github.com/not-fl3/miniquad"
 description = """
@@ -34,6 +35,7 @@ winapi = { version = "0.3", features = [
     "windowsx",
     "winbase",
     "hidusage",
+    "shellapi",
 ] }
 
 [target.'cfg(target_os = "android")'.dependencies]
@@ -41,7 +43,7 @@ libc = "0.2"
 ndk-sys = "0.2"
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
-objc = "0.2"
+objc = { package = "objc-rs", version = "0.2" }
 
 [dev-dependencies]
 glam = { version = "0.24", features = ["scalar-math"] }

@@ -6,11 +6,11 @@ use crate::event::{KeyCode, KeyMods, MouseButton, TouchPhase};
 
 pub fn translate_mouse_button(button: i32) -> MouseButton {
     match button {
-        0 => return MouseButton::Left,
-        1 => return MouseButton::Right,
-        2 => return MouseButton::Middle,
-        _ => return MouseButton::Unknown,
-    };
+        0 => MouseButton::Left,
+        1 => MouseButton::Right,
+        2 => MouseButton::Middle,
+        _ => MouseButton::Unknown,
+    }
 }
 pub fn translate_mod(wasm_mods: i32) -> KeyMods {
     const SAPP_MODIFIER_SHIFT: i32 = 1;
@@ -31,7 +31,7 @@ pub fn translate_mod(wasm_mods: i32) -> KeyMods {
     if wasm_mods & SAPP_MODIFIER_SUPER != 0 {
         mods.logo = true;
     }
-    return mods;
+    mods
 }
 
 pub fn translate_keycode(keycode: i32) -> KeyCode {

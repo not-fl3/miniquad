@@ -22,6 +22,8 @@ import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 
 import android.graphics.Color;
 import android.graphics.Insets;
@@ -341,6 +343,26 @@ public class MainActivity extends Activity {
                     }
                 }
             });
+    }
+
+    public String getClipboardText() {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+
+        if (clipboard == null || !clipboard.hasPrimaryClip()) {
+            return null;
+        }
+
+        CharSequence clipData = clipboard.getPrimaryClip().getItemAt(0).getText();
+        if (clipData == null) {
+            return null;
+        }
+
+        return clipData.toString();
+    }
+    public void setClipboardText(String text) {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        ClipData clip = ClipData.newPlainText("label", text);
+        clipboard.setPrimaryClip(clip);
     }
 }
 

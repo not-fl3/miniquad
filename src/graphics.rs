@@ -202,16 +202,11 @@ impl VertexFormat {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum VertexStep {
+    #[default]
     PerVertex,
     PerInstance,
-}
-
-impl Default for VertexStep {
-    fn default() -> VertexStep {
-        VertexStep::PerVertex
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -278,6 +273,15 @@ pub enum ShaderType {
     Fragment,
 }
 
+impl Display for ShaderType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Vertex => write!(f, "Vertex"),
+            Self::Fragment => write!(f, "Fragment"),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ShaderError {
     CompilationError {
@@ -297,15 +301,18 @@ impl From<std::ffi::NulError> for ShaderError {
 
 impl Display for ShaderError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self) // Display the same way as Debug
+        match self {
+            Self::CompilationError {
+                shader_type,
+                error_message,
+            } => write!(f, "{shader_type} shader error:\n{error_message}"),
+            Self::LinkError(msg) => write!(f, "Link shader error:\n{msg}"),
+            Self::FFINulError(e) => write!(f, "{e}"),
+        }
     }
 }
 
-impl Error for ShaderError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
-}
+impl Error for ShaderError {}
 
 /// List of all the possible formats of input data when uploading to texture.
 /// The list is built by intersection of texture formats supported by 3.3 core profile and webgl1.
@@ -631,10 +638,11 @@ impl From<Comparison> for GLenum {
 
 /// Specifies how incoming RGBA values (source) and the RGBA in framebuffer (destination)
 /// are combined.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub enum Equation {
     /// Adds source and destination. Source and destination are multiplied
     /// by blending parameters before addition.
+    #[default]
     Add,
     /// Subtracts destination from source. Source and destination are
     /// multiplied by blending parameters before subtraction.
@@ -661,12 +669,6 @@ pub enum BlendFactor {
     Value(BlendValue),
     OneMinusValue(BlendValue),
     SourceAlphaSaturate,
-}
-
-impl Default for Equation {
-    fn default() -> Equation {
-        Equation::Add
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -870,6 +872,12 @@ pub struct ElapsedQuery {
     gl_query: GLuint,
 }
 
+impl Default for ElapsedQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ElapsedQuery {
     pub fn new() -> ElapsedQuery {
         ElapsedQuery { gl_query: 0 }
@@ -952,7 +960,7 @@ impl ElapsedQuery {
     ///
     /// Implemented as `glDeleteQueries(...)` on OpenGL/WebGL platforms.
     pub fn delete(&mut self) {
-        unsafe { glDeleteQueries(1, &mut self.gl_query) }
+        unsafe { glDeleteQueries(1, &self.gl_query) }
         self.gl_query = 0;
     }
 }
@@ -1070,8 +1078,8 @@ pub struct ContextInfo {
     /// allowing to see which glsl versions are actually supported.
     /// Unfortunately, it only works on GL4.3+... and even there it is not quite correct.
     ///
-    /// miniquad will take a guess based on GL_VERSION_STRING, current platform and implementation details.
-    /// Would be all false on metal.
+    /// miniquad will take a guess based on GL_VERSION_STRING, current platform and implementation
+    /// details. Would be all false on metal.
     pub glsl_support: GlslSupport,
     /// List of platform-dependent features that miniquad failed to make cross-platforms
     /// and therefore they might be missing.
@@ -1092,8 +1100,10 @@ impl ContextInfo {
 pub trait RenderingBackend {
     fn info(&self) -> ContextInfo;
     /// For metal context's ShaderSource should contain MSL source string, for GL - glsl.
+    ///
     /// If in doubt, _most_ OpenGL contexts support "#version 100" glsl shaders.
-    /// So far miniquad never encountered where it can create a rendering context, but `version 100` shaders are not supported.
+    /// So far miniquad never encountered where it can create a rendering context,
+    /// but `version 100` shaders are not supported.
     ///
     /// Typical `new_shader` invocation for an MSL and `glsl version 100` sources:
     /// ```ignore
@@ -1227,13 +1237,14 @@ pub trait RenderingBackend {
     /// is recommended instead.
     fn render_pass_texture(&self, render_pass: RenderPass) -> TextureId {
         let textures = self.render_pass_color_attachments(render_pass);
+        #[allow(clippy::len_zero)]
         if textures.len() == 0 {
             panic!("depth-only render pass");
         }
         if textures.len() != 1 {
             panic!("multiple render target render pass");
         }
-        return textures[0];
+        textures[0]
     }
     /// For depth-only render pass returns empty slice.
     fn render_pass_color_attachments(&self, render_pass: RenderPass) -> &[TextureId];
@@ -1277,29 +1288,29 @@ pub trait RenderingBackend {
 
     /// Delete GPU buffer, leaving handle unmodified.
     ///
-    /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
-    /// more RAII buffer object.
+    /// More high-level code on top of miniquad probably is going to call this in Drop
+    /// implementation of some more RAII buffer object.
     ///
-    /// There is no protection against using deleted buffers later. However its not an UB in OpenGl and thats why
-    /// this function is not marked as unsafe
+    /// There is no protection against using deleted buffers later. However its not an UB in OpenGl
+    /// and thats why this function is not marked as unsafe
     fn delete_buffer(&mut self, buffer: BufferId);
 
     /// Delete GPU texture, leaving handle unmodified.
     ///
-    /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
-    /// more RAII buffer object.
+    /// More high-level code on top of miniquad probably is going to call this in Drop
+    /// implementation of some more RAII buffer object.
     ///
-    /// There is no protection against using deleted textures later. However its not a CPU-level UB and thats why
-    /// this function is not marked as unsafe
+    /// There is no protection against using deleted textures later. However its not a CPU-level UB
+    /// and thats why this function is not marked as unsafe
     fn delete_texture(&mut self, texture: TextureId);
 
     /// Delete GPU program, leaving handle unmodified.
     ///
-    /// More high-level code on top of miniquad probably is going to call this in Drop implementation of some
-    /// more RAII buffer object.
+    /// More high-level code on top of miniquad probably is going to call this in Drop
+    /// implementation of some more RAII buffer object.
     ///
-    /// There is no protection against using deleted programs later. However its not a CPU-level Porgram and thats why
-    /// this function is not marked as unsafe
+    /// There is no protection against using deleted programs later. However its not a CPU-level
+    /// Porgram and thats why this function is not marked as unsafe
     fn delete_shader(&mut self, program: ShaderId);
 
     /// Set a new viewport rectangle.

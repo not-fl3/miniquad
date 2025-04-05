@@ -67,35 +67,30 @@ pub unsafe fn cfstring_ref_to_string(cfstring: CFStringRef) -> String {
         kCFStringEncodingUTF8,
         0,
         false,
-        0 as *mut u8,
+        std::ptr::null_mut::<u8>(),
         0,
         &mut num_bytes,
     );
     if converted == 0 || num_bytes == 0 {
         return String::new();
     }
-    let mut buffer = Vec::new();
-    buffer.resize(num_bytes as usize, 0u8);
+    let mut buffer = vec![0u8; num_bytes as usize];
     CFStringGetBytes(
         cfstring,
         range,
         kCFStringEncodingUTF8,
         0,
         false,
-        buffer.as_mut_ptr() as *mut u8,
+        buffer.as_mut_ptr(),
         num_bytes,
-        0 as *mut u64,
+        std::ptr::null_mut::<u64>(),
     );
-    if let Ok(val) = String::from_utf8(buffer) {
-        val
-    } else {
-        String::new()
-    }
+    String::from_utf8(buffer).unwrap_or_default()
 }
 
 pub fn load_webkit_cursor(cursor_name_str: &str) -> ObjcId {
     unsafe {
-        static CURSOR_ROOT: &'static str = "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/HIServices.framework/Versions/A/Resources/cursors";
+        static CURSOR_ROOT: &str = "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/HIServices.framework/Versions/A/Resources/cursors";
         let cursor_root = str_to_nsstring(CURSOR_ROOT);
         let cursor_name = str_to_nsstring(cursor_name_str);
         let cursor_pdf = str_to_nsstring("cursor.pdf");
@@ -137,7 +132,7 @@ pub fn get_event_char(event: ObjcId) -> Option<char> {
         }
         let chars = nsstring_to_string(characters);
 
-        if chars.len() == 0 {
+        if chars.is_empty() {
             return None;
         }
         Some(chars.chars().next().unwrap())
@@ -402,7 +397,7 @@ pub fn keycode_to_menu_key(keycode: KeyCode, shift: bool) -> &'static str {
     }
 }
 
-pub unsafe fn superclass<'a>(this: &'a Object) -> &'a Class {
+pub unsafe fn superclass(this: &Object) -> &Class {
     let superclass: ObjcId = msg_send![this, superclass];
     &*(superclass as *const _)
 }

@@ -256,8 +256,7 @@ pub fn define_app_delegate() -> *const Class {
             yes1 as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
         );
     }
-
-    return decl.register();
+    decl.register()
 }
 
 pub fn define_cocoa_window_delegate() -> *const Class {
@@ -284,9 +283,9 @@ pub fn define_cocoa_window_delegate() -> *const Class {
             }
         }
         if native_display_blocking().quit_ordered {
-            return YES;
+            YES
         } else {
-            return NO;
+            NO
         }
     }
 
@@ -301,6 +300,10 @@ pub fn define_cocoa_window_delegate() -> *const Class {
 
     extern "C" fn window_did_move(this: &Object, _: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
+        if payload.gl_context.is_null() {
+            // Startup: the gl_context has not yet been created.
+            return;
+        }
         unsafe {
             msg_send_![payload.gl_context, update];
         }
@@ -328,11 +331,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
             let responds: bool = msg_send![payload.window, respondsToSelector:sel!(occlusionState)];
             if responds {
                 let state: u64 = msg_send![payload.window, occlusionState];
-                if state & NSWindowOcclusionStateVisible != 0 {
-                    payload.occluded = false;
-                } else {
-                    payload.occluded = true;
-                }
+                payload.occluded = state & NSWindowOcclusionStateVisible == 0;
             }
         }
     }
@@ -375,7 +374,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
     // Store internal state as user data
     decl.add_ivar::<*mut c_void>("display_ptr");
 
-    return decl.register();
+    decl.register()
 }
 
 unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
@@ -485,7 +484,7 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
                 let cursor_id = *payload
                     .cursors
                     .entry(current_cursor)
-                    .or_insert_with(|| load_mouse_cursor(current_cursor.clone()));
+                    .or_insert_with(|| load_mouse_cursor(current_cursor));
                 assert!(!cursor_id.is_null());
                 cursor_id
             };
@@ -737,10 +736,9 @@ pub fn define_opengl_view_class() -> *const Class {
 
         view_base_decl(&mut decl);
     }
-
     decl.add_ivar::<*mut c_void>("display_ptr");
 
-    return decl.register();
+    decl.register()
 }
 
 pub fn define_metal_view_class() -> *const Class {
@@ -769,7 +767,7 @@ pub fn define_metal_view_class() -> *const Class {
         view_base_decl(&mut decl);
     }
 
-    return decl.register();
+    decl.register()
 }
 
 fn get_window_payload(this: &Object) -> &mut MacosDisplay {
@@ -797,6 +795,7 @@ unsafe fn create_metal_view(_: &mut MacosDisplay, sample_count: i32, _: bool) ->
     view
 }
 
+#[allow(clippy::vec_init_then_push)]
 unsafe fn create_opengl_view(
     display: &mut MacosDisplay,
     sample_count: i32,
@@ -865,12 +864,12 @@ impl crate::native::Clipboard for MacosClipboard {
 }
 
 unsafe extern "C" fn release_data(info: *mut c_void, _: *const c_void, _: usize) {
-    drop(Box::from_raw(info));
+    drop(Box::from_raw(info as *mut &[u8]));
 }
 
 unsafe fn set_icon(ns_app: ObjcId, icon: &Icon) {
-    let width = 64 as usize;
-    let height = 64 as usize;
+    let width = 64_usize;
+    let height = 64_usize;
     let colors = &icon.big[..];
     let rgb = CGColorSpaceCreateDeviceRGB();
     let bits_per_component: usize = 8; // number of bits in UInt8
@@ -1049,10 +1048,13 @@ where
 
     initialize_menu_bar(ns_app);
 
-    let window_masks = NSWindowStyleMask::NSTitledWindowMask as u64
+    let mut window_masks = NSWindowStyleMask::NSTitledWindowMask as u64
         | NSWindowStyleMask::NSClosableWindowMask as u64
-        | NSWindowStyleMask::NSMiniaturizableWindowMask as u64
-        | NSWindowStyleMask::NSResizableWindowMask as u64;
+        | NSWindowStyleMask::NSMiniaturizableWindowMask as u64;
+
+    if conf.window_resizable {
+        window_masks |= NSWindowStyleMask::NSResizableWindowMask as u64;
+    }
 
     let window_frame = NSRect {
         origin: NSPoint { x: 0., y: 0. },
@@ -1066,7 +1068,7 @@ where
     let window: ObjcId = msg_send![
         window,
         initWithContentRect: window_frame
-        styleMask: window_masks as u64
+        styleMask: window_masks
         backing: NSBackingStoreType::NSBackingStoreBuffered as u64
         defer: NO
     ];
@@ -1081,8 +1083,6 @@ where
     let title = str_to_nsstring(&conf.window_title);
     //let () = msg_send![window, setReleasedWhenClosed: NO];
     let () = msg_send![window, setTitle: title];
-    let () = msg_send![window, center];
-    let () = msg_send![window, setAcceptsMouseMovedEvents: YES];
 
     let view = match conf.platform.apple_gfx_api {
         AppleGfxApi::OpenGl => create_opengl_view(&mut display, conf.sample_count, conf.high_dpi),
@@ -1097,8 +1097,6 @@ where
     display.window = window;
     display.view = view;
 
-    let () = msg_send![window, setContentView: view];
-
     // cannot place it to create_opengl_view, because it should be called after setContentView
     if conf.platform.apple_gfx_api == AppleGfxApi::OpenGl {
         msg_send_![display.gl_context, setView:view];
@@ -1111,11 +1109,15 @@ where
         });
     }
 
+    let () = msg_send![window, setContentView: view];
+    let () = msg_send![window, makeFirstResponder: view];
+
     let _ = display.update_dimensions();
 
     assert!(!view.is_null());
 
-    let () = msg_send![window, makeFirstResponder: view];
+    let () = msg_send![window, center];
+    let () = msg_send![window, setAcceptsMouseMovedEvents: YES];
 
     if conf.fullscreen {
         let () = msg_send![window, toggleFullScreen: nil];

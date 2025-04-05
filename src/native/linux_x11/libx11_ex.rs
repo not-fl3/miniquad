@@ -10,7 +10,7 @@ impl LibX11 {
             if !db.is_null() {
                 let mut value = XrmValue {
                     size: 0,
-                    addr: 0 as *mut libc::c_char,
+                    addr: std::ptr::null_mut::<libc::c_char>(),
                 };
                 let mut type_ = std::ptr::null_mut();
                 if (self.XrmGetResource)(
@@ -37,7 +37,7 @@ impl LibX11 {
             event: *mut XErrorEvent,
         ) -> libc::c_int {
             eprintln!("Error: {}", (*event).error_code);
-            return 0 as libc::c_int;
+            0 as libc::c_int
         }
 
         (self.XSetErrorHandler)(Some(
@@ -88,7 +88,7 @@ impl LibX11 {
             8,
             PropModeReplace,
             c_title.as_ptr() as *mut libc::c_uchar,
-            libc::strlen(c_title.as_ptr()) as libc::c_int,
+            c_title.as_bytes().len() as libc::c_int,
         );
         (self.XChangeProperty)(
             display,
@@ -98,7 +98,7 @@ impl LibX11 {
             8 as libc::c_int,
             PropModeReplace,
             c_title.as_ptr() as *mut libc::c_uchar,
-            libc::strlen(c_title.as_ptr()) as libc::c_int,
+            c_title.as_bytes().len() as libc::c_int,
         );
         (self.XFlush)(display);
     }
@@ -119,7 +119,7 @@ impl LibX11 {
         let icons = [
             (16, &icon.small[..]),
             (32, &icon.medium[..]),
-            (65, &icon.big[..]),
+            (64, &icon.big[..]),
         ];
 
         {
@@ -223,7 +223,7 @@ impl LibX11 {
         (self.XSetWMProtocols)(display, window, protocols.as_mut_ptr(), 1 as libc::c_int);
         let hints = (self.XAllocSizeHints)();
         (*hints).flags |= PWinGravity;
-        if conf.window_resizable == false {
+        if !conf.window_resizable {
             (*hints).flags |= PMinSize | PMaxSize;
             (*hints).min_width = conf.window_width;
             (*hints).min_height = conf.window_height;
@@ -233,6 +233,13 @@ impl LibX11 {
         (*hints).win_gravity = StaticGravity;
         (self.XSetWMNormalHints)(display, window, hints);
         (self.XFree)(hints as *mut libc::c_void);
+
+        let class_hint = (self.XAllocClassHint)();
+        let wm_class = std::ffi::CString::new(conf.platform.linux_wm_class).unwrap();
+        (*class_hint).res_name = wm_class.as_ptr() as _;
+        (*class_hint).res_class = wm_class.as_ptr() as _;
+        (self.XSetClassHint)(display, window, class_hint);
+        (self.XFree)(class_hint as *mut libc::c_void);
 
         if let Some(ref icon) = conf.icon {
             self.update_window_icon(display, window, icon);

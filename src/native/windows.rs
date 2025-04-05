@@ -1,3 +1,5 @@
+use std::{ffi::OsString, os::windows::ffi::OsStringExt, path::PathBuf};
+
 use crate::{
     conf::{Conf, Icon},
     event::{KeyMods, MouseButton},
@@ -8,13 +10,14 @@ use crate::{
 use winapi::{
     shared::{
         hidusage::{HID_USAGE_GENERIC_MOUSE, HID_USAGE_PAGE_GENERIC},
-        minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
+        minwindef::{DWORD, HIWORD, LOWORD, LPARAM, LRESULT, MAX_PATH, TRUE, UINT, WPARAM},
         ntdef::NULL,
         windef::{HBRUSH, HCURSOR, HDC, HICON, HWND, POINT, RECT},
         windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
     },
     um::{
         libloaderapi::{GetModuleHandleW, GetProcAddress},
+        shellapi::{DragAcceptFiles, DragQueryFileW, HDROP},
         shellscalingapi::*,
         wingdi::*,
         winuser::*,
@@ -160,7 +163,7 @@ impl WindowsDisplay {
         unsafe {
             #[cfg(target_arch = "x86_64")]
             SetWindowLongPtrA(self.wnd, GWL_STYLE, win_style as _);
-            #[cfg(target_arch = "i686")]
+            #[cfg(target_arch = "x86")]
             SetWindowLong(self.wnd, GWL_STYLE, win_style as _);
 
             if self.fullscreen {
@@ -439,7 +442,7 @@ unsafe extern "system" fn win32_wndproc(
                 dy = dy / 65535.0 * height;
             }
 
-            event_handler.raw_mouse_motion(dx as f32, dy as f32);
+            event_handler.raw_mouse_motion(dx, dy);
         }
 
         WM_MOUSELEAVE => {
@@ -462,7 +465,7 @@ unsafe extern "system" fn win32_wndproc(
             let repeat = !!(lparam & 0x40000000) != 0;
             let mods = key_mods();
             if chr > 0 {
-                if let Some(chr) = std::char::from_u32(chr as u32) {
+                if let Some(chr) = char::from_u32(chr) {
                     event_handler.char_event(chr, mods, repeat);
                 }
             }
@@ -511,6 +514,27 @@ unsafe extern "system" fn win32_wndproc(
         WM_EXITSIZEMOVE | WM_EXITMENULOOP => {
             KillTimer(hwnd, &mut payload.modal_resizing_timer as *mut _ as usize);
         }
+        WM_DROPFILES => {
+            let hdrop = wparam as HDROP;
+            let mut path = core::mem::MaybeUninit::<[u16; MAX_PATH]>::uninit();
+            let num_drops = DragQueryFileW(hdrop, u32::MAX, std::ptr::null_mut(), 0);
+
+            let mut d = crate::native_display().lock().unwrap();
+            for i in 0..num_drops {
+                let path_ptr = path.as_mut_ptr() as *mut u16;
+                let path_len = DragQueryFileW(hdrop, i, path_ptr, MAX_PATH as u32) as usize;
+                if path_len > 0 {
+                    // SAFETY: `DragQueryFileW` initializes `path_ptr` up to `path_len`
+                    // elements before use, and we only access the initialized portion.
+                    let path = unsafe {
+                        let path = path.assume_init();
+                        PathBuf::from(OsString::from_wide(&path[0..path_len]))
+                    };
+                    d.dropped_files.bytes.push(std::fs::read(&path).unwrap());
+                    d.dropped_files.paths.push(path);
+                }
+            }
+        }
         _ => {}
     }
 
@@ -547,7 +571,7 @@ unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: &[u8]) -> 
     if color.is_null() {
         return None;
     }
-    assert!(target.is_null() == false);
+    assert!(!target.is_null());
 
     let mask = CreateBitmap(width as _, height as _, 1, 1, std::ptr::null());
     if mask.is_null() {
@@ -673,7 +697,7 @@ unsafe fn create_window(
         GetModuleHandleW(NULL as _), // hInstance
         NULL as _,                   // lparam
     );
-    assert!(hwnd.is_null() == false);
+    assert!(!hwnd.is_null());
 
     let mut rawinputdevice: RAWINPUTDEVICE = std::mem::zeroed();
     rawinputdevice.usUsagePage = HID_USAGE_PAGE_GENERIC;
@@ -691,7 +715,9 @@ unsafe fn create_window(
 
     ShowWindow(hwnd, SW_SHOW);
     let dc = GetDC(hwnd);
-    assert!(dc.is_null() == false);
+    assert!(!dc.is_null());
+
+    DragAcceptFiles(hwnd, TRUE);
 
     (hwnd, dc)
 }
@@ -716,7 +742,7 @@ unsafe fn create_msg_window() -> (HWND, HDC) {
         NULL,
     );
     assert!(
-        msg_hwnd.is_null() == false,
+        !msg_hwnd.is_null(),
         "Win32: failed to create helper window!"
     );
     ShowWindow(msg_hwnd, SW_HIDE);
@@ -727,7 +753,7 @@ unsafe fn create_msg_window() -> (HWND, HDC) {
     }
     let msg_dc = GetDC(msg_hwnd);
     assert!(
-        msg_dc.is_null() == false,
+        !msg_dc.is_null(),
         "Win32: failed to obtain helper window DC!"
     );
 
@@ -745,7 +771,10 @@ impl WindowsDisplay {
             eprintln!("Load GL func {:?} failed.", proc);
             return None;
         }
-        Some(std::mem::transmute(proc_ptr))
+        Some(std::mem::transmute::<
+            *mut winapi::shared::minwindef::__some_function,
+            unsafe extern "C" fn(),
+        >(proc_ptr))
     }
 
     /// updates current window and framebuffer size from the window's client rect,
@@ -824,23 +853,21 @@ impl WindowsDisplay {
 
     fn process_request(&mut self, request: Request) {
         use Request::*;
-        unsafe {
-            match request {
-                ScheduleUpdate => {
-                    self.update_requested = true;
-                }
-                SetCursorGrab(grab) => self.set_cursor_grab(grab),
-                ShowMouse(show) => self.show_mouse(show),
-                SetMouseCursor(icon) => self.set_mouse_cursor(icon),
-                SetWindowSize {
-                    new_width,
-                    new_height,
-                } => self.set_window_size(new_width as _, new_height as _),
-                SetWindowPosition { new_x, new_y } => self.set_window_position(new_x, new_y),
-                SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
-                ShowKeyboard(show) => {
-                    eprintln!("Not implemented for windows")
-                }
+        match request {
+            ScheduleUpdate => {
+                self.update_requested = true;
+            }
+            SetCursorGrab(grab) => self.set_cursor_grab(grab),
+            ShowMouse(show) => self.show_mouse(show),
+            SetMouseCursor(icon) => self.set_mouse_cursor(icon),
+            SetWindowSize {
+                new_width,
+                new_height,
+            } => self.set_window_size(new_width as _, new_height as _),
+            SetWindowPosition { new_x, new_y } => self.set_window_position(new_x, new_y),
+            SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
+            ShowKeyboard(_show) => {
+                eprintln!("Not implemented for windows")
             }
         }
     }
@@ -917,7 +944,7 @@ where
 
         #[cfg(target_arch = "x86_64")]
         SetWindowLongPtrA(wnd, GWLP_USERDATA, &mut display as *mut _ as isize);
-        #[cfg(target_arch = "i686")]
+        #[cfg(target_arch = "x86")]
         SetWindowLong(wnd, GWLP_USERDATA, &mut display as *mut _ as isize);
 
         let mut done = false;

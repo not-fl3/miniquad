@@ -181,6 +181,8 @@ pub trait EventHandler {
 
     fn key_down_event(&mut self, _keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {}
 
+    /// Note: you are not always guaranteed to receive a key_up event. For example on
+    /// Wayland when leaving the focused window, the key_up event will not be caught.
     fn key_up_event(&mut self, _keycode: KeyCode, _keymods: KeyMods) {}
 
     /// Default implementation emulates mouse clicks

@@ -1,6 +1,7 @@
 // Spiritual successor of an X11 part of https://github.com/floooh/sokol/blob/master/sokol_app.h
 
 mod clipboard;
+mod drag_n_drop;
 mod glx;
 mod keycodes;
 pub mod libx11;
@@ -25,7 +26,10 @@ pub enum X11Error {
 }
 impl std::fmt::Display for X11Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Self::LibraryNotFound(e) => write!(f, "Library not found error: {e}"),
+            Self::GLXError(msg) => write!(f, "GLX error:\n{msg}"),
+        }
     }
 }
 impl From<module::Error> for X11Error {
@@ -46,20 +50,21 @@ pub struct X11Display {
     empty_cursor: libx11::Cursor,
     cursor_cache: HashMap<CursorIcon, libx11::Cursor>,
     update_requested: bool,
+    drag_n_drop: drag_n_drop::X11DnD,
 }
 
 impl X11Display {
     unsafe fn process_event(&mut self, event: &mut XEvent, event_handler: &mut dyn EventHandler) {
-        match (*event).type_0 {
+        match event.type_0 {
             2 => {
-                let keycode = (*event).xkey.keycode as libc::c_int;
+                let keycode = event.xkey.keycode as libc::c_int;
                 let key = keycodes::translate_key(&mut self.libx11, self.display, keycode);
                 let repeat = self.repeated_keycodes[(keycode & 0xff) as usize];
                 self.repeated_keycodes[(keycode & 0xff) as usize] = true;
-                let mods = keycodes::translate_mod((*event).xkey.state as libc::c_int);
+                let mods = keycodes::translate_mod(event.xkey.state as libc::c_int);
                 let mut keysym: KeySym = 0;
                 (self.libx11.XLookupString)(
-                    &mut (*event).xkey,
+                    &mut event.xkey,
                     std::ptr::null_mut(),
                     0 as libc::c_int,
                     &mut keysym,
@@ -67,28 +72,28 @@ impl X11Display {
                 );
                 let chr = keycodes::keysym_to_unicode(&mut self.libxkbcommon, keysym);
                 if chr > 0 {
-                    if let Some(chr) = std::char::from_u32(chr as u32) {
+                    if let Some(chr) = char::from_u32(chr as u32) {
                         event_handler.char_event(chr, mods, repeat);
                     }
                 }
                 event_handler.key_down_event(key, mods, repeat);
             }
             3 => {
-                let keycode = (*event).xkey.keycode;
+                let keycode = event.xkey.keycode;
                 let key = keycodes::translate_key(&mut self.libx11, self.display, keycode as _);
                 self.repeated_keycodes[(keycode & 0xff) as usize] = false;
-                let mods = keycodes::translate_mod((*event).xkey.state as libc::c_int);
+                let mods = keycodes::translate_mod(event.xkey.state as libc::c_int);
                 event_handler.key_up_event(key, mods);
             }
             4 => {
-                let btn = keycodes::translate_mouse_button((*event).xbutton.button as _);
-                let x = (*event).xmotion.x as libc::c_float;
-                let y = (*event).xmotion.y as libc::c_float;
+                let btn = keycodes::translate_mouse_button(event.xbutton.button as _);
+                let x = event.xmotion.x as libc::c_float;
+                let y = event.xmotion.y as libc::c_float;
 
                 if btn != crate::event::MouseButton::Unknown {
                     event_handler.mouse_button_down_event(btn, x, y);
                 } else {
-                    match (*event).xbutton.button {
+                    match event.xbutton.button {
                         4 => {
                             event_handler.mouse_wheel_event(0.0, 1.0);
                         }
@@ -106,9 +111,9 @@ impl X11Display {
                 }
             }
             5 => {
-                let btn = keycodes::translate_mouse_button((*event).xbutton.button as _);
-                let x = (*event).xmotion.x as libc::c_float;
-                let y = (*event).xmotion.y as libc::c_float;
+                let btn = keycodes::translate_mouse_button(event.xbutton.button as _);
+                let x = event.xmotion.x as libc::c_float;
+                let y = event.xmotion.y as libc::c_float;
 
                 if btn != crate::event::MouseButton::Unknown {
                     event_handler.mouse_button_up_event(btn, x, y);
@@ -121,8 +126,8 @@ impl X11Display {
                 // Mouse Leave
             }
             6 => {
-                let x = (*event).xmotion.x as libc::c_float;
-                let y = (*event).xmotion.y as libc::c_float;
+                let x = event.xmotion.x as libc::c_float;
+                let y = event.xmotion.y as libc::c_float;
                 event_handler.mouse_motion_event(x, y);
             }
             9 => {
@@ -133,29 +138,82 @@ impl X11Display {
             }
             22 => {
                 let mut d = crate::native_display_nonblocking();
-                let left = (*event).xconfigure.x;
-                let top = (*event).xconfigure.y;
+                let left = event.xconfigure.x;
+                let top = event.xconfigure.y;
                 d.screen_position = (left as _, top as _);
-                if (*event).xconfigure.width != d.screen_width
-                    || (*event).xconfigure.height != d.screen_height
+                if event.xconfigure.width != d.screen_width
+                    || event.xconfigure.height != d.screen_height
                 {
-                    let width = (*event).xconfigure.width;
-                    let height = (*event).xconfigure.height;
+                    let width = event.xconfigure.width;
+                    let height = event.xconfigure.height;
                     d.screen_width = width;
                     d.screen_height = height;
                     drop(d);
                     event_handler.resize_event(width as _, height as _);
                 }
             }
-            33 => {
-                let mut d = crate::native_display_nonblocking();
-                if (*event).xclient.message_type == self.libx11.extensions.wm_protocols {
-                    let protocol = (*event).xclient.data.l[0 as libc::c_int as usize] as Atom;
+            // ClientMessage
+            33 => match event.xclient.message_type {
+                t if t == self.libx11.extensions.wm_protocols => {
+                    let mut d = crate::native_display_nonblocking();
+                    let protocol = event.xclient.data.l[0 as libc::c_int as usize] as Atom;
                     if protocol == self.libx11.extensions.wm_delete_window {
                         d.quit_requested = true;
                     }
                 }
-            }
+                t if t == self.libx11.extensions.xdnd_enter => {
+                    self.drag_n_drop.on_enter(
+                        &mut self.libx11,
+                        self.display,
+                        self.window,
+                        event.xclient.data,
+                    );
+                }
+                t if t == self.libx11.extensions.xdnd_position => {
+                    self.drag_n_drop.on_position(
+                        &mut self.libx11,
+                        self.display,
+                        self.window,
+                        event.xclient.data,
+                    );
+                }
+                t if t == self.libx11.extensions.xdnd_drop => {
+                    self.drag_n_drop.on_drop(
+                        &mut self.libx11,
+                        self.display,
+                        self.window,
+                        event.xclient.data,
+                    );
+                }
+
+                _ => (),
+            },
+            // SelectionNotify
+            31 => match event.xselection.property {
+                p if p == self.libx11.extensions.xdnd_selection => {
+                    let bytes = clipboard::get_property_bytes(
+                        &mut self.libx11,
+                        self.display,
+                        self.window,
+                        p,
+                    );
+                    if let Ok(filenames) = std::str::from_utf8(&bytes) {
+                        let mut d = crate::native_display().try_lock().unwrap();
+                        d.dropped_files = Default::default();
+                        for filename in filenames.lines() {
+                            let path = std::path::PathBuf::from(filename);
+                            if let Ok(bytes) = std::fs::read(&path) {
+                                d.dropped_files.paths.push(path);
+                                d.dropped_files.bytes.push(bytes);
+                            }
+                        }
+                        // drop d since files_dropped_event is likely to need access to it
+                        drop(d);
+                        event_handler.files_dropped_event();
+                    }
+                }
+                _ => (),
+            },
             // SelectionRequest
             30 => {
                 // // some other app is waiting for clibpoard content
@@ -168,9 +226,9 @@ impl X11Display {
             17 => {}
 
             // GenericEvent
-            35 if Some((*event).xcookie.extension) == self.libxi.xi_extension_opcode => {
-                if (*event).xcookie.evtype == xi_input::XI_RawMotion {
-                    let (dx, dy) = self.libxi.read_cookie(&mut (*event).xcookie, self.display);
+            35 if Some(event.xcookie.extension) == self.libxi.xi_extension_opcode => {
+                if event.xcookie.evtype == xi_input::XI_RawMotion {
+                    let (dx, dy) = self.libxi.read_cookie(&mut event.xcookie, self.display);
                     event_handler.raw_mouse_motion(dx as f32, dy as f32);
                 }
             }
@@ -244,7 +302,7 @@ impl X11Display {
                 serial: 0,
                 send_event: true as _,
                 message_type: wm_state,
-                window: window,
+                window,
                 display: self.display,
                 format: 32,
                 data: ClientMessageData {
@@ -396,6 +454,7 @@ where
     );
     gl::load_gl_funcs(|proc| glx.libgl.get_procaddr(proc));
 
+    display.init_drag_n_drop();
     display.libx11.show_window(display.display, display.window);
 
     (display.libx11.XFlush)(display.display);
@@ -435,7 +494,7 @@ where
             // them all in one frame.
             // However, when there are no events in the queue, +1 hack
             // will block main thread and release the cpu until the new event.
-            count = count + 1;
+            count += 1;
         }
 
         for _ in 0..count {
@@ -470,7 +529,7 @@ unsafe fn egl_main_loop<F>(
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    let mut egl_lib = match egl::LibEgl::try_load() {
+    let mut egl_lib = match egl::LibEgl::try_load().ok() {
         Some(glx) => glx,
         _ => return Err(display),
     };
@@ -488,27 +547,27 @@ where
     )
     .unwrap();
 
-    let egl_surface = (egl_lib.eglCreateWindowSurface.unwrap())(
-        egl_display,
-        config,
-        display.window,
-        std::ptr::null_mut(),
-    );
+    let egl_surface =
+        (egl_lib.eglCreateWindowSurface)(egl_display, config, display.window, std::ptr::null_mut());
 
-    if egl_surface == /* EGL_NO_SURFACE  */ std::ptr::null_mut() {
+    if egl_surface.is_null() {
+        // == EGL_NO_SURFACE
         panic!("surface creation failed");
     }
-    if (egl_lib.eglMakeCurrent.unwrap())(egl_display, egl_surface, egl_surface, context) == 0 {
+    if (egl_lib.eglMakeCurrent)(egl_display, egl_surface, egl_surface, context) == 0 {
         panic!("eglMakeCurrent failed");
+    }
+
+    if (egl_lib.eglSwapInterval)(egl_display, conf.platform.swap_interval.unwrap_or(1)) == 0 {
+        eprintln!("eglSwapInterval failed");
     }
 
     crate::native::gl::load_gl_funcs(|proc| {
         let name = std::ffi::CString::new(proc).unwrap();
-        egl_lib
-            .eglGetProcAddress
-            .expect("non-null function pointer")(name.as_ptr() as _)
+        (egl_lib.eglGetProcAddress)(name.as_ptr() as _)
     });
 
+    display.init_drag_n_drop();
     display.libx11.show_window(display.display, display.window);
     let (w, h) = display
         .libx11
@@ -543,7 +602,7 @@ where
         let block_on_wait = conf.platform.blocking_event_loop && !display.update_requested;
         if block_on_wait {
             // same thing as in glx loop, explained there
-            count = count + 1;
+            count += 1;
         }
         for _ in 0..count {
             let mut xevent = _XEvent { type_0: 0 };
@@ -556,7 +615,7 @@ where
             event_handler.update();
             event_handler.draw();
 
-            (egl_lib.eglSwapBuffers.unwrap())(egl_display, egl_surface);
+            (egl_lib.eglSwapBuffers)(egl_display, egl_surface);
             (display.libx11.XFlush)(display.display);
         }
     }
@@ -614,6 +673,7 @@ where
             repeated_keycodes: [false; 256],
             cursor_cache: HashMap::new(),
             update_requested: true,
+            drag_n_drop: Default::default(),
         };
 
         display
@@ -622,19 +682,19 @@ where
 
         match conf.platform.linux_x11_gl {
             crate::conf::LinuxX11Gl::GLXOnly => {
-                glx_main_loop(display, &conf, f, x11_screen).ok().unwrap();
+                glx_main_loop(display, conf, f, x11_screen).ok().unwrap();
             }
             crate::conf::LinuxX11Gl::EGLOnly => {
-                egl_main_loop(display, &conf, f).ok().unwrap();
+                egl_main_loop(display, conf, f).ok().unwrap();
             }
             crate::conf::LinuxX11Gl::GLXWithEGLFallback => {
-                if let Err(display) = glx_main_loop(display, &conf, f, x11_screen) {
-                    egl_main_loop(display, &conf, f).ok().unwrap();
+                if let Err(display) = glx_main_loop(display, conf, f, x11_screen) {
+                    egl_main_loop(display, conf, f).ok().unwrap();
                 }
             }
             crate::conf::LinuxX11Gl::EGLWithGLXFallback => {
-                if let Err(display) = egl_main_loop(display, &conf, f) {
-                    glx_main_loop(display, &conf, f, x11_screen).ok().unwrap();
+                if let Err(display) = egl_main_loop(display, conf, f) {
+                    glx_main_loop(display, conf, f, x11_screen).ok().unwrap();
                 }
             }
         }

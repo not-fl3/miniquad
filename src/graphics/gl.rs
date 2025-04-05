@@ -521,6 +521,12 @@ pub struct GlContext {
     pub(crate) info: ContextInfo,
 }
 
+impl Default for GlContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GlContext {
     pub fn new() -> GlContext {
         unsafe {
@@ -767,7 +773,7 @@ impl GlContext {
                 glStencilFuncSeparate(
                     GL_BACK,
                     back.test_func.into(),
-                    back.test_ref.into(),
+                    back.test_ref,
                     back.test_mask,
                 );
                 glStencilMaskSeparate(GL_BACK, back.write_mask);
@@ -810,6 +816,7 @@ impl GlContext {
     }
 }
 
+#[allow(clippy::field_reassign_with_default)]
 fn gl_info() -> ContextInfo {
     let version_string = unsafe { glGetString(super::gl::GL_VERSION) };
     let gl_version_string = unsafe { std::ffi::CStr::from_ptr(version_string as _) }
@@ -826,7 +833,6 @@ fn gl_info() -> ContextInfo {
     let features = Features {
         instancing: !gl2,
         resolve_attachments: !webgl1 && !gl2,
-        ..Default::default()
     };
 
     let mut glsl_support = GlslSupport::default();
@@ -862,9 +868,8 @@ fn gl_info() -> ContextInfo {
         glsl_support.v150 = true; // MacOS is defaulting to 3.2 and GLSL 150
     } else if gl_version_string.starts_with("4") || gl_version_string.starts_with("3.3") {
         glsl_support.v330 = true;
-    } else
     // gl 3.0, 3.1, 3.2 maps to 1.30, 1.40, 1.50 glsl versions
-    if gl_version_string.starts_with("3") {
+    } else if gl_version_string.starts_with("3") {
         glsl_support.v130 = true;
     }
 
@@ -872,7 +877,7 @@ fn gl_info() -> ContextInfo {
         backend: Backend::OpenGl,
         gl_version_string,
         glsl_support,
-        features: features,
+        features,
     }
 }
 
@@ -1005,11 +1010,8 @@ impl RenderingBackend for GlContext {
     ) {
         let mut t = self.textures.get(texture);
         t.resize(self, width, height, source);
-        match texture.0 {
-            TextureIdInner::Managed(tex_id) => {
-                self.textures.0[tex_id].params = t.params;
-            }
-            _ => {}
+        if let TextureIdInner::Managed(tex_id) = texture.0 {
+            self.textures.0[tex_id].params = t.params;
         };
     }
     fn texture_read_pixels(&mut self, texture: TextureId, source: &mut [u8]) {
@@ -1523,13 +1525,11 @@ impl RenderingBackend for GlContext {
                         gl_vbuf: vb.gl_buf,
                     });
                 }
-            } else {
-                if cached_attr.is_some() {
-                    unsafe {
-                        glDisableVertexAttribArray(attr_index as GLuint);
-                    }
-                    *cached_attr = None;
+            } else if cached_attr.is_some() {
+                unsafe {
+                    glDisableVertexAttribArray(attr_index as GLuint);
                 }
+                *cached_attr = None;
             }
         }
     }
@@ -1540,7 +1540,7 @@ impl RenderingBackend for GlContext {
 
         let mut offset = 0;
 
-        for (_, uniform) in shader.uniforms.iter().enumerate() {
+        for uniform in shader.uniforms.iter() {
             use UniformType::*;
 
             assert!(
@@ -1549,8 +1549,8 @@ impl RenderingBackend for GlContext {
             );
 
             unsafe {
-                let data = (uniform_ptr as *const f32).offset(offset as isize);
-                let data_int = (uniform_ptr as *const i32).offset(offset as isize);
+                let data = (uniform_ptr as *const f32).add(offset);
+                let data_int = (uniform_ptr as *const i32).add(offset);
 
                 if let Some(gl_loc) = uniform.gl_loc {
                     match uniform.uniform_type {

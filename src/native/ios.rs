@@ -107,18 +107,15 @@ enum Message {
 unsafe impl Send for Message {}
 
 thread_local! {
-    static MESSAGES_TX: RefCell<Option<mpsc::Sender<Message>>> = RefCell::new(None);
+    static MESSAGES_TX: RefCell<Option<mpsc::Sender<Message>>> = const { RefCell::new(None) };
 }
 
 impl MainThreadState {
     fn process_request(&mut self, request: crate::native::Request) {
         use crate::native::Request::*;
 
-        match request {
-            ScheduleUpdate => {
-                self.update_requested = true;
-            }
-            _ => {}
+        if let ScheduleUpdate = request {
+            self.update_requested = true;
         }
     }
 }
@@ -275,7 +272,7 @@ pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
     }
 
     decl.add_ivar::<*mut c_void>("display_ptr");
-    return decl.register();
+    decl.register()
 }
 
 unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
@@ -371,7 +368,7 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
     }
 
     decl.add_ivar::<*mut c_void>("display_ptr");
-    return decl.register();
+    decl.register()
 }
 
 // metal or opengl view and the objects required to collect all the window events
@@ -691,8 +688,7 @@ pub fn define_app_delegate() -> *const Class {
             application_will_resign_active as extern "C" fn(&Object, Sel, ObjcId),
         );
     }
-
-    return decl.register();
+    decl.register()
 }
 
 fn define_textfield_dlg() -> *const Class {
@@ -719,7 +715,7 @@ fn define_textfield_dlg() -> *const Class {
                     let c: u16 = msg_send![string, characterAtIndex: i];
 
                     match c {
-                        c if c >= 32 && (c < 0xD800 || c > 0xDFFF) => {
+                        c if c >= 32 && !(0xD800..=0xDFFF).contains(&c) => {
                             send_message(Message::Character {
                                 character: c as u32,
                             })
@@ -778,7 +774,7 @@ fn define_textfield_dlg() -> *const Class {
         );
     }
     decl.add_ivar::<*mut c_void>("display_ptr");
-    return decl.register();
+    decl.register()
 }
 
 pub fn log(message: &str) {
@@ -825,6 +821,7 @@ pub fn load_file<F: Fn(crate::fs::Response) + 'static>(path: &str, on_loaded: F)
 
 // this is the way to pass argument to UiApplicationMain
 // this static will be used exactly once, to .take() the "run" arguments
+#[allow(clippy::type_complexity)]
 static mut RUN_ARGS: Option<(Box<dyn FnOnce() -> Box<dyn EventHandler>>, Conf)> = None;
 
 pub unsafe fn run<F>(conf: Conf, f: F)
