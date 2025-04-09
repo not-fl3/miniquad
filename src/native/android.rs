@@ -344,7 +344,7 @@ impl crate::native::Clipboard for AndroidClipboard {
                 return None;
             }
 
-            let text = ndk_utils::get_utf_str!(env, text).to_string();
+            let text = ndk_utils::get_utf_str!(env, text);
             Some(text)
         }
     }
