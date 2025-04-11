@@ -248,6 +248,85 @@ impl Icon {
             big: crate::default_icon::BIG,
         }
     }
+
+    /// Constructs an icon from the given bytes.
+    /// The bytes must be RGBA pixels (each 4 * u8) in row-major order.
+    /// The image must be a square and its side length must be a power of two.
+    ///
+    /// Returns `None` if the above conditions are not fulfilled.
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        fn adjust<const N: usize>(bytes: &[u8], side_len: usize, desired_len: usize) -> [u8; N] {
+            let diff = desired_len.ilog2() as i32 - side_len.ilog2() as i32;
+
+            let mut arr = [0u8; N];
+            if diff > 0 {
+                // upscale
+                let n = diff as u16 + 1;
+                let mut write_index = 0;
+                let mut current_line_length = 0;
+
+                for pixel in bytes.chunks(4) {
+                    // repeat n times horizontally
+                    for _ in 0..n {
+                        arr[write_index] = pixel[0];
+                        arr[write_index + 1] = pixel[1];
+                        arr[write_index + 2] = pixel[2];
+                        arr[write_index + 3] = pixel[3];
+                        write_index += 4;
+                    }
+                    current_line_length += 1;
+
+                    if current_line_length == side_len {
+                        // repeat n - 1 times vertically, because one line already exists
+                        let last_line =
+                            arr[(write_index - (4 * side_len * n as usize))..write_index].to_vec();
+                        for _ in 0..n - 1 {
+                            for i in 0..last_line.len() {
+                                arr[write_index] = last_line[i];
+                                write_index += 1;
+                            }
+                        }
+                        current_line_length = 0;
+                    }
+                }
+            } else if diff == 0 {
+                arr.copy_from_slice(bytes);
+            } else {
+                // downscale
+                let n = (-diff) as usize + 1;
+                let mut write_index = 0;
+
+                for line in 0..side_len {
+                    for column in 0..side_len {
+                        if line % n == 0 && column % n == 0 {
+                            let index = usize::from(side_len * line + column) * 4;
+                            arr[write_index] = bytes[index];
+                            arr[write_index + 1] = bytes[index + 1];
+                            arr[write_index + 2] = bytes[index + 2];
+                            arr[write_index + 3] = bytes[index + 3];
+                            write_index += 4;
+                        }
+                    }
+                }
+            };
+
+            arr
+        }
+
+        if bytes.len() % 4 != 0 {
+            return None;
+        }
+        let pixel_amount = bytes.len() / 4;
+        let side_len = (pixel_amount as f32).sqrt().floor() as usize;
+        if side_len * side_len != pixel_amount || !side_len.is_power_of_two() {
+            return None;
+        }
+        Some(Self {
+            small: adjust(bytes, side_len, 16),
+            medium: adjust(bytes, side_len, 32),
+            big: adjust(bytes, side_len, 64),
+        })
+    }
 }
 // Printing 64x64 array with a default formatter is not meaningfull,
 // so debug will skip the data fields of an Icon
