@@ -1169,6 +1169,12 @@ impl RenderingBackend for GlContext {
         for color_texture in &render_pass.color_textures {
             self.delete_texture(*color_texture);
         }
+        if let Some(resolves) = render_pass.resolves {
+            for (fb, texture) in resolves {
+                unsafe { glDeleteFramebuffers(1, &fb as *const _) }
+                self.delete_texture(texture);
+            }
+        }
         if let Some(depth_texture) = render_pass.depth_texture {
             self.delete_texture(depth_texture);
         }
