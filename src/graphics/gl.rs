@@ -1096,7 +1096,7 @@ impl RenderingBackend for GlContext {
             if let Some(depth_img) = depth_img {
                 let texture = self.textures.get(depth_img);
                 if texture.params.sample_count > 1 {
-                    let raw = texture.raw.texture().unwrap();
+                    let raw = texture.raw.renderbuffer().unwrap();
                     glFramebufferRenderbuffer(
                         GL_FRAMEBUFFER,
                         GL_DEPTH_ATTACHMENT,
