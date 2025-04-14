@@ -247,7 +247,21 @@ impl Modifiers {
         }
     }
 }
+
 pub fn define_app_delegate() -> *const Class {
+    extern "C" fn application_did_update(this: &mut Object, _: Sel, _: ObjcId) {
+        unsafe {
+            let activated: bool = *this.get_ivar("activated");
+            if !activated {
+                this.set_ivar("activated", true);
+                let ns_app: ObjcId = msg_send![class!(NSRunningApplication), currentApplication];
+                let options =
+                    NSApplicationActivationOptions::NSApplicationActivateIgnoringOtherApps;
+                msg_send_![ns_app, activateWithOptions: options];
+            }
+        }
+    }
+
     let superclass = class!(NSObject);
     let mut decl = ClassDecl::new("NSAppDelegate", superclass).unwrap();
     unsafe {
@@ -255,7 +269,13 @@ pub fn define_app_delegate() -> *const Class {
             sel!(applicationShouldTerminateAfterLastWindowClosed:),
             yes1 as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
         );
+        decl.add_method(
+            sel!(applicationDidUpdate:),
+            application_did_update as extern "C" fn(&mut Object, Sel, ObjcId),
+        );
     }
+
+    decl.add_ivar::<bool>("activated");
     decl.register()
 }
 
@@ -1033,6 +1053,7 @@ where
 
     let app_delegate_class = define_app_delegate();
     let app_delegate_instance: ObjcId = msg_send![app_delegate_class, new];
+    (*app_delegate_instance).set_ivar("activated", false);
 
     let ns_app: ObjcId = msg_send![class!(NSApplication), sharedApplication];
     let () = msg_send![ns_app, setDelegate: app_delegate_instance];
@@ -1124,7 +1145,6 @@ where
     }
 
     msg_send_![window, orderFront: nil];
-    let () = msg_send![ns_app, activateIgnoringOtherApps: YES];
     let () = msg_send![window, makeKeyAndOrderFront: nil];
 
     let () = msg_send![ns_app, finishLaunching];
