@@ -814,7 +814,7 @@ pub fn load_file<F: Fn(crate::fs::Response) + 'static>(path: &str, on_loaded: F)
             return;
         }
         let length: usize = msg_send![file_data, length];
-        let slice = std::slice::from_raw_parts(bytes, length);
+        let slice = core::slice::from_raw_parts(bytes, length);
         on_loaded(Ok(slice.to_vec()))
     }
 }

@@ -101,7 +101,7 @@ pub(crate) unsafe fn get_property_bytes(
                 32 => core::mem::size_of::<libc::c_long>(),
                 _ => unreachable!(),
             };
-            bytes.extend(std::slice::from_raw_parts(
+            bytes.extend(core::slice::from_raw_parts(
                 buf as *const _,
                 n_bits * size as usize,
             ));

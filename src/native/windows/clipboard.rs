@@ -47,7 +47,7 @@ unsafe fn get_raw_clipboard() -> Option<Vec<u16>> {
     }
     let data_size = GlobalSize(clipboard_data) as usize;
 
-    let slice = std::slice::from_raw_parts(data_ptr, data_size);
+    let slice = core::slice::from_raw_parts(data_ptr, data_size);
     let len = slice.iter().position(|b| *b == 0).unwrap_or(data_size);
 
     // search for the first null byte to see where the string ends.

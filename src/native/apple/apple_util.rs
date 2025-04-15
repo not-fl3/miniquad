@@ -14,7 +14,7 @@ pub fn nsstring_to_string(string: ObjcId) -> String {
     unsafe {
         let utf8_string: *const core::ffi::c_uchar = msg_send![string, UTF8String];
         let utf8_len: usize = msg_send![string, lengthOfBytesUsingEncoding: UTF8_ENCODING];
-        let slice = std::slice::from_raw_parts(utf8_string, utf8_len);
+        let slice = core::slice::from_raw_parts(utf8_string, utf8_len);
         core::str::from_utf8_unchecked(slice).to_owned()
     }
 }

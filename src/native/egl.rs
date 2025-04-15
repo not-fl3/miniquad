@@ -44,7 +44,7 @@ pub type EGLDisplay = *mut ::core::ffi::c_void;
 pub type EGLConfig = *mut ::core::ffi::c_void;
 pub type EGLSurface = *mut ::core::ffi::c_void;
 pub type EGLContext = *mut ::core::ffi::c_void;
-pub type __eglMustCastToProperFunctionPointerType = ::std::option::Option<unsafe extern "C" fn()>;
+pub type __eglMustCastToProperFunctionPointerType = ::core::option::Option<unsafe extern "C" fn()>;
 
 crate::declare_module! {
     LibEgl,

@@ -2,7 +2,7 @@
 
 use crate::native::gl::*;
 
-use std::{error::Error, fmt::Display};
+use core::{error::Error, fmt::Display};
 
 //pub use texture::{FilterMode, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 
@@ -973,7 +973,7 @@ pub struct Arg<'a> {
     element_size: usize,
     size: usize,
     is_slice: bool,
-    _phantom: std::marker::PhantomData<&'a ()>,
+    _phantom: core::marker::PhantomData<&'a ()>,
 }
 
 pub enum TextureSource<'a> {
@@ -1010,7 +1010,7 @@ impl<'a> BufferSource<'a> {
             size: core::mem::size_of_val(data),
             element_size: core::mem::size_of::<T>(),
             is_slice: true,
-            _phantom: std::marker::PhantomData,
+            _phantom: core::marker::PhantomData,
         })
     }
 
@@ -1020,7 +1020,7 @@ impl<'a> BufferSource<'a> {
             size,
             element_size,
             is_slice: true,
-            _phantom: std::marker::PhantomData,
+            _phantom: core::marker::PhantomData,
         })
     }
 }
@@ -1033,7 +1033,7 @@ impl<'a> UniformsSource<'a> {
             size: core::mem::size_of_val(data),
             element_size: core::mem::size_of::<T>(),
             is_slice: false,
-            _phantom: std::marker::PhantomData,
+            _phantom: core::marker::PhantomData,
         })
     }
 }

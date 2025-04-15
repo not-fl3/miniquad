@@ -16,11 +16,9 @@ impl Display for Error {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod linux {
     use super::Error;
+    use alloc::ffi::CString;
+    use core::{ffi::c_void, ptr::NonNull};
     use libc::{dlclose, dlopen, dlsym, RTLD_LAZY, RTLD_LOCAL};
-    use std::{
-        ffi::{c_void, CString},
-        ptr::NonNull,
-    };
 
     pub struct Module(NonNull<c_void>);
 
