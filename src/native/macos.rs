@@ -399,7 +399,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
 
 unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
     mod libc {
-        use std::ffi::{c_char, c_int, c_void};
+        use core::ffi::{c_char, c_int, c_void};
 
         pub const RTLD_LAZY: c_int = 1;
         extern "C" {
@@ -407,7 +407,7 @@ unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
             pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
         }
     }
-    static mut OPENGL: *mut std::ffi::c_void = core::ptr::null_mut();
+    static mut OPENGL: *mut core::ffi::c_void = core::ptr::null_mut();
 
     if OPENGL.is_null() {
         OPENGL = libc::dlopen(

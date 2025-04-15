@@ -392,7 +392,7 @@ impl PointerContext {
             self.queued_cursor_icon = Some(icon);
         }
     }
-    unsafe fn set_grab(&mut self, data: *mut std::ffi::c_void, grab: bool) {
+    unsafe fn set_grab(&mut self, data: *mut core::ffi::c_void, grab: bool) {
         let display: &mut WaylandPayload = &mut *(data as *mut _);
         if grab {
             if self.locked_pointer.is_null() {
@@ -462,7 +462,7 @@ static mut RELATIVE_POINTER_LISTENER: extensions::cursor::zwp_relative_pointer_v
     extensions::cursor::zwp_relative_pointer_v1_listener::dummy();
 
 unsafe extern "C" fn seat_handle_capabilities(
-    data: *mut std::ffi::c_void,
+    data: *mut core::ffi::c_void,
     seat: *mut wl_seat,
     caps: wl_seat_capability,
 ) {
@@ -553,7 +553,7 @@ unsafe extern "C" fn keyboard_handle_keymap(
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     let map_shm = libc::mmap(
-        core::ptr::null_mut::<std::ffi::c_void>(),
+        core::ptr::null_mut::<core::ffi::c_void>(),
         size as usize,
         libc::PROT_READ,
         libc::MAP_PRIVATE,
@@ -785,7 +785,7 @@ unsafe extern "C" fn relative_pointer_handle_relative_motion(
 }
 
 unsafe extern "C" fn output_handle_scale(
-    _data: *mut std::ffi::c_void,
+    _data: *mut core::ffi::c_void,
     _output: *mut wl_output,
     factor: core::ffi::c_int,
 ) {
@@ -799,7 +799,7 @@ unsafe extern "C" fn output_handle_scale(
 }
 
 unsafe extern "C" fn touch_handle_down(
-    data: *mut std::ffi::c_void,
+    data: *mut core::ffi::c_void,
     _touch: *mut wl_touch,
     _serial: core::ffi::c_uint,
     _time: core::ffi::c_uint,
@@ -825,7 +825,7 @@ unsafe extern "C" fn touch_handle_down(
 }
 
 unsafe extern "C" fn touch_handle_motion(
-    data: *mut std::ffi::c_void,
+    data: *mut core::ffi::c_void,
     _touch: *mut wl_touch,
     _time: core::ffi::c_uint,
     id: core::ffi::c_int,
@@ -845,7 +845,7 @@ unsafe extern "C" fn touch_handle_motion(
 }
 
 unsafe extern "C" fn touch_handle_up(
-    data: *mut std::ffi::c_void,
+    data: *mut core::ffi::c_void,
     _touch: *mut wl_touch,
     _serial: core::ffi::c_uint,
     _time: core::ffi::c_uint,
@@ -861,7 +861,7 @@ unsafe extern "C" fn touch_handle_up(
     }
 }
 
-unsafe extern "C" fn touch_handle_cancel(data: *mut std::ffi::c_void, _touch: *mut wl_touch) {
+unsafe extern "C" fn touch_handle_cancel(data: *mut core::ffi::c_void, _touch: *mut wl_touch) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     for (id, (x, y)) in display.touch_positions.drain() {
         display.events.push(WaylandEvent::Touch(
@@ -874,7 +874,7 @@ unsafe extern "C" fn touch_handle_cancel(data: *mut std::ffi::c_void, _touch: *m
 }
 
 unsafe extern "C" fn registry_add_object(
-    data: *mut std::ffi::c_void,
+    data: *mut core::ffi::c_void,
     registry: *mut wl_registry,
     name: u32,
     interface: *const ::core::ffi::c_char,
@@ -1017,7 +1017,7 @@ unsafe extern "C" fn registry_add_object(
 }
 
 unsafe extern "C" fn xdg_wm_base_handle_ping(
-    data: *mut std::ffi::c_void,
+    data: *mut core::ffi::c_void,
     toplevel: *mut extensions::xdg_shell::xdg_wm_base,
     serial: u32,
 ) {

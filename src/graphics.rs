@@ -290,11 +290,11 @@ pub enum ShaderError {
     },
     LinkError(String),
     /// Shader strings should never contains \00 in the middle
-    FFINulError(std::ffi::NulError),
+    FFINulError(alloc::ffi::NulError),
 }
 
-impl From<std::ffi::NulError> for ShaderError {
-    fn from(e: std::ffi::NulError) -> ShaderError {
+impl From<alloc::ffi::NulError> for ShaderError {
+    fn from(e: alloc::ffi::NulError) -> ShaderError {
         ShaderError::FFINulError(e)
     }
 }
@@ -969,7 +969,7 @@ impl ElapsedQuery {
 /// Basically, the same thing as `fn f<U>(a: &U)`, but
 /// trait-object friendly.
 pub struct Arg<'a> {
-    ptr: *const std::ffi::c_void,
+    ptr: *const core::ffi::c_void,
     element_size: usize,
     size: usize,
     is_slice: bool,

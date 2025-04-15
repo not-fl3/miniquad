@@ -644,7 +644,7 @@ unsafe fn create_window(
     wndclassw.hbrBackground = GetStockObject(BLACK_BRUSH as i32) as HBRUSH;
     let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
     wndclassw.lpszClassName = class_name.as_ptr() as _;
-    wndclassw.cbWndExtra = std::mem::size_of::<*mut std::ffi::c_void>() as i32;
+    wndclassw.cbWndExtra = std::mem::size_of::<*mut core::ffi::c_void>() as i32;
     RegisterClassW(&wndclassw);
 
     let win_style: DWORD;

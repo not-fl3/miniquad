@@ -19,7 +19,7 @@ pub mod ndk_utils;
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(
     vm: *mut ndk_sys::JavaVM,
-    _: std::ffi::c_void,
+    _: core::ffi::c_void,
 ) -> ndk_sys::jint {
     VM = vm as *mut _ as _;
 
@@ -515,7 +515,7 @@ where
 }
 
 #[no_mangle]
-extern "C" fn jni_on_load(vm: *mut std::ffi::c_void) {
+extern "C" fn jni_on_load(vm: *mut core::ffi::c_void) {
     unsafe {
         VM = vm as _;
     }

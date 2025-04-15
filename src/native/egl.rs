@@ -168,7 +168,7 @@ pub struct Egl {}
 
 pub unsafe fn create_egl_context(
     egl: &mut LibEgl,
-    display: *mut std::ffi::c_void,
+    display: *mut core::ffi::c_void,
     alpha: bool,
     sample_count: i32,
 ) -> Result<(EGLContext, EGLConfig, EGLDisplay), EglError> {
