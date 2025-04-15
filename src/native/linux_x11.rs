@@ -197,7 +197,7 @@ impl X11Display {
                         self.window,
                         p,
                     );
-                    if let Ok(filenames) = std::str::from_utf8(&bytes) {
+                    if let Ok(filenames) = core::str::from_utf8(&bytes) {
                         let mut d = crate::native_display().try_lock().unwrap();
                         d.dropped_files = Default::default();
                         for filename in filenames.lines() {

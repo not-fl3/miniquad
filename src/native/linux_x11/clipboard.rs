@@ -231,7 +231,7 @@ impl crate::native::Clipboard for X11Clipboard {
         let utf8_string = self.libx11.extensions.utf8_string;
         let bytes =
             unsafe { get_clipboard(&mut self.libx11, self.display, self.window, utf8_string)? };
-        Some(std::str::from_utf8(&bytes).ok()?.to_string())
+        Some(core::str::from_utf8(&bytes).ok()?.to_string())
     }
 
     fn set(&mut self, data: &str) {

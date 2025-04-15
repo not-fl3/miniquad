@@ -157,7 +157,7 @@ impl WaylandClipboard {
 impl crate::native::Clipboard for WaylandClipboard {
     fn get(&mut self) -> Option<String> {
         let bytes = unsafe { CLIPBOARD.get_mut().unwrap().get_clipboard("UTF8_STRING")? };
-        Some(std::str::from_utf8(&bytes).ok()?.to_string())
+        Some(core::str::from_utf8(&bytes).ok()?.to_string())
     }
     fn set(&mut self, data: &str) {
         unsafe {

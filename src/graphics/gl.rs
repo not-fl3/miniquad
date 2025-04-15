@@ -613,7 +613,7 @@ fn load_shader_internal(
             );
             assert!(max_length >= 1);
             let error_message =
-                std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1]);
+                alloc::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1]);
             return Err(ShaderError::LinkError(error_message.to_string()));
         }
 
@@ -669,7 +669,7 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderEr
 
             assert!(max_length >= 1);
             let mut error_message =
-                std::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1])
+                alloc::string::String::from_utf8_lossy(&error_message[0..max_length as usize - 1])
                     .into_owned();
 
             // On Wasm + Chrome, for unknown reason, string with zero-terminator is returned. On Firefox there is no zero-terminators in JavaScript string.
