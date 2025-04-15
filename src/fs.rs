@@ -54,7 +54,7 @@ fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
     fn load_file_sync(path: &str) -> Response {
         use crate::native;
 
-        let filename = std::ffi::CString::new(path).unwrap();
+        let filename = alloc::ffi::CString::new(path).unwrap();
 
         let mut data: native::android_asset = unsafe { std::mem::zeroed() };
 
@@ -111,7 +111,7 @@ mod wasm {
 
     pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
         use native::wasm::fs;
-        use std::ffi::CString;
+        use alloc::ffi::CString;
 
         let url = CString::new(path).unwrap();
         let file_id = unsafe { fs::fs_load_file(url.as_ptr(), url.as_bytes().len() as u32) };

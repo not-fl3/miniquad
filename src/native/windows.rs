@@ -762,7 +762,7 @@ unsafe fn create_msg_window() -> (HWND, HDC) {
 
 impl WindowsDisplay {
     unsafe fn get_proc_address(&mut self, proc: &str) -> Option<unsafe extern "C" fn() -> ()> {
-        let proc = std::ffi::CString::new(proc).unwrap();
+        let proc = alloc::ffi::CString::new(proc).unwrap();
         let mut proc_ptr = (self.libopengl32.wglGetProcAddress)(proc.as_ptr());
         if proc_ptr.is_null() {
             proc_ptr = GetProcAddress(self.libopengl32.module.0, proc.as_ptr());

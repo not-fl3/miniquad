@@ -64,7 +64,7 @@ mod windows {
 
     impl Module {
         pub fn load(path: &str) -> Result<Self, Error> {
-            let cpath = std::ffi::CString::new(path).unwrap();
+            let cpath = alloc::ffi::CString::new(path).unwrap();
             let library = unsafe { LoadLibraryA(cpath.as_ptr()) };
             if library.is_null() {
                 return Err(Error::DlOpenError(path.to_string()));
@@ -72,7 +72,7 @@ mod windows {
             Ok(Self(library))
         }
         pub fn get_symbol<F: Sized>(&self, name: &str) -> Result<F, Error> {
-            let cname = std::ffi::CString::new(name).unwrap();
+            let cname = alloc::ffi::CString::new(name).unwrap();
             let proc = unsafe { GetProcAddress(self.0, cname.as_ptr() as *const _) };
             if proc.is_null() {
                 return Err(Error::DlSymError(name.to_string()));

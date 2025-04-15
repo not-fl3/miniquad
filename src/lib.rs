@@ -7,6 +7,9 @@
     clippy::missing_safety_doc
 )]
 
+extern crate alloc;
+
+
 pub mod conf;
 mod event;
 pub mod fs;

@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use alloc::ffi::CString;
 
 use crate::{window, ResourceManager};
 
@@ -819,7 +819,7 @@ impl GlContext {
 #[allow(clippy::field_reassign_with_default)]
 fn gl_info() -> ContextInfo {
     let version_string = unsafe { glGetString(super::gl::GL_VERSION) };
-    let gl_version_string = unsafe { std::ffi::CStr::from_ptr(version_string as _) }
+    let gl_version_string = unsafe { core::ffi::CStr::from_ptr(version_string as _) }
         .to_str()
         .unwrap()
         .to_string();

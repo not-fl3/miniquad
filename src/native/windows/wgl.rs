@@ -202,7 +202,7 @@ pub struct Wgl {
 }
 
 unsafe fn get_wgl_proc_address<T>(libopengl32: &mut LibOpengl32, proc: &str) -> Option<T> {
-    let proc = std::ffi::CString::new(proc).unwrap();
+    let proc = alloc::ffi::CString::new(proc).unwrap();
     let proc = (libopengl32.wglGetProcAddress)(proc.as_ptr() as *const _);
 
     if proc.is_null() {
@@ -251,7 +251,7 @@ impl Wgl {
                 let extensions = getExtensionsStringEXT();
 
                 if !extensions.is_null() {
-                    let extensions_string = std::ffi::CStr::from_ptr(extensions).to_string_lossy();
+                    let extensions_string = alloc::ffi::CStr::from_ptr(extensions).to_string_lossy();
                     if extensions_string.contains(ext) {
                         return true;
                     }
@@ -261,7 +261,7 @@ impl Wgl {
             if let Some(getExtensionsStringARB) = GetExtensionsStringARB {
                 let extensions = getExtensionsStringARB((display.libopengl32.wglGetCurrentDC)());
                 if !extensions.is_null() {
-                    let extensions_string = std::ffi::CStr::from_ptr(extensions).to_string_lossy();
+                    let extensions_string = alloc::ffi::CStr::from_ptr(extensions).to_string_lossy();
 
                     if extensions_string.contains(ext) {
                         return true;

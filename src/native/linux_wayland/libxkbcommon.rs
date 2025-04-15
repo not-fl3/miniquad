@@ -93,13 +93,13 @@ pub mod libxkbcommon_ex {
 
     impl XkbKeymap {
         pub unsafe fn cache_mod_indices(&mut self, libxkb: &mut LibXkbCommon) {
-            let shift = std::ffi::CString::new(XKB_MOD_NAME_SHIFT).unwrap();
+            let shift = alloc::ffi::CString::new(XKB_MOD_NAME_SHIFT).unwrap();
             self.shift = (libxkb.xkb_keymap_mod_get_index)(self.xkb_keymap, shift.as_ptr());
-            let ctrl = std::ffi::CString::new(XKB_MOD_NAME_CTRL).unwrap();
+            let ctrl = alloc::ffi::CString::new(XKB_MOD_NAME_CTRL).unwrap();
             self.ctrl = (libxkb.xkb_keymap_mod_get_index)(self.xkb_keymap, ctrl.as_ptr());
-            let alt = std::ffi::CString::new(XKB_MOD_NAME_ALT).unwrap();
+            let alt = alloc::ffi::CString::new(XKB_MOD_NAME_ALT).unwrap();
             self.alt = (libxkb.xkb_keymap_mod_get_index)(self.xkb_keymap, alt.as_ptr());
-            let logo = std::ffi::CString::new(XKB_MOD_NAME_LOGO).unwrap();
+            let logo = alloc::ffi::CString::new(XKB_MOD_NAME_LOGO).unwrap();
             self.logo = (libxkb.xkb_keymap_mod_get_index)(self.xkb_keymap, logo.as_ptr());
         }
         pub unsafe fn get_keymods(

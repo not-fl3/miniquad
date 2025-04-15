@@ -655,7 +655,7 @@ gl_loader!(
 // not just after context creation
 pub unsafe fn is_gl2() -> bool {
     let version_string = glGetString(super::gl::GL_VERSION);
-    let version_string = std::ffi::CStr::from_ptr(version_string as _)
+    let version_string = core::ffi::CStr::from_ptr(version_string as _)
         .to_str()
         .unwrap();
 

@@ -882,7 +882,7 @@ unsafe extern "C" fn registry_add_object(
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
 
-    let interface = std::ffi::CStr::from_ptr(interface).to_str().unwrap();
+    let interface = core::ffi::CStr::from_ptr(interface).to_str().unwrap();
     match interface {
         "wl_output" => {
             let wl_output: *mut wl_output = display.client.wl_registry_bind(
@@ -1173,7 +1173,7 @@ where
         }
 
         crate::native::gl::load_gl_funcs(|proc| {
-            let name = std::ffi::CString::new(proc).unwrap();
+            let name = alloc::ffi::CString::new(proc).unwrap();
             (libegl.eglGetProcAddress)(name.as_ptr() as _)
         });
 
@@ -1187,7 +1187,7 @@ where
             conf.window_title.as_str(),
         );
 
-        let wm_class = std::ffi::CString::new(conf.platform.linux_wm_class).unwrap();
+        let wm_class = alloc::ffi::CString::new(conf.platform.linux_wm_class).unwrap();
         wl_request!(
             display.client,
             display.xdg_toplevel,

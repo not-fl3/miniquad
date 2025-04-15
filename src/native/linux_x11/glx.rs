@@ -153,10 +153,10 @@ impl LibGlx {
 
     pub unsafe fn get_procaddr(&self, procname: &str) -> Option<unsafe extern "C" fn() -> ()> {
         if self.glxGetProcAddress.is_some() {
-            let name = std::ffi::CString::new(procname).unwrap();
+            let name = alloc::ffi::CString::new(procname).unwrap();
             self.glxGetProcAddress.expect("non-null function pointer")(name.as_ptr() as _)
         } else if self.glxGetProcAddressARB.is_some() {
-            let name = std::ffi::CString::new(procname).unwrap();
+            let name = alloc::ffi::CString::new(procname).unwrap();
             self.glxGetProcAddressARB
                 .expect("non-null function pointer")(name.as_ptr() as _)
         } else {
@@ -241,7 +241,7 @@ impl Glx {
         }
 
         let exts = (libgl.glxQueryExtensionsString.unwrap())(display, screen);
-        let extensions = std::ffi::CStr::from_ptr(exts).to_str().unwrap().to_owned();
+        let extensions = core::ffi::CStr::from_ptr(exts).to_str().unwrap().to_owned();
 
         let multisample = extensions.contains("GLX_ARB_multisample");
         // let glx_ARB_framebuffer_sRGB =

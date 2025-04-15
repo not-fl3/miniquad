@@ -119,7 +119,7 @@ pub unsafe fn console_error(msg: *const ::core::ffi::c_char) {
 }
 
 // fn log_info(message: &str) {
-//     use std::ffi::CString;
+//     use core::ptr::nulltring;
 
 //     let msg = CString::new(message).unwrap_or_else(|_| panic!());
 
@@ -350,7 +350,7 @@ impl crate::native::Clipboard for AndroidClipboard {
     }
 
     fn set(&mut self, data: &str) {
-        let data = std::ffi::CString::new(data).unwrap();
+        let data = alloc::ffi::CString::new(data).unwrap();
         unsafe {
             let env = attach_jni_env();
 
@@ -373,7 +373,7 @@ where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     {
-        use std::ffi::CString;
+        use alloc::ffi::CString;
         use std::panic;
 
         panic::set_hook(Box::new(|info| {
@@ -432,7 +432,7 @@ where
         assert!(!egl_config.is_null());
 
         crate::native::gl::load_gl_funcs(|proc| {
-            let name = std::ffi::CString::new(proc).unwrap();
+            let name = alloc::ffi::CString::new(proc).unwrap();
             (libegl.eglGetProcAddress)(name.as_ptr() as _)
         });
 

@@ -62,7 +62,7 @@ impl IosDisplay {
 
         if self.gfx_api == AppleGfxApi::OpenGl {
             crate::native::gl::load_gl_funcs(|proc| {
-                let name = std::ffi::CString::new(proc).unwrap();
+                let name = alloc::ffi::CString::new(proc).unwrap();
 
                 unsafe { get_proc_address(name.as_ptr() as _) }
             });

@@ -1124,7 +1124,7 @@ where
         msg_send_![display.gl_context, makeCurrentContext];
 
         gl::load_gl_funcs(|proc| {
-            let name = std::ffi::CString::new(proc).unwrap();
+            let name = alloc::ffi::CString::new(proc).unwrap();
 
             get_proc_address(name.as_ptr() as _)
         });

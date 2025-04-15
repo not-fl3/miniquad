@@ -84,7 +84,7 @@ impl Decorations {
         xdg_toplevel: *mut xdg_toplevel,
         title: &str,
     ) {
-        let title = std::ffi::CString::new(title).unwrap();
+        let title = alloc::ffi::CString::new(title).unwrap();
         match self {
             Decorations::None | Decorations::Server | Decorations::Fallback(..) => {
                 wl_request!(
