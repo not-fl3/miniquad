@@ -96,7 +96,7 @@ And then use the following .html to load .wasm:
 
 One of the ways to server static .wasm and .html:
 
-```
+```no-run
 cargo install basic-http-server
 basic-http-server .
 ```
@@ -106,7 +106,7 @@ basic-http-server .
 Recommended way to build for android is using Docker.<br/>
 miniquad uses slightly modifed version of `cargo-apk`
 
-```
+```no-run
 docker run --rm -v $(pwd)":/root/src" -w /root/src notfl3/cargo-apk cargo quad-apk build --example quad
 ```
 
@@ -119,7 +119,7 @@ No code modifications for Android required, everything should just works.
 
 To run on the simulator:
 
-```
+```no-run
 mkdir MyGame.app
 cargo build --target x86_64-apple-ios --release
 cp target/release/mygame MyGame.app
