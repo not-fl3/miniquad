@@ -251,8 +251,8 @@ impl Icon {
 }
 // Printing 64x64 array with a default formatter is not meaningfull,
 // so debug will skip the data fields of an Icon
-impl std::fmt::Debug for Icon {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for Icon {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Icon").finish()
     }
 }

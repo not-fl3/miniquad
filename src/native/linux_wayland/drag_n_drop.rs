@@ -38,7 +38,7 @@ pub(super) unsafe extern "C" fn data_device_handle_enter(
     display.drag_n_drop.enter_serial = Some(serial);
     display.drag_n_drop.data_offer = Some(data_offer);
     // only accept utf8 strings
-    let mime_type = std::ffi::CString::new("UTF8_STRING").unwrap();
+    let mime_type = alloc::ffi::CString::new("UTF8_STRING").unwrap();
     wl_request!(
         display.client,
         data_offer,
@@ -65,7 +65,7 @@ pub(super) unsafe extern "C" fn data_device_handle_drop(
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     assert_eq!(data_device, display.data_device);
     if let Some(data_offer) = display.drag_n_drop.data_offer {
-        let mime_type = std::ffi::CString::new("UTF8_STRING").unwrap();
+        let mime_type = alloc::ffi::CString::new("UTF8_STRING").unwrap();
         if let Some(bytes) =
             display
                 .client
