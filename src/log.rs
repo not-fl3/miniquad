@@ -5,7 +5,7 @@
 /// Will send log calls like debug!(), warn!() and error!() to appropriate console_* call on wasm
 /// and just println! on PC.
 /// If you need better control of log messages - just dont use "log-impl" feature and use appropriate loggers from log-rs
-use std::cmp;
+use core::cmp;
 
 #[repr(usize)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
