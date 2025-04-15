@@ -56,7 +56,7 @@ impl LibX11 {
         display: *mut Display,
         window: Window,
     ) -> (i32, i32) {
-        let mut attribs: XWindowAttributes = std::mem::zeroed();
+        let mut attribs: XWindowAttributes = core::mem::zeroed();
         (self.XGetWindowAttributes)(display, window, &mut attribs);
         (attribs.width, attribs.height)
     }
@@ -179,7 +179,7 @@ impl LibX11 {
         libc::memset(
             &mut wa as *mut XSetWindowAttributes as *mut libc::c_void,
             0 as libc::c_int,
-            ::std::mem::size_of::<XSetWindowAttributes>() as _,
+            ::core::mem::size_of::<XSetWindowAttributes>() as _,
         );
         let wamask = (CWBorderPixel | CWColormap | CWEventMask) as u32;
 

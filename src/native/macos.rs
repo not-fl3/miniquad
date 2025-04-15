@@ -422,7 +422,7 @@ unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
     if symbol.is_null() {
         return None;
     }
-    Some(unsafe { std::mem::transmute_copy(&symbol) })
+    Some(unsafe { core::mem::transmute_copy(&symbol) })
 }
 
 // methods for both metal or OPENGL view

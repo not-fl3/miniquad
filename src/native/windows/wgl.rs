@@ -208,13 +208,13 @@ unsafe fn get_wgl_proc_address<T>(libopengl32: &mut LibOpengl32, proc: &str) -> 
     if proc.is_null() {
         return None;
     }
-    Some(std::mem::transmute_copy(&proc))
+    Some(core::mem::transmute_copy(&proc))
 }
 
 impl Wgl {
     pub(crate) unsafe fn new(display: &mut WindowsDisplay) -> Wgl {
-        let mut pfd: PIXELFORMATDESCRIPTOR = std::mem::zeroed();
-        pfd.nSize = std::mem::size_of_val(&pfd) as _;
+        let mut pfd: PIXELFORMATDESCRIPTOR = core::mem::zeroed();
+        pfd.nSize = core::mem::size_of_val(&pfd) as _;
         pfd.nVersion = 1;
         pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
         pfd.iPixelType = PFD_TYPE_RGBA;
@@ -384,11 +384,11 @@ impl Wgl {
         if 0 == pixel_format {
             panic!("WGL: Didn't find matching pixel format.");
         }
-        let mut pfd: PIXELFORMATDESCRIPTOR = std::mem::zeroed();
+        let mut pfd: PIXELFORMATDESCRIPTOR = core::mem::zeroed();
         if DescribePixelFormat(
             display.dc,
             pixel_format as _,
-            std::mem::size_of_val(&pfd) as _,
+            core::mem::size_of_val(&pfd) as _,
             &mut pfd as *mut _ as _,
         ) == 0
         {

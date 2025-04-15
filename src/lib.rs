@@ -16,7 +16,7 @@ pub mod fs;
 pub mod graphics;
 pub mod native;
 use std::collections::HashMap;
-use std::ops::{Index, IndexMut};
+use core::ops::{Index, IndexMut};
 
 #[cfg(feature = "log-impl")]
 pub mod log;

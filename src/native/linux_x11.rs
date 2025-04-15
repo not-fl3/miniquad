@@ -306,7 +306,7 @@ impl X11Display {
                 display: self.display,
                 format: 32,
                 data: ClientMessageData {
-                    l: std::mem::transmute(data),
+                    l: core::mem::transmute(data),
                 },
             };
             (self.libx11.XSendEvent)(

@@ -289,18 +289,18 @@ impl Glx {
         };
         if extensions_string.contains("GLX_EXT_swap_control") {
             extensions.glxSwapIntervalExt =
-                std::mem::transmute_copy(&libgl.get_procaddr("glXSwapIntervalEXT"));
+                core::mem::transmute_copy(&libgl.get_procaddr("glXSwapIntervalEXT"));
         }
         if extensions_string.contains("GLX_MESA_swap_control") {
             extensions.glxSwapIntervalMesa =
-                std::mem::transmute_copy(&libgl.get_procaddr("glXSwapIntervalMESA"));
+                core::mem::transmute_copy(&libgl.get_procaddr("glXSwapIntervalMESA"));
         }
 
         if extensions_string.contains("GLX_ARB_create_context")
             && extensions_string.contains("GLX_ARB_create_context_profile")
         {
             extensions.glxCreateContextAttribsARB =
-                std::mem::transmute_copy(&libgl.get_procaddr("glXCreateContextAttribsARB"))
+                core::mem::transmute_copy(&libgl.get_procaddr("glXCreateContextAttribsARB"))
         };
 
         Ok(Glx {

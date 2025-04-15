@@ -329,7 +329,7 @@ macro_rules! gl_loader {
             $(
                 unsafe {
                     let fn_name = stringify!($fn);
-                    __pfns::$fn = ::std::mem::transmute_copy(&getprocaddr(fn_name));
+                    __pfns::$fn = ::core::mem::transmute_copy(&getprocaddr(fn_name));
                 }
             )*
         }

@@ -96,9 +96,9 @@ pub(crate) unsafe fn get_property_bytes(
             return bytes;
         } else {
             let n_bits = match actual_format {
-                8 => std::mem::size_of::<libc::c_char>(),
-                16 => std::mem::size_of::<libc::c_int>(),
-                32 => std::mem::size_of::<libc::c_long>(),
+                8 => core::mem::size_of::<libc::c_char>(),
+                16 => core::mem::size_of::<libc::c_int>(),
+                32 => core::mem::size_of::<libc::c_long>(),
                 _ => unreachable!(),
             };
             bytes.extend(std::slice::from_raw_parts(

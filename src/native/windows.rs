@@ -98,7 +98,7 @@ impl WindowsDisplay {
         let mut final_new_width = new_width;
         let mut final_new_height = new_height;
 
-        let mut rect: RECT = unsafe { std::mem::zeroed() };
+        let mut rect: RECT = unsafe { core::mem::zeroed() };
         if unsafe { GetClientRect(self.wnd, &mut rect as *mut _ as _) } != 0 {
             x = rect.left;
             y = rect.bottom;
@@ -136,7 +136,7 @@ impl WindowsDisplay {
     }
     /// Set the window position in screen coordinates.
     fn set_window_position(&mut self, new_x: u32, new_y: u32) {
-        let mut rect: RECT = unsafe { std::mem::zeroed() };
+        let mut rect: RECT = unsafe { core::mem::zeroed() };
         if unsafe { GetClientRect(self.wnd, &mut rect as *mut _ as _) } != 0 {
             let mut new_rect = rect;
             new_rect.right = new_rect.right - new_rect.left + new_x as i32;
@@ -217,7 +217,7 @@ fn get_win_style(is_fullscreen: bool, is_resizable: bool) -> DWORD {
 unsafe fn update_clip_rect(hwnd: HWND) {
     // Retrieve the screen coordinates of the client area,
     // and convert them into client coordinates.
-    let mut rect: RECT = std::mem::zeroed();
+    let mut rect: RECT = core::mem::zeroed();
 
     GetClientRect(hwnd, &mut rect as *mut _ as _);
     let mut upper_left = POINT {
@@ -391,9 +391,9 @@ unsafe extern "system" fn win32_wndproc(
             // if !_sapp.win32_mouse_tracked {
             //     _sapp.win32_mouse_tracked = true;
 
-            //     let mut tme: TRACKMOUSEEVENT = std::mem::zeroed();
+            //     let mut tme: TRACKMOUSEEVENT = core::mem::zeroed();
 
-            //     tme.cbSize = std::mem::size_of_val(&tme) as _;
+            //     tme.cbSize = core::mem::size_of_val(&tme) as _;
             //     tme.dwFlags = TME_LEAVE;
             //     tme.hwndTrack = wnd;
             //     TrackMouseEvent(&mut tme as *mut _);
@@ -414,14 +414,14 @@ unsafe extern "system" fn win32_wndproc(
         }
 
         WM_INPUT => {
-            let mut data: RAWINPUT = std::mem::zeroed();
-            let mut size = std::mem::size_of::<RAWINPUT>();
+            let mut data: RAWINPUT = core::mem::zeroed();
+            let mut size = core::mem::size_of::<RAWINPUT>();
             let get_succeed = GetRawInputData(
                 lparam as _,
                 RID_INPUT,
                 &mut data as *mut _ as _,
                 &mut size as *mut _ as _,
-                std::mem::size_of::<RAWINPUTHEADER>() as _,
+                core::mem::size_of::<RAWINPUTHEADER>() as _,
             );
             if get_succeed as i32 == -1 {
                 panic!("failed to retrieve raw input data");
@@ -542,9 +542,9 @@ unsafe extern "system" fn win32_wndproc(
 }
 
 unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: &[u8]) -> Option<HICON> {
-    let mut bi: BITMAPV5HEADER = std::mem::zeroed();
+    let mut bi: BITMAPV5HEADER = core::mem::zeroed();
 
-    bi.bV5Size = std::mem::size_of::<BITMAPV5HEADER>() as _;
+    bi.bV5Size = core::mem::size_of::<BITMAPV5HEADER>() as _;
     bi.bV5Width = width as i32;
     bi.bV5Height = -(height as i32); // NOTE the '-' here to indicate that origin is top-left
     bi.bV5Planes = 1;
@@ -586,7 +586,7 @@ unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: &[u8]) -> 
         *(target as *mut u8).offset(i as isize * 4 + 3) = colors[i * 4 + 3];
     }
 
-    let mut icon_info: ICONINFO = std::mem::zeroed();
+    let mut icon_info: ICONINFO = core::mem::zeroed();
     icon_info.fIcon = 1;
     icon_info.xHotspot = 0;
     icon_info.yHotspot = 0;
@@ -634,7 +634,7 @@ unsafe fn create_window(
     width: i32,
     height: i32,
 ) -> (HWND, HDC) {
-    let mut wndclassw: WNDCLASSW = std::mem::zeroed();
+    let mut wndclassw: WNDCLASSW = core::mem::zeroed();
 
     wndclassw.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wndclassw.lpfnWndProc = Some(win32_wndproc);
@@ -644,7 +644,7 @@ unsafe fn create_window(
     wndclassw.hbrBackground = GetStockObject(BLACK_BRUSH as i32) as HBRUSH;
     let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
     wndclassw.lpszClassName = class_name.as_ptr() as _;
-    wndclassw.cbWndExtra = std::mem::size_of::<*mut core::ffi::c_void>() as i32;
+    wndclassw.cbWndExtra = core::mem::size_of::<*mut core::ffi::c_void>() as i32;
     RegisterClassW(&wndclassw);
 
     let win_style: DWORD;
@@ -699,14 +699,14 @@ unsafe fn create_window(
     );
     assert!(!hwnd.is_null());
 
-    let mut rawinputdevice: RAWINPUTDEVICE = std::mem::zeroed();
+    let mut rawinputdevice: RAWINPUTDEVICE = core::mem::zeroed();
     rawinputdevice.usUsagePage = HID_USAGE_PAGE_GENERIC;
     rawinputdevice.usUsage = HID_USAGE_GENERIC_MOUSE;
     rawinputdevice.hwndTarget = NULL as _;
     let register_succeed = RegisterRawInputDevices(
         &rawinputdevice as *const _,
         1,
-        std::mem::size_of::<RAWINPUTDEVICE>() as _,
+        core::mem::size_of::<RAWINPUTDEVICE>() as _,
     );
     assert!(
         register_succeed == 1,
@@ -746,7 +746,7 @@ unsafe fn create_msg_window() -> (HWND, HDC) {
         "Win32: failed to create helper window!"
     );
     ShowWindow(msg_hwnd, SW_HIDE);
-    let mut msg = std::mem::zeroed();
+    let mut msg = core::mem::zeroed();
     while PeekMessageW(&mut msg as _, msg_hwnd, 0, 0, PM_REMOVE) != 0 {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
@@ -771,7 +771,7 @@ impl WindowsDisplay {
             eprintln!("Load GL func {:?} failed.", proc);
             return None;
         }
-        Some(std::mem::transmute::<
+        Some(core::mem::transmute::<
             *mut winapi::shared::minwindef::__some_function,
             unsafe extern "C" fn(),
         >(proc_ptr))
@@ -782,12 +782,12 @@ impl WindowsDisplay {
     /// returns true if size or position has changed
     unsafe fn update_dimensions(&mut self, hwnd: HWND) -> bool {
         let mut d = crate::native_display().lock().unwrap();
-        let mut rect: RECT = std::mem::zeroed();
+        let mut rect: RECT = core::mem::zeroed();
 
         // Get the outer rectangle of the window in screen coordinates
         if GetWindowRect(hwnd, &mut rect as *mut _ as _) != 0 {
             // Get the client area rectangle in client coordinates
-            let mut client_rect: RECT = std::mem::zeroed();
+            let mut client_rect: RECT = core::mem::zeroed();
             if GetClientRect(hwnd, &mut client_rect as *mut _ as _) != 0 {
                 // Calculate window width and height based on the client area
                 let window_width =
@@ -961,7 +961,7 @@ where
                     DispatchMessageW(&mut msg as *mut _ as _);
                 }
             };
-            let mut msg: MSG = std::mem::zeroed();
+            let mut msg: MSG = core::mem::zeroed();
             let block_on_wait = conf.platform.blocking_event_loop && !display.update_requested;
             if block_on_wait {
                 GetMessageW(&mut msg as *mut _ as _, NULL as _, 0, 0);

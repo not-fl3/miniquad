@@ -56,7 +56,7 @@ fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
 
         let filename = alloc::ffi::CString::new(path).unwrap();
 
-        let mut data: native::android_asset = unsafe { std::mem::zeroed() };
+        let mut data: native::android_asset = unsafe { core::mem::zeroed() };
 
         unsafe { native::android::load_asset(filename.as_ptr(), &mut data as _) };
 

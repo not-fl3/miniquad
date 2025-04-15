@@ -41,7 +41,7 @@ pub mod linux {
             if symbol.is_null() {
                 return Err(Error::DlSymError(name.to_string()));
             }
-            Ok(unsafe { std::mem::transmute_copy::<_, F>(&symbol) })
+            Ok(unsafe { core::mem::transmute_copy::<_, F>(&symbol) })
         }
     }
 
@@ -77,7 +77,7 @@ mod windows {
             if proc.is_null() {
                 return Err(Error::DlSymError(name.to_string()));
             }
-            Ok(unsafe { std::mem::transmute_copy(&proc) })
+            Ok(unsafe { core::mem::transmute_copy(&proc) })
         }
     }
 
@@ -115,7 +115,7 @@ macro_rules! declare_module {
     $($vis:vis $field:ident: $field_ty:ty,)*) => {
         #[derive(Clone)]
         pub struct $name {
-            _module: std::rc::Rc<$crate::native::module::Module>,
+            _module: alloc::rc::Rc<$crate::native::module::Module>,
             $($s_vis $s_name: $s_type,)*
             $($f_vis $f_name: unsafe extern "C" fn ($($f_arg),*)$( -> $f_ret)?,)*
             $($v_vis $v_name: unsafe extern "C" fn ($($v_arg),*, ...)$( -> $v_ret)?,)*
