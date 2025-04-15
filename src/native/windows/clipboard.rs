@@ -4,7 +4,7 @@ use winapi::um::winuser::{
     CloseClipboard, EmptyClipboard, GetClipboardData, OpenClipboard, SetClipboardData,
 };
 
-use std::ptr;
+use core::ptr;
 
 struct ClipboardGuard;
 impl ClipboardGuard {

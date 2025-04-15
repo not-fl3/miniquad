@@ -644,7 +644,7 @@ impl RenderingBackend for MetalContext {
 
         unsafe {
             let dest: *mut core::ffi::c_void = msg_send![buffer.raw[buffer.next_value], contents];
-            std::ptr::copy(data.ptr, dest, data.size);
+            core::ptr::copy(data.ptr, dest, data.size);
 
             #[cfg(target_os = "macos")]
             msg_send_![buffer.raw[buffer.next_value], didModifyRange:NSRange::new(0, data.size as u64)];
@@ -1127,7 +1127,7 @@ impl RenderingBackend for MetalContext {
         let buffer = self.uniform_buffers[self.current_frame_index];
         unsafe {
             let dest: *mut core::ffi::c_void = msg_send![buffer, contents];
-            std::ptr::copy(
+            core::ptr::copy(
                 uniform_ptr as _,
                 dest.add(self.current_ub_offset as usize),
                 size,
