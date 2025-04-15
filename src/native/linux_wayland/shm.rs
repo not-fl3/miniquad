@@ -51,7 +51,7 @@ pub unsafe fn create_shm_buffer(
         panic!("Failed to create temporary file");
     }
     let data = libc::mmap(
-        std::ptr::null_mut(),
+        core::ptr::null_mut(),
         length as _,
         libc::PROT_READ | libc::PROT_WRITE,
         libc::MAP_SHARED,

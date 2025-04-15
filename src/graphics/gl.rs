@@ -245,7 +245,7 @@ impl Texture {
                         0,
                         format,
                         pixel_type,
-                        std::ptr::null() as _,
+                        core::ptr::null() as _,
                     );
                 }
                 TextureSource::Bytes(source) => {
@@ -347,7 +347,7 @@ impl Texture {
                 pixel_type,
                 match source {
                     Some(source) => source.as_ptr() as *const _,
-                    Option::None => std::ptr::null(),
+                    Option::None => core::ptr::null(),
                 },
             );
         }
@@ -650,7 +650,7 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderEr
 
         let cstring = CString::new(source)?;
         let csource = [cstring];
-        glShaderSource(shader, 1, csource.as_ptr() as *const _, std::ptr::null());
+        glShaderSource(shader, 1, csource.as_ptr() as *const _, core::ptr::null());
         glCompileShader(shader);
 
         let mut is_compiled = 0;
@@ -1365,7 +1365,7 @@ impl RenderingBackend for GlContext {
             self.cache.store_buffer_binding(gl_target);
             self.cache.bind_buffer(gl_target, gl_buf, index_type);
 
-            glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
+            glBufferData(gl_target, size as _, core::ptr::null() as *const _, gl_usage);
             if let BufferSource::Slice(data) = data {
                 debug_assert!(data.is_slice);
                 glBufferSubData(gl_target, 0, size as _, data.ptr as _);

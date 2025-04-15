@@ -65,7 +65,7 @@ pub(crate) unsafe fn get_property_bytes(
     property: Atom,
 ) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut buf = std::ptr::null_mut::<libc::c_char>();
+    let mut buf = core::ptr::null_mut::<libc::c_char>();
     let mut size: libc::c_ulong = 0;
     let mut actual_type = 0 as Atom;
     let mut actual_format: libc::c_int = 0;

@@ -285,7 +285,7 @@ unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
             pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
         }
     }
-    static mut OPENGL: *mut std::ffi::c_void = std::ptr::null_mut();
+    static mut OPENGL: *mut std::ffi::c_void = core::ptr::null_mut();
 
     if OPENGL.is_null() {
         OPENGL = libc::dlopen(

@@ -517,7 +517,7 @@ unsafe extern "system" fn win32_wndproc(
         WM_DROPFILES => {
             let hdrop = wparam as HDROP;
             let mut path = core::mem::MaybeUninit::<[u16; MAX_PATH]>::uninit();
-            let num_drops = DragQueryFileW(hdrop, u32::MAX, std::ptr::null_mut(), 0);
+            let num_drops = DragQueryFileW(hdrop, u32::MAX, core::ptr::null_mut(), 0);
 
             let mut d = crate::native_display().lock().unwrap();
             for i in 0..num_drops {
@@ -555,25 +555,25 @@ unsafe fn create_win_icon_from_image(width: u32, height: u32, colors: &[u8]) -> 
     bi.bV5BlueMask = 0x000000FF;
     bi.bV5AlphaMask = 0xFF000000;
 
-    let mut target = std::ptr::null_mut();
+    let mut target = core::ptr::null_mut();
     // const uint8_t* source = (const uint8_t*)desc->pixels.ptr;
 
-    let dc = GetDC(std::ptr::null_mut());
+    let dc = GetDC(core::ptr::null_mut());
     let color = CreateDIBSection(
         dc,
         &bi as *const _ as *const BITMAPINFO,
         DIB_RGB_COLORS,
         &mut target,
-        std::ptr::null_mut(),
+        core::ptr::null_mut(),
         0,
     );
-    ReleaseDC(std::ptr::null_mut(), dc);
+    ReleaseDC(core::ptr::null_mut(), dc);
     if color.is_null() {
         return None;
     }
     assert!(!target.is_null());
 
-    let mask = CreateBitmap(width as _, height as _, 1, 1, std::ptr::null());
+    let mask = CreateBitmap(width as _, height as _, 1, 1, core::ptr::null());
     if mask.is_null() {
         DeleteObject(color as *mut _);
         return None;
@@ -908,7 +908,7 @@ where
             mouse_y: 0.,
             show_cursor: true,
             user_cursor: false,
-            cursor: std::ptr::null_mut(),
+            cursor: core::ptr::null_mut(),
             libopengl32,
             _msg_wnd: msg_wnd,
             msg_dc,

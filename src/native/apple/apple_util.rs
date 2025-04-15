@@ -67,7 +67,7 @@ pub unsafe fn cfstring_ref_to_string(cfstring: CFStringRef) -> String {
         kCFStringEncodingUTF8,
         0,
         false,
-        std::ptr::null_mut::<u8>(),
+        core::ptr::null_mut::<u8>(),
         0,
         &mut num_bytes,
     );
@@ -83,7 +83,7 @@ pub unsafe fn cfstring_ref_to_string(cfstring: CFStringRef) -> String {
         false,
         buffer.as_mut_ptr(),
         num_bytes,
-        std::ptr::null_mut::<u64>(),
+        core::ptr::null_mut::<u64>(),
     );
     String::from_utf8(buffer).unwrap_or_default()
 }

@@ -128,7 +128,7 @@ impl WaylandPayload {
         match errno {
             0 => (),
             libc::EPROTO => {
-                let mut interface: *const wl_interface = std::ptr::null();
+                let mut interface: *const wl_interface = core::ptr::null();
                 let mut id = 0;
                 let code = (self.client.wl_display_get_protocol_error)(
                     self.display,
@@ -188,7 +188,7 @@ impl WaylandPayload {
                 self.client,
                 self.xdg_toplevel,
                 extensions::xdg_shell::xdg_toplevel::set_fullscreen,
-                std::ptr::null_mut::<wl_output>()
+                core::ptr::null_mut::<wl_output>()
             );
         } else {
             wl_request!(
@@ -331,17 +331,17 @@ struct PointerContext {
 impl PointerContext {
     fn new() -> Self {
         Self {
-            pointer: std::ptr::null_mut(),
+            pointer: core::ptr::null_mut(),
             enter_serial: None,
             position: (0., 0.),
             cursor_icon: Some(crate::CursorIcon::Default),
             queued_cursor_icon: None,
-            cursor_shape_manager: std::ptr::null_mut(),
-            cursor_shape_device: std::ptr::null_mut(),
-            pointer_constraints: std::ptr::null_mut(),
-            locked_pointer: std::ptr::null_mut(),
-            relative_pointer_manager: std::ptr::null_mut(),
-            relative_pointer: std::ptr::null_mut(),
+            cursor_shape_manager: core::ptr::null_mut(),
+            cursor_shape_device: core::ptr::null_mut(),
+            pointer_constraints: core::ptr::null_mut(),
+            locked_pointer: core::ptr::null_mut(),
+            relative_pointer_manager: core::ptr::null_mut(),
+            relative_pointer: core::ptr::null_mut(),
         }
     }
     unsafe fn set_cursor_with_serial(
@@ -367,7 +367,7 @@ impl PointerContext {
                 self.pointer,
                 WL_POINTER_SET_CURSOR,
                 serial,
-                std::ptr::null_mut::<wl_surface>(),
+                core::ptr::null_mut::<wl_surface>(),
                 0,
                 0
             );
@@ -404,7 +404,7 @@ impl PointerContext {
                         &extensions::cursor::zwp_locked_pointer_v1_interface,
                         display.surface,
                         self.pointer,
-                        std::ptr::null_mut::<wl_region>(),
+                        core::ptr::null_mut::<wl_region>(),
                         extensions::cursor::zwp_pointer_constraints_v1_lifetime_PERSISTENT
                     );
                     assert!(!self.locked_pointer.is_null());
@@ -438,12 +438,12 @@ impl PointerContext {
             if !self.locked_pointer.is_null() {
                 wl_request!(display.client, self.locked_pointer, 0);
                 (display.client.wl_proxy_destroy)(self.locked_pointer as _);
-                self.locked_pointer = std::ptr::null_mut();
+                self.locked_pointer = core::ptr::null_mut();
             }
             if !self.relative_pointer.is_null() {
                 wl_request!(display.client, self.relative_pointer, 0);
                 (display.client.wl_proxy_destroy)(self.relative_pointer as _);
-                self.relative_pointer = std::ptr::null_mut();
+                self.relative_pointer = core::ptr::null_mut();
             }
         }
     }
@@ -553,7 +553,7 @@ unsafe extern "C" fn keyboard_handle_keymap(
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
     let map_shm = libc::mmap(
-        std::ptr::null_mut::<std::ffi::c_void>(),
+        core::ptr::null_mut::<std::ffi::c_void>(),
         size as usize,
         libc::PROT_READ,
         libc::MAP_PRIVATE,
@@ -1056,7 +1056,7 @@ where
         let egl = LibWaylandEgl::try_load().ok()?;
         let xkb = LibXkbCommon::try_load().ok()?;
 
-        let wdisplay = (client.wl_display_connect)(std::ptr::null_mut());
+        let wdisplay = (client.wl_display_connect)(core::ptr::null_mut());
         if wdisplay.is_null() {
             eprintln!("Failed to connect to Wayland display.");
             return None;
@@ -1078,25 +1078,25 @@ where
             registry,
             egl,
             xkb,
-            compositor: std::ptr::null_mut(),
-            subcompositor: std::ptr::null_mut(),
-            xdg_toplevel: std::ptr::null_mut(),
-            xdg_wm_base: std::ptr::null_mut(),
-            surface: std::ptr::null_mut(),
-            viewporter: std::ptr::null_mut(),
-            shm: std::ptr::null_mut(),
-            seat: std::ptr::null_mut(),
-            data_device_manager: std::ptr::null_mut(),
-            data_device: std::ptr::null_mut(),
+            compositor: core::ptr::null_mut(),
+            subcompositor: core::ptr::null_mut(),
+            xdg_toplevel: core::ptr::null_mut(),
+            xdg_wm_base: core::ptr::null_mut(),
+            surface: core::ptr::null_mut(),
+            viewporter: core::ptr::null_mut(),
+            shm: core::ptr::null_mut(),
+            seat: core::ptr::null_mut(),
+            data_device_manager: core::ptr::null_mut(),
+            data_device: core::ptr::null_mut(),
             xkb_context,
             keymap: Default::default(),
-            xkb_state: std::ptr::null_mut(),
-            egl_window: std::ptr::null_mut(),
-            keyboard: std::ptr::null_mut(),
-            touch: std::ptr::null_mut(),
+            xkb_state: core::ptr::null_mut(),
+            egl_window: core::ptr::null_mut(),
+            keyboard: core::ptr::null_mut(),
+            touch: core::ptr::null_mut(),
             touch_positions: HashMap::new(),
-            focused_window: std::ptr::null_mut(),
-            decoration_manager: std::ptr::null_mut(),
+            focused_window: core::ptr::null_mut(),
+            decoration_manager: core::ptr::null_mut(),
             decorations: decorations::Decorations::None,
             events: Vec::new(),
             pointer_context: PointerContext::new(),
@@ -1157,7 +1157,7 @@ where
             egl_display,
             config,
             display.egl_window as _,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
         );
 
         if egl_surface.is_null() {

@@ -336,7 +336,7 @@ impl Glx {
         let glx_ctx = self.extensions.glxCreateContextAttribsARB.unwrap()(
             display,
             self.fbconfig,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
             true as _,
             attribs.as_ptr(),
         );
@@ -344,7 +344,7 @@ impl Glx {
         // _sapp_x11_release_error_handler(libx11);
 
         let glx_window =
-            self.libgl.glxCreateWindow.unwrap()(display, self.fbconfig, window, std::ptr::null());
+            self.libgl.glxCreateWindow.unwrap()(display, self.fbconfig, window, core::ptr::null());
         assert!(glx_window != 0, "GLX: failed to create window");
 
         (glx_ctx, glx_window)
@@ -501,7 +501,7 @@ pub unsafe extern "C" fn gl_choose_fbconfig(
     let mut extra_diff;
     let mut least_extra_diff: i32 = 10000000;
     let mut current: *const GLFBConfig;
-    let mut closest = std::ptr::null();
+    let mut closest = core::ptr::null();
 
     for i in 0..count as i32 {
         current = alternatives.offset(i as isize);

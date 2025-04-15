@@ -73,7 +73,7 @@ macro_rules! call_bool_method {
 #[macro_export]
 macro_rules! get_utf_str {
     ($env:expr, $obj:expr) => {{
-        let cstr_dat = (**$env).GetStringUTFChars.unwrap()($env, $obj, std::ptr::null_mut());
+        let cstr_dat = (**$env).GetStringUTFChars.unwrap()($env, $obj, core::ptr::null_mut());
         let string = std::ffi::CStr::from_ptr(cstr_dat)
             .to_str()
             .unwrap()

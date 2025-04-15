@@ -407,7 +407,7 @@ unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
             pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
         }
     }
-    static mut OPENGL: *mut std::ffi::c_void = std::ptr::null_mut();
+    static mut OPENGL: *mut std::ffi::c_void = core::ptr::null_mut();
 
     if OPENGL.is_null() {
         OPENGL = libc::dlopen(
@@ -910,7 +910,7 @@ unsafe fn set_icon(ns_app: ObjcId, icon: &Icon) {
         rgb,
         kCGBitmapByteOrderDefault | kCGImageAlphaLast,
         provider,
-        std::ptr::null(),
+        core::ptr::null(),
         false,
         kCGRenderingIntentDefault,
     );
@@ -1033,9 +1033,9 @@ where
     });
 
     let mut display = MacosDisplay {
-        view: std::ptr::null_mut(),
-        window: std::ptr::null_mut(),
-        gl_context: std::ptr::null_mut(),
+        view: core::ptr::null_mut(),
+        window: core::ptr::null_mut(),
+        gl_context: core::ptr::null_mut(),
         fullscreen: false,
         occluded: false,
         cursor_shown: true,

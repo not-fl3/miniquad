@@ -681,7 +681,7 @@ macro_rules! wl_request_constructor {
             $instance as _,
             $request_name,
             $interface as _,
-            std::ptr::null_mut::<std::ffi::c_void>(),
+            core::ptr::null_mut::<std::ffi::c_void>(),
             $($arg,)*
         );
 

@@ -65,10 +65,10 @@ impl X11Display {
                 let mut keysym: KeySym = 0;
                 (self.libx11.XLookupString)(
                     &mut event.xkey,
-                    std::ptr::null_mut(),
+                    core::ptr::null_mut(),
                     0 as libc::c_int,
                     &mut keysym,
-                    std::ptr::null_mut(),
+                    core::ptr::null_mut(),
                 );
                 let chr = keycodes::keysym_to_unicode(&mut self.libxkbcommon, keysym);
                 if chr > 0 {
@@ -537,7 +537,7 @@ where
     display.window =
         display
             .libx11
-            .create_window(display.root, display.display, std::ptr::null_mut(), 0, conf);
+            .create_window(display.root, display.display, core::ptr::null_mut(), 0, conf);
 
     let (context, config, egl_display) = egl::create_egl_context(
         &mut egl_lib,
@@ -548,7 +548,7 @@ where
     .unwrap();
 
     let egl_surface =
-        (egl_lib.eglCreateWindowSurface)(egl_display, config, display.window, std::ptr::null_mut());
+        (egl_lib.eglCreateWindowSurface)(egl_display, config, display.window, core::ptr::null_mut());
 
     if egl_surface.is_null() {
         // == EGL_NO_SURFACE
@@ -639,7 +639,7 @@ where
         (libx11.XInitThreads)();
         (libx11.XrmInitialize)();
 
-        let x11_display = (libx11.XOpenDisplay)(std::ptr::null());
+        let x11_display = (libx11.XOpenDisplay)(core::ptr::null());
         if x11_display.is_null() {
             panic!("XOpenDisplay() failed!");
         }
@@ -659,7 +659,7 @@ where
         // released. If DetectableAutoRepeat is not supported or has not been
         // requested, the server synthesizes a KeyRelease event for each
         // repeating KeyPress event it generates.
-        (libx11.XkbSetDetectableAutoRepeat)(x11_display, true as _, std::ptr::null_mut());
+        (libx11.XkbSetDetectableAutoRepeat)(x11_display, true as _, core::ptr::null_mut());
 
         libx11.load_extensions(x11_display);
         let mut display = X11Display {

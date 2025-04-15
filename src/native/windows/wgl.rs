@@ -422,7 +422,7 @@ impl Wgl {
         ];
         let mut gl_ctx = self.CreateContextAttribsARB.unwrap()(
             display.dc,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
             attrs.as_ptr() as *const _,
         );
 
@@ -441,7 +441,7 @@ impl Wgl {
             ];
             gl_ctx = self.CreateContextAttribsARB.unwrap()(
                 display.dc,
-                std::ptr::null_mut(),
+                core::ptr::null_mut(),
                 attrs.as_ptr() as *const _,
             );
         }

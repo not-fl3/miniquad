@@ -83,8 +83,8 @@ fn send_message(message: Message) {
     })
 }
 
-pub static mut ACTIVITY: ndk_sys::jobject = std::ptr::null_mut();
-static mut VM: *mut ndk_sys::JavaVM = std::ptr::null_mut();
+pub static mut ACTIVITY: ndk_sys::jobject = core::ptr::null_mut();
+static mut VM: *mut ndk_sys::JavaVM = core::ptr::null_mut();
 
 pub unsafe fn console_debug(msg: *const ::core::ffi::c_char) {
     ndk_sys::__android_log_write(
@@ -144,12 +144,12 @@ impl MainThreadState {
     unsafe fn destroy_surface(&mut self) {
         (self.libegl.eglMakeCurrent)(
             self.egl_display,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
         );
         (self.libegl.eglDestroySurface)(self.egl_display, self.surface);
-        self.surface = std::ptr::null_mut();
+        self.surface = core::ptr::null_mut();
     }
 
     unsafe fn update_surface(&mut self, window: *mut ndk_sys::ANativeWindow) {
@@ -165,7 +165,7 @@ impl MainThreadState {
             self.egl_display,
             self.egl_config,
             window as _,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
         );
 
         assert!(!self.surface.is_null());
@@ -314,10 +314,10 @@ impl MainThreadState {
 /// TODO: (this should be a GH issue)
 /// TODO: for reference - grep for "pthread_setspecific" in SDL2 sources, SDL fixed it!
 pub unsafe fn attach_jni_env() -> *mut ndk_sys::JNIEnv {
-    let mut env: *mut ndk_sys::JNIEnv = std::ptr::null_mut();
+    let mut env: *mut ndk_sys::JNIEnv = core::ptr::null_mut();
     let attach_current_thread = (**VM).AttachCurrentThread.unwrap();
 
-    let res = attach_current_thread(VM, &mut env, std::ptr::null_mut());
+    let res = attach_current_thread(VM, &mut env, core::ptr::null_mut());
     assert!(res == 0);
 
     env
@@ -422,7 +422,7 @@ where
 
         let (egl_context, egl_config, egl_display) = crate::native::egl::create_egl_context(
             &mut libegl,
-            std::ptr::null_mut(), /* EGL_DEFAULT_DISPLAY */
+            core::ptr::null_mut(), /* EGL_DEFAULT_DISPLAY */
             conf.platform.framebuffer_alpha,
             conf.sample_count,
         )
@@ -440,7 +440,7 @@ where
             egl_display,
             egl_config,
             window as _,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
         );
 
         if (libegl.eglMakeCurrent)(egl_display, surface, surface, egl_context) == 0 {
@@ -504,9 +504,9 @@ where
 
         (s.libegl.eglMakeCurrent)(
             s.egl_display,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
         );
         (s.libegl.eglDestroySurface)(s.egl_display, s.surface);
         (s.libegl.eglDestroyContext)(s.egl_display, s.egl_context);

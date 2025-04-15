@@ -82,7 +82,7 @@ pub mod libxkbcommon_ex {
     impl Default for XkbKeymap {
         fn default() -> Self {
             XkbKeymap {
-                xkb_keymap: std::ptr::null_mut(),
+                xkb_keymap: core::ptr::null_mut(),
                 shift: 0,
                 ctrl: 0,
                 alt: 0,

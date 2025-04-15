@@ -10,9 +10,9 @@ impl LibX11 {
             if !db.is_null() {
                 let mut value = XrmValue {
                     size: 0,
-                    addr: std::ptr::null_mut::<libc::c_char>(),
+                    addr: core::ptr::null_mut::<libc::c_char>(),
                 };
-                let mut type_ = std::ptr::null_mut();
+                let mut type_ = core::ptr::null_mut();
                 if (self.XrmGetResource)(
                     db,
                     b"Xft.dpi\x00".as_ptr() as _,
@@ -74,11 +74,11 @@ impl LibX11 {
             window,
             c_title.as_ptr(),
             c_title.as_ptr(),
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
             0 as libc::c_int,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
         );
         (self.XChangeProperty)(
             display,
