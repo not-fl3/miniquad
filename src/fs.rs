@@ -18,8 +18,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
             Self::IOError(e) => write!(f, "I/O error: {e}"),
             Self::DownloadFailed => write!(f, "Download failed"),

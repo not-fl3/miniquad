@@ -274,7 +274,7 @@ pub enum ShaderType {
 }
 
 impl Display for ShaderType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Vertex => write!(f, "Vertex"),
             Self::Fragment => write!(f, "Fragment"),
@@ -300,7 +300,7 @@ impl From<alloc::ffi::NulError> for ShaderError {
 }
 
 impl Display for ShaderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::CompilationError {
                 shader_type,

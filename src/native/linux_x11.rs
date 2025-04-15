@@ -24,8 +24,8 @@ pub enum X11Error {
     LibraryNotFound(module::Error),
     GLXError(String),
 }
-impl std::fmt::Display for X11Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for X11Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::LibraryNotFound(e) => write!(f, "Library not found error: {e}"),
             Self::GLXError(msg) => write!(f, "GLX error:\n{msg}"),
