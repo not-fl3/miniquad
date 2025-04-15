@@ -2,7 +2,8 @@
 
 use crate::native::gl::*;
 
-use core::{error::Error, fmt::Display};
+use core::fmt::Display;
+use std::error::Error;
 
 //pub use texture::{FilterMode, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 

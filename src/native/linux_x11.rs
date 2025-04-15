@@ -534,10 +534,13 @@ where
         _ => return Err(display),
     };
 
-    display.window =
-        display
-            .libx11
-            .create_window(display.root, display.display, core::ptr::null_mut(), 0, conf);
+    display.window = display.libx11.create_window(
+        display.root,
+        display.display,
+        core::ptr::null_mut(),
+        0,
+        conf,
+    );
 
     let (context, config, egl_display) = egl::create_egl_context(
         &mut egl_lib,
@@ -547,8 +550,12 @@ where
     )
     .unwrap();
 
-    let egl_surface =
-        (egl_lib.eglCreateWindowSurface)(egl_display, config, display.window, core::ptr::null_mut());
+    let egl_surface = (egl_lib.eglCreateWindowSurface)(
+        egl_display,
+        config,
+        display.window,
+        core::ptr::null_mut(),
+    );
 
     if egl_surface.is_null() {
         // == EGL_NO_SURFACE

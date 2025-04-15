@@ -110,8 +110,8 @@ mod wasm {
     }
 
     pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
-        use native::wasm::fs;
         use alloc::ffi::CString;
+        use native::wasm::fs;
 
         let url = CString::new(path).unwrap();
         let file_id = unsafe { fs::fs_load_file(url.as_ptr(), url.as_bytes().len() as u32) };

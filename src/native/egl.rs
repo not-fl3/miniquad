@@ -14,8 +14,8 @@ pub type EGLNativePixmapType = ::core::ffi::c_ulong;
 #[cfg(target_os = "android")]
 pub type EGLNativeWindowType = ::core::ffi::c_ulong;
 
-pub use core::ptr::null_mut;
 use core::fmt::Display;
+pub use core::ptr::null_mut;
 
 pub const EGL_SUCCESS: u32 = 12288;
 

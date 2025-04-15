@@ -9,14 +9,13 @@
 
 extern crate alloc;
 
-
 pub mod conf;
 mod event;
 pub mod fs;
 pub mod graphics;
 pub mod native;
-use std::collections::HashMap;
 use core::ops::{Index, IndexMut};
+use std::collections::HashMap;
 
 #[cfg(feature = "log-impl")]
 pub mod log;

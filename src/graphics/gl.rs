@@ -1365,7 +1365,12 @@ impl RenderingBackend for GlContext {
             self.cache.store_buffer_binding(gl_target);
             self.cache.bind_buffer(gl_target, gl_buf, index_type);
 
-            glBufferData(gl_target, size as _, core::ptr::null() as *const _, gl_usage);
+            glBufferData(
+                gl_target,
+                size as _,
+                core::ptr::null() as *const _,
+                gl_usage,
+            );
             if let BufferSource::Slice(data) = data {
                 debug_assert!(data.is_slice);
                 glBufferSubData(gl_target, 0, size as _, data.ptr as _);
