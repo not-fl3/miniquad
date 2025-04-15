@@ -251,7 +251,7 @@ impl Wgl {
                 let extensions = getExtensionsStringEXT();
 
                 if !extensions.is_null() {
-                    let extensions_string = alloc::ffi::CStr::from_ptr(extensions).to_string_lossy();
+                    let extensions_string = core::ffi::CStr::from_ptr(extensions).to_string_lossy();
                     if extensions_string.contains(ext) {
                         return true;
                     }
@@ -261,7 +261,7 @@ impl Wgl {
             if let Some(getExtensionsStringARB) = GetExtensionsStringARB {
                 let extensions = getExtensionsStringARB((display.libopengl32.wglGetCurrentDC)());
                 if !extensions.is_null() {
-                    let extensions_string = alloc::ffi::CStr::from_ptr(extensions).to_string_lossy();
+                    let extensions_string = core::ffi::CStr::from_ptr(extensions).to_string_lossy();
 
                     if extensions_string.contains(ext) {
                         return true;
