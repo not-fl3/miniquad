@@ -869,6 +869,12 @@ impl WindowsDisplay {
             ShowKeyboard(_show) => {
                 eprintln!("Not implemented for windows")
             }
+            SetWindowTitle(_title) => {
+                eprintln!("SetWindowTitle is not yet implemented on windows");
+            }
+            SetWindowIcon(icon) => unsafe {
+                set_icon(self.wnd, &icon);
+            },
         }
     }
 }
