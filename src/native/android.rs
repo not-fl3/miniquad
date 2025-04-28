@@ -252,6 +252,7 @@ impl MainThreadState {
             }
             Message::Destroy => {
                 self.quit = true;
+                self.event_handler.quit_requested_event()
             }
         }
     }
