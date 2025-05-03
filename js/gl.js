@@ -1366,7 +1366,7 @@ var importObject = {
             let lastFocus = document.hasFocus();
             var checkFocus = function () {
                 let hasFocus = document.hasFocus();
-                if (lastFocus == hasFocus) {
+                if (lastFocus != hasFocus) {
                     wasm_exports.focus(hasFocus);
                     lastFocus = hasFocus;
                 }
