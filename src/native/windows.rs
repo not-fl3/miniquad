@@ -535,6 +535,13 @@ unsafe extern "system" fn win32_wndproc(
                 }
             }
         }
+        WM_ACTIVATE => {
+            if LOWORD(wparam as _) == WA_ACTIVE || LOWORD(wparam as _) == WA_CLICKACTIVE {
+                event_handler.window_restored_event();
+            } else {
+                event_handler.window_minimized_event();
+            }
+        }
         _ => {}
     }
 

@@ -1365,7 +1365,9 @@ var importObject = {
 
             let lastFocus = document.hasFocus();
             var checkFocus = function () {
-                let hasFocus = document.hasFocus();
+                // The element doesn't loose focus when the user switches tabs.
+                // However, the document becomes invisible
+                let hasFocus = document.hasFocus() && document.visibilityState == "visible";
                 if (lastFocus != hasFocus) {
                     wasm_exports.focus(hasFocus);
                     lastFocus = hasFocus;

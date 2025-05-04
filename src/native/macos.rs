@@ -324,6 +324,9 @@ pub fn define_cocoa_window_delegate() -> *const Class {
             // Startup: the gl_context has not yet been created.
             return;
         }
+        if let Some(event_handler) = payload.context() {
+            event_handler.window_minimized_event();
+        }
         unsafe {
             msg_send_![payload.gl_context, update];
         }
@@ -353,6 +356,18 @@ pub fn define_cocoa_window_delegate() -> *const Class {
                 let state: u64 = msg_send![payload.window, occlusionState];
                 payload.occluded = state & NSWindowOcclusionStateVisible == 0;
             }
+        }
+    }
+    extern "C" fn window_did_become_key(this: &Object, _: Sel, _: ObjcId) {
+        let payload = get_window_payload(this);
+        if let Some(event_handler) = payload.context() {
+            event_handler.window_restored_event();
+        }
+    }
+    extern "C" fn window_did_resign_key(this: &Object, _: Sel, _: ObjcId) {
+        let payload = get_window_payload(this);
+        if let Some(event_handler) = payload.context() {
+            event_handler.window_minimized_event();
         }
     }
 
@@ -389,6 +404,14 @@ pub fn define_cocoa_window_delegate() -> *const Class {
         decl.add_method(
             sel!(windowDidChangeOcclusionState:),
             window_did_change_occlusion_state as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(windowDidBecomeKey:),
+            window_did_become_key as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(windowDidResignKey:),
+            window_did_resign_key as extern "C" fn(&Object, Sel, ObjcId),
         );
     }
     // Store internal state as user data
