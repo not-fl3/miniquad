@@ -54,9 +54,9 @@ impl NativeDisplayData {
             #[cfg(target_vendor = "apple")]
             gfx_api: crate::conf::AppleGfxApi::OpenGl,
             #[cfg(target_vendor = "apple")]
-            view: std::ptr::null_mut(),
+            view: core::ptr::null_mut(),
             #[cfg(target_os = "ios")]
-            view_ctrl: std::ptr::null_mut(),
+            view_ctrl: core::ptr::null_mut(),
         }
     }
 }

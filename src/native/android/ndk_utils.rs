@@ -12,8 +12,8 @@ macro_rules! new_object {
         let get_method_id = (**$env).GetMethodID.unwrap();
         let new_object = (**$env).NewObject.unwrap();
 
-        let class = std::ffi::CString::new($class).unwrap();
-        let sig = std::ffi::CString::new($sig).unwrap();
+        let class = alloc::ffi::CString::new($class).unwrap();
+        let sig = alloc::ffi::CString::new($sig).unwrap();
         let class = find_class($env, class.as_ptr() as _);
 
         let constructor = get_method_id($env, class, b"<init>\0".as_ptr() as _, sig.as_ptr() as _);
@@ -29,8 +29,8 @@ macro_rules! call_method {
         let get_method_id = (**$env).GetMethodID.unwrap();
         let call_object_method = (**$env).$fn.unwrap();
 
-        let method = std::ffi::CString::new($method).unwrap();
-        let sig = std::ffi::CString::new($sig).unwrap();
+        let method = alloc::ffi::CString::new($method).unwrap();
+        let sig = alloc::ffi::CString::new($sig).unwrap();
         let class = get_object_class($env, $obj);
 
         assert!(!class.is_null());
@@ -73,8 +73,8 @@ macro_rules! call_bool_method {
 #[macro_export]
 macro_rules! get_utf_str {
     ($env:expr, $obj:expr) => {{
-        let cstr_dat = (**$env).GetStringUTFChars.unwrap()($env, $obj, std::ptr::null_mut());
-        let string = std::ffi::CStr::from_ptr(cstr_dat)
+        let cstr_dat = (**$env).GetStringUTFChars.unwrap()($env, $obj, core::ptr::null_mut());
+        let string = core::ffi::CStr::from_ptr(cstr_dat)
             .to_str()
             .unwrap()
             .to_string();

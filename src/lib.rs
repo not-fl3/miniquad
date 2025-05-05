@@ -7,13 +7,15 @@
     clippy::missing_safety_doc
 )]
 
+extern crate alloc;
+
 pub mod conf;
 mod event;
 pub mod fs;
 pub mod graphics;
 pub mod native;
+use core::ops::{Index, IndexMut};
 use std::collections::HashMap;
-use std::ops::{Index, IndexMut};
 
 #[cfg(feature = "log-impl")]
 pub mod log;

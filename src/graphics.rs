@@ -2,7 +2,8 @@
 
 use crate::native::gl::*;
 
-use std::{error::Error, fmt::Display};
+use core::fmt::Display;
+use std::error::Error;
 
 //pub use texture::{FilterMode, TextureAccess, TextureFormat, TextureParams, TextureWrap};
 
@@ -274,7 +275,7 @@ pub enum ShaderType {
 }
 
 impl Display for ShaderType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Vertex => write!(f, "Vertex"),
             Self::Fragment => write!(f, "Fragment"),
@@ -290,17 +291,17 @@ pub enum ShaderError {
     },
     LinkError(String),
     /// Shader strings should never contains \00 in the middle
-    FFINulError(std::ffi::NulError),
+    FFINulError(alloc::ffi::NulError),
 }
 
-impl From<std::ffi::NulError> for ShaderError {
-    fn from(e: std::ffi::NulError) -> ShaderError {
+impl From<alloc::ffi::NulError> for ShaderError {
+    fn from(e: alloc::ffi::NulError) -> ShaderError {
         ShaderError::FFINulError(e)
     }
 }
 
 impl Display for ShaderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::CompilationError {
                 shader_type,
@@ -969,11 +970,11 @@ impl ElapsedQuery {
 /// Basically, the same thing as `fn f<U>(a: &U)`, but
 /// trait-object friendly.
 pub struct Arg<'a> {
-    ptr: *const std::ffi::c_void,
+    ptr: *const core::ffi::c_void,
     element_size: usize,
     size: usize,
     is_slice: bool,
-    _phantom: std::marker::PhantomData<&'a ()>,
+    _phantom: core::marker::PhantomData<&'a ()>,
 }
 
 pub enum TextureSource<'a> {
@@ -997,9 +998,9 @@ impl<'a> BufferSource<'a> {
     ///
     /// For vertex buffers it is OK to use `empty::<u8>(byte_size);`
     pub fn empty<T>(size: usize) -> BufferSource<'a> {
-        let element_size = std::mem::size_of::<T>();
+        let element_size = core::mem::size_of::<T>();
         BufferSource::Empty {
-            size: size * std::mem::size_of::<T>(),
+            size: size * core::mem::size_of::<T>(),
             element_size,
         }
     }
@@ -1007,10 +1008,10 @@ impl<'a> BufferSource<'a> {
     pub fn slice<T>(data: &'a [T]) -> BufferSource<'a> {
         BufferSource::Slice(Arg {
             ptr: data.as_ptr() as _,
-            size: std::mem::size_of_val(data),
-            element_size: std::mem::size_of::<T>(),
+            size: core::mem::size_of_val(data),
+            element_size: core::mem::size_of::<T>(),
             is_slice: true,
-            _phantom: std::marker::PhantomData,
+            _phantom: core::marker::PhantomData,
         })
     }
 
@@ -1020,7 +1021,7 @@ impl<'a> BufferSource<'a> {
             size,
             element_size,
             is_slice: true,
-            _phantom: std::marker::PhantomData,
+            _phantom: core::marker::PhantomData,
         })
     }
 }
@@ -1030,10 +1031,10 @@ impl<'a> UniformsSource<'a> {
     pub fn table<T>(data: &'a T) -> UniformsSource<'a> {
         Self(Arg {
             ptr: data as *const T as _,
-            size: std::mem::size_of_val(data),
-            element_size: std::mem::size_of::<T>(),
+            size: core::mem::size_of_val(data),
+            element_size: core::mem::size_of::<T>(),
             is_slice: false,
-            _phantom: std::marker::PhantomData,
+            _phantom: core::marker::PhantomData,
         })
     }
 }

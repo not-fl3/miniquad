@@ -54,7 +54,7 @@ where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
     {
-        use std::ffi::CString;
+        use alloc::ffi::CString;
         use std::panic;
 
         panic::set_hook(Box::new(|info| {
@@ -206,7 +206,7 @@ impl crate::native::Clipboard for Clipboard {
 
     fn set(&mut self, data: &str) {
         let len = data.len();
-        let data = std::ffi::CString::new(data).unwrap();
+        let data = alloc::ffi::CString::new(data).unwrap();
         unsafe { sapp_set_clipboard(data.as_ptr(), len) };
     }
 }
