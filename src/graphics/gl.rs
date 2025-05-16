@@ -472,7 +472,7 @@ pub(crate) struct PipelineInternal {
     params: PipelineParams,
 }
 
-type UniformLocation = Option<GLint>;
+type UniformLocation = GLint;
 
 pub struct ShaderImage {
     gl_loc: UniformLocation,
@@ -619,21 +619,33 @@ fn load_shader_internal(
 
         glUseProgram(program);
 
-        #[rustfmt::skip]
-        let images = meta.images.iter().map(|name| ShaderImage {
-            gl_loc: get_uniform_location(program, name),
-        }).collect();
+        let images = meta
+            .images
+            .into_iter()
+            .map(|name| {
+                Ok(ShaderImage {
+                    gl_loc: get_uniform_location(program, &name)
+                        .ok_or(ShaderError::MissingUniform { uniform: name })?,
+                })
+            })
+            .collect::<Result<Vec<_>, ShaderError>>()?;
 
-        #[rustfmt::skip]
-        let uniforms = meta.uniforms.uniforms.iter().scan(0, |offset, uniform| {
-            let res = ShaderUniform {
-                gl_loc: get_uniform_location(program, &uniform.name),
-                uniform_type: uniform.uniform_type,
-                array_count: uniform.array_count as _,
-            };
-            *offset += uniform.uniform_type.size() * uniform.array_count;
-            Some(res)
-        }).collect();
+        let uniforms = meta
+            .uniforms
+            .uniforms
+            .into_iter()
+            .map(|uniform| {
+                Ok(ShaderUniform {
+                    gl_loc: get_uniform_location(program, &uniform.name).ok_or(
+                        ShaderError::MissingUniform {
+                            uniform: uniform.name,
+                        },
+                    )?,
+                    uniform_type: uniform.uniform_type,
+                    array_count: uniform.array_count as _,
+                })
+            })
+            .collect::<Result<Vec<_>, ShaderError>>()?;
 
         Ok(ShaderInternal {
             program,
@@ -1456,16 +1468,15 @@ impl RenderingBackend for GlContext {
             let bindings_image = textures
                 .get(n)
                 .unwrap_or_else(|| panic!("Image count in bindings and shader did not match!"));
-            if let Some(gl_loc) = shader_image.gl_loc {
-                let texture = self.textures.get(*bindings_image);
-                let raw = match texture.raw {
-                    TextureOrRenderbuffer::Texture(id) => id,
-                    TextureOrRenderbuffer::Renderbuffer(id) => id,
-                };
-                unsafe {
-                    self.cache.bind_texture(n, texture.params.kind.into(), raw);
-                    glUniform1i(gl_loc, n as i32);
-                }
+            let gl_loc = shader_image.gl_loc;
+            let texture = self.textures.get(*bindings_image);
+            let raw = match texture.raw {
+                TextureOrRenderbuffer::Texture(id) => id,
+                TextureOrRenderbuffer::Renderbuffer(id) => id,
+            };
+            unsafe {
+                self.cache.bind_texture(n, texture.params.kind.into(), raw);
+                glUniform1i(gl_loc, n as i32);
             }
         }
 
@@ -1557,36 +1568,35 @@ impl RenderingBackend for GlContext {
             unsafe {
                 let data = (uniform_ptr as *const f32).add(offset);
                 let data_int = (uniform_ptr as *const i32).add(offset);
+                let gl_loc = uniform.gl_loc;
 
-                if let Some(gl_loc) = uniform.gl_loc {
-                    match uniform.uniform_type {
-                        Float1 => {
-                            glUniform1fv(gl_loc, uniform.array_count, data);
-                        }
-                        Float2 => {
-                            glUniform2fv(gl_loc, uniform.array_count, data);
-                        }
-                        Float3 => {
-                            glUniform3fv(gl_loc, uniform.array_count, data);
-                        }
-                        Float4 => {
-                            glUniform4fv(gl_loc, uniform.array_count, data);
-                        }
-                        Int1 => {
-                            glUniform1iv(gl_loc, uniform.array_count, data_int);
-                        }
-                        Int2 => {
-                            glUniform2iv(gl_loc, uniform.array_count, data_int);
-                        }
-                        Int3 => {
-                            glUniform3iv(gl_loc, uniform.array_count, data_int);
-                        }
-                        Int4 => {
-                            glUniform4iv(gl_loc, uniform.array_count, data_int);
-                        }
-                        Mat4 => {
-                            glUniformMatrix4fv(gl_loc, uniform.array_count, 0, data);
-                        }
+                match uniform.uniform_type {
+                    Float1 => {
+                        glUniform1fv(gl_loc, uniform.array_count, data);
+                    }
+                    Float2 => {
+                        glUniform2fv(gl_loc, uniform.array_count, data);
+                    }
+                    Float3 => {
+                        glUniform3fv(gl_loc, uniform.array_count, data);
+                    }
+                    Float4 => {
+                        glUniform4fv(gl_loc, uniform.array_count, data);
+                    }
+                    Int1 => {
+                        glUniform1iv(gl_loc, uniform.array_count, data_int);
+                    }
+                    Int2 => {
+                        glUniform2iv(gl_loc, uniform.array_count, data_int);
+                    }
+                    Int3 => {
+                        glUniform3iv(gl_loc, uniform.array_count, data_int);
+                    }
+                    Int4 => {
+                        glUniform4iv(gl_loc, uniform.array_count, data_int);
+                    }
+                    Mat4 => {
+                        glUniformMatrix4fv(gl_loc, uniform.array_count, 0, data);
                     }
                 }
             }
