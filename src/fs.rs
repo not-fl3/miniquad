@@ -35,7 +35,7 @@ impl std::error::Error for Error {}
 pub type Response = Result<Vec<u8>, Error>;
 
 /// Filesystem path on desktops or HTTP URL in WASM
-pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
+pub fn load_file<F: FnOnce(Response) + 'static>(path: &str, on_loaded: F) {
     #[cfg(target_arch = "wasm32")]
     wasm::load_file(path, on_loaded);
 
@@ -50,7 +50,7 @@ pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
 }
 
 #[cfg(target_os = "android")]
-fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
+fn load_file_android<F: FnOnce(Response)>(path: &str, on_loaded: F) {
     fn load_file_sync(path: &str) -> Response {
         use crate::native;
 
@@ -84,7 +84,7 @@ mod wasm {
 
     thread_local! {
         #[allow(clippy::type_complexity)]
-        static FILES: RefCell<HashMap<u32, Box<dyn Fn(Response)>>> = RefCell::new(HashMap::new());
+        static FILES: RefCell<HashMap<u32, Box<dyn FnOnce(Response)>>> = RefCell::new(HashMap::new());
     }
 
     #[no_mangle]
@@ -109,7 +109,7 @@ mod wasm {
         })
     }
 
-    pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
+    pub fn load_file<F: FnOnce(Response) + 'static>(path: &str, on_loaded: F) {
         use native::wasm::fs;
         use std::ffi::CString;
 
@@ -123,7 +123,7 @@ mod wasm {
 }
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
-fn load_file_desktop<F: Fn(Response)>(path: &str, on_loaded: F) {
+fn load_file_desktop<F: FnOnce(Response)>(path: &str, on_loaded: F) {
     fn load_file_sync(path: &str) -> Response {
         use std::fs::File;
         use std::io::Read;
