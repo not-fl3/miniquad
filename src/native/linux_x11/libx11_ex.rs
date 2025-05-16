@@ -10,9 +10,9 @@ impl LibX11 {
             if !db.is_null() {
                 let mut value = XrmValue {
                     size: 0,
-                    addr: std::ptr::null_mut::<libc::c_char>(),
+                    addr: core::ptr::null_mut::<libc::c_char>(),
                 };
-                let mut type_ = std::ptr::null_mut();
+                let mut type_ = core::ptr::null_mut();
                 if (self.XrmGetResource)(
                     db,
                     b"Xft.dpi\x00".as_ptr() as _,
@@ -56,7 +56,7 @@ impl LibX11 {
         display: *mut Display,
         window: Window,
     ) -> (i32, i32) {
-        let mut attribs: XWindowAttributes = std::mem::zeroed();
+        let mut attribs: XWindowAttributes = core::mem::zeroed();
         (self.XGetWindowAttributes)(display, window, &mut attribs);
         (attribs.width, attribs.height)
     }
@@ -67,18 +67,18 @@ impl LibX11 {
         window: Window,
         title: &str,
     ) {
-        let c_title = std::ffi::CString::new(title).unwrap();
+        let c_title = alloc::ffi::CString::new(title).unwrap();
 
         (self.Xutf8SetWMProperties)(
             display,
             window,
             c_title.as_ptr(),
             c_title.as_ptr(),
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
             0 as libc::c_int,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
         );
         (self.XChangeProperty)(
             display,
@@ -179,7 +179,7 @@ impl LibX11 {
         libc::memset(
             &mut wa as *mut XSetWindowAttributes as *mut libc::c_void,
             0 as libc::c_int,
-            ::std::mem::size_of::<XSetWindowAttributes>() as _,
+            ::core::mem::size_of::<XSetWindowAttributes>() as _,
         );
         let wamask = (CWBorderPixel | CWColormap | CWEventMask) as u32;
 
@@ -235,7 +235,7 @@ impl LibX11 {
         (self.XFree)(hints as *mut libc::c_void);
 
         let class_hint = (self.XAllocClassHint)();
-        let wm_class = std::ffi::CString::new(conf.platform.linux_wm_class).unwrap();
+        let wm_class = alloc::ffi::CString::new(conf.platform.linux_wm_class).unwrap();
         (*class_hint).res_name = wm_class.as_ptr() as _;
         (*class_hint).res_class = wm_class.as_ptr() as _;
         (self.XSetClassHint)(display, window, class_hint);

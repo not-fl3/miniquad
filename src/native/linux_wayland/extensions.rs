@@ -58,7 +58,7 @@ macro_rules! wayland_interface {
             static mut events: [wl_message; $crate::count!($($event_name)*)] = [$(wl_message {
                 name: concat!($event_name, '\0').as_ptr() as _,
                 signature: concat!($event_sign, '\0').as_ptr() as _,
-                types: std::ptr::null_mut()
+                types: core::ptr::null_mut()
             }),*];
 
             pub static mut $name: wl_interface = wl_interface {

@@ -62,7 +62,7 @@ impl IosDisplay {
 
         if self.gfx_api == AppleGfxApi::OpenGl {
             crate::native::gl::load_gl_funcs(|proc| {
-                let name = std::ffi::CString::new(proc).unwrap();
+                let name = alloc::ffi::CString::new(proc).unwrap();
 
                 unsafe { get_proc_address(name.as_ptr() as _) }
             });
@@ -277,7 +277,7 @@ pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
 
 unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
     mod libc {
-        use std::ffi::{c_char, c_int, c_void};
+        use core::ffi::{c_char, c_int, c_void};
 
         pub const RTLD_LAZY: c_int = 1;
         extern "C" {
@@ -285,7 +285,7 @@ unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
             pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
         }
     }
-    static mut OPENGL: *mut std::ffi::c_void = std::ptr::null_mut();
+    static mut OPENGL: *mut core::ffi::c_void = core::ptr::null_mut();
 
     if OPENGL.is_null() {
         OPENGL = libc::dlopen(
@@ -300,7 +300,7 @@ unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
     if symbol.is_null() {
         return None;
     }
-    Some(unsafe { std::mem::transmute_copy(&symbol) })
+    Some(unsafe { core::mem::transmute_copy(&symbol) })
 }
 
 pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
@@ -576,7 +576,7 @@ pub fn define_app_delegate() -> *const Class {
                 _gles2: view._gles2,
                 state: state_original.clone(),
             });
-            let payload_ptr = Box::into_raw(payload) as *mut std::ffi::c_void;
+            let payload_ptr = Box::into_raw(payload) as *mut core::ffi::c_void;
 
             (*view.view).set_ivar("display_ptr", payload_ptr);
             (*view.view_dlg).set_ivar("display_ptr", payload_ptr);
@@ -814,7 +814,7 @@ pub fn load_file<F: Fn(crate::fs::Response) + 'static>(path: &str, on_loaded: F)
             return;
         }
         let length: usize = msg_send![file_data, length];
-        let slice = std::slice::from_raw_parts(bytes, length);
+        let slice = core::slice::from_raw_parts(bytes, length);
         on_loaded(Ok(slice.to_vec()))
     }
 }

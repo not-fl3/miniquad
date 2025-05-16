@@ -14,8 +14,8 @@ pub type EGLNativePixmapType = ::core::ffi::c_ulong;
 #[cfg(target_os = "android")]
 pub type EGLNativeWindowType = ::core::ffi::c_ulong;
 
+use core::fmt::Display;
 pub use core::ptr::null_mut;
-use std::fmt::Display;
 
 pub const EGL_SUCCESS: u32 = 12288;
 
@@ -44,7 +44,7 @@ pub type EGLDisplay = *mut ::core::ffi::c_void;
 pub type EGLConfig = *mut ::core::ffi::c_void;
 pub type EGLSurface = *mut ::core::ffi::c_void;
 pub type EGLContext = *mut ::core::ffi::c_void;
-pub type __eglMustCastToProperFunctionPointerType = ::std::option::Option<unsafe extern "C" fn()>;
+pub type __eglMustCastToProperFunctionPointerType = ::core::option::Option<unsafe extern "C" fn()>;
 
 crate::declare_module! {
     LibEgl,
@@ -153,7 +153,7 @@ pub enum EglError {
 }
 
 impl Display for EglError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::NoDisplay => write!(f, "No display"),
             Self::InitializeFailed => write!(f, "Failed to initialize context"),
@@ -168,7 +168,7 @@ pub struct Egl {}
 
 pub unsafe fn create_egl_context(
     egl: &mut LibEgl,
-    display: *mut std::ffi::c_void,
+    display: *mut core::ffi::c_void,
     alpha: bool,
     sample_count: i32,
 ) -> Result<(EGLContext, EGLConfig, EGLDisplay), EglError> {

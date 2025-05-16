@@ -5,7 +5,7 @@
 /// Will send log calls like debug!(), warn!() and error!() to appropriate console_* call on wasm
 /// and just println! on PC.
 /// If you need better control of log messages - just dont use "log-impl" feature and use appropriate loggers from log-rs
-use std::cmp;
+use core::cmp;
 
 #[repr(usize)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
@@ -194,7 +194,7 @@ pub fn __private_api_log_lit(
     &(_target, _module_path, _file, _line): &(&str, &'static str, &'static str, u32),
 ) {
     use crate::native::wasm;
-    use std::ffi::CString;
+    use alloc::ffi::CString;
 
     let log_fn = match level {
         Level::Debug => wasm::console_debug,
@@ -214,7 +214,7 @@ pub fn __private_api_log_lit(
     level: Level,
     &(_target, _module_path, _file, _line): &(&str, &'static str, &'static str, u32),
 ) {
-    use std::ffi::CString;
+    use alloc::ffi::CString;
 
     let log_fn = match level {
         Level::Debug => crate::native::android::console_debug,
