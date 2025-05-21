@@ -26,7 +26,7 @@ var blocking_event_loop = false;
 
 function init_webgl(version) {
     if (version == 1) {
-        gl = canvas.getContext("webgl");
+        gl = canvas.getContext("webgl2");
 
         function acquireVertexArrayObjectExtension(ctx) {
             // Extension available in WebGL 1 from Firefox 25 and WebKit 536.28/desktop Safari 6.0.3 onwards. Core feature in WebGL 2.
