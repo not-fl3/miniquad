@@ -402,6 +402,7 @@ pub unsafe fn superclass(this: &Object) -> &Class {
     &*(superclass as *const _)
 }
 
+#[cfg(target_os = "macos")]
 pub fn bottom_left_to_top_left(rect: NSRect) -> f64 {
     let height = unsafe { CGDisplayPixelsHigh(CGMainDisplayID()) };
     height as f64 - (rect.origin.y + rect.size.height)
