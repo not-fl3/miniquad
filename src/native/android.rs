@@ -193,10 +193,6 @@ impl MainThreadState {
                 width,
                 height,
             } => {
-                unsafe {
-                    self.update_surface(window);
-                }
-
                 {
                     let mut d = crate::native_display().lock().unwrap();
                     d.screen_width = width as _;
@@ -450,7 +446,7 @@ where
 
         let (tx, requests_rx) = std::sync::mpsc::channel();
         let clipboard = Box::new(AndroidClipboard::new());
-        crate::set_display(NativeDisplayData {
+        crate::set_or_replace_display(NativeDisplayData {
             high_dpi: conf.high_dpi,
             blocking_event_loop: conf.platform.blocking_event_loop,
             ..NativeDisplayData::new(screen_width as _, screen_height as _, tx, clipboard)
