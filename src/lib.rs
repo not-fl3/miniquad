@@ -97,6 +97,17 @@ fn set_display(display: native::NativeDisplayData) {
         .set(Mutex::new(display))
         .unwrap_or_else(|_| panic!("NATIVE_DISPLAY already set"));
 }
+/// This for now is Android specific since the process can continue running but the display
+/// is restarted. We support reinitializing the display.
+fn set_or_replace_display(display: native::NativeDisplayData) {
+    if let Some(m) = NATIVE_DISPLAY.get() {
+        // Replace existing display
+        *m.lock().unwrap() = display;
+    } else {
+        // First time initialization
+        set_display(display);
+    }
+}
 fn native_display() -> &'static Mutex<native::NativeDisplayData> {
     NATIVE_DISPLAY
         .get()
