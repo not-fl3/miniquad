@@ -284,6 +284,9 @@ impl Display for ShaderType {
 
 #[derive(Clone, Debug)]
 pub enum ShaderError {
+    MissingUniform {
+        uniform: String,
+    },
     CompilationError {
         shader_type: ShaderType,
         error_message: String,
@@ -302,6 +305,7 @@ impl From<std::ffi::NulError> for ShaderError {
 impl Display for ShaderError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::MissingUniform { uniform } => write!(f, "No such uniform:{uniform}"),
             Self::CompilationError {
                 shader_type,
                 error_message,
