@@ -137,7 +137,7 @@ impl X11Display {
                 event_handler.window_minimized_event();
             }
             22 => {
-                let mut d = crate::native_display().try_lock().unwrap();
+                let mut d = crate::native_display_nonblocking();
                 let left = event.xconfigure.x;
                 let top = event.xconfigure.y;
                 d.screen_position = (left as _, top as _);
@@ -155,7 +155,7 @@ impl X11Display {
             // ClientMessage
             33 => match event.xclient.message_type {
                 t if t == self.libx11.extensions.wm_protocols => {
-                    let mut d = crate::native_display().try_lock().unwrap();
+                    let mut d = crate::native_display_nonblocking();
                     let protocol = event.xclient.data.l[0 as libc::c_int as usize] as Atom;
                     if protocol == self.libx11.extensions.wm_delete_window {
                         d.quit_requested = true;
@@ -235,11 +235,11 @@ impl X11Display {
             _ => {}
         };
 
-        let d = crate::native_display().try_lock().unwrap();
+        let d = crate::native_display_nonblocking();
         if d.quit_requested && !d.quit_ordered {
             drop(d);
             event_handler.quit_requested_event();
-            let mut d = crate::native_display().try_lock().unwrap();
+            let mut d = crate::native_display_nonblocking();
             if d.quit_requested {
                 d.quit_ordered = true
             }
@@ -481,7 +481,7 @@ where
 
     let mut event_handler = (f.take().unwrap())();
 
-    while !crate::native_display().try_lock().unwrap().quit_ordered {
+    while !crate::native_display_nonblocking().quit_ordered {
         while let Ok(request) = rx.try_recv() {
             display.process_request(request);
         }
@@ -593,7 +593,7 @@ where
 
     let mut event_handler = (f.take().unwrap())();
 
-    while !crate::native_display().try_lock().unwrap().quit_ordered {
+    while !crate::native_display_nonblocking().quit_ordered {
         while let Ok(request) = rx.try_recv() {
             display.process_request(request);
         }
