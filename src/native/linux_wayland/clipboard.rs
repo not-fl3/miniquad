@@ -33,7 +33,7 @@ impl ClipboardContext {
     unsafe fn get_clipboard(&mut self, mime_type: &str) -> Option<Vec<u8>> {
         self.data_offer.map(|data_offer| {
             let display: &mut WaylandPayload = &mut *self.display;
-            let mime_type = std::ffi::CString::new(mime_type).unwrap();
+            let mime_type = alloc::ffi::CString::new(mime_type).unwrap();
             display
                 .client
                 .data_offer_receive(display.display, data_offer, mime_type.as_ptr())
@@ -48,7 +48,7 @@ impl ClipboardContext {
         if let Some(serial) = display.keyboard_context.enter_serial {
             let data_source = self.new_data_source();
             // only support copying utf8 strings
-            let mime_type = std::ffi::CString::new("UTF8_STRING").unwrap();
+            let mime_type = alloc::ffi::CString::new("UTF8_STRING").unwrap();
             wl_request!(
                 display.client,
                 data_source,
@@ -157,7 +157,7 @@ impl WaylandClipboard {
 impl crate::native::Clipboard for WaylandClipboard {
     fn get(&mut self) -> Option<String> {
         let bytes = unsafe { CLIPBOARD.get_mut().unwrap().get_clipboard("UTF8_STRING")? };
-        Some(std::str::from_utf8(&bytes).ok()?.to_string())
+        Some(core::str::from_utf8(&bytes).ok()?.to_string())
     }
     fn set(&mut self, data: &str) {
         unsafe {

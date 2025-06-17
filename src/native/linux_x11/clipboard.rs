@@ -65,7 +65,7 @@ pub(crate) unsafe fn get_property_bytes(
     property: Atom,
 ) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut buf = std::ptr::null_mut::<libc::c_char>();
+    let mut buf = core::ptr::null_mut::<libc::c_char>();
     let mut size: libc::c_ulong = 0;
     let mut actual_type = 0 as Atom;
     let mut actual_format: libc::c_int = 0;
@@ -96,12 +96,12 @@ pub(crate) unsafe fn get_property_bytes(
             return bytes;
         } else {
             let n_bits = match actual_format {
-                8 => std::mem::size_of::<libc::c_char>(),
-                16 => std::mem::size_of::<libc::c_int>(),
-                32 => std::mem::size_of::<libc::c_long>(),
+                8 => core::mem::size_of::<libc::c_char>(),
+                16 => core::mem::size_of::<libc::c_int>(),
+                32 => core::mem::size_of::<libc::c_long>(),
                 _ => unreachable!(),
             };
-            bytes.extend(std::slice::from_raw_parts(
+            bytes.extend(core::slice::from_raw_parts(
                 buf as *const _,
                 n_bits * size as usize,
             ));
@@ -231,7 +231,7 @@ impl crate::native::Clipboard for X11Clipboard {
         let utf8_string = self.libx11.extensions.utf8_string;
         let bytes =
             unsafe { get_clipboard(&mut self.libx11, self.display, self.window, utf8_string)? };
-        Some(std::str::from_utf8(&bytes).ok()?.to_string())
+        Some(core::str::from_utf8(&bytes).ok()?.to_string())
     }
 
     fn set(&mut self, data: &str) {
