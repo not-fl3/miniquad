@@ -162,7 +162,7 @@ class QuadSurface
             int character = event.getUnicodeChar();
             if (character == 0) {
                 String characters = event.getCharacters();
-                if (characters != null && characters.length() >= 0) {
+                if (characters != null && !characters.isEmpty()) {
                     character = characters.charAt(0);
                 }
             }
@@ -348,9 +348,12 @@ public class MainActivity extends Activity {
     public String getClipboardText() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
 
-        if (clipboard == null || !clipboard.hasPrimaryClip()) {
+        if (!clipboard.hasPrimaryClip())
             return null;
-        }
+
+        ClipData primaryClip = clipboard.getPrimaryClip();
+        if (primaryClip == null || primaryClip.getItemCount() < 1)
+            return null;
 
         CharSequence clipData = clipboard.getPrimaryClip().getItemAt(0).getText();
         if (clipData == null) {
