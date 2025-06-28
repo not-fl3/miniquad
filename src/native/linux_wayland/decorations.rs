@@ -84,7 +84,7 @@ impl Decorations {
         xdg_toplevel: *mut xdg_toplevel,
         title: &str,
     ) {
-        let title = std::ffi::CString::new(title).unwrap();
+        let title = alloc::ffi::CString::new(title).unwrap();
         match self {
             Decorations::None | Decorations::Server | Decorations::Fallback(..) => {
                 wl_request!(
@@ -171,7 +171,7 @@ impl Decorations {
 }
 
 unsafe extern "C" fn xdg_surface_handle_configure(
-    data: *mut std::ffi::c_void,
+    data: *mut core::ffi::c_void,
     xdg_surface: *mut extensions::xdg_shell::xdg_surface,
     serial: u32,
 ) {
@@ -187,7 +187,7 @@ unsafe extern "C" fn xdg_surface_handle_configure(
     wl_request!(payload.client, payload.surface, WL_SURFACE_COMMIT)
 }
 
-unsafe extern "C" fn handle_configure(data: *mut std::ffi::c_void, width: i32, height: i32) {
+unsafe extern "C" fn handle_configure(data: *mut core::ffi::c_void, width: i32, height: i32) {
     assert!(!data.is_null());
     let payload: &mut WaylandPayload = &mut *(data as *mut _);
 
@@ -237,7 +237,7 @@ unsafe extern "C" fn handle_configure(data: *mut std::ffi::c_void, width: i32, h
 }
 
 unsafe extern "C" fn xdg_toplevel_handle_configure(
-    data: *mut std::ffi::c_void,
+    data: *mut core::ffi::c_void,
     _toplevel: *mut extensions::xdg_shell::xdg_toplevel,
     width: i32,
     height: i32,
@@ -277,7 +277,7 @@ unsafe extern "C" fn libdecor_frame_handle_configure(
 }
 
 unsafe extern "C" fn xdg_toplevel_handle_close(
-    _data: *mut std::ffi::c_void,
+    _data: *mut core::ffi::c_void,
     _xdg_toplevel: *mut extensions::xdg_shell::xdg_toplevel,
 ) {
     crate::native_display().try_lock().unwrap().quit_requested = true;

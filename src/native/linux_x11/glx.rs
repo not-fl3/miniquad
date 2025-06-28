@@ -153,10 +153,10 @@ impl LibGlx {
 
     pub unsafe fn get_procaddr(&self, procname: &str) -> Option<unsafe extern "C" fn() -> ()> {
         if self.glxGetProcAddress.is_some() {
-            let name = std::ffi::CString::new(procname).unwrap();
+            let name = alloc::ffi::CString::new(procname).unwrap();
             self.glxGetProcAddress.expect("non-null function pointer")(name.as_ptr() as _)
         } else if self.glxGetProcAddressARB.is_some() {
-            let name = std::ffi::CString::new(procname).unwrap();
+            let name = alloc::ffi::CString::new(procname).unwrap();
             self.glxGetProcAddressARB
                 .expect("non-null function pointer")(name.as_ptr() as _)
         } else {
@@ -241,7 +241,7 @@ impl Glx {
         }
 
         let exts = (libgl.glxQueryExtensionsString.unwrap())(display, screen);
-        let extensions = std::ffi::CStr::from_ptr(exts).to_str().unwrap().to_owned();
+        let extensions = core::ffi::CStr::from_ptr(exts).to_str().unwrap().to_owned();
 
         let multisample = extensions.contains("GLX_ARB_multisample");
         // let glx_ARB_framebuffer_sRGB =
@@ -289,18 +289,18 @@ impl Glx {
         };
         if extensions_string.contains("GLX_EXT_swap_control") {
             extensions.glxSwapIntervalExt =
-                std::mem::transmute_copy(&libgl.get_procaddr("glXSwapIntervalEXT"));
+                core::mem::transmute_copy(&libgl.get_procaddr("glXSwapIntervalEXT"));
         }
         if extensions_string.contains("GLX_MESA_swap_control") {
             extensions.glxSwapIntervalMesa =
-                std::mem::transmute_copy(&libgl.get_procaddr("glXSwapIntervalMESA"));
+                core::mem::transmute_copy(&libgl.get_procaddr("glXSwapIntervalMESA"));
         }
 
         if extensions_string.contains("GLX_ARB_create_context")
             && extensions_string.contains("GLX_ARB_create_context_profile")
         {
             extensions.glxCreateContextAttribsARB =
-                std::mem::transmute_copy(&libgl.get_procaddr("glXCreateContextAttribsARB"))
+                core::mem::transmute_copy(&libgl.get_procaddr("glXCreateContextAttribsARB"))
         };
 
         Ok(Glx {
@@ -336,7 +336,7 @@ impl Glx {
         let glx_ctx = self.extensions.glxCreateContextAttribsARB.unwrap()(
             display,
             self.fbconfig,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
             true as _,
             attribs.as_ptr(),
         );
@@ -344,7 +344,7 @@ impl Glx {
         // _sapp_x11_release_error_handler(libx11);
 
         let glx_window =
-            self.libgl.glxCreateWindow.unwrap()(display, self.fbconfig, window, std::ptr::null());
+            self.libgl.glxCreateWindow.unwrap()(display, self.fbconfig, window, core::ptr::null());
         assert!(glx_window != 0, "GLX: failed to create window");
 
         (glx_ctx, glx_window)
@@ -501,7 +501,7 @@ pub unsafe extern "C" fn gl_choose_fbconfig(
     let mut extra_diff;
     let mut least_extra_diff: i32 = 10000000;
     let mut current: *const GLFBConfig;
-    let mut closest = std::ptr::null();
+    let mut closest = core::ptr::null();
 
     for i in 0..count as i32 {
         current = alternatives.offset(i as isize);

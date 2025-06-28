@@ -94,7 +94,7 @@ impl LibXi {
         let mut mask = XI_RawMotionMask;
         let mut masks = XIEventMask {
             deviceid: XIAllDevices,
-            mask_len: ::std::mem::size_of::<libc::c_int>() as _,
+            mask_len: ::core::mem::size_of::<libc::c_int>() as _,
             mask: &mut mask as *mut _ as *mut _,
         };
 

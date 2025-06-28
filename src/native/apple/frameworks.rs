@@ -10,6 +10,7 @@
 #![allow(dead_code)]
 
 pub use {
+    core::{ffi::c_void, ptr::NonNull},
     objc::{
         class,
         declare::ClassDecl,
@@ -17,7 +18,6 @@ pub use {
         runtime::{Class, Object, Sel, BOOL, NO, YES},
         sel, sel_impl, Encode, Encoding,
     },
-    std::{ffi::c_void, ptr::NonNull},
 };
 
 //use bitflags::bitflags;

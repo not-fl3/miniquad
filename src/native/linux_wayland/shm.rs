@@ -20,7 +20,7 @@ unsafe extern "C" fn create_tmpfile_cloexec(tmpname: *mut libc::c_char) -> libc:
 unsafe extern "C" fn create_anonymous_file(size: usize) -> libc::c_int {
     let xdg_folder_path = std::env::var("XDG_RUNTIME_DIR").expect("XDG_RUNTIME_DIR not set");
     let filepath = format!("{}/miniquad-shared-XXXXXX", xdg_folder_path);
-    let c_filepath = std::ffi::CString::new(filepath).unwrap();
+    let c_filepath = alloc::ffi::CString::new(filepath).unwrap();
     let fd = create_tmpfile_cloexec(c_filepath.as_ptr() as _);
 
     if fd < 0 {
@@ -51,7 +51,7 @@ pub unsafe fn create_shm_buffer(
         panic!("Failed to create temporary file");
     }
     let data = libc::mmap(
-        std::ptr::null_mut(),
+        core::ptr::null_mut(),
         length as _,
         libc::PROT_READ | libc::PROT_WRITE,
         libc::MAP_SHARED,

@@ -837,7 +837,7 @@ macro_rules! declare_atoms {
             pub unsafe fn load(libx11: &mut LibX11, display: *mut Display) -> Self {
                 Self {
                     $($name: {
-                        let atom = std::ffi::CString::new($atom).unwrap();
+                        let atom = alloc::ffi::CString::new($atom).unwrap();
                         (libx11.XInternAtom)(display, atom.as_ptr(), false as _)
                     },)*
                 }

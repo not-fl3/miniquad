@@ -202,19 +202,19 @@ pub struct Wgl {
 }
 
 unsafe fn get_wgl_proc_address<T>(libopengl32: &mut LibOpengl32, proc: &str) -> Option<T> {
-    let proc = std::ffi::CString::new(proc).unwrap();
+    let proc = alloc::ffi::CString::new(proc).unwrap();
     let proc = (libopengl32.wglGetProcAddress)(proc.as_ptr() as *const _);
 
     if proc.is_null() {
         return None;
     }
-    Some(std::mem::transmute_copy(&proc))
+    Some(core::mem::transmute_copy(&proc))
 }
 
 impl Wgl {
     pub(crate) unsafe fn new(display: &mut WindowsDisplay) -> Wgl {
-        let mut pfd: PIXELFORMATDESCRIPTOR = std::mem::zeroed();
-        pfd.nSize = std::mem::size_of_val(&pfd) as _;
+        let mut pfd: PIXELFORMATDESCRIPTOR = core::mem::zeroed();
+        pfd.nSize = core::mem::size_of_val(&pfd) as _;
         pfd.nVersion = 1;
         pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
         pfd.iPixelType = PFD_TYPE_RGBA;
@@ -251,7 +251,7 @@ impl Wgl {
                 let extensions = getExtensionsStringEXT();
 
                 if !extensions.is_null() {
-                    let extensions_string = std::ffi::CStr::from_ptr(extensions).to_string_lossy();
+                    let extensions_string = core::ffi::CStr::from_ptr(extensions).to_string_lossy();
                     if extensions_string.contains(ext) {
                         return true;
                     }
@@ -261,7 +261,7 @@ impl Wgl {
             if let Some(getExtensionsStringARB) = GetExtensionsStringARB {
                 let extensions = getExtensionsStringARB((display.libopengl32.wglGetCurrentDC)());
                 if !extensions.is_null() {
-                    let extensions_string = std::ffi::CStr::from_ptr(extensions).to_string_lossy();
+                    let extensions_string = core::ffi::CStr::from_ptr(extensions).to_string_lossy();
 
                     if extensions_string.contains(ext) {
                         return true;
@@ -384,11 +384,11 @@ impl Wgl {
         if 0 == pixel_format {
             panic!("WGL: Didn't find matching pixel format.");
         }
-        let mut pfd: PIXELFORMATDESCRIPTOR = std::mem::zeroed();
+        let mut pfd: PIXELFORMATDESCRIPTOR = core::mem::zeroed();
         if DescribePixelFormat(
             display.dc,
             pixel_format as _,
-            std::mem::size_of_val(&pfd) as _,
+            core::mem::size_of_val(&pfd) as _,
             &mut pfd as *mut _ as _,
         ) == 0
         {
@@ -422,7 +422,7 @@ impl Wgl {
         ];
         let mut gl_ctx = self.CreateContextAttribsARB.unwrap()(
             display.dc,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
             attrs.as_ptr() as *const _,
         );
 
@@ -441,7 +441,7 @@ impl Wgl {
             ];
             gl_ctx = self.CreateContextAttribsARB.unwrap()(
                 display.dc,
-                std::ptr::null_mut(),
+                core::ptr::null_mut(),
                 attrs.as_ptr() as *const _,
             );
         }

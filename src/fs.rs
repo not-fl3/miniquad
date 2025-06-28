@@ -18,8 +18,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
             Self::IOError(e) => write!(f, "I/O error: {e}"),
             Self::DownloadFailed => write!(f, "Download failed"),
@@ -54,15 +54,15 @@ fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
     fn load_file_sync(path: &str) -> Response {
         use crate::native;
 
-        let filename = std::ffi::CString::new(path).unwrap();
+        let filename = alloc::ffi::CString::new(path).unwrap();
 
-        let mut data: native::android_asset = unsafe { std::mem::zeroed() };
+        let mut data: native::android_asset = unsafe { core::mem::zeroed() };
 
         unsafe { native::android::load_asset(filename.as_ptr(), &mut data as _) };
 
         if data.content.is_null() == false {
             let slice =
-                unsafe { std::slice::from_raw_parts(data.content, data.content_length as _) };
+                unsafe { core::slice::from_raw_parts(data.content, data.content_length as _) };
             let response = slice.iter().map(|c| *c as _).collect::<Vec<_>>();
             Ok(response)
         } else {
@@ -110,8 +110,8 @@ mod wasm {
     }
 
     pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
+        use alloc::ffi::CString;
         use native::wasm::fs;
-        use std::ffi::CString;
 
         let url = CString::new(path).unwrap();
         let file_id = unsafe { fs::fs_load_file(url.as_ptr(), url.as_bytes().len() as u32) };

@@ -14,8 +14,8 @@ pub fn nsstring_to_string(string: ObjcId) -> String {
     unsafe {
         let utf8_string: *const core::ffi::c_uchar = msg_send![string, UTF8String];
         let utf8_len: usize = msg_send![string, lengthOfBytesUsingEncoding: UTF8_ENCODING];
-        let slice = std::slice::from_raw_parts(utf8_string, utf8_len);
-        std::str::from_utf8_unchecked(slice).to_owned()
+        let slice = core::slice::from_raw_parts(utf8_string, utf8_len);
+        core::str::from_utf8_unchecked(slice).to_owned()
     }
 }
 
@@ -67,7 +67,7 @@ pub unsafe fn cfstring_ref_to_string(cfstring: CFStringRef) -> String {
         kCFStringEncodingUTF8,
         0,
         false,
-        std::ptr::null_mut::<u8>(),
+        core::ptr::null_mut::<u8>(),
         0,
         &mut num_bytes,
     );
@@ -83,7 +83,7 @@ pub unsafe fn cfstring_ref_to_string(cfstring: CFStringRef) -> String {
         false,
         buffer.as_mut_ptr(),
         num_bytes,
-        std::ptr::null_mut::<u64>(),
+        core::ptr::null_mut::<u64>(),
     );
     String::from_utf8(buffer).unwrap_or_default()
 }

@@ -422,7 +422,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
 
 unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
     mod libc {
-        use std::ffi::{c_char, c_int, c_void};
+        use core::ffi::{c_char, c_int, c_void};
 
         pub const RTLD_LAZY: c_int = 1;
         extern "C" {
@@ -430,7 +430,7 @@ unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
             pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
         }
     }
-    static mut OPENGL: *mut std::ffi::c_void = std::ptr::null_mut();
+    static mut OPENGL: *mut core::ffi::c_void = core::ptr::null_mut();
 
     if OPENGL.is_null() {
         OPENGL = libc::dlopen(
@@ -445,7 +445,7 @@ unsafe fn get_proc_address(name: *const u8) -> Option<unsafe extern "C" fn()> {
     if symbol.is_null() {
         return None;
     }
-    Some(unsafe { std::mem::transmute_copy(&symbol) })
+    Some(unsafe { core::mem::transmute_copy(&symbol) })
 }
 
 // methods for both metal or OPENGL view
@@ -933,7 +933,7 @@ unsafe fn set_icon(ns_app: ObjcId, icon: &Icon) {
         rgb,
         kCGBitmapByteOrderDefault | kCGImageAlphaLast,
         provider,
-        std::ptr::null(),
+        core::ptr::null(),
         false,
         kCGRenderingIntentDefault,
     );
@@ -1056,9 +1056,9 @@ where
     });
 
     let mut display = MacosDisplay {
-        view: std::ptr::null_mut(),
-        window: std::ptr::null_mut(),
-        gl_context: std::ptr::null_mut(),
+        view: core::ptr::null_mut(),
+        window: core::ptr::null_mut(),
+        gl_context: core::ptr::null_mut(),
         fullscreen: false,
         occluded: false,
         cursor_shown: true,
@@ -1147,7 +1147,7 @@ where
         msg_send_![display.gl_context, makeCurrentContext];
 
         gl::load_gl_funcs(|proc| {
-            let name = std::ffi::CString::new(proc).unwrap();
+            let name = alloc::ffi::CString::new(proc).unwrap();
 
             get_proc_address(name.as_ptr() as _)
         });
