@@ -169,6 +169,10 @@ pub struct Platform {
     // for most purposes they are the same so we just use class name for simplicity
     // https://unix.stackexchange.com/questions/494169/
     pub linux_wm_class: &'static str,
+
+    /// Whether to automatically setup the panic hook for Android.
+    /// Set this to false if your app does its own panic_hook setup to avoid conflicts.
+    pub android_panic_hook: bool,
 }
 
 impl Default for Platform {
@@ -183,6 +187,7 @@ impl Default for Platform {
             framebuffer_alpha: false,
             wayland_decorations: WaylandDecorations::default(),
             linux_wm_class: "miniquad-application",
+            android_panic_hook: true,
         }
     }
 }
