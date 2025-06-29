@@ -369,7 +369,7 @@ pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    {
+    if conf.platform.android_panic_hook {
         use std::ffi::CString;
         use std::panic;
 
