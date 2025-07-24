@@ -520,6 +520,7 @@ unsafe extern "system" fn win32_wndproc(
             let num_drops = DragQueryFileW(hdrop, u32::MAX, std::ptr::null_mut(), 0);
 
             let mut d = crate::native_display().lock().unwrap();
+            d.dropped_files = Default::default();
             for i in 0..num_drops {
                 let path_ptr = path.as_mut_ptr() as *mut u16;
                 let path_len = DragQueryFileW(hdrop, i, path_ptr, MAX_PATH as u32) as usize;
