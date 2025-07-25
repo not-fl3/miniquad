@@ -2,11 +2,11 @@
 
 use std::sync::mpsc;
 
-#[derive(Default)]
-pub(crate) struct DroppedFiles {
-    pub paths: Vec<std::path::PathBuf>,
-    pub bytes: Vec<Vec<u8>>,
+pub(crate) struct DroppedFile {
+    pub path: std::path::PathBuf,
+    pub bytes: Vec<u8>,
 }
+
 pub(crate) struct NativeDisplayData {
     pub screen_width: i32,
     pub screen_height: i32,
@@ -17,7 +17,7 @@ pub(crate) struct NativeDisplayData {
     pub quit_ordered: bool,
     pub native_requests: mpsc::Sender<Request>,
     pub clipboard: Box<dyn Clipboard>,
-    pub dropped_files: DroppedFiles,
+    pub dropped_files: Vec<DroppedFile>,
     pub blocking_event_loop: bool,
 
     #[cfg(target_vendor = "apple")]

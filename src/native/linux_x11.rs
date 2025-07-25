@@ -11,7 +11,7 @@ mod xi_input;
 
 use crate::{
     event::EventHandler,
-    native::{egl, gl, module, NativeDisplayData, Request},
+    native::{egl, gl, module, DroppedFile, NativeDisplayData, Request},
     CursorIcon,
 };
 
@@ -203,8 +203,7 @@ impl X11Display {
                         for filename in filenames.lines() {
                             let path = std::path::PathBuf::from(filename);
                             if let Ok(bytes) = std::fs::read(&path) {
-                                d.dropped_files.paths.push(path);
-                                d.dropped_files.bytes.push(bytes);
+                                d.dropped_files.push(DroppedFile { path, bytes });
                             }
                         }
                         // drop d since files_dropped_event is likely to need access to it

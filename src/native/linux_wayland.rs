@@ -18,7 +18,7 @@ use libxkbcommon::*;
 
 use crate::{
     event::{EventHandler, KeyCode, KeyMods, MouseButton},
-    native::{egl, NativeDisplayData, Request},
+    native::{egl, DroppedFile, NativeDisplayData, Request},
 };
 
 use core::time::Duration;
@@ -1277,8 +1277,7 @@ where
                         for filename in filenames.lines() {
                             let path = std::path::PathBuf::from(filename);
                             if let Ok(bytes) = std::fs::read(&path) {
-                                d.dropped_files.paths.push(path);
-                                d.dropped_files.bytes.push(bytes);
+                                d.dropped_files.push(DroppedFile { path, bytes });
                             }
                         }
                         // drop d since files_dropped_event is likely to need access to it
