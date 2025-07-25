@@ -53,6 +53,7 @@ pub(crate) struct WindowsDisplay {
     event_handler: Option<Box<dyn EventHandler>>,
     modal_resizing_timer: usize,
     update_requested: bool,
+    opt_min_client_size: Option<(i32, i32)>,
 }
 
 impl WindowsDisplay {
@@ -286,6 +287,18 @@ unsafe extern "system" fn win32_wndproc(
     let event_handler = payload.event_handler.as_mut().unwrap();
 
     match umsg {
+        WM_GETMINMAXINFO => {
+            let minmax = lparam as *mut MINMAXINFO;
+            if !minmax.is_null() {
+                if let Some(min_client_size) = payload.opt_min_client_size {
+                    let calculated_win_attribs = determine_window_size_from_client_size(min_client_size.0, min_client_size.1, payload.fullscreen, payload.window_resizable);
+                    // Set minimum tracking size (when user resizes)
+                    (*minmax).ptMinTrackSize.x = calculated_win_attribs.win_width;
+                    (*minmax).ptMinTrackSize.y = calculated_win_attribs.win_height;
+                }
+            }
+            return 0;
+        },
         WM_CLOSE => {
             let mut d = crate::native_display().lock().unwrap();
             // only give user a chance to intervene when sapp_quit() wasn't already called
@@ -635,26 +648,14 @@ unsafe fn set_icon(wnd: HWND, icon: &Icon) {
     }
 }
 
-unsafe fn create_window(
-    window_title: &str,
-    fullscreen: bool,
-    resizable: bool,
-    width: i32,
-    height: i32,
-) -> (HWND, HDC) {
-    let mut wndclassw: WNDCLASSW = std::mem::zeroed();
+struct CalculatedWindowAttributes {
+    pub win_style: DWORD,
+    pub win_ex_style: DWORD,
+    pub win_width: i32,
+    pub win_height: i32,
+}
 
-    wndclassw.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-    wndclassw.lpfnWndProc = Some(win32_wndproc);
-    wndclassw.hInstance = GetModuleHandleW(NULL as _);
-    wndclassw.hCursor = LoadCursorW(NULL as _, IDC_ARROW);
-    wndclassw.hIcon = LoadIconW(NULL as _, IDI_WINLOGO);
-    wndclassw.hbrBackground = GetStockObject(BLACK_BRUSH as i32) as HBRUSH;
-    let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
-    wndclassw.lpszClassName = class_name.as_ptr() as _;
-    wndclassw.cbWndExtra = std::mem::size_of::<*mut std::ffi::c_void>() as i32;
-    RegisterClassW(&wndclassw);
-
+unsafe fn determine_window_size_from_client_size(client_width: i32, client_height: i32, fullscreen: bool, resizable: bool) -> CalculatedWindowAttributes {
     let win_style: DWORD;
     let win_ex_style: DWORD = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
     let mut rect = RECT {
@@ -681,25 +682,56 @@ unsafe fn create_window(
             WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
         };
 
-        rect.right = width;
-        rect.bottom = height;
+        rect.right = client_width;
+        rect.bottom = client_height;
     }
 
     AdjustWindowRectEx(&rect as *const _ as _, win_style, false as _, win_ex_style);
+
     let win_width = rect.right - rect.left;
     let win_height = rect.bottom - rect.top;
+    return CalculatedWindowAttributes {
+        win_style: win_style,
+        win_ex_style: win_ex_style,
+        win_width,
+        win_height,
+    };
+}
+
+unsafe fn create_window(
+    window_title: &str,
+    fullscreen: bool,
+    resizable: bool,
+    width: i32,
+    height: i32,
+) -> (HWND, HDC) {
+    let mut wndclassw: WNDCLASSW = std::mem::zeroed();
+
+    wndclassw.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+    wndclassw.lpfnWndProc = Some(win32_wndproc);
+    wndclassw.hInstance = GetModuleHandleW(NULL as _);
+    wndclassw.hCursor = LoadCursorW(NULL as _, IDC_ARROW);
+    wndclassw.hIcon = LoadIconW(NULL as _, IDI_WINLOGO);
+    wndclassw.hbrBackground = GetStockObject(BLACK_BRUSH as i32) as HBRUSH;
+    let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
+    wndclassw.lpszClassName = class_name.as_ptr() as _;
+    wndclassw.cbWndExtra = std::mem::size_of::<*mut std::ffi::c_void>() as i32;
+    RegisterClassW(&wndclassw);
+
+    let calculated_win_attribs = determine_window_size_from_client_size(width, height, fullscreen, resizable);
+
     let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
     let mut window_name = window_title.encode_utf16().collect::<Vec<u16>>();
     window_name.push(0);
     let hwnd = CreateWindowExW(
-        win_ex_style,                // dwExStyle
+        calculated_win_attribs.win_ex_style,                // dwExStyle
         class_name.as_ptr(),         // lpClassName
         window_name.as_ptr(),        // lpWindowName
-        win_style,                   // dwStyle
+        calculated_win_attribs.win_style,                   // dwStyle
         CW_USEDEFAULT,               // X
         CW_USEDEFAULT,               // Y
-        win_width,                   // nWidth
-        win_height,                  // nHeight
+        calculated_win_attribs.win_width,                   // nWidth
+        calculated_win_attribs.win_height,                  // nHeight
         NULL as _,                   // hWndParent
         NULL as _,                   // hMenu
         GetModuleHandleW(NULL as _), // hInstance
@@ -925,6 +957,7 @@ where
             event_handler: None,
             modal_resizing_timer: 0,
             update_requested: true,
+            opt_min_client_size: Some((conf.window_width, conf.window_height)),
         };
         display.init_dpi(conf.high_dpi);
 

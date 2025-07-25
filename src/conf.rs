@@ -221,6 +221,9 @@ pub struct Conf {
     /// If `true`, the user can resize the window.
     pub window_resizable: bool,
 
+    /// if `Some((width, height))`, the window will not be smaller than the specified size (Works only with Windows currently).
+    pub min_window_size: Option<(i32, i32)>,
+
     /// Optional icon data used by the OS where applicable:
     /// - On Windows, taskbar/title bar icon
     /// - On macOS, Dock/title bar icon
@@ -274,6 +277,7 @@ impl Default for Conf {
             fullscreen: false,
             sample_count: 1,
             window_resizable: true,
+            min_window_size: None,
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
         }
