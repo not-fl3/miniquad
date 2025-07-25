@@ -298,15 +298,15 @@ pub mod window {
     }
     pub fn dropped_file_count() -> usize {
         let d = native_display().lock().unwrap();
-        d.dropped_files.bytes.len()
+        d.dropped_files.len()
     }
     pub fn dropped_file_bytes(index: usize) -> Option<Vec<u8>> {
         let d = native_display().lock().unwrap();
-        d.dropped_files.bytes.get(index).cloned()
+        d.dropped_files.get(index).map(|file| file.bytes.clone())
     }
     pub fn dropped_file_path(index: usize) -> Option<std::path::PathBuf> {
         let d = native_display().lock().unwrap();
-        d.dropped_files.paths.get(index).cloned()
+        d.dropped_files.get(index).map(|file| file.path.clone())
     }
 
     /// Show/hide onscreen keyboard.
