@@ -1233,9 +1233,9 @@ impl OSError {
         })
     }
 
-    pub fn from_nserror(ns_error: ObjcId) -> Result<(), Self> {
+    pub unsafe fn from_nserror(ns_error: ObjcId) -> Result<(), Self> {
         if ns_error != nil {
-            let code: i32 = unsafe { msg_send![ns_error, code] };
+            let code: i32 = msg_send![ns_error, code];
             Self::from(code)
         } else {
             Ok(())

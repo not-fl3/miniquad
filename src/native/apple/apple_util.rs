@@ -10,13 +10,11 @@ use crate::{
     CursorIcon,
 };
 
-pub fn nsstring_to_string(string: ObjcId) -> String {
-    unsafe {
-        let utf8_string: *const core::ffi::c_uchar = msg_send![string, UTF8String];
-        let utf8_len: usize = msg_send![string, lengthOfBytesUsingEncoding: UTF8_ENCODING];
-        let slice = std::slice::from_raw_parts(utf8_string, utf8_len);
-        std::str::from_utf8_unchecked(slice).to_owned()
-    }
+pub unsafe fn nsstring_to_string(string: ObjcId) -> String {
+    let utf8_string: *const core::ffi::c_uchar = msg_send![string, UTF8String];
+    let utf8_len: usize = msg_send![string, lengthOfBytesUsingEncoding: UTF8_ENCODING];
+    let slice = std::slice::from_raw_parts(utf8_string, utf8_len);
+    std::str::from_utf8_unchecked(slice).to_owned()
 }
 
 pub fn str_to_nsstring(str: &str) -> ObjcId {
@@ -50,7 +48,7 @@ pub fn load_undocumented_cursor(cursor_name: &str) -> ObjcId {
 }
 
 pub unsafe fn ccfstr_from_str(inp: &str) -> CFStringRef {
-    let null = format!("{}\0", inp);
+    let null = format!("{inp}\0");
     __CFStringMakeConstantString(null.as_ptr() as *const ::core::ffi::c_char)
 }
 
@@ -124,23 +122,21 @@ pub fn load_webkit_cursor(cursor_name_str: &str) -> ObjcId {
     }
 }
 
-pub fn get_event_char(event: ObjcId) -> Option<char> {
-    unsafe {
-        let characters: ObjcId = msg_send![event, characters];
-        if characters == nil {
-            return None;
-        }
-        let chars = nsstring_to_string(characters);
-
-        if chars.is_empty() {
-            return None;
-        }
-        Some(chars.chars().next().unwrap())
+pub unsafe fn get_event_char(event: ObjcId) -> Option<char> {
+    let characters: ObjcId = msg_send![event, characters];
+    if characters == nil {
+        return None;
     }
+    let chars = nsstring_to_string(characters);
+
+    if chars.is_empty() {
+        return None;
+    }
+    Some(chars.chars().next().unwrap())
 }
 
-pub fn get_event_key_modifier(event: ObjcId) -> KeyMods {
-    let flags: u64 = unsafe { msg_send![event, modifierFlags] };
+pub unsafe fn get_event_key_modifier(event: ObjcId) -> KeyMods {
+    let flags: u64 = msg_send![event, modifierFlags];
     KeyMods {
         shift: flags & NSEventModifierFlags::NSShiftKeyMask as u64 != 0,
         ctrl: flags & NSEventModifierFlags::NSControlKeyMask as u64 != 0,
@@ -149,8 +145,8 @@ pub fn get_event_key_modifier(event: ObjcId) -> KeyMods {
     }
 }
 
-pub fn get_event_keycode(event: ObjcId) -> Option<KeyCode> {
-    let scan_code: core::ffi::c_ushort = unsafe { msg_send![event, keyCode] };
+pub unsafe fn get_event_keycode(event: ObjcId) -> Option<KeyCode> {
+    let scan_code: core::ffi::c_ushort = msg_send![event, keyCode];
 
     Some(match scan_code {
         0x00 => KeyCode::A,

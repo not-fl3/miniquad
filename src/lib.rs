@@ -99,6 +99,7 @@ fn set_display(display: native::NativeDisplayData) {
 }
 /// This for now is Android specific since the process can continue running but the display
 /// is restarted. We support reinitializing the display.
+#[allow(dead_code)]
 fn set_or_replace_display(display: native::NativeDisplayData) {
     if let Some(m) = NATIVE_DISPLAY.get() {
         // Replace existing display

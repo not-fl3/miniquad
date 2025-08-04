@@ -543,15 +543,15 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
 
     extern "C" fn key_down(this: &Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
-        let mods = get_event_key_modifier(event);
+        let mods = unsafe { get_event_key_modifier(event) };
         let repeat: bool = unsafe { msg_send!(event, isARepeat) };
-        if let Some(key) = get_event_keycode(event) {
+        if let Some(key) = unsafe { get_event_keycode(event) } {
             if let Some(event_handler) = payload.context() {
                 event_handler.key_down_event(key, mods, repeat);
             }
         }
 
-        if let Some(character) = get_event_char(event) {
+        if let Some(character) = unsafe { get_event_char(event) } {
             if let Some(event_handler) = payload.context() {
                 event_handler.char_event(character, mods, repeat);
             }
@@ -560,8 +560,8 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
 
     extern "C" fn key_up(this: &Object, _sel: Sel, event: ObjcId) {
         let payload = get_window_payload(this);
-        let mods = get_event_key_modifier(event);
-        if let Some(key) = get_event_keycode(event) {
+        let mods = unsafe { get_event_key_modifier(event) };
+        if let Some(key) = unsafe { get_event_keycode(event) } {
             if let Some(event_handler) = payload.context() {
                 event_handler.key_up_event(key, mods);
             }
@@ -590,7 +590,7 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         }
 
         let payload = get_window_payload(this);
-        let mods = get_event_key_modifier(event);
+        let mods = unsafe { get_event_key_modifier(event) };
         let flags: u64 = unsafe { msg_send![event, modifierFlags] };
         let new_modifiers = Modifiers::new(flags);
 
@@ -652,6 +652,102 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         );
 
         payload.modifiers = new_modifiers;
+    }
+
+    // Drag and Drop methods
+    extern "C" fn dragging_entered(_this: &Object, _sel: Sel, sender: ObjcId) -> u64 {
+        unsafe {
+            let pasteboard: ObjcId = msg_send![sender, draggingPasteboard];
+            let types: ObjcId = msg_send![pasteboard, types];
+            let contains_file_urls: bool =
+                msg_send![types, containsObject: NSPasteboardTypeFileURL];
+
+            if contains_file_urls {
+                use crate::native::apple::frameworks::NSDragOperation;
+                NSDragOperation::Copy as u64
+            } else {
+                use crate::native::apple::frameworks::NSDragOperation;
+                NSDragOperation::None as u64
+            }
+        }
+    }
+
+    extern "C" fn dragging_updated(_this: &Object, _sel: Sel, sender: ObjcId) -> u64 {
+        unsafe {
+            let pasteboard: ObjcId = msg_send![sender, draggingPasteboard];
+            let types: ObjcId = msg_send![pasteboard, types];
+            let contains_file_urls: bool =
+                msg_send![types, containsObject: NSPasteboardTypeFileURL];
+
+            if contains_file_urls {
+                use crate::native::apple::frameworks::NSDragOperation;
+                NSDragOperation::Copy as u64
+            } else {
+                use crate::native::apple::frameworks::NSDragOperation;
+                NSDragOperation::None as u64
+            }
+        }
+    }
+
+    extern "C" fn perform_drag_operation(this: &Object, _sel: Sel, sender: ObjcId) -> bool {
+        let payload = get_window_payload(this);
+
+        unsafe {
+            let pasteboard: ObjcId = msg_send![sender, draggingPasteboard];
+            let nsurl_class = class!(NSURL);
+            let classes_array: ObjcId = msg_send![class!(NSArray), arrayWithObject: nsurl_class];
+            let options: ObjcId = msg_send![class!(NSDictionary), dictionary];
+            let file_urls: ObjcId = msg_send![pasteboard,
+                readObjectsForClasses: classes_array
+                options: options
+            ];
+
+            if file_urls == nil {
+                return false;
+            }
+
+            let count: usize = msg_send![file_urls, count];
+            if count == 0 {
+                return false;
+            }
+
+            // Clear previous dropped files
+            {
+                let mut d = crate::native_display().lock().unwrap();
+                d.dropped_files.paths.clear();
+                d.dropped_files.bytes.clear();
+            }
+
+            // Process each dropped file
+            for i in 0..count {
+                let url: ObjcId = msg_send![file_urls, objectAtIndex: i];
+                if url == nil {
+                    continue;
+                }
+
+                let path_nsstring: ObjcId = msg_send![url, path];
+                if path_nsstring == nil {
+                    continue;
+                }
+
+                let path_str = crate::native::apple::apple_util::nsstring_to_string(path_nsstring);
+                let path = std::path::PathBuf::from(path_str);
+
+                // Try to read file contents
+                if let Ok(bytes) = std::fs::read(&path) {
+                    let mut d = crate::native_display().lock().unwrap();
+                    d.dropped_files.paths.push(path);
+                    d.dropped_files.bytes.push(bytes);
+                }
+            }
+
+            // Trigger the dropped files event
+            if let Some(event_handler) = payload.context() {
+                event_handler.files_dropped_event();
+            }
+
+            true
+        }
     }
 
     decl.add_method(
@@ -720,6 +816,20 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         flags_changed as extern "C" fn(&Object, Sel, ObjcId),
     );
     decl.add_method(sel!(keyUp:), key_up as extern "C" fn(&Object, Sel, ObjcId));
+
+    // Add drag and drop methods
+    decl.add_method(
+        sel!(draggingEntered:),
+        dragging_entered as extern "C" fn(&Object, Sel, ObjcId) -> u64,
+    );
+    decl.add_method(
+        sel!(draggingUpdated:),
+        dragging_updated as extern "C" fn(&Object, Sel, ObjcId) -> u64,
+    );
+    decl.add_method(
+        sel!(performDragOperation:),
+        perform_drag_operation as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
+    );
 }
 
 pub fn define_opengl_view_class() -> *const Class {
@@ -813,6 +923,7 @@ pub fn define_metal_view_class() -> *const Class {
     decl.register()
 }
 
+#[allow(clippy::mut_from_ref)]
 fn get_window_payload(this: &Object) -> &mut MacosDisplay {
     unsafe {
         let ptr: *mut c_void = *this.get_ivar("display_ptr");
@@ -1162,6 +1273,13 @@ where
 
     let () = msg_send![window, center];
     let () = msg_send![window, setAcceptsMouseMovedEvents: YES];
+
+    // Register the view to accept dragged file URLs
+    unsafe {
+        let file_url_type = NSPasteboardTypeFileURL;
+        let types_array: ObjcId = msg_send![class!(NSArray), arrayWithObject: file_url_type];
+        let () = msg_send![view, registerForDraggedTypes: types_array];
+    }
 
     if conf.fullscreen {
         let () = msg_send![window, toggleFullScreen: nil];
