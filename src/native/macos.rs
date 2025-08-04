@@ -689,7 +689,7 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         }
     }
 
-    extern "C" fn perform_drag_operation(this: &Object, _sel: Sel, sender: ObjcId) -> bool {
+    extern "C" fn perform_drag_operation(this: &Object, _sel: Sel, sender: ObjcId) -> BOOL {
         let payload = get_window_payload(this);
 
         unsafe {
@@ -703,12 +703,12 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
             ];
 
             if file_urls == nil {
-                return false;
+                return NO;
             }
 
             let count: usize = msg_send![file_urls, count];
             if count == 0 {
-                return false;
+                return NO;
             }
 
             // Clear previous dropped files
@@ -746,7 +746,7 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
                 event_handler.files_dropped_event();
             }
 
-            true
+            YES
         }
     }
 
