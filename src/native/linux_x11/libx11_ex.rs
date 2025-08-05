@@ -202,11 +202,17 @@ impl LibX11 {
             | PropertyChangeMask;
         self.grab_error_handler();
 
+        let (win_x, win_y) = if let Some((x, y)) = conf.window_position {
+            (x as libc::c_int, y as libc::c_int)
+        } else {
+            (0 as libc::c_int, 0 as libc::c_int)
+        };
+
         let window = (self.XCreateWindow)(
             display,
             root,
-            0 as libc::c_int,
-            0 as libc::c_int,
+            win_x,
+            win_y,
             conf.window_width as _,
             conf.window_height as _,
             0 as libc::c_int as libc::c_uint,

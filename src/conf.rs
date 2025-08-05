@@ -40,6 +40,21 @@
 //!
 //! [`dpi_scale`]: super::window::dpi_scale
 //! [`screen_size`]: super::window::screen_size
+//!
+//! ## Window positioning
+//!
+//! You can set the initial window position using the [`Conf::window_position`] field:
+//! ```ignore
+//! Conf {
+//!     window_width: 800,
+//!     window_height: 600,
+//!     window_position: Some((200, 100)), // Position at (200, 100)
+//!     ..Default::default()
+//! }
+//! ```
+//!
+//! This feature only works on desktop platforms (Windows, macOS, Linux).
+//! It is ignored on WASM, iOS, and Android platforms.
 
 /// Specifies how to load an OpenGL context on X11 in Linux.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -214,6 +229,11 @@ pub struct Conf {
     /// Defaults to `false`.
     pub fullscreen: bool,
 
+    /// Optional initial window position (x, y) in screen coordinates.
+    /// Only works on desktop platforms (Windows, macOS, Linux).
+    /// Ignored on WASM, iOS, and Android. Defaults to `None` (system default).
+    pub window_position: Option<(i32, i32)>,
+
     /// MSAA sample count.
     /// Defaults to `1`.
     pub sample_count: i32,
@@ -276,6 +296,7 @@ impl Default for Conf {
             window_resizable: true,
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
+            window_position: None,
         }
     }
 }
@@ -293,6 +314,7 @@ impl Default for Conf {
             window_resizable: false, //
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
+            window_position: None,
         }
     }
 }

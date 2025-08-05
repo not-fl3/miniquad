@@ -1221,7 +1221,14 @@ where
     }
 
     let window_frame = NSRect {
-        origin: NSPoint { x: 0., y: 0. },
+        origin: if let Some((x, y)) = conf.window_position {
+            NSPoint {
+                x: x as f64,
+                y: y as f64,
+            }
+        } else {
+            NSPoint { x: 0., y: 0. }
+        },
         size: NSSize {
             width: conf.window_width as f64,
             height: conf.window_height as f64,
