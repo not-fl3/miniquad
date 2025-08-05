@@ -97,6 +97,12 @@ impl MacosDisplay {
         };
         let () = unsafe { msg_send![self.window, setFrame:frame display:true animate:true] };
     }
+    fn set_window_position(&mut self, new_x: u32, new_y: u32) {
+        let mut frame: NSRect = unsafe { msg_send![self.window, frame] };
+        frame.origin.x = new_x as f64;
+        frame.origin.y = new_y as f64;
+        let () = unsafe { msg_send![self.window, setFrame:frame display:true animate:true] };
+    }
     fn set_fullscreen(&mut self, fullscreen: bool) {
         if self.fullscreen != fullscreen {
             self.fullscreen = fullscreen;
@@ -209,9 +215,7 @@ impl MacosDisplay {
                 new_height,
             } => self.set_window_size(new_width as _, new_height as _),
             SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
-            SetWindowPosition { .. } => {
-                eprintln!("Not implemented for macos");
-            }
+            SetWindowPosition { new_x, new_y } => self.set_window_position(new_x, new_y),
             _ => {}
         }
     }
