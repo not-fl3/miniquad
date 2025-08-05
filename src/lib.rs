@@ -175,6 +175,21 @@ pub mod window {
         }
     }
 
+    /// Get metrics for the primary monitor
+    pub fn primary_monitor() -> crate::MonitorMetrics {
+        native::primary_monitor_impl()
+    }
+
+    /// Get metrics for all available monitors
+    pub fn monitors() -> Vec<crate::MonitorMetrics> {
+        native::monitors_impl()
+    }
+
+    /// Get metrics for the monitor where the current window is displayed
+    pub fn current_monitor() -> crate::MonitorMetrics {
+        native::current_monitor_impl()
+    }
+
     pub fn blocking_event_loop() -> bool {
         let d = native_display().lock().unwrap();
         d.blocking_event_loop
@@ -371,6 +386,16 @@ pub struct ScreenMetrics {
     pub position: (u32, u32),
     pub dpi_scale: f32,
     pub high_dpi: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MonitorMetrics {
+    pub width: f32,
+    pub height: f32,
+    pub position: (u32, u32),
+    pub dpi_scale: f32,
+    pub refresh_rate: Option<f32>,
+    pub name: Option<String>,
 }
 
 /// Start miniquad.

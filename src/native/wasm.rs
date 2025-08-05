@@ -365,3 +365,16 @@ pub extern "C" fn on_file_dropped(
     d.dropped_files.paths.push(path);
     d.dropped_files.bytes.push(bytes);
 }
+
+pub fn primary_monitor() -> crate::MonitorMetrics {
+    // For WASM, get the browser window/screen dimensions
+    // This is a basic implementation - could be enhanced with JS interop
+    crate::MonitorMetrics {
+        width: 1920.0, // Default fallback
+        height: 1080.0,
+        position: (0, 0),
+        dpi_scale: 1.0,
+        refresh_rate: None,
+        name: Some("Browser".to_string()),
+    }
+}

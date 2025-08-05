@@ -701,3 +701,54 @@ where
     }
     Ok(())
 }
+
+pub fn primary_monitor() -> crate::MonitorMetrics {
+    unsafe {
+        let display = (LIBX11.XOpenDisplay)(std::ptr::null());
+        if display.is_null() {
+            return crate::MonitorMetrics {
+                width: 1920.0,
+                height: 1080.0,
+                position: (0, 0),
+                dpi_scale: 1.0,
+                refresh_rate: None,
+                name: Some("Primary Monitor".to_string()),
+            };
+        }
+
+        let screen = (LIBX11.XDefaultScreen)(display);
+        let width = (LIBX11.XDisplayWidth)(display, screen) as f32;
+        let height = (LIBX11.XDisplayHeight)(display, screen) as f32;
+
+        // Get DPI information
+        let width_mm = (LIBX11.XDisplayWidthMM)(display, screen) as f32;
+        let dpi_scale = if width_mm > 0.0 {
+            (width * 25.4 / width_mm) / 96.0 // Convert to DPI scale factor
+        } else {
+            1.0
+        };
+
+        (LIBX11.XCloseDisplay)(display);
+
+        crate::MonitorMetrics {
+            width,
+            height,
+            position: (0, 0),
+            dpi_scale,
+            refresh_rate: None,
+            name: Some("X11 Primary Monitor".to_string()),
+        }
+    }
+}
+
+pub fn monitors() -> Vec<crate::MonitorMetrics> {
+    // For basic X11 implementation, return just the primary monitor
+    // A full implementation would use XRandR extension to enumerate all monitors
+    vec![primary_monitor()]
+}
+
+pub fn current_monitor() -> crate::MonitorMetrics {
+    // For basic X11 implementation, return the primary monitor
+    // A proper implementation would determine which monitor contains the window
+    primary_monitor()
+}

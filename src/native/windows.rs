@@ -1008,3 +1008,131 @@ where
         DestroyWindow(wnd);
     }
 }
+
+pub fn primary_monitor() -> crate::MonitorMetrics {
+    use winapi::um::winuser::*;
+    unsafe {
+        let primary_monitor = MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY);
+        let mut monitor_info: MONITORINFOEXW = std::mem::zeroed();
+        monitor_info.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
+
+        if GetMonitorInfoW(primary_monitor, &mut monitor_info as *mut _ as *mut _) != 0 {
+            let rect = monitor_info.rcMonitor;
+            let width = (rect.right - rect.left) as f32;
+            let height = (rect.bottom - rect.top) as f32;
+
+            // Get DPI information
+            let dpi = GetDpiForSystem() as f32 / 96.0; // 96 is the default DPI
+
+            // Convert device name to String
+            let device_name = String::from_utf16_lossy(&monitor_info.szDevice);
+            let clean_name = device_name.trim_end_matches('\0');
+
+            crate::MonitorMetrics {
+                width,
+                height,
+                position: (rect.left as u32, rect.top as u32),
+                dpi_scale: dpi,
+                refresh_rate: None, // Would need additional API calls to get refresh rate
+                name: Some(clean_name.to_string()),
+            }
+        } else {
+            // Fallback if monitor info fails
+            crate::MonitorMetrics {
+                width: GetSystemMetrics(SM_CXSCREEN) as f32,
+                height: GetSystemMetrics(SM_CYSCREEN) as f32,
+                position: (0, 0),
+                dpi_scale: 1.0,
+                refresh_rate: None,
+                name: Some("Primary Monitor".to_string()),
+            }
+        }
+    }
+}
+
+pub fn monitors() -> Vec<crate::MonitorMetrics> {
+    use winapi::shared::minwindef::*;
+    use winapi::shared::windef::*;
+    use winapi::um::winuser::*;
+
+    unsafe {
+        static mut MONITORS: Vec<crate::MonitorMetrics> = Vec::new();
+
+        unsafe extern "system" fn enum_monitor_proc(
+            monitor: HMONITOR,
+            _hdc: HDC,
+            _rect: LPRECT,
+            _lparam: LPARAM,
+        ) -> BOOL {
+            let mut monitor_info: MONITORINFOEXW = std::mem::zeroed();
+            monitor_info.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
+
+            if GetMonitorInfoW(monitor, &mut monitor_info as *mut _ as *mut _) != 0 {
+                let rect = monitor_info.rcMonitor;
+                let width = (rect.right - rect.left) as f32;
+                let height = (rect.bottom - rect.top) as f32;
+
+                let dpi = GetDpiForSystem() as f32 / 96.0;
+                let device_name = String::from_utf16_lossy(&monitor_info.szDevice);
+                let clean_name = device_name.trim_end_matches('\0');
+
+                MONITORS.push(crate::MonitorMetrics {
+                    width,
+                    height,
+                    position: (rect.left as u32, rect.top as u32),
+                    dpi_scale: dpi,
+                    refresh_rate: None,
+                    name: Some(clean_name.to_string()),
+                });
+            }
+            TRUE
+        }
+
+        MONITORS.clear();
+        EnumDisplayMonitors(
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            Some(enum_monitor_proc),
+            0,
+        );
+        MONITORS.clone()
+    }
+}
+
+pub fn current_monitor() -> crate::MonitorMetrics {
+    use winapi::shared::windef::*;
+    use winapi::um::winuser::*;
+
+    unsafe {
+        // Get the current window handle - we need to find a way to get the HWND
+        // For now, let's use MonitorFromPoint with the current cursor position
+        let mut cursor_pos = POINT { x: 0, y: 0 };
+        GetCursorPos(&mut cursor_pos);
+
+        let monitor = MonitorFromPoint(cursor_pos, MONITOR_DEFAULTTONEAREST);
+        let mut monitor_info: MONITORINFOEXW = std::mem::zeroed();
+        monitor_info.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
+
+        if GetMonitorInfoW(monitor, &mut monitor_info as *mut _ as *mut _) != 0 {
+            let rect = monitor_info.rcMonitor;
+            let width = (rect.right - rect.left) as f32;
+            let height = (rect.bottom - rect.top) as f32;
+
+            let dpi = GetDpiForSystem() as f32 / 96.0;
+            let device_name = String::from_utf16_lossy(&monitor_info.szDevice);
+            let clean_name = device_name.trim_end_matches('\0');
+
+            crate::MonitorMetrics {
+                width,
+                height,
+                position: (rect.left as u32, rect.top as u32),
+                dpi_scale: dpi,
+                refresh_rate: None,
+                name: Some(clean_name.to_string()),
+            }
+        } else {
+            // Fallback to primary monitor
+            primary_monitor()
+        }
+    }
+}

@@ -177,16 +177,14 @@ impl MacosDisplay {
             d.dpi_scale = (backing_size.width / bounds.size.width) as f32;
         }
 
-        // Get the actual screen/monitor resolution instead of window bounds
-        let screen: ObjcId = msg_send![self.window, screen];
-        let screen_frame: NSRect = msg_send![screen, frame];
-        let screen_width = (screen_frame.size.width as f32 * d.dpi_scale) as i32;
-        let screen_height = (screen_frame.size.height as f32 * d.dpi_scale) as i32;
+        // Get the window content view bounds for the drawable area
+        let bounds: NSRect = msg_send![self.view, bounds];
+        let screen_width = (bounds.size.width as f32 * d.dpi_scale) as i32;
+        let screen_height = (bounds.size.height as f32 * d.dpi_scale) as i32;
 
-        // Get window position
-        let window_frame: NSRect = msg_send![self.window, frame];
-        let window_x = (window_frame.origin.x * d.dpi_scale as f64) as u32;
-        let window_y = (window_frame.origin.y * d.dpi_scale as f64) as u32;
+        // For window metrics, position is relative to the window itself (0,0)
+        let window_x = 0u32;
+        let window_y = 0u32;
 
         let dim_changed = screen_width != d.screen_width || screen_height != d.screen_height;
 
@@ -1350,6 +1348,104 @@ where
 
         if !conf.platform.blocking_event_loop || display.update_requested {
             perform_redraw(&mut display, conf.platform.apple_gfx_api, false);
+        }
+    }
+}
+
+pub fn primary_monitor() -> crate::MonitorMetrics {
+    use crate::native::apple::{apple_util::*, frameworks::*};
+    unsafe {
+        let main_screen: ObjcId = msg_send![class!(NSScreen), mainScreen];
+        let screen_frame: NSRect = msg_send![main_screen, frame];
+        let backing_scale: f64 = msg_send![main_screen, backingScaleFactor];
+        let screen_name: ObjcId = msg_send![main_screen, localizedName];
+        let name_str = if screen_name != nil {
+            Some(nsstring_to_string(screen_name))
+        } else {
+            None
+        };
+
+        crate::MonitorMetrics {
+            width: screen_frame.size.width as f32,
+            height: screen_frame.size.height as f32,
+            position: (screen_frame.origin.x as u32, screen_frame.origin.y as u32),
+            dpi_scale: backing_scale as f32,
+            refresh_rate: None, // NSScreen doesn't easily expose refresh rate
+            name: name_str,
+        }
+    }
+}
+
+pub fn monitors() -> Vec<crate::MonitorMetrics> {
+    use crate::native::apple::{apple_util::*, frameworks::*};
+    unsafe {
+        let screens: ObjcId = msg_send![class!(NSScreen), screens];
+        let count: usize = msg_send![screens, count];
+        let mut monitors = Vec::new();
+
+        for i in 0..count {
+            let screen: ObjcId = msg_send![screens, objectAtIndex: i];
+            let screen_frame: NSRect = msg_send![screen, frame];
+            let backing_scale: f64 = msg_send![screen, backingScaleFactor];
+            let screen_name: ObjcId = msg_send![screen, localizedName];
+            let name_str = if screen_name != nil {
+                Some(nsstring_to_string(screen_name))
+            } else {
+                None
+            };
+
+            monitors.push(crate::MonitorMetrics {
+                width: screen_frame.size.width as f32,
+                height: screen_frame.size.height as f32,
+                position: (screen_frame.origin.x as u32, screen_frame.origin.y as u32),
+                dpi_scale: backing_scale as f32,
+                refresh_rate: None,
+                name: name_str,
+            });
+        }
+
+        monitors
+    }
+}
+
+pub fn current_monitor() -> crate::MonitorMetrics {
+    use crate::native::apple::{apple_util::*, frameworks::*};
+
+    // Get the current window's screen from the view
+    let d = crate::native_display().lock().unwrap();
+    let view = d.view;
+    drop(d); // Release lock early
+
+    unsafe {
+        // Get the window from the view
+        let window: ObjcId = msg_send![view, window];
+        if window == nil {
+            // Fallback to primary monitor if no window
+            return primary_monitor();
+        }
+
+        // Get the screen that contains this window
+        let screen: ObjcId = msg_send![window, screen];
+        if screen == nil {
+            return primary_monitor();
+        }
+
+        let screen_frame: NSRect = msg_send![screen, frame];
+        let backing_scale: f64 = msg_send![screen, backingScaleFactor];
+        let screen_name: ObjcId = msg_send![screen, localizedName];
+        let name_str = if screen_name != nil {
+            Some(nsstring_to_string(screen_name))
+        } else {
+            None
+        };
+
+        crate::MonitorMetrics {
+            width: screen_frame.size.width as f32,
+            height: screen_frame.size.height as f32,
+            position: (screen_frame.origin.x as u32, screen_frame.origin.y as u32),
+            dpi_scale: backing_scale as f32,
+            refresh_rate: None,
+            name: name_str,
         }
     }
 }

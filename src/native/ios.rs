@@ -312,20 +312,20 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
             payload.init_event_handler();
         }
 
-        let main_screen: ObjcId = unsafe { msg_send![class!(UIScreen), mainScreen] };
-        let screen_rect: NSRect = unsafe { msg_send![main_screen, bounds] };
+        // Get the view bounds for the drawable area instead of screen bounds
+        let view_bounds: NSRect = unsafe { msg_send![payload.view, bounds] };
         let high_dpi = native_display().lock().unwrap().high_dpi;
 
         let (screen_width, screen_height) = if high_dpi {
             (
-                screen_rect.size.width as i32 * 2,
-                screen_rect.size.height as i32 * 2,
+                view_bounds.size.width as i32 * 2,
+                view_bounds.size.height as i32 * 2,
             )
         } else {
             let content_scale_factor: f64 = unsafe { msg_send![payload.view, contentScaleFactor] };
             (
-                (screen_rect.size.width * content_scale_factor) as i32,
-                (screen_rect.size.height * content_scale_factor) as i32,
+                (view_bounds.size.width * content_scale_factor) as i32,
+                (view_bounds.size.height * content_scale_factor) as i32,
             )
         };
 
@@ -842,4 +842,22 @@ where
     let class_string = frameworks::NSStringFromClass(class as _);
 
     UIApplicationMain(argc, &mut argv, nil, class_string);
+}
+
+pub fn primary_monitor() -> crate::MonitorMetrics {
+    use crate::native::apple::{apple_util::*, frameworks::*};
+    unsafe {
+        let main_screen: ObjcId = msg_send![class!(UIScreen), mainScreen];
+        let screen_bounds: NSRect = msg_send![main_screen, bounds];
+        let scale: f64 = msg_send![main_screen, scale];
+
+        crate::MonitorMetrics {
+            width: screen_bounds.size.width as f32,
+            height: screen_bounds.size.height as f32,
+            position: (0, 0), // iOS is single screen, fullscreen
+            dpi_scale: scale as f32,
+            refresh_rate: None, // iOS doesn't expose refresh rate easily
+            name: Some("iOS Screen".to_string()),
+        }
+    }
 }

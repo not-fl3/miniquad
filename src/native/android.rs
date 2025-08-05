@@ -698,3 +698,16 @@ pub(crate) unsafe fn load_asset(filepath: *const ::core::ffi::c_char, out: *mut 
         (*out).content = buffer as _;
     }
 }
+
+pub fn primary_monitor() -> crate::MonitorMetrics {
+    // On Android, get the screen metrics from the current display
+    let d = crate::native_display().lock().unwrap();
+    crate::MonitorMetrics {
+        width: d.screen_width as f32,
+        height: d.screen_height as f32,
+        position: (0, 0), // Android is single screen, fullscreen
+        dpi_scale: d.dpi_scale,
+        refresh_rate: None, // Android doesn't easily expose refresh rate
+        name: Some("Android Screen".to_string()),
+    }
+}

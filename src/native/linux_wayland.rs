@@ -1311,3 +1311,29 @@ where
 
     Some(())
 }
+
+pub fn primary_monitor() -> crate::MonitorMetrics {
+    // For Wayland, getting monitor information requires a complex approach
+    // involving wl_output protocol. For simplicity, we'll return default values.
+    // A full implementation would need to track wl_output events during setup.
+    crate::MonitorMetrics {
+        width: 1920.0,
+        height: 1080.0,
+        position: (0, 0),
+        dpi_scale: 1.0,
+        refresh_rate: None,
+        name: Some("Wayland Monitor".to_string()),
+    }
+}
+
+pub fn monitors() -> Vec<crate::MonitorMetrics> {
+    // Wayland monitor enumeration requires tracking wl_output protocol events
+    // For basic implementation, return just primary monitor
+    vec![primary_monitor()]
+}
+
+pub fn current_monitor() -> crate::MonitorMetrics {
+    // For Wayland, return the primary monitor
+    // A proper implementation would track which monitor the surface is on
+    primary_monitor()
+}

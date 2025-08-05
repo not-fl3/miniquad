@@ -119,3 +119,73 @@ pub mod gl;
 pub use wasm::webgl as gl;
 
 pub mod query_stab;
+
+// Monitor metrics implementation functions
+pub fn primary_monitor_impl() -> crate::MonitorMetrics {
+    #[cfg(target_os = "macos")]
+    return macos::primary_monitor();
+    #[cfg(target_os = "windows")]
+    return windows::primary_monitor();
+    #[cfg(target_os = "linux")]
+    return linux_monitor();
+    #[cfg(target_os = "ios")]
+    return ios::primary_monitor();
+    #[cfg(target_os = "android")]
+    return android::primary_monitor();
+    #[cfg(target_arch = "wasm32")]
+    return wasm::primary_monitor();
+}
+
+pub fn monitors_impl() -> Vec<crate::MonitorMetrics> {
+    #[cfg(target_os = "macos")]
+    return macos::monitors();
+    #[cfg(target_os = "windows")]
+    return windows::monitors();
+    #[cfg(target_os = "linux")]
+    return linux_monitors();
+    #[cfg(target_os = "ios")]
+    return vec![ios::primary_monitor()];
+    #[cfg(target_os = "android")]
+    return vec![android::primary_monitor()];
+    #[cfg(target_arch = "wasm32")]
+    return vec![wasm::primary_monitor()];
+}
+
+pub fn current_monitor_impl() -> crate::MonitorMetrics {
+    #[cfg(target_os = "macos")]
+    return macos::current_monitor();
+    #[cfg(target_os = "windows")]
+    return windows::current_monitor();
+    #[cfg(target_os = "linux")]
+    return linux_current_monitor();
+    #[cfg(target_os = "ios")]
+    return ios::primary_monitor();
+    #[cfg(target_os = "android")]
+    return android::primary_monitor();
+    #[cfg(target_arch = "wasm32")]
+    return wasm::primary_monitor();
+}
+
+#[cfg(target_os = "linux")]
+fn linux_monitor() -> crate::MonitorMetrics {
+    #[cfg(feature = "wayland")]
+    return linux_wayland::primary_monitor();
+    #[cfg(not(feature = "wayland"))]
+    return linux_x11::primary_monitor();
+}
+
+#[cfg(target_os = "linux")]
+fn linux_monitors() -> Vec<crate::MonitorMetrics> {
+    #[cfg(feature = "wayland")]
+    return linux_wayland::monitors();
+    #[cfg(not(feature = "wayland"))]
+    return linux_x11::monitors();
+}
+
+#[cfg(target_os = "linux")]
+fn linux_current_monitor() -> crate::MonitorMetrics {
+    #[cfg(feature = "wayland")]
+    return linux_wayland::current_monitor();
+    #[cfg(not(feature = "wayland"))]
+    return linux_x11::current_monitor();
+}
