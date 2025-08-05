@@ -931,6 +931,7 @@ crate::declare_module!(
     pub fn XDefaultScreen(*mut Display) -> c_int,
     pub fn XDisplayWidth(*mut Display, c_int) -> c_int,
     pub fn XDisplayHeight(*mut Display, c_int) -> c_int,
+    pub fn XDisplayWidthMM(*mut Display, c_int) -> c_int,
     ...
     ...
     pub extensions: X11Extensions,

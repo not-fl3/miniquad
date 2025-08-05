@@ -704,7 +704,22 @@ where
 
 pub fn primary_monitor() -> crate::MonitorMetrics {
     unsafe {
-        let display = (LIBX11.XOpenDisplay)(std::ptr::null());
+        // Create a temporary LibX11 instance for monitor queries
+        let mut libx11 = match libx11::LibX11::try_load() {
+            Ok(lib) => lib,
+            Err(_) => {
+                return crate::MonitorMetrics {
+                    width: 1920.0,
+                    height: 1080.0,
+                    position: (0, 0),
+                    dpi_scale: 1.0,
+                    refresh_rate: None,
+                    name: Some("Primary Monitor".to_string()),
+                };
+            }
+        };
+
+        let display = (libx11.XOpenDisplay)(std::ptr::null());
         if display.is_null() {
             return crate::MonitorMetrics {
                 width: 1920.0,
@@ -716,19 +731,19 @@ pub fn primary_monitor() -> crate::MonitorMetrics {
             };
         }
 
-        let screen = (LIBX11.XDefaultScreen)(display);
-        let width = (LIBX11.XDisplayWidth)(display, screen) as f32;
-        let height = (LIBX11.XDisplayHeight)(display, screen) as f32;
+        let screen = (libx11.XDefaultScreen)(display);
+        let width = (libx11.XDisplayWidth)(display, screen) as f32;
+        let height = (libx11.XDisplayHeight)(display, screen) as f32;
 
         // Get DPI information
-        let width_mm = (LIBX11.XDisplayWidthMM)(display, screen) as f32;
+        let width_mm = (libx11.XDisplayWidthMM)(display, screen) as f32;
         let dpi_scale = if width_mm > 0.0 {
             (width * 25.4 / width_mm) / 96.0 // Convert to DPI scale factor
         } else {
             1.0
         };
 
-        (LIBX11.XCloseDisplay)(display);
+        (libx11.XCloseDisplay)(display);
 
         crate::MonitorMetrics {
             width,
