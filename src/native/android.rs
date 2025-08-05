@@ -43,7 +43,6 @@ extern "C" {
 #[derive(Debug)]
 enum Message {
     SurfaceChanged {
-        window: *mut ndk_sys::ANativeWindow,
         width: i32,
         height: i32,
     },
@@ -189,7 +188,6 @@ impl MainThreadState {
                 self.destroy_surface();
             },
             Message::SurfaceChanged {
-                window,
                 width,
                 height,
             } => {
@@ -404,14 +402,23 @@ where
         //
         // sometimes before launching an app android will show a permission dialog
         // it is important to create GL context only after a first SurfaceChanged
-        let (window, screen_width, screen_height) = 'a: loop {
+        let window = 'a: loop {
+            match rx.try_recv() {
+                Ok(Message::SurfaceCreated {
+                    window,
+                }) => {
+                    break 'a window;
+                }
+                _ => {}
+            }
+        };
+        let (screen_width, screen_height) = 'a: loop {
             match rx.try_recv() {
                 Ok(Message::SurfaceChanged {
-                    window,
                     width,
                     height,
                 }) => {
-                    break 'a (window, width as f32, height as f32);
+                    break 'a (width as f32, height as f32);
                 }
                 _ => {}
             }
@@ -581,14 +588,11 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnSurfaceDestroyed(
 extern "C" fn Java_quad_1native_QuadNative_surfaceOnSurfaceChanged(
     _: *mut ndk_sys::JNIEnv,
     _: ndk_sys::jobject,
-    surface: ndk_sys::jobject,
+    _: ndk_sys::jobject,
     width: ndk_sys::jint,
     height: ndk_sys::jint,
 ) {
-    let window = unsafe { create_native_window(surface) };
-
     send_message(Message::SurfaceChanged {
-        window,
         width: width as _,
         height: height as _,
     });
