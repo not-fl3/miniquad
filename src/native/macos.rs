@@ -177,10 +177,16 @@ impl MacosDisplay {
         let screen_width = (screen_frame.size.width as f32 * d.dpi_scale) as i32;
         let screen_height = (screen_frame.size.height as f32 * d.dpi_scale) as i32;
 
+        // Get window position
+        let window_frame: NSRect = msg_send![self.window, frame];
+        let window_x = (window_frame.origin.x * d.dpi_scale as f64) as u32;
+        let window_y = (window_frame.origin.y * d.dpi_scale as f64) as u32;
+
         let dim_changed = screen_width != d.screen_width || screen_height != d.screen_height;
 
         d.screen_width = screen_width;
         d.screen_height = screen_height;
+        d.screen_position = (window_x, window_y);
 
         if dim_changed {
             Some((screen_width, screen_height))
@@ -326,10 +332,9 @@ pub fn define_cocoa_window_delegate() -> *const Class {
             // Startup: the gl_context has not yet been created.
             return;
         }
-        if let Some(event_handler) = payload.context() {
-            event_handler.window_minimized_event();
-        }
+        // Update screen position when window moves
         unsafe {
+            payload.update_dimensions();
             msg_send_![payload.gl_context, update];
         }
     }

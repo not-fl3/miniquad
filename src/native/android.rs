@@ -187,10 +187,7 @@ impl MainThreadState {
             Message::SurfaceDestroyed => unsafe {
                 self.destroy_surface();
             },
-            Message::SurfaceChanged {
-                width,
-                height,
-            } => {
+            Message::SurfaceChanged { width, height } => {
                 {
                     let mut d = crate::native_display().lock().unwrap();
                     d.screen_width = width as _;
@@ -404,9 +401,7 @@ where
         // it is important to create GL context only after a first SurfaceChanged
         let window = 'a: loop {
             match rx.try_recv() {
-                Ok(Message::SurfaceCreated {
-                    window,
-                }) => {
+                Ok(Message::SurfaceCreated { window }) => {
                     break 'a window;
                 }
                 _ => {}
@@ -414,10 +409,7 @@ where
         };
         let (screen_width, screen_height) = 'a: loop {
             match rx.try_recv() {
-                Ok(Message::SurfaceChanged {
-                    width,
-                    height,
-                }) => {
+                Ok(Message::SurfaceChanged { width, height }) => {
                     break 'a (width as f32, height as f32);
                 }
                 _ => {}
