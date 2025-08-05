@@ -163,6 +163,18 @@ pub mod window {
         d.high_dpi
     }
 
+    /// Get comprehensive screen metrics including size, position, DPI scale, and high DPI status
+    pub fn screen_metrics() -> crate::ScreenMetrics {
+        let d = native_display().lock().unwrap();
+        crate::ScreenMetrics {
+            width: d.screen_width as f32,
+            height: d.screen_height as f32,
+            position: d.screen_position,
+            dpi_scale: d.dpi_scale,
+            high_dpi: d.high_dpi,
+        }
+    }
+
     pub fn blocking_event_loop() -> bool {
         let d = native_display().lock().unwrap();
         d.blocking_event_loop
@@ -350,6 +362,15 @@ pub enum CursorIcon {
     NSResize,
     NESWResize,
     NWSEResize,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct ScreenMetrics {
+    pub width: f32,
+    pub height: f32,
+    pub position: (u32, u32),
+    pub dpi_scale: f32,
+    pub high_dpi: bool,
 }
 
 /// Start miniquad.

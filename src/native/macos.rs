@@ -171,9 +171,11 @@ impl MacosDisplay {
             d.dpi_scale = (backing_size.width / bounds.size.width) as f32;
         }
 
-        let bounds: NSRect = msg_send![self.view, bounds];
-        let screen_width = (bounds.size.width as f32 * d.dpi_scale) as i32;
-        let screen_height = (bounds.size.height as f32 * d.dpi_scale) as i32;
+        // Get the actual screen/monitor resolution instead of window bounds
+        let screen: ObjcId = msg_send![self.window, screen];
+        let screen_frame: NSRect = msg_send![screen, frame];
+        let screen_width = (screen_frame.size.width as f32 * d.dpi_scale) as i32;
+        let screen_height = (screen_frame.size.height as f32 * d.dpi_scale) as i32;
 
         let dim_changed = screen_width != d.screen_width || screen_height != d.screen_height;
 
