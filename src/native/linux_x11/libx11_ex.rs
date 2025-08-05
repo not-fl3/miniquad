@@ -204,6 +204,7 @@ impl LibX11 {
 
         let (win_x, win_y) = if conf.desktop_center {
             // For desktop centering, calculate center position
+            let screen = (self.XDefaultScreen)(display);
             let screen_width = (self.XDisplayWidth)(display, screen) as i32;
             let screen_height = (self.XDisplayHeight)(display, screen) as i32;
             let center_x = (screen_width - conf.window_width) / 2;

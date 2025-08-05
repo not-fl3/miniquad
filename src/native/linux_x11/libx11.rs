@@ -928,6 +928,9 @@ crate::declare_module!(
     pub fn XCreatePixmapCursor(*mut Display, Pixmap, Pixmap, *mut XColor, *mut XColor, c_uint, c_uint) -> Cursor,
     pub fn XFreePixmap(*mut Display, Pixmap) -> c_int,
     pub fn XDefineCursor(*mut Display, Window, Cursor) -> c_int,
+    pub fn XDefaultScreen(*mut Display) -> c_int,
+    pub fn XDisplayWidth(*mut Display, c_int) -> c_int,
+    pub fn XDisplayHeight(*mut Display, c_int) -> c_int,
     ...
     ...
     pub extensions: X11Extensions,
