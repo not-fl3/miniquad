@@ -14,10 +14,10 @@ impl EventHandler for Stage {
 fn main() {
     miniquad::start(
         conf::Conf {
-            window_title: "Window Position Test".to_string(),
+            window_title: "Desktop Center Test".to_string(),
             window_width: 640,
             window_height: 480,
-            window_position: Some((200, 150)), // Position window at (200, 150)
+            desktop_center: true, // Center window on desktop
             ..Default::default()
         },
         || {

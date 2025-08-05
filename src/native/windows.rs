@@ -641,7 +641,7 @@ unsafe fn create_window(
     resizable: bool,
     width: i32,
     height: i32,
-    position: Option<(i32, i32)>,
+    desktop_center: bool,
 ) -> (HWND, HDC) {
     let mut wndclassw: WNDCLASSW = std::mem::zeroed();
 
@@ -693,8 +693,13 @@ unsafe fn create_window(
     let mut window_name = window_title.encode_utf16().collect::<Vec<u16>>();
     window_name.push(0);
 
-    let (win_x, win_y) = if let Some((x, y)) = position {
-        (x, y)
+    let (win_x, win_y) = if desktop_center {
+        // For desktop centering, calculate center position
+        let screen_width = GetSystemMetrics(SM_CXSCREEN);
+        let screen_height = GetSystemMetrics(SM_CYSCREEN);
+        let center_x = (screen_width - win_width) / 2;
+        let center_y = (screen_height - win_height) / 2;
+        (center_x, center_y)
     } else {
         (CW_USEDEFAULT, CW_USEDEFAULT)
     };
@@ -903,7 +908,7 @@ where
             conf.window_resizable,
             conf.window_width as _,
             conf.window_height as _,
-            conf.window_position,
+            conf.desktop_center,
         );
         if let Some(icon) = &conf.icon {
             set_icon(wnd, icon);

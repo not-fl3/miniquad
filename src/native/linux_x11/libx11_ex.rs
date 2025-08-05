@@ -202,8 +202,13 @@ impl LibX11 {
             | PropertyChangeMask;
         self.grab_error_handler();
 
-        let (win_x, win_y) = if let Some((x, y)) = conf.window_position {
-            (x as libc::c_int, y as libc::c_int)
+        let (win_x, win_y) = if conf.desktop_center {
+            // For desktop centering, calculate center position
+            let screen_width = (self.XDisplayWidth)(display, screen) as i32;
+            let screen_height = (self.XDisplayHeight)(display, screen) as i32;
+            let center_x = (screen_width - conf.window_width) / 2;
+            let center_y = (screen_height - conf.window_height) / 2;
+            (center_x as libc::c_int, center_y as libc::c_int)
         } else {
             (0 as libc::c_int, 0 as libc::c_int)
         };

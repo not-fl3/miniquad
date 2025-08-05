@@ -1221,14 +1221,7 @@ where
     }
 
     let window_frame = NSRect {
-        origin: if let Some((x, y)) = conf.window_position {
-            NSPoint {
-                x: x as f64,
-                y: y as f64,
-            }
-        } else {
-            NSPoint { x: 0., y: 0. }
-        },
+        origin: NSPoint { x: 0., y: 0. },
         size: NSSize {
             width: conf.window_width as f64,
             height: conf.window_height as f64,
@@ -1287,7 +1280,6 @@ where
 
     assert!(!view.is_null());
 
-    let () = msg_send![window, center];
     let () = msg_send![window, setAcceptsMouseMovedEvents: YES];
 
     // Register the view to accept dragged file URLs
@@ -1303,6 +1295,27 @@ where
 
     msg_send_![window, orderFront: nil];
     let () = msg_send![window, makeKeyAndOrderFront: nil];
+
+    if conf.desktop_center {
+        // Get the primary monitor's frame for proper centering
+        unsafe {
+            let screen: ObjcId = msg_send![class!(NSScreen), mainScreen];
+            let screen_frame: NSRect = msg_send![screen, frame];
+            let window_frame: NSRect = msg_send![window, frame];
+
+            // Calculate center position
+            let center_x =
+                screen_frame.origin.x + (screen_frame.size.width - window_frame.size.width) / 2.0;
+            let center_y =
+                screen_frame.origin.y + (screen_frame.size.height - window_frame.size.height) / 2.0;
+
+            // Set the window position
+            let mut new_frame = window_frame;
+            new_frame.origin.x = center_x;
+            new_frame.origin.y = center_y;
+            let () = msg_send![window, setFrame:new_frame display:true animate:false];
+        }
+    }
 
     let () = msg_send![ns_app, finishLaunching];
 

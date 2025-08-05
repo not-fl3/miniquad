@@ -43,12 +43,12 @@
 //!
 //! ## Window positioning
 //!
-//! You can set the initial window position using the [`Conf::window_position`] field:
+//! You can center the window on the desktop by setting [`Conf::desktop_center`]:
 //! ```ignore
 //! Conf {
 //!     window_width: 800,
 //!     window_height: 600,
-//!     window_position: Some((200, 100)), // Position at (200, 100)
+//!     desktop_center: true, // Center window on desktop
 //!     ..Default::default()
 //! }
 //! ```
@@ -229,10 +229,10 @@ pub struct Conf {
     /// Defaults to `false`.
     pub fullscreen: bool,
 
-    /// Optional initial window position (x, y) in screen coordinates.
+    /// If `true`, center the window on the primary monitor.
     /// Only works on desktop platforms (Windows, macOS, Linux).
-    /// Ignored on WASM, iOS, and Android. Defaults to `None` (system default).
-    pub window_position: Option<(i32, i32)>,
+    /// Ignored on WASM, iOS, and Android. Defaults to `false`.
+    pub desktop_center: bool,
 
     /// MSAA sample count.
     /// Defaults to `1`.
@@ -296,7 +296,7 @@ impl Default for Conf {
             window_resizable: true,
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
-            window_position: None,
+            desktop_center: false,
         }
     }
 }
@@ -314,7 +314,7 @@ impl Default for Conf {
             window_resizable: false, //
             icon: Some(Icon::miniquad_logo()),
             platform: Default::default(),
-            window_position: None,
+            desktop_center: false,
         }
     }
 }
