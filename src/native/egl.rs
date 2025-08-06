@@ -101,6 +101,7 @@ crate::declare_module! {
         EGLint,
         *mut EGLint,
     ) -> EGLBoolean,
+    pub fn eglGetCurrentContext() -> EGLContext,
     pub fn eglGetCurrentDisplay() -> EGLDisplay,
     pub fn eglGetCurrentSurface(EGLint) -> EGLSurface,
     pub fn eglGetDisplay(EGLNativeDisplayType) -> EGLDisplay,
