@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+#[cfg(not(target_os = "android"))]
 use std::sync::mpsc;
 
 #[derive(Default)]
@@ -15,6 +16,9 @@ pub(crate) struct NativeDisplayData {
     pub high_dpi: bool,
     pub quit_requested: bool,
     pub quit_ordered: bool,
+    #[cfg(target_os = "android")]
+    pub native_requests: Box<dyn Fn(Request) + Send>,
+    #[cfg(not(target_os = "android"))]
     pub native_requests: mpsc::Sender<Request>,
     pub clipboard: Box<dyn Clipboard>,
     pub dropped_files: DroppedFiles,
@@ -36,7 +40,8 @@ impl NativeDisplayData {
     pub fn new(
         screen_width: i32,
         screen_height: i32,
-        native_requests: mpsc::Sender<Request>,
+        #[cfg(target_os = "android")] native_requests: Box<dyn Fn(Request) + Send>,
+        #[cfg(not(target_os = "android"))] native_requests: mpsc::Sender<Request>,
         clipboard: Box<dyn Clipboard>,
     ) -> NativeDisplayData {
         NativeDisplayData {
