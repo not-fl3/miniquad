@@ -68,6 +68,7 @@ enum Message {
     Pause,
     Resume,
     Destroy,
+    Request(crate::native::Request),
 }
 unsafe impl Send for Message {}
 
@@ -187,10 +188,7 @@ impl MainThreadState {
             Message::SurfaceDestroyed => unsafe {
                 self.destroy_surface();
             },
-            Message::SurfaceChanged {
-                width,
-                height,
-            } => {
+            Message::SurfaceChanged { width, height } => {
                 {
                     let mut d = crate::native_display().lock().unwrap();
                     d.screen_width = width as _;
@@ -248,6 +246,7 @@ impl MainThreadState {
                 self.quit = true;
                 self.event_handler.quit_requested_event()
             }
+            Message::Request(req) => self.process_request(req),
         }
     }
 
@@ -393,7 +392,8 @@ where
 
     let (tx, rx) = mpsc::channel();
 
-    MESSAGES_TX.with(move |messages_tx| *messages_tx.borrow_mut() = Some(tx));
+    let tx2 = tx.clone();
+    MESSAGES_TX.with(move |messages_tx| *messages_tx.borrow_mut() = Some(tx2));
 
     thread::spawn(move || {
         let mut libegl = LibEgl::try_load().expect("Cant load LibEGL");
@@ -404,9 +404,7 @@ where
         // it is important to create GL context only after a first SurfaceChanged
         let window = 'a: loop {
             match rx.try_recv() {
-                Ok(Message::SurfaceCreated {
-                    window,
-                }) => {
+                Ok(Message::SurfaceCreated { window }) => {
                     break 'a window;
                 }
                 _ => {}
@@ -414,10 +412,7 @@ where
         };
         let (screen_width, screen_height) = 'a: loop {
             match rx.try_recv() {
-                Ok(Message::SurfaceChanged {
-                    width,
-                    height,
-                }) => {
+                Ok(Message::SurfaceChanged { width, height }) => {
                     break 'a (width as f32, height as f32);
                 }
                 _ => {}
@@ -451,12 +446,12 @@ where
             panic!();
         }
 
-        let (tx, requests_rx) = std::sync::mpsc::channel();
         let clipboard = Box::new(AndroidClipboard::new());
+        let tx_fn = Box::new(move |req| tx.send(Message::Request(req)).unwrap());
         crate::set_or_replace_display(NativeDisplayData {
             high_dpi: conf.high_dpi,
             blocking_event_loop: conf.platform.blocking_event_loop,
-            ..NativeDisplayData::new(screen_width as _, screen_height as _, tx, clipboard)
+            ..NativeDisplayData::new(screen_width as _, screen_height as _, tx_fn, clipboard)
         });
 
         let event_handler = f.0();
@@ -480,10 +475,6 @@ where
         };
 
         while !s.quit {
-            while let Ok(request) = requests_rx.try_recv() {
-                s.process_request(request);
-            }
-
             let block_on_wait = conf.platform.blocking_event_loop && !s.update_requested;
 
             if block_on_wait {

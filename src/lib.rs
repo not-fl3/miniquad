@@ -211,9 +211,17 @@ pub mod window {
     /// TODO: implement window focus events
     pub fn set_cursor_grab(grab: bool) {
         let d = native_display().lock().unwrap();
-        d.native_requests
-            .send(native::Request::SetCursorGrab(grab))
-            .unwrap();
+        #[cfg(target_os = "android")]
+        {
+            (d.native_requests)(native::Request::SetCursorGrab(grab));
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            d.native_requests
+                .send(native::Request::SetCursorGrab(grab))
+                .unwrap();
+        }
     }
 
     /// With `conf.platform.blocking_event_loop`, `schedule_update` called from an
@@ -222,7 +230,13 @@ pub mod window {
     ///
     /// Does nothing without `conf.platform.blocking_event_loop`.
     pub fn schedule_update() {
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(all(target_os = "android", not(target_arch = "wasm32")))]
+        {
+            let d = native_display().lock().unwrap();
+            (d.native_requests)(native::Request::ScheduleUpdate);
+        }
+
+        #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
         {
             let d = native_display().lock().unwrap();
             d.native_requests
@@ -239,35 +253,70 @@ pub mod window {
     /// Show or hide the mouse cursor
     pub fn show_mouse(shown: bool) {
         let d = native_display().lock().unwrap();
-        d.native_requests
-            .send(native::Request::ShowMouse(shown))
-            .unwrap();
+        #[cfg(target_os = "android")]
+        {
+            (d.native_requests)(native::Request::ShowMouse(shown));
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            d.native_requests
+                .send(native::Request::ShowMouse(shown))
+                .unwrap();
+        }
     }
 
     /// Set the mouse cursor icon.
     pub fn set_mouse_cursor(cursor_icon: CursorIcon) {
         let d = native_display().lock().unwrap();
-        d.native_requests
-            .send(native::Request::SetMouseCursor(cursor_icon))
-            .unwrap();
+        #[cfg(target_os = "android")]
+        {
+            (d.native_requests)(native::Request::SetMouseCursor(cursor_icon));
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            d.native_requests
+                .send(native::Request::SetMouseCursor(cursor_icon))
+                .unwrap();
+        }
     }
 
     /// Set the application's window size.
     pub fn set_window_size(new_width: u32, new_height: u32) {
         let d = native_display().lock().unwrap();
-        d.native_requests
-            .send(native::Request::SetWindowSize {
+        #[cfg(target_os = "android")]
+        {
+            (d.native_requests)(native::Request::SetWindowSize {
                 new_width,
                 new_height,
-            })
-            .unwrap();
+            });
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            d.native_requests
+                .send(native::Request::SetWindowSize {
+                    new_width,
+                    new_height,
+                })
+                .unwrap();
+        }
     }
 
     pub fn set_window_position(new_x: u32, new_y: u32) {
         let d = native_display().lock().unwrap();
-        d.native_requests
-            .send(native::Request::SetWindowPosition { new_x, new_y })
-            .unwrap();
+        #[cfg(target_os = "android")]
+        {
+            (d.native_requests)(native::Request::SetWindowPosition { new_x, new_y });
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            d.native_requests
+                .send(native::Request::SetWindowPosition { new_x, new_y })
+                .unwrap();
+        }
     }
 
     /// Get the position of the window.
@@ -280,9 +329,17 @@ pub mod window {
 
     pub fn set_fullscreen(fullscreen: bool) {
         let d = native_display().lock().unwrap();
-        d.native_requests
-            .send(native::Request::SetFullscreen(fullscreen))
-            .unwrap();
+        #[cfg(target_os = "android")]
+        {
+            (d.native_requests)(native::Request::SetFullscreen(fullscreen));
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            d.native_requests
+                .send(native::Request::SetFullscreen(fullscreen))
+                .unwrap();
+        }
     }
 
     /// Get current OS clipboard value
@@ -313,9 +370,17 @@ pub mod window {
     /// Only works on Android right now.
     pub fn show_keyboard(show: bool) {
         let d = native_display().lock().unwrap();
-        d.native_requests
-            .send(native::Request::ShowKeyboard(show))
-            .unwrap();
+        #[cfg(target_os = "android")]
+        {
+            (d.native_requests)(native::Request::ShowKeyboard(show));
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            d.native_requests
+                .send(native::Request::ShowKeyboard(show))
+                .unwrap();
+        }
     }
 
     #[cfg(target_vendor = "apple")]
