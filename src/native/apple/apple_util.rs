@@ -152,6 +152,8 @@ pub fn get_event_key_modifier(event: ObjcId) -> KeyMods {
 pub fn get_event_keycode(event: ObjcId) -> Option<KeyCode> {
     let scan_code: core::ffi::c_ushort = unsafe { msg_send![event, keyCode] };
 
+    // Check mapping here
+    // https://boredzo.org/blog/archives/2007-05-22/virtual-key-codes
     Some(match scan_code {
         0x00 => KeyCode::A,
         0x01 => KeyCode::S,
@@ -195,7 +197,7 @@ pub fn get_event_keycode(event: ObjcId) -> Option<KeyCode> {
         0x27 => KeyCode::Apostrophe,
         0x28 => KeyCode::K,
         0x29 => KeyCode::Semicolon,
-        0x2a => KeyCode::Apostrophe,
+        0x2a => KeyCode::Backslash,
         0x2b => KeyCode::Comma,
         0x2c => KeyCode::Slash,
         0x2d => KeyCode::N,
@@ -203,7 +205,7 @@ pub fn get_event_keycode(event: ObjcId) -> Option<KeyCode> {
         0x2f => KeyCode::Period,
         0x30 => KeyCode::Tab,
         0x31 => KeyCode::Space,
-        0x32 => KeyCode::Backslash,
+        0x32 => KeyCode::GraveAccent,
         0x33 => KeyCode::Backspace,
         //0x34 => unkown,
         0x35 => KeyCode::Escape,
@@ -290,7 +292,8 @@ pub fn get_event_keycode(event: ObjcId) -> Option<KeyCode> {
 pub fn keycode_to_menu_key(keycode: KeyCode, shift: bool) -> &'static str {
     if !shift {
         match keycode {
-            KeyCode::Apostrophe => "`",
+            KeyCode::GraveAccent => "`",
+            KeyCode::Apostrophe => "'",
             KeyCode::Key0 => "0",
             KeyCode::Key1 => "1",
             KeyCode::Key2 => "2",
@@ -343,19 +346,20 @@ pub fn keycode_to_menu_key(keycode: KeyCode, shift: bool) -> &'static str {
         }
     } else {
         match keycode {
-            //KeyCode::Backtick => "~",
-            KeyCode::Key0 => "!",
-            KeyCode::Key1 => "@",
-            KeyCode::Key2 => "#",
-            KeyCode::Key3 => "$",
-            KeyCode::Key4 => "%",
-            KeyCode::Key5 => "^",
-            KeyCode::Key6 => "&",
-            KeyCode::Key7 => "*",
-            KeyCode::Key8 => "(",
-            KeyCode::Key9 => ")",
+            KeyCode::GraveAccent => "~",
+            KeyCode::Apostrophe => "\"",
+            KeyCode::Key0 => ")",
+            KeyCode::Key1 => "!",
+            KeyCode::Key2 => "@",
+            KeyCode::Key3 => "#",
+            KeyCode::Key4 => "$",
+            KeyCode::Key5 => "%",
+            KeyCode::Key6 => "^",
+            KeyCode::Key7 => "&",
+            KeyCode::Key8 => "*",
+            KeyCode::Key9 => "(",
             KeyCode::Minus => "_",
-            KeyCode::Equal => "=",
+            KeyCode::Equal => "+",
 
             KeyCode::Q => "Q",
             KeyCode::W => "W",
@@ -380,7 +384,7 @@ pub fn keycode_to_menu_key(keycode: KeyCode, shift: bool) -> &'static str {
             KeyCode::K => "K",
             KeyCode::L => "L",
             KeyCode::Semicolon => ":",
-            KeyCode::Slash => "\"",
+            KeyCode::Slash => "?",
             KeyCode::Backslash => "|",
 
             KeyCode::Z => "Z",
@@ -390,8 +394,8 @@ pub fn keycode_to_menu_key(keycode: KeyCode, shift: bool) -> &'static str {
             KeyCode::B => "B",
             KeyCode::N => "N",
             KeyCode::M => "M",
-            KeyCode::Comma => ",",
-            KeyCode::Period => ".k",
+            KeyCode::Comma => "<",
+            KeyCode::Period => ">",
             _ => "",
         }
     }
