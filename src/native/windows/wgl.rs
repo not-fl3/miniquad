@@ -406,13 +406,13 @@ impl Wgl {
 
         // CreateContextAttribsARB is supposed to create the context with
         // the highest version version possible
-        // but, somehow, sometimes, it creates 2.1 context when 3.2 is in fact available
-        // so this is a workaround: try to create 3.2, and if it fails, go for 2.1
+        // but, somehow, sometimes, it creates 2.1 context when 3.1 is in fact available
+        // so this is a workaround: try to create 3.1, and if it fails, go for 2.1
         let attrs = [
             WGL_CONTEXT_MAJOR_VERSION_ARB,
             3,
             WGL_CONTEXT_MINOR_VERSION_ARB,
-            2,
+            1,
             WGL_CONTEXT_FLAGS_ARB,
             WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
             WGL_CONTEXT_PROFILE_MASK_ARB,
@@ -427,7 +427,7 @@ impl Wgl {
         );
 
         if gl_ctx.is_null() {
-            eprintln!("WGL: failed to create 3.2 context, trying 2.1");
+            eprintln!("WGL: failed to create 3.1 context, trying 2.1");
 
             let attrs = [
                 WGL_CONTEXT_MAJOR_VERSION_ARB,
@@ -445,10 +445,11 @@ impl Wgl {
                 attrs.as_ptr() as *const _,
             );
         }
+
         if gl_ctx.is_null() {
             let err = GetLastError();
             if err == (0xc0070000 | ERROR_INVALID_VERSION_ARB) {
-                panic!("WGL: Driver does not support OpenGL version 3.3");
+                panic!("WGL: Driver does not support requested OpenGL version");
             } else if err == (0xc0070000 | ERROR_INVALID_PROFILE_ARB) {
                 panic!("WGL: Driver does not support the requested OpenGL profile");
             } else if err == (0xc0070000 | ERROR_INCOMPATIBLE_DEVICE_CONTEXTS_ARB) {
