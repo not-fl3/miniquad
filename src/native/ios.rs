@@ -141,8 +141,11 @@ pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
                 let mut ios_pos: NSPoint = msg_send![ios_touch, locationInView: this];
 
                 if native_display().lock().unwrap().high_dpi {
-                    ios_pos.x *= 2.;
-                    ios_pos.y *= 2.;
+                    let main_screen: ObjcId = msg_send![class!(UIScreen), mainScreen];
+                    let scale: f64 = msg_send![main_screen, scale];
+
+                    ios_pos.x *= scale;
+                    ios_pos.y *= scale;
                 } else {
                     let content_scale_factor: f64 = msg_send![this, contentScaleFactor];
                     ios_pos.x *= content_scale_factor;
@@ -317,9 +320,11 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
         let high_dpi = native_display().lock().unwrap().high_dpi;
 
         let (screen_width, screen_height) = if high_dpi {
+            let scale: f64 = unsafe { msg_send![main_screen, scale] };
+
             (
-                screen_rect.size.width as i32 * 2,
-                screen_rect.size.height as i32 * 2,
+                (screen_rect.size.width * scale) as i32,
+                (screen_rect.size.height * scale) as i32,
             )
         } else {
             let content_scale_factor: f64 = unsafe { msg_send![payload.view, contentScaleFactor] };
@@ -414,7 +419,10 @@ unsafe fn create_opengl_view(screen_rect: NSRect, _sample_count: i32, high_dpi: 
     msg_send_![glk_view_obj, setUserInteractionEnabled: YES];
     msg_send_![glk_view_obj, setMultipleTouchEnabled: YES];
     if high_dpi {
-        msg_send_![glk_view_obj, setContentScaleFactor: 2.0];
+        let main_screen: ObjcId = msg_send![class!(UIScreen), mainScreen];
+        let scale: f64 = msg_send![main_screen, scale];
+
+        msg_send_![glk_view_obj, setContentScaleFactor: scale];
     } else {
         msg_send_![glk_view_obj, setContentScaleFactor: 1.0];
     }
@@ -486,9 +494,11 @@ pub fn define_app_delegate() -> *const Class {
             let screen_rect: NSRect = msg_send![main_screen, bounds];
 
             let (_, _) = if conf.high_dpi {
+                let scale: f64 = msg_send![main_screen, scale];
+
                 (
-                    screen_rect.size.width as i32 * 2,
-                    screen_rect.size.height as i32 * 2,
+                    (screen_rect.size.width * scale) as i32,
+                    (screen_rect.size.height * scale) as i32,
                 )
             } else {
                 (
