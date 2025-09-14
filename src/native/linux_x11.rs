@@ -420,6 +420,12 @@ impl X11Display {
                 ShowKeyboard(..) => {
                     eprintln!("Not implemented for X11")
                 }
+                SetWindowTitle(title) => {
+                    self.libx11.update_window_title(self.display, self.window, &title);
+                }
+                SetWindowIcon(icon) => {
+                    self.libx11.update_window_icon(self.display, self.window, &icon);
+                }
             }
         }
     }

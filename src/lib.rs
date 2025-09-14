@@ -319,6 +319,25 @@ pub mod window {
         }
     }
 
+    /// Set the application's window title.
+    /// TODO: This is not implemented for all platforms yet.
+    pub fn set_window_title(title: &str) {
+        let d = native_display().lock().unwrap();
+        d.native_requests
+            .send(native::Request::SetWindowTitle(title.to_string()))
+            .unwrap();
+    }
+
+    // Since icons are large structs, wrap them in a Box to avoid excessive stack consumption.
+    /// Set the application's icon.
+    /// TODO: This is not implemented for all platforms yet.
+    pub fn set_window_icon(icon: Box<conf::Icon>) {
+        let d = native_display().lock().unwrap();
+        d.native_requests
+            .send(native::Request::SetWindowIcon(icon))
+            .unwrap();
+    }
+
     /// Get the position of the window.
     /// TODO: implement for other platforms
     #[cfg(any(target_os = "windows", target_os = "linux"))]
