@@ -12,7 +12,7 @@ use std::{
 
 use crate::{
     event::EventHandler,
-    native::{NativeDisplayData, Request},
+    native::{DroppedFile, NativeDisplayData, Request},
 };
 
 // fn dropped_file_count(&mut self) -> usize {
@@ -362,6 +362,5 @@ pub extern "C" fn on_file_dropped(
     let path = PathBuf::from(unsafe { String::from_raw_parts(path, path_len, path_len) });
     let bytes = unsafe { Vec::from_raw_parts(bytes, bytes_len, bytes_len) };
 
-    d.dropped_files.paths.push(path);
-    d.dropped_files.bytes.push(bytes);
+    d.dropped_files.push(DroppedFile { path, bytes });
 }
