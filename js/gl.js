@@ -640,7 +640,10 @@ var importObject = {
             emscripten_shaders_hack = flag;
         },
         sapp_set_clipboard: function (ptr, len) {
-            clipboard = UTF8ToString(ptr, len);
+            let string_copy = (' ' + UTF8ToString(ptr, len)).slice(1);
+            if (string_copy != "") {
+                clipboard = string_copy;
+            }
         },
         dpi_scale,
         rand: function () {
