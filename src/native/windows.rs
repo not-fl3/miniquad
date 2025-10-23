@@ -352,36 +352,42 @@ unsafe extern "system" fn win32_wndproc(
             let mouse_x = payload.mouse_x;
             let mouse_y = payload.mouse_y;
             event_handler.mouse_button_down_event(MouseButton::Left, mouse_x, mouse_y);
+            SetCapture(hwnd);
         }
         WM_RBUTTONDOWN => {
             let mouse_x = payload.mouse_x;
             let mouse_y = payload.mouse_y;
 
             event_handler.mouse_button_down_event(MouseButton::Right, mouse_x, mouse_y);
+            SetCapture(hwnd);
         }
         WM_MBUTTONDOWN => {
             let mouse_x = payload.mouse_x;
             let mouse_y = payload.mouse_y;
 
             event_handler.mouse_button_down_event(MouseButton::Middle, mouse_x, mouse_y);
+            SetCapture(hwnd);
         }
         WM_LBUTTONUP => {
             let mouse_x = payload.mouse_x;
             let mouse_y = payload.mouse_y;
 
             event_handler.mouse_button_up_event(MouseButton::Left, mouse_x, mouse_y);
+            ReleaseCapture();
         }
         WM_RBUTTONUP => {
             let mouse_x = payload.mouse_x;
             let mouse_y = payload.mouse_y;
 
             event_handler.mouse_button_up_event(MouseButton::Right, mouse_x, mouse_y);
+            ReleaseCapture();
         }
         WM_MBUTTONUP => {
             let mouse_x = payload.mouse_x;
             let mouse_y = payload.mouse_y;
 
             event_handler.mouse_button_up_event(MouseButton::Middle, mouse_x, mouse_y);
+            ReleaseCapture();
         }
 
         WM_MOUSEMOVE => {
