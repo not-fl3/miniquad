@@ -255,7 +255,7 @@ pub struct Icon {
 }
 
 impl Icon {
-    pub fn miniquad_logo() -> Icon {
+    pub const fn miniquad_logo() -> Icon {
         Icon {
             small: crate::default_icon::SMALL,
             medium: crate::default_icon::MEDIUM,

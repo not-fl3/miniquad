@@ -16,7 +16,7 @@
 use crate::event::KeyCode;
 use crate::native::linux_wayland::libxkbcommon::xkb_keysym_t;
 
-pub fn translate_keysym(keysym: xkb_keysym_t) -> KeyCode {
+pub const fn translate_keysym(keysym: xkb_keysym_t) -> KeyCode {
     // See xkbcommon/xkbcommon-keysyms.h
     match keysym {
         65307 => KeyCode::Escape,
