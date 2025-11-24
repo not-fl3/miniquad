@@ -136,8 +136,10 @@ pub fn define_glk_or_mtk_view(superclass: &Class) -> *const Class {
             let size: u64 = msg_send![enumerator, count];
             let enumerator: ObjcId = msg_send![enumerator, objectEnumerator];
 
-            for touch_id in 0..size {
+            for _ in 0..size {
                 let ios_touch: ObjcId = msg_send![enumerator, nextObject];
+                // Use the UITouch pointer as a stable ID instead of loop index
+                let touch_id = ios_touch as u64;
                 let mut ios_pos: NSPoint = msg_send![ios_touch, locationInView: this];
 
                 if native_display().lock().unwrap().high_dpi {
