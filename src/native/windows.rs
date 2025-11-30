@@ -93,16 +93,11 @@ impl WindowsDisplay {
         self.user_cursor = cursor_icon != CursorIcon::Default;
     }
     fn set_window_size(&mut self, new_width: u32, new_height: u32) {
-        let mut x = 0;
-        let mut y = 0;
         let mut final_new_width = new_width;
         let mut final_new_height = new_height;
 
         let mut rect: RECT = unsafe { std::mem::zeroed() };
-        if unsafe { GetClientRect(self.wnd, &mut rect as *mut _ as _) } != 0 {
-            x = rect.left;
-            y = rect.bottom;
-        }
+        unsafe { GetClientRect(self.wnd, &mut rect as *mut _ as _) };
 
         rect.right = (rect.left + new_width as i32) as _;
         rect.top = (rect.bottom - new_height as i32) as _;
@@ -126,12 +121,12 @@ impl WindowsDisplay {
             SetWindowPos(
                 self.wnd,
                 HWND_TOP,
-                x,
-                y,
+                (GetSystemMetrics(SM_CXSCREEN) - final_new_width as i32) / 2,
+                (GetSystemMetrics(SM_CYSCREEN) - final_new_height as i32) / 2,
                 final_new_width as i32,
                 final_new_height as i32,
-                SWP_NOMOVE,
-            )
+                0,
+            );
         };
     }
     /// Set the window position in screen coordinates.
@@ -688,6 +683,9 @@ unsafe fn create_window(
     AdjustWindowRectEx(&rect as *const _ as _, win_style, false as _, win_ex_style);
     let win_width = rect.right - rect.left;
     let win_height = rect.bottom - rect.top;
+    let win_x = (GetSystemMetrics(SM_CXSCREEN) - win_width) / 2;
+    let win_y = (GetSystemMetrics(SM_CYSCREEN) - win_height) / 2;
+
     let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
     let mut window_name = window_title.encode_utf16().collect::<Vec<u16>>();
     window_name.push(0);
@@ -696,8 +694,8 @@ unsafe fn create_window(
         class_name.as_ptr(),         // lpClassName
         window_name.as_ptr(),        // lpWindowName
         win_style,                   // dwStyle
-        CW_USEDEFAULT,               // X
-        CW_USEDEFAULT,               // Y
+        win_x,                       // X
+        win_y,                       // Y
         win_width,                   // nWidth
         win_height,                  // nHeight
         NULL as _,                   // hWndParent
