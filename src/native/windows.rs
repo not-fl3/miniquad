@@ -63,7 +63,7 @@ struct COMPOSITIONFORM {
     rcArea: RECT,
 }
 
-// CANDIDATEFORM structure  
+// CANDIDATEFORM structure
 #[repr(C)]
 #[allow(non_snake_case)]
 struct CANDIDATEFORM {
@@ -590,7 +590,6 @@ unsafe extern "system" fn win32_wndproc(
         }
         WM_IME_COMPOSITION => {
             let flags = lparam as u32;
-            const GCS_RESULTSTR: u32 = 0x800;
             
             // Extract and dispatch the result string manually to avoid duplicates
             if (flags & GCS_RESULTSTR) != 0 {
@@ -637,10 +636,13 @@ unsafe extern "system" fn win32_wndproc(
             return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         WM_IME_STARTCOMPOSITION => {
+            // Offset for candidate window below composition position
+            const CANDIDATE_WINDOW_Y_OFFSET: i32 = 20;
+            
             // Set candidate window position when IME starts composition
             let himc = ImmGetContext(hwnd);
             if !himc.is_null() {
-                let mut pt = POINT { x: 100, y: 100 };
+                let mut pt: POINT = std::mem::zeroed();
                 GetCaretPos(&mut pt);
                 
                 let comp_form = COMPOSITIONFORM {
@@ -650,16 +652,14 @@ unsafe extern "system" fn win32_wndproc(
                 };
                 ImmSetCompositionWindow(himc, &comp_form);
                 
-                // Set candidate window position for all 4 possible candidate windows
-                for i in 0..4 {
-                    let cand_form = CANDIDATEFORM {
-                        dwIndex: i,
-                        dwStyle: CFS_CANDIDATEPOS,
-                        ptCurrentPos: POINT { x: pt.x, y: pt.y + 20 },
-                        rcArea: RECT { left: 0, top: 0, right: 0, bottom: 0 },
-                    };
-                    ImmSetCandidateWindow(himc, &cand_form);
-                }
+                // Set candidate window position (most IMEs only use index 0)
+                let cand_form = CANDIDATEFORM {
+                    dwIndex: 0,
+                    dwStyle: CFS_CANDIDATEPOS,
+                    ptCurrentPos: POINT { x: pt.x, y: pt.y + CANDIDATE_WINDOW_Y_OFFSET },
+                    rcArea: RECT { left: 0, top: 0, right: 0, bottom: 0 },
+                };
+                ImmSetCandidateWindow(himc, &cand_form);
                 
                 ImmReleaseContext(hwnd, himc);
             }
@@ -778,8 +778,11 @@ unsafe extern "system" fn win32_wndproc(
                     // Create new IME context if none exists
                     let new_himc = ImmCreateContext();
                     if !new_himc.is_null() {
-                        ImmAssociateContext(hwnd, new_himc);
-                        ImmSetOpenStatus(new_himc, 1);
+                        let prev_himc = ImmAssociateContext(hwnd, new_himc);
+                        if ImmSetOpenStatus(new_himc, 1) == 0 && prev_himc.is_null() {
+                            // If SetOpenStatus fails and no previous context, release the new one
+                            ImmReleaseContext(hwnd, new_himc);
+                        }
                     }
                 } else {
                     // Ensure IME is open

@@ -80,6 +80,7 @@ impl TextRenderer {
             return;
         }
 
+        // Copy glyph bitmap to atlas
         for y in 0..m.height {
             for x in 0..m.width {
                 let src = y * m.width + x;
@@ -102,6 +103,7 @@ impl TextRenderer {
 
         self.cursor_x += m.width as u32 + 1;
         self.row_h = self.row_h.max(m.height as u32);
+        // Mark atlas dirty only after successful insertion
         self.dirty = true;
     }
 
