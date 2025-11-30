@@ -16,6 +16,7 @@ use winapi::{
         windowsx::{GET_X_LPARAM, GET_Y_LPARAM},
     },
     um::{
+        imm::{HIMC, ImmGetContext, ImmReleaseContext},
         libloaderapi::{GetModuleHandleW, GetProcAddress},
         shellapi::{DragAcceptFiles, DragQueryFileW, HDROP},
         shellscalingapi::*,
@@ -23,6 +24,70 @@ use winapi::{
         winuser::*,
     },
 };
+
+// IME constants
+const GCS_RESULTSTR: DWORD = 0x0800;
+
+// IME message constants
+const WM_IME_SETCONTEXT: UINT = 0x0281;
+const WM_IME_NOTIFY: UINT = 0x0282;
+const WM_IME_CHAR: UINT = 0x0286;
+const WM_IME_STARTCOMPOSITION: UINT = 0x010D;
+const WM_IME_ENDCOMPOSITION: UINT = 0x010E;
+const WM_IME_COMPOSITION: UINT = 0x010F;
+const WM_INPUTLANGCHANGE: UINT = 0x0051;
+const WM_INPUTLANGCHANGEREQUEST: UINT = 0x0050;
+
+// Window focus messages
+const WM_SETFOCUS: UINT = 0x0007;
+const WM_KILLFOCUS: UINT = 0x0008;
+
+/// Global flag tracking whether IME has been explicitly disabled by the user.
+/// This is controlled via `show_keyboard(bool)` API calls.
+use std::sync::atomic::AtomicBool;
+static IME_USER_DISABLED: AtomicBool = AtomicBool::new(false);
+
+// IME composition form constants
+const CFS_POINT: DWORD = 0x0002;
+const CFS_CANDIDATEPOS: DWORD = 0x0040;
+
+// ImmAssociateContextEx flags
+const IACE_DEFAULT: DWORD = 0x0010;
+
+// COMPOSITIONFORM structure
+#[repr(C)]
+#[allow(non_snake_case)]
+struct COMPOSITIONFORM {
+    dwStyle: DWORD,
+    ptCurrentPos: POINT,
+    rcArea: RECT,
+}
+
+// CANDIDATEFORM structure  
+#[repr(C)]
+#[allow(non_snake_case)]
+struct CANDIDATEFORM {
+    dwIndex: DWORD,
+    dwStyle: DWORD,
+    ptCurrentPos: POINT,
+    rcArea: RECT,
+}
+
+// Link to imm32.dll for IME support
+#[link(name = "imm32")]
+extern "system" {
+    fn ImmGetCompositionStringW(himc: HIMC, index: DWORD, buf: *mut std::ffi::c_void, len: DWORD) -> i32;
+    fn ImmAssociateContextEx(hwnd: HWND, himc: HIMC, flags: DWORD) -> i32;
+    fn ImmAssociateContext(hwnd: HWND, himc: HIMC) -> HIMC;
+    fn ImmCreateContext() -> HIMC;
+    fn ImmSetCompositionWindow(himc: HIMC, lpCompForm: *const COMPOSITIONFORM) -> i32;
+    fn ImmSetCandidateWindow(himc: HIMC, lpCandidate: *const CANDIDATEFORM) -> i32;
+    fn ImmGetOpenStatus(himc: HIMC) -> i32;
+    fn ImmSetOpenStatus(himc: HIMC, fOpen: i32) -> i32;
+}
+
+// IME Association flags
+const IACE_CHILDREN: DWORD = 0x0001;
 
 mod clipboard;
 mod keycodes;
@@ -72,6 +137,51 @@ impl WindowsDisplay {
             unsafe { ShowCursor(shown.into()) };
         }
     }
+    /// Set IME candidate window position in client coordinates
+    fn set_ime_position(&mut self, x: i32, y: i32) {
+        unsafe {
+            let himc = ImmGetContext(self.wnd);
+            if himc.is_null() {
+                return;
+            }
+
+            // Set composition window position (where the composing text appears)
+            let comp_form = COMPOSITIONFORM {
+                dwStyle: CFS_POINT,
+                ptCurrentPos: POINT { x, y },
+                rcArea: std::mem::zeroed(),
+            };
+            ImmSetCompositionWindow(himc, &comp_form);
+
+            // Set candidate window position (the popup with character choices)
+            let cand_form = CANDIDATEFORM {
+                dwIndex: 0,
+                dwStyle: CFS_CANDIDATEPOS,
+                ptCurrentPos: POINT { x, y },
+                rcArea: std::mem::zeroed(),
+            };
+            ImmSetCandidateWindow(himc, &cand_form);
+
+            ImmReleaseContext(self.wnd, himc);
+        }
+    }
+    
+    /// Enable or disable IME for the window.
+    /// When disabled, the IME will not process keyboard input, useful for game controls.
+    fn set_ime_enabled(&mut self, enabled: bool) {
+        unsafe {
+            if enabled {
+                IME_USER_DISABLED.store(false, std::sync::atomic::Ordering::Relaxed);
+                // Re-associate IME context with the window
+                ImmAssociateContextEx(self.wnd, std::ptr::null_mut(), IACE_DEFAULT);
+            } else {
+                IME_USER_DISABLED.store(true, std::sync::atomic::Ordering::Relaxed);
+                // Disassociate IME context from the window
+                ImmAssociateContextEx(self.wnd, std::ptr::null_mut(), 0);
+            }
+        }
+    }
+    
     fn set_mouse_cursor(&mut self, cursor_icon: CursorIcon) {
         let cursor_name = match cursor_icon {
             CursorIcon::Default => IDC_ARROW,
@@ -469,19 +579,133 @@ unsafe extern "system" fn win32_wndproc(
                     event_handler.char_event(chr, mods, repeat);
                 }
             }
+            return 0;
+        }
+        // IME message handling:
+        // We manually extract the result string from WM_IME_COMPOSITION
+        // instead of relying on WM_IME_CHAR to avoid duplicate characters.
+        WM_IME_CHAR => {
+            // Already handled in WM_IME_COMPOSITION; ignore to prevent duplicates
+            return 0;
+        }
+        WM_IME_COMPOSITION => {
+            let flags = lparam as u32;
+            const GCS_RESULTSTR: u32 = 0x800;
+            
+            // Extract and dispatch the result string manually to avoid duplicates
+            if (flags & GCS_RESULTSTR) != 0 {
+                let himc = ImmGetContext(hwnd);
+                if !himc.is_null() {
+                    let len = ImmGetCompositionStringW(himc, GCS_RESULTSTR, std::ptr::null_mut(), 0);
+                    if len > 0 {
+                        let mut buffer: Vec<u16> = vec![0; (len as usize / 2) + 1];
+                        let actual_len = ImmGetCompositionStringW(
+                            himc, 
+                            GCS_RESULTSTR, 
+                            buffer.as_mut_ptr() as *mut _, 
+                            len as u32
+                        );
+                        if actual_len > 0 {
+                            let char_count = actual_len as usize / 2;
+                            let mods = key_mods();
+                            // Send chars in order
+                            for i in 0..char_count {
+                                let chr = buffer[i];
+                                if let Some(c) = char::from_u32(chr as u32) {
+                                    event_handler.char_event(c, mods, false);
+                                }
+                            }
+                        }
+                    }
+                    ImmReleaseContext(hwnd, himc);
+                }
+                return 0;
+            }
+            
+            // For non-result messages (composition state updates), pass to DefWindowProc
+            return DefWindowProcW(hwnd, umsg, wparam, lparam);
+        }
+        WM_IME_SETCONTEXT => {
+            let user_disabled = IME_USER_DISABLED.load(std::sync::atomic::Ordering::Relaxed);
+            
+            // If user explicitly disabled IME, don't auto-restore
+            if user_disabled {
+                return 0;
+            }
+            
+            // Must pass to DefWindowProc to enable IME properly
+            return DefWindowProcW(hwnd, umsg, wparam, lparam);
+        }
+        WM_IME_STARTCOMPOSITION => {
+            // Set candidate window position when IME starts composition
+            let himc = ImmGetContext(hwnd);
+            if !himc.is_null() {
+                let mut pt = POINT { x: 100, y: 100 };
+                GetCaretPos(&mut pt);
+                
+                let comp_form = COMPOSITIONFORM {
+                    dwStyle: CFS_POINT,
+                    ptCurrentPos: pt,
+                    rcArea: RECT { left: 0, top: 0, right: 0, bottom: 0 },
+                };
+                ImmSetCompositionWindow(himc, &comp_form);
+                
+                // Set candidate window position for all 4 possible candidate windows
+                for i in 0..4 {
+                    let cand_form = CANDIDATEFORM {
+                        dwIndex: i,
+                        dwStyle: CFS_CANDIDATEPOS,
+                        ptCurrentPos: POINT { x: pt.x, y: pt.y + 20 },
+                        rcArea: RECT { left: 0, top: 0, right: 0, bottom: 0 },
+                    };
+                    ImmSetCandidateWindow(himc, &cand_form);
+                }
+                
+                ImmReleaseContext(hwnd, himc);
+            }
+            return DefWindowProcW(hwnd, umsg, wparam, lparam);
+        }
+        WM_IME_ENDCOMPOSITION => {
+            return DefWindowProcW(hwnd, umsg, wparam, lparam);
+        }
+        WM_IME_NOTIFY => {
+            const IMN_SETOPENSTATUS: WPARAM = 0x0008;
+            
+            // Re-enable IME if it was unexpectedly closed (unless user disabled it)
+            if wparam == IMN_SETOPENSTATUS {
+                let himc = ImmGetContext(hwnd);
+                if !himc.is_null() {
+                    let open_status = ImmGetOpenStatus(himc);
+                    let user_disabled = IME_USER_DISABLED.load(std::sync::atomic::Ordering::Relaxed);
+                    if open_status == 0 && !user_disabled {
+                        ImmSetOpenStatus(himc, 1);
+                    }
+                    ImmReleaseContext(hwnd, himc);
+                }
+            }
+            
+            return DefWindowProcW(hwnd, umsg, wparam, lparam);
+        }
+        WM_INPUTLANGCHANGEREQUEST | WM_INPUTLANGCHANGE => {
+            // Pass input language change messages to default handler
+            return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         WM_KEYDOWN | WM_SYSKEYDOWN => {
-            let keycode = HIWORD(lparam as _) as u32 & 0x1FF;
-            let keycode = keycodes::translate_keycode(keycode);
+            let keycode_raw = HIWORD(lparam as _) as u32 & 0x1FF;
+            let keycode = keycodes::translate_keycode(keycode_raw);
             let mods = key_mods();
             let repeat = !!(lparam & 0x40000000) != 0;
             event_handler.key_down_event(keycode, mods, repeat);
+            // Pass to DefWindowProc for IME to work properly
+            return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         WM_KEYUP | WM_SYSKEYUP => {
             let keycode = HIWORD(lparam as _) as u32 & 0x1FF;
             let keycode = keycodes::translate_keycode(keycode);
             let mods = key_mods();
             event_handler.key_up_event(keycode, mods);
+            // IMPORTANT: Pass to DefWindowProc for IME to work properly
+            return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         WM_ENTERSIZEMOVE | WM_ENTERMENULOOP => {
             SetTimer(
@@ -542,6 +766,35 @@ unsafe extern "system" fn win32_wndproc(
             } else {
                 event_handler.window_minimized_event();
             }
+        }
+        WM_SETFOCUS => {
+            let user_disabled = IME_USER_DISABLED.load(std::sync::atomic::Ordering::Relaxed);
+            
+            // Ensure IME context is available when window gains focus
+            if !user_disabled {
+                let himc = ImmGetContext(hwnd);
+                
+                if himc.is_null() {
+                    // Create new IME context if none exists
+                    let new_himc = ImmCreateContext();
+                    if !new_himc.is_null() {
+                        ImmAssociateContext(hwnd, new_himc);
+                        ImmSetOpenStatus(new_himc, 1);
+                    }
+                } else {
+                    // Ensure IME is open
+                    let open_status = ImmGetOpenStatus(himc);
+                    if open_status == 0 {
+                        ImmSetOpenStatus(himc, 1);
+                    }
+                    ImmReleaseContext(hwnd, himc);
+                }
+            }
+            
+            return DefWindowProcW(hwnd, umsg, wparam, lparam);
+        }
+        WM_KILLFOCUS => {
+            return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         _ => {}
     }
@@ -644,6 +897,7 @@ unsafe fn create_window(
 ) -> (HWND, HDC) {
     let mut wndclassw: WNDCLASSW = std::mem::zeroed();
 
+    // CS_OWNDC is required for OpenGL
     wndclassw.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wndclassw.lpfnWndProc = Some(win32_wndproc);
     wndclassw.hInstance = GetModuleHandleW(NULL as _);
@@ -707,21 +961,9 @@ unsafe fn create_window(
     );
     assert!(!hwnd.is_null());
 
-    let mut rawinputdevice: RAWINPUTDEVICE = std::mem::zeroed();
-    rawinputdevice.usUsagePage = HID_USAGE_PAGE_GENERIC;
-    rawinputdevice.usUsage = HID_USAGE_GENERIC_MOUSE;
-    rawinputdevice.hwndTarget = NULL as _;
-    let register_succeed = RegisterRawInputDevices(
-        &rawinputdevice as *const _,
-        1,
-        std::mem::size_of::<RAWINPUTDEVICE>() as _,
-    );
-    assert!(
-        register_succeed == 1,
-        "Win32: failed to register for raw mouse input!"
-    );
-
-    ShowWindow(hwnd, SW_SHOW);
+    // NOTE: Do not call ShowWindow here!
+    // Must show window AFTER SetPixelFormat and wglCreateContext
+    // Otherwise IME will not work correctly.
     let dc = GetDC(hwnd);
     assert!(!dc.is_null());
 
@@ -731,7 +973,16 @@ unsafe fn create_window(
 }
 
 unsafe fn create_msg_window() -> (HWND, HDC) {
-    let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
+    // Use a separate window class to avoid interfering with main window's IME
+    let class_name = "MINIQUADMSGWND\0".encode_utf16().collect::<Vec<u16>>();
+    
+    let mut wndclassw: WNDCLASSW = std::mem::zeroed();
+    wndclassw.style = 0;
+    wndclassw.lpfnWndProc = Some(DefWindowProcW);
+    wndclassw.hInstance = GetModuleHandleW(NULL as _);
+    wndclassw.lpszClassName = class_name.as_ptr() as _;
+    RegisterClassW(&wndclassw);
+    
     let window_name = "miniquad message window\0"
         .encode_utf16()
         .collect::<Vec<u16>>();
@@ -753,6 +1004,10 @@ unsafe fn create_msg_window() -> (HWND, HDC) {
         !msg_hwnd.is_null(),
         "Win32: failed to create helper window!"
     );
+    
+    // Disable IME for message window to avoid interfering with main window
+    ImmAssociateContextEx(msg_hwnd, std::ptr::null_mut(), IACE_CHILDREN);
+    
     ShowWindow(msg_hwnd, SW_HIDE);
     let mut msg = std::mem::zeroed();
     while PeekMessageW(&mut msg as _, msg_hwnd, 0, 0, PM_REMOVE) != 0 {
@@ -874,8 +1129,19 @@ impl WindowsDisplay {
             } => self.set_window_size(new_width as _, new_height as _),
             SetWindowPosition { new_x, new_y } => self.set_window_position(new_x, new_y),
             SetFullscreen(fullscreen) => self.set_fullscreen(fullscreen),
-            ShowKeyboard(_show) => {
-                eprintln!("Not implemented for windows")
+            ShowKeyboard(show) => {
+                // On Windows, ShowKeyboard controls IME state
+                if show {
+                    IME_USER_DISABLED.store(false, std::sync::atomic::Ordering::Relaxed);
+                } else {
+                    IME_USER_DISABLED.store(true, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+            SetImePosition { x, y } => {
+                self.set_ime_position(x, y);
+            }
+            SetImeEnabled(enabled) => {
+                self.set_ime_enabled(enabled);
             }
         }
     }
@@ -947,6 +1213,25 @@ where
         );
 
         super::gl::load_gl_funcs(|proc| display.get_proc_address(proc));
+
+        // IMPORTANT: Show window AFTER WGL context is created
+        // This ensures IME initializes correctly when window gains focus
+        ShowWindow(wnd, SW_SHOW);
+
+        // Register for raw mouse input (needed for raw_mouse_motion event)
+        let mut rawinputdevice: RAWINPUTDEVICE = std::mem::zeroed();
+        rawinputdevice.usUsagePage = HID_USAGE_PAGE_GENERIC;
+        rawinputdevice.usUsage = HID_USAGE_GENERIC_MOUSE;
+        rawinputdevice.hwndTarget = NULL as _;
+        let register_succeed = RegisterRawInputDevices(
+            &rawinputdevice as *const _,
+            1,
+            std::mem::size_of::<RAWINPUTDEVICE>() as _,
+        );
+        assert!(
+            register_succeed == 1,
+            "Win32: failed to register for raw mouse input!"
+        );
 
         display.event_handler = Some(f());
 

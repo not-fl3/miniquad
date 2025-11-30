@@ -76,6 +76,8 @@ pub(crate) enum Request {
     SetWindowPosition { new_x: u32, new_y: u32 },
     SetFullscreen(bool),
     ShowKeyboard(bool),
+    SetImePosition { x: i32, y: i32 },
+    SetImeEnabled(bool),
 }
 
 pub trait Clipboard: Send + Sync {

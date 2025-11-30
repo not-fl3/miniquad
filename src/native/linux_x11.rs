@@ -420,6 +420,12 @@ impl X11Display {
                 ShowKeyboard(..) => {
                     eprintln!("Not implemented for X11")
                 }
+                SetImePosition { .. } => {
+                    // IME position control not implemented for X11 yet
+                }
+                SetImeEnabled(..) => {
+                    // IME enable/disable not implemented for X11 yet
+                }
             }
         }
     }
