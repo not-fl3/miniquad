@@ -36,6 +36,7 @@ winapi = { version = "0.3", features = [
     "winbase",
     "hidusage",
     "shellapi",
+    "imm",
 ] }
 
 [target.'cfg(target_os = "android")'.dependencies]
@@ -48,6 +49,7 @@ objc = { package = "objc-rs", version = "0.2" }
 [dev-dependencies]
 glam = { version = "0.24", features = ["scalar-math"] }
 quad-rand = "0.1"
+fontdue = "0.8"
 
 [profile.release]
 lto = true

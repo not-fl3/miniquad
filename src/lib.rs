@@ -383,6 +383,47 @@ pub mod window {
         }
     }
 
+    /// Set the position of the IME candidate window.
+    /// The position is in window client coordinates (pixels).
+    /// This should be called when the text cursor moves to keep the IME
+    /// candidate window near the insertion point.
+    pub fn set_ime_position(x: i32, y: i32) {
+        let d = native_display().lock().unwrap();
+        #[cfg(target_os = "android")]
+        {
+            let _ = (x, y); // IME position not applicable on Android
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            d.native_requests
+                .send(native::Request::SetImePosition { x, y })
+                .unwrap();
+        }
+    }
+
+    /// Enable or disable IME (Input Method Editor) for the window.
+    /// When enabled, the IME will process keyboard input for CJK text input.
+    /// When disabled, keyboard events are sent directly to the application,
+    /// which is useful for game controls (e.g., WASD movement).
+    ///
+    /// # Arguments
+    /// * `enabled` - `true` to enable IME (for text input), `false` to disable (for game controls)
+    pub fn set_ime_enabled(enabled: bool) {
+        let d = native_display().lock().unwrap();
+        #[cfg(target_os = "android")]
+        {
+            let _ = enabled; // IME control not applicable on Android
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            d.native_requests
+                .send(native::Request::SetImeEnabled(enabled))
+                .unwrap();
+        }
+    }
+
     #[cfg(target_vendor = "apple")]
     pub fn apple_gfx_api() -> crate::conf::AppleGfxApi {
         let d = native_display().lock().unwrap();

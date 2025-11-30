@@ -114,8 +114,17 @@ impl MainThreadState {
     fn process_request(&mut self, request: crate::native::Request) {
         use crate::native::Request::*;
 
-        if let ScheduleUpdate = request {
-            self.update_requested = true;
+        match request {
+            ScheduleUpdate => {
+                self.update_requested = true;
+            }
+            SetImePosition { .. } => {
+                // IME position control not applicable on iOS
+            }
+            SetImeEnabled(..) => {
+                // IME enable/disable not applicable on iOS
+            }
+            _ => {}
         }
     }
 }

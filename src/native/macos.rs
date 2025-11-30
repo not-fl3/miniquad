@@ -204,7 +204,15 @@ impl MacosDisplay {
             SetWindowPosition { .. } => {
                 eprintln!("Not implemented for macos");
             }
-            _ => {}
+            ShowKeyboard(..) => {
+                // Not applicable on macOS desktop
+            }
+            SetImePosition { .. } => {
+                // IME position control not implemented for macOS yet
+            }
+            SetImeEnabled(..) => {
+                // IME enable/disable not implemented for macOS yet
+            }
         }
     }
 }
