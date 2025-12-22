@@ -1709,6 +1709,11 @@ impl RenderingBackend for GlContext {
             glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
             self.cache.bind_buffer(GL_ARRAY_BUFFER, 0, None);
             self.cache.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0, None);
+
+            // On Android when resizing the screen, visual tearing may occur
+            // on some devices since clearing the screen is clipped by scissor.
+            // So disable it when cleaning up the render pass.
+            glDisable(GL_SCISSOR_TEST);
         }
     }
 
