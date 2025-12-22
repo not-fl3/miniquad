@@ -152,6 +152,14 @@ pub struct Platform {
     /// [`schedule_update`]: super::window::schedule_update
     pub blocking_event_loop: bool,
 
+    /// When `blocking_event_loop` is enabled, we can set this value to periodically
+    /// wakeup the `update()` and `draw()` functions. This reduces CPU usage vs
+    /// continuously drawing without having to continuously schedule updates that can
+    /// choke the receiver queue.
+    ///
+    /// Currently supported only on Android.
+    pub sleep_interval_ms: Option<u32>,
+
     /// If `true`, the framebuffer includes an alpha channel.
     /// Currently supported only on Android.
     ///
@@ -183,6 +191,7 @@ impl Default for Platform {
             apple_gfx_api: AppleGfxApi::default(),
             webgl_version: WebGLVersion::default(),
             blocking_event_loop: false,
+            sleep_interval_ms: None,
             swap_interval: None,
             framebuffer_alpha: false,
             wayland_decorations: WaylandDecorations::default(),
