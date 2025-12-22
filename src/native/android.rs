@@ -6,7 +6,7 @@ use crate::{
     },
 };
 
-use std::{cell::RefCell, sync::mpsc, thread};
+use std::{cell::RefCell, sync::mpsc, thread, time::Duration};
 
 pub use crate::native::gl::{self, *};
 
@@ -480,14 +480,23 @@ where
             },
         };
 
+        let rx_timeout = conf
+            .platform
+            .sleep_interval_ms
+            .map(|sleep| Duration::from_millis(sleep as u64));
+
         while !s.quit {
             let block_on_wait = conf.platform.blocking_event_loop && !s.update_requested;
 
             if block_on_wait {
-                let res = rx.recv();
+                // We don't need to loop here because the loop above consumes all
+                // available messages. Instead we are going to block until receiving here.
 
-                if let Ok(msg) = res {
-                    s.process_message(msg);
+                match rx_recv(&rx, rx_timeout) {
+                    Ok(msg) => s.process_message(msg),
+                    // Timeout so time to do periodic update()
+                    Err(mpsc::RecvTimeoutError::Timeout) => s.update_requested = true,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => panic!(),
                 }
             } else {
                 // process all the messages from the main thread
@@ -513,6 +522,19 @@ where
         (s.libegl.eglDestroyContext)(s.egl_display, s.egl_context);
         (s.libegl.eglTerminate)(s.egl_display);
     });
+}
+
+/// Adds a call to Receiver as if there was a `.recv_timeout_opt(timeout)`
+/// where the `timeout` arg is optional.
+fn rx_recv<T>(
+    rx: &mpsc::Receiver<T>,
+    timeout: Option<Duration>,
+) -> Result<T, mpsc::RecvTimeoutError> {
+    match timeout {
+        Some(timeout) => rx.recv_timeout(timeout),
+        // No timeout specified so just do a normal blocking recv()
+        None => rx.recv().map_err(|_| mpsc::RecvTimeoutError::Disconnected),
+    }
 }
 
 #[no_mangle]
