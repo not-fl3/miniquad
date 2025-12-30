@@ -1205,6 +1205,10 @@ where
 
         let mut event_handler = (f.take().unwrap())();
 
+        // track cursor visibility and icon separately, so that we can show/hide cursor without resetting icon
+        let mut cursor_icon = crate::CursorIcon::Default;
+        let mut cursor_visible = true;
+
         while !crate::native_display().try_lock().unwrap().quit_ordered {
             while let Ok(request) = rx.try_recv() {
                 match request {
@@ -1213,19 +1217,20 @@ where
                     }
                     Request::ScheduleUpdate => display.update_requested = true,
                     Request::SetMouseCursor(icon) => {
+                        cursor_icon = icon;
                         display
                             .pointer_context
-                            .set_cursor(&mut display.client, Some(icon));
+                            .set_cursor(&mut display.client, cursor_visible.then_some(cursor_icon));
                     }
                     Request::SetCursorGrab(grab) => {
                         let payload = &mut display as *mut _ as _;
                         display.pointer_context.set_grab(payload, grab);
                     }
                     Request::ShowMouse(show) => {
-                        display.pointer_context.set_cursor(
-                            &mut display.client,
-                            show.then_some(crate::CursorIcon::Default),
-                        );
+                        cursor_visible = show;
+                        display
+                            .pointer_context
+                            .set_cursor(&mut display.client, cursor_visible.then_some(cursor_icon));
                     }
                     // TODO: implement the other events
                     _ => (),
