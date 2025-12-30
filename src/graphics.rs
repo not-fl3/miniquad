@@ -1280,7 +1280,15 @@ pub trait RenderingBackend {
     /// ```
     fn new_buffer(&mut self, type_: BufferType, usage: BufferUsage, data: BufferSource)
         -> BufferId;
-    fn buffer_update(&mut self, buffer: BufferId, data: BufferSource);
+
+    fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
+        self.buffer_update_part(buffer, 0, data);
+    }
+
+    /// Update only a part of a buffer. 
+    /// 
+    /// The offset is given in bytes
+    fn buffer_update_part(&mut self, buffer: BufferId, offset: usize, data: BufferSource);
 
     /// Size of buffer in bytes.
     /// For 1 element, u16 buffer this will return 2.

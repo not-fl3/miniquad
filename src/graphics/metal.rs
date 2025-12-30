@@ -634,12 +634,17 @@ impl RenderingBackend for MetalContext {
         BufferId(self.buffers.len() - 1)
     }
 
-    fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
+    fn buffer_update_part(&mut self, buffer: BufferId, offset: usize, data: BufferSource) {
         let data = match data {
             BufferSource::Slice(data) => data,
-            _ => panic!("buffer_update expects BufferSource::slice"),
+            _ => panic!("buffer_update_part expects BufferSource::slice"),
         };
         let buffer = &mut self.buffers[buffer.0];
+
+        // Make sure that the offset isn't larger than the buffer's size itself
+        assert!(offset < buffer.size);
+
+        // And that our data actually fits into the buffer with this offset
         assert!(data.size <= buffer.size);
 
         unsafe {
@@ -647,7 +652,7 @@ impl RenderingBackend for MetalContext {
             std::ptr::copy(data.ptr, dest, data.size);
 
             #[cfg(target_os = "macos")]
-            msg_send_![buffer.raw[buffer.next_value], didModifyRange:NSRange::new(0, data.size as u64)];
+            msg_send_![buffer.raw[buffer.next_value], didModifyRange:NSRange::new(offset as u64, data.size as u64)];
         }
         buffer.value = buffer.next_value;
     }
