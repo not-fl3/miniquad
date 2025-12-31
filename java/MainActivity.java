@@ -199,21 +199,38 @@ class ResizingLayout
         LinearLayout
     implements
         View.OnApplyWindowInsetsListener {
+    //% RESIZING_LAYOUT_BODY
 
-    public ResizingLayout(Context context){
-        super(context);
+    public ResizingLayout(MainActivity activity){
+        super(activity);
         // When viewing in landscape mode with keyboard shown, there are
         // gaps on both sides so we fill the negative space with black.
         setBackgroundColor(Color.BLACK);
         setOnApplyWindowInsetsListener(this);
+
+        //% RESIZING_LAYOUT_CONSTRUCTOR
     }
 
     @Override
     public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+        // This handler provides a default impl which resizes content when the
+        // IME is shown or hidden.
+        //
+        // However this will lead to flickers in your app as the content is
+        // resized before you have a chance to redraw it.
+        //
+        // The workaround for now is:
+        // * Get IME and system insets and send them to your app.
+        // * Notify your app to draw and apply the insets to fit.
+        // * Disable this function by returning early.
+
+        //% RESIZING_LAYOUT_ON_APPLY_WINDOW_INSETS
+
         if (Build.VERSION.SDK_INT >= 30) {
             Insets imeInsets = insets.getInsets(WindowInsets.Type.ime());
             Insets sysInsets = insets.getInsets(WindowInsets.Type.systemBars());
 
+            // When IME is visible then we dont need bottom inset
             int bottomPadding = sysInsets.bottom;
             if (imeInsets.bottom > 0) {
                 bottomPadding = imeInsets.bottom;
