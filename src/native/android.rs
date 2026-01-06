@@ -716,12 +716,14 @@ pub(crate) unsafe fn load_asset(filepath: *const ::core::ffi::c_char, out: *mut 
         return;
     }
     let length = ndk_sys::AAsset_getLength64(asset);
-    // TODO: memory leak right here! this buffer would never freed
     let buffer = libc::malloc(length as _);
     if ndk_sys::AAsset_read(asset, buffer, length as _) > 0 {
         ndk_sys::AAsset_close(asset);
 
         (*out).content_length = length as _;
         (*out).content = buffer as _;
+    } else {
+        libc::free(buffer);
+        ndk_sys::AAsset_close(asset);
     }
 }
