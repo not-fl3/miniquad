@@ -141,7 +141,8 @@ extern "C" {
 
     // Gamepad support (W3C Gamepad API)
     // https://w3c.github.io/gamepad/#remapping
-    /// Returns the number of connected gamepads (0-4).
+    /// Returns the number of gamepad slots to check (0-4).
+    /// This is the highest occupied index + 1, not the count of connected gamepads.
     pub fn sapp_gamepad_count() -> i32;
     /// Returns 1 if gamepad at index is connected, 0 otherwise.
     pub fn sapp_gamepad_connected(id: i32) -> i32;

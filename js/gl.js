@@ -1462,6 +1462,7 @@ var importObject = {
 
         // Gamepad support (W3C Gamepad API)
         // https://w3c.github.io/gamepad/#remapping
+        // Returns highest occupied gamepad slot + 1 (not count of connected gamepads)
         sapp_gamepad_count: function() {
             var gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
             var count = 0;
