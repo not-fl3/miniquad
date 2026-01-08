@@ -1199,6 +1199,23 @@ where
             display.set_fullscreen(true);
         }
 
+        if !conf.window_resizable {
+            wl_request!(
+                display.client,
+                display.xdg_toplevel,
+                extensions::xdg_shell::xdg_toplevel::set_min_size,
+                conf.window_width,
+                conf.window_height
+            );
+            wl_request!(
+                display.client,
+                display.xdg_toplevel,
+                extensions::xdg_shell::xdg_toplevel::set_max_size,
+                conf.window_width,
+                conf.window_height
+            );
+        }
+
         wl_request!(display.client, display.surface, WL_SURFACE_COMMIT);
         (display.client.wl_display_dispatch)(display.display);
         (display.client.wl_display_dispatch)(display.display);
