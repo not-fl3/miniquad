@@ -1057,13 +1057,13 @@ impl WindowsDisplay {
             if GetClientRect(hwnd, &mut client_rect as *mut _ as _) != 0 {
                 // Calculate window width and height based on the client area
                 let window_width =
-                    ((client_rect.right - client_rect.left) as f32 / self.window_scale) as i32;
+                    (client_rect.right - client_rect.left) as f32 / self.window_scale;
                 let window_height =
-                    ((client_rect.bottom - client_rect.top) as f32 / self.window_scale) as i32;
+                    (client_rect.bottom - client_rect.top) as f32 / self.window_scale;
 
                 // Prevent a framebuffer size of 0 when the window is minimized
-                let fb_width = ((window_width as f32 * self.content_scale) as i32).max(1);
-                let fb_height = ((window_height as f32 * self.content_scale) as i32).max(1);
+                let fb_width = ((window_width * self.content_scale).round() as i32).max(1);
+                let fb_height = ((window_height * self.content_scale).round() as i32).max(1);
 
                 // Check for size changes
                 if fb_width != d.screen_width || fb_height != d.screen_height {
