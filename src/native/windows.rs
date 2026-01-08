@@ -3,7 +3,7 @@ use std::{ffi::OsString, os::windows::ffi::OsStringExt, path::PathBuf};
 use crate::{
     conf::{Conf, Icon},
     event::{KeyMods, MouseButton},
-    native::{NativeDisplayData, Request},
+    native::{DroppedFile, NativeDisplayData, Request},
     CursorIcon, EventHandler,
 };
 
@@ -755,8 +755,10 @@ unsafe extern "system" fn win32_wndproc(
                         let path = path.assume_init();
                         PathBuf::from(OsString::from_wide(&path[0..path_len]))
                     };
-                    d.dropped_files.bytes.push(std::fs::read(&path).unwrap());
-                    d.dropped_files.paths.push(path);
+                    d.dropped_files.push(DroppedFile {
+                        bytes: std::fs::read(&path).unwrap(),
+                        path,
+                    });
                 }
             }
         }
