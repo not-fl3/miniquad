@@ -138,6 +138,19 @@ extern "C" {
     pub fn sapp_schedule_update();
     pub fn init_webgl(version: i32);
     pub fn now() -> f64;
+
+    // Gamepad support (W3C Gamepad API)
+    // https://w3c.github.io/gamepad/#remapping
+    /// Returns the number of connected gamepads (0-4).
+    pub fn sapp_gamepad_count() -> i32;
+    /// Returns 1 if gamepad at index is connected, 0 otherwise.
+    pub fn sapp_gamepad_connected(id: i32) -> i32;
+    /// Returns 1 if button is pressed, 0 otherwise.
+    /// Button indices follow W3C standard gamepad mapping.
+    pub fn sapp_gamepad_button(id: i32, btn: i32) -> i32;
+    /// Returns axis value (-1.0 to 1.0).
+    /// Axis indices: 0=LeftX, 1=LeftY, 2=RightX, 3=RightY
+    pub fn sapp_gamepad_axis(id: i32, axis: i32) -> f32;
 }
 
 unsafe fn show_mouse(shown: bool) {

@@ -1458,7 +1458,38 @@ var importObject = {
             }
             animation_frame_timeout = window.requestAnimationFrame(animation);
         },
-        init_webgl
+        init_webgl,
+
+        // Gamepad support (W3C Gamepad API)
+        // https://w3c.github.io/gamepad/#remapping
+        sapp_gamepad_count: function() {
+            var gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            var count = 0;
+            for (var i = 0; i < gamepads.length && i < 4; i++) {
+                if (gamepads[i]) count = i + 1;
+            }
+            return count;
+        },
+        sapp_gamepad_connected: function(id) {
+            var gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            if (id < 0 || id >= gamepads.length) return 0;
+            var gp = gamepads[id];
+            return (gp && gp.connected) ? 1 : 0;
+        },
+        sapp_gamepad_button: function(id, btn) {
+            var gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            if (id < 0 || id >= gamepads.length) return 0;
+            var gp = gamepads[id];
+            if (!gp || !gp.connected || btn < 0 || btn >= gp.buttons.length) return 0;
+            return gp.buttons[btn].pressed ? 1 : 0;
+        },
+        sapp_gamepad_axis: function(id, axis) {
+            var gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            if (id < 0 || id >= gamepads.length) return 0.0;
+            var gp = gamepads[id];
+            if (!gp || !gp.connected || axis < 0 || axis >= gp.axes.length) return 0.0;
+            return gp.axes[axis];
+        }
     }
 };
 
