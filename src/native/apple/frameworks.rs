@@ -443,6 +443,13 @@ pub enum NSApplicationActivationPolicy {
 
 #[repr(u64)]
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub enum NSApplicationTerminateReply {
+    NSApplicationTerminateCancel = 0,
+    NSApplicationTerminateNow = 1,
+}
+
+#[repr(u64)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NSBackingStoreType {
     NSBackingStoreRetained = 0,
     NSBackingStoreNonretained = 1,

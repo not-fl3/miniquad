@@ -256,6 +256,32 @@ impl Modifiers {
     }
 }
 
+fn get_app_payload() -> &'static mut MacosDisplay {
+    unsafe {
+        let d = native_display().lock().unwrap();
+        let ptr: *mut c_void = *(*d.view).get_ivar("display_ptr");
+        &mut *(ptr as *mut MacosDisplay)
+    }
+}
+
+// Called when the application is requested to quit. Sends out the quit_requested event.
+// Returns true if the quit was ordered, false if the quit was canceled.
+fn handle_quit(payload: &mut MacosDisplay) -> bool {
+    // only give user-code a chance to intervene when quit wasn't already called
+    if !native_display().lock().unwrap().quit_ordered {
+        native_display().lock().unwrap().quit_requested = true;
+        if let Some(event_handler) = payload.context() {
+            event_handler.quit_requested_event();
+        }
+
+        // // user code hasn't intervened, quit the app
+        if native_display().lock().unwrap().quit_requested {
+            native_display().lock().unwrap().quit_ordered = true;
+        }
+    }
+    native_display().lock().unwrap().quit_ordered
+}
+
 pub fn define_app_delegate() -> *const Class {
     extern "C" fn application_did_update(this: &mut Object, _: Sel, _: ObjcId) {
         unsafe {
@@ -270,9 +296,22 @@ pub fn define_app_delegate() -> *const Class {
         }
     }
 
+    extern "C" fn application_should_terminate(_this: &mut Object, _: Sel, _: ObjcId) -> u64 {
+        let payload = get_app_payload();
+        if handle_quit(payload) {
+            NSApplicationTerminateReply::NSApplicationTerminateNow as u64
+        } else {
+            NSApplicationTerminateReply::NSApplicationTerminateCancel as u64
+        }
+    }
+
     let superclass = class!(NSObject);
     let mut decl = ClassDecl::new("NSAppDelegate", superclass).unwrap();
     unsafe {
+        decl.add_method(
+            sel!(applicationShouldTerminate:),
+            application_should_terminate as extern "C" fn(&mut Object, Sel, ObjcId) -> u64,
+        );
         decl.add_method(
             sel!(applicationShouldTerminateAfterLastWindowClosed:),
             yes1 as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
@@ -296,21 +335,7 @@ pub fn define_cocoa_window_delegate() -> *const Class {
             msg_send_![capture_manager, stopCapture];
         }
 
-        // only give user-code a chance to intervene when sapp_quit() wasn't already called
-        if !native_display().lock().unwrap().quit_ordered {
-            // if window should be closed and event handling is enabled, give user code
-            // a chance to intervene via sapp_cancel_quit()
-            native_display().lock().unwrap().quit_requested = true;
-            if let Some(event_handler) = payload.context() {
-                event_handler.quit_requested_event();
-            }
-
-            // user code hasn't intervened, quit the app
-            if native_display().lock().unwrap().quit_requested {
-                native_display().lock().unwrap().quit_ordered = true;
-            }
-        }
-        if native_display().lock().unwrap().quit_ordered {
+        if handle_quit(payload) {
             YES
         } else {
             NO
