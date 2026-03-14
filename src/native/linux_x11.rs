@@ -12,7 +12,7 @@ mod xi_input;
 use crate::{
     event::EventHandler,
     native::{egl, gl, module, NativeDisplayData, Request},
-    CursorIcon,
+    CursorIcon, MouseButton,
 };
 
 use libx11::*;
@@ -121,16 +121,27 @@ impl X11Display {
                     event_handler.mouse_button_up_event(btn, x, y);
                 }
             }
-            7 => {
-                // Mouse Enter
-            }
-            8 => {
-                // Mouse Leave
-            }
             6 => {
                 let x = event.xmotion.x as libc::c_float;
                 let y = event.xmotion.y as libc::c_float;
                 event_handler.mouse_motion_event(x, y);
+            }
+            7 => {
+                let x = event.xcrossing.x as libc::c_float;
+                let y = event.xcrossing.y as libc::c_float;
+                let state = event.xcrossing.state as libc::c_long;
+
+                let btn = match () {
+                    _ if (state & Button1MotionMask) != 0 => MouseButton::Left,
+                    _ if (state & Button2MotionMask) != 0 => MouseButton::Middle,
+                    _ if (state & Button3MotionMask) != 0 => MouseButton::Right,
+                    _ => MouseButton::Unknown,
+                };
+                event_handler.mouse_enter_event( btn , x, y);
+
+            }
+            8 => {
+                event_handler.mouse_leave_event();
             }
             9 => {
                 event_handler.window_restored_event();

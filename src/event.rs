@@ -176,6 +176,8 @@ pub trait EventHandler {
     fn mouse_wheel_event(&mut self, _x: f32, _y: f32) {}
     fn mouse_button_down_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
     fn mouse_button_up_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
+    fn mouse_leave_event(&mut self) {}
+    fn mouse_enter_event(&mut self, _button: MouseButton ,_x: f32, _y: f32 ) {}
 
     fn char_event(&mut self, _character: char, _keymods: KeyMods, _repeat: bool) {}
 
