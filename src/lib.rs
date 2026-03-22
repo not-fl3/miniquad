@@ -547,7 +547,9 @@ extern "C" {
     fn quad_main();
 }
 
+#[cfg(target_env = "ohos")]
 static mut OHOS_EXPORTS: Option<Object<'static>> = None;
+#[cfg(target_env = "ohos")]
 static mut OHOS_ENV: Option<Env> = None;
 
 #[cfg(target_env = "ohos")]
