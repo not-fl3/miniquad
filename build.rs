@@ -6,4 +6,6 @@ fn main() {
     if target.contains("darwin") || target.contains("ios") {
         println!("cargo:rustc-link-lib=framework=MetalKit");
     }
+    #[cfg(target_env = "ohos")]
+    napi_build_ohos::setup();
 }

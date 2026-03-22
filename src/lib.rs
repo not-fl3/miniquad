@@ -7,6 +7,15 @@
     clippy::missing_safety_doc
 )]
 
+#[cfg(target_env = "ohos")]
+use napi_derive_ohos::napi;
+
+#[cfg(target_env = "ohos")]
+use napi_ohos::{bindgen_prelude::Object, Env, Result};
+
+#[cfg(target_env = "ohos")]
+use ohos_hilog_binding::forward_stdio_to_hilog;
+
 pub mod conf;
 mod event;
 pub mod fs;
@@ -209,6 +218,7 @@ pub mod window {
     /// NOTICE: on desktop cursor will not be automatically released after window lost focus
     ///         so set_cursor_grab(false) on window's focus lost is recommended.
     /// TODO: implement window focus events
+    #[cfg(not(target_env = "ohos"))]
     pub fn set_cursor_grab(grab: bool) {
         let d = native_display().lock().unwrap();
         #[cfg(target_os = "android")]
@@ -230,13 +240,16 @@ pub mod window {
     ///
     /// Does nothing without `conf.platform.blocking_event_loop`.
     pub fn schedule_update() {
-        #[cfg(all(target_os = "android", not(target_arch = "wasm32")))]
+        #[cfg(all(
+            any(target_os = "android", target_env = "ohos"),
+            not(target_arch = "wasm32")
+        ))]
         {
             let d = native_display().lock().unwrap();
             (d.native_requests)(native::Request::ScheduleUpdate);
         }
 
-        #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+        #[cfg(not(any(target_arch = "wasm32", target_os = "android", target_env = "ohos")))]
         {
             let d = native_display().lock().unwrap();
             d.native_requests
@@ -251,6 +264,7 @@ pub mod window {
     }
 
     /// Show or hide the mouse cursor
+    #[cfg(not(target_env = "ohos"))]
     pub fn show_mouse(shown: bool) {
         let d = native_display().lock().unwrap();
         #[cfg(target_os = "android")]
@@ -267,6 +281,7 @@ pub mod window {
     }
 
     /// Set the mouse cursor icon.
+    #[cfg(not(target_env = "ohos"))]
     pub fn set_mouse_cursor(cursor_icon: CursorIcon) {
         let d = native_display().lock().unwrap();
         #[cfg(target_os = "android")]
@@ -283,6 +298,7 @@ pub mod window {
     }
 
     /// Set the application's window size.
+    #[cfg(not(target_env = "ohos"))]
     pub fn set_window_size(new_width: u32, new_height: u32) {
         let d = native_display().lock().unwrap();
         #[cfg(target_os = "android")]
@@ -303,7 +319,7 @@ pub mod window {
                 .unwrap();
         }
     }
-
+    #[cfg(not(target_env = "ohos"))]
     pub fn set_window_position(new_x: u32, new_y: u32) {
         let d = native_display().lock().unwrap();
         #[cfg(target_os = "android")]
@@ -321,12 +337,16 @@ pub mod window {
 
     /// Get the position of the window.
     /// TODO: implement for other platforms
-    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    #[cfg(any(
+        target_os = "windows",
+        all(target_os = "linux", not(target_env = "ohos"))
+    ))]
     pub fn get_window_position() -> (u32, u32) {
         let d = native_display().lock().unwrap();
         d.screen_position
     }
 
+    #[cfg(not(target_env = "ohos"))]
     pub fn set_fullscreen(fullscreen: bool) {
         let d = native_display().lock().unwrap();
         #[cfg(target_os = "android")]
@@ -368,6 +388,7 @@ pub mod window {
 
     /// Show/hide onscreen keyboard.
     /// Only works on Android right now.
+    #[cfg(not(target_env = "ohos"))]
     pub fn show_keyboard(show: bool) {
         let d = native_display().lock().unwrap();
         #[cfg(target_os = "android")]
@@ -387,6 +408,7 @@ pub mod window {
     /// The position is in window client coordinates (pixels).
     /// This should be called when the text cursor moves to keep the IME
     /// candidate window near the insertion point.
+    #[cfg(not(target_env = "ohos"))]
     pub fn set_ime_position(x: i32, y: i32) {
         let d = native_display().lock().unwrap();
         #[cfg(target_os = "android")]
@@ -409,6 +431,7 @@ pub mod window {
     ///
     /// # Arguments
     /// * `enabled` - `true` to enable IME (for text input), `false` to disable (for game controls)
+    #[cfg(not(target_env = "ohos"))]
     pub fn set_ime_enabled(enabled: bool) {
         let d = native_display().lock().unwrap();
         #[cfg(target_os = "android")]
@@ -462,7 +485,11 @@ pub fn start<F>(conf: conf::Conf, f: F)
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    #[cfg(target_os = "linux")]
+    #[cfg(target_env = "ohos")]
+    unsafe {
+        native::ohos::run(conf, f);
+    }
+    #[cfg(all(target_os = "linux", not(target_env = "ohos")))]
     {
         let mut f = Some(f);
         let f = &mut f;
@@ -513,4 +540,24 @@ where
     unsafe {
         native::ios::run(conf, f);
     }
+}
+
+#[cfg(target_env = "ohos")]
+extern "C" {
+    fn quad_main();
+}
+
+static mut OHOS_EXPORTS: Option<Object<'static>> = None;
+static mut OHOS_ENV: Option<Env> = None;
+
+#[cfg(target_env = "ohos")]
+#[napi(module_exports)]
+pub fn init(exports: Object, env: Env) -> Result<()> {
+    let _ = forward_stdio_to_hilog();
+    unsafe {
+        OHOS_EXPORTS = Some(std::mem::transmute(exports));
+        OHOS_ENV = Some(env);
+        quad_main();
+    }
+    Ok(())
 }
