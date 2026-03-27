@@ -188,8 +188,6 @@ extern "C" {
         window_id: u32,
         imageoptions: u32,
     ) -> ObjcId;
-    pub fn CGMainDisplayID() -> u32;
-    pub fn CGDisplayPixelsHigh(display: u32) -> u64;
     pub fn CGColorCreateGenericRGB(red: f64, green: f64, blue: f64, alpha: f64) -> ObjcId;
     pub fn CGAssociateMouseAndMouseCursorPosition(connected: bool);
     pub fn CGWarpMouseCursorPosition(newCursorPosition: NSPoint);
@@ -219,6 +217,14 @@ extern "C" {
 
     pub fn CGColorSpaceCreateDeviceRGB() -> *const ObjcId;
     pub fn CGColorSpaceRelease(space: *const ObjcId);
+}
+
+// Some CoreGraphics functions are only available on macOS
+#[cfg(target_os = "macos")]
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    pub fn CGMainDisplayID() -> u32;
+    pub fn CGDisplayPixelsHigh(display: u32) -> u64;
 }
 
 pub const kCGBitmapByteOrderDefault: u32 = 0 << 12;
