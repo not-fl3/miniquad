@@ -545,6 +545,17 @@ pub enum MTLStoreAction {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MTLViewport {
+    pub origin_x: f64,
+    pub origin_y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub znear: f64,
+    pub zfar: f64,
+}
+
+#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct MTLClearColor {
     pub red: f64,
@@ -723,6 +734,14 @@ pub enum MTLPrimitiveType {
 pub enum MTLIndexType {
     UInt16 = 0,
     UInt32 = 1,
+}
+impl MTLIndexType {
+    pub fn size(&self) -> usize {
+        match self {
+            MTLIndexType::UInt16 => size_of::<u16>(),
+            MTLIndexType::UInt32 => size_of::<u32>(),
+        }
+    }
 }
 
 #[repr(u64)]

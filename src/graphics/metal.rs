@@ -408,7 +408,18 @@ impl RenderingBackend for MetalContext {
             msg_send_![texture.texture, release];
         }
     }
-    fn apply_viewport(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
+    fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) {
+        assert!(self.render_encoder.is_some());
+        let viewport = MTLViewport {
+            origin_x: x as f64,
+            origin_y: y as f64,
+            width: w as f64,
+            height: h as f64,
+            znear: 0.0,
+            zfar: 1.0,
+        };
+        unsafe { msg_send_![self.render_encoder.unwrap(), setViewport: viewport] };
+    }
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
         assert!(self.render_encoder.is_some());
 
@@ -1252,16 +1263,15 @@ impl RenderingBackend for MetalContext {
         let pip = &self.pipelines[self.current_pipeline.unwrap().0];
         let primitive_type: MTLPrimitiveType = pip.params.primitive_type.into();
 
-        assert!(base_element == 0); // TODO: figure indexBufferOffset/baseVertex
+        let index_type = MTLIndexType::UInt16;
+
         unsafe {
             msg_send_![render_encoder,drawIndexedPrimitives:primitive_type
                        indexCount:num_elements as u64
-                       indexType:MTLIndexType::UInt16
+                       indexType:index_type
                        indexBuffer:index_buffer
-                       indexBufferOffset:0
+                       indexBufferOffset: base_element as u64 * index_type.size() as u64
                        instanceCount:num_instances as u64
-                       baseVertex:0
-                       baseInstance:0
             ];
         }
     }
