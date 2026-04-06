@@ -601,6 +601,75 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         }
     }
 
+    extern "C" fn dragging_entered(_this: &Object, _sel: Sel, sender: ObjcId) -> NSDragOperation {
+        unsafe {
+            let pasteboard: ObjcId = msg_send![sender, draggingPasteboard];
+            let file_types: ObjcId =
+                msg_send![class!(NSArray), arrayWithObject: NSPasteboardTypeFileURL];
+            let matched_type: ObjcId = msg_send![pasteboard, availableTypeFromArray: file_types];
+            if matched_type != nil {
+                NSDragOperation::Copy
+            } else {
+                NSDragOperation::None
+            }
+        }
+    }
+
+    extern "C" fn perform_drag_operation(this: &Object, _sel: Sel, sender: ObjcId) -> BOOL {
+        let payload = get_window_payload(this);
+
+        unsafe {
+            let pasteboard: ObjcId = msg_send![sender, draggingPasteboard];
+            let classes: ObjcId = msg_send![class!(NSArray), arrayWithObject: class!(NSURL)];
+            let urls: ObjcId = msg_send![pasteboard, readObjectsForClasses: classes options: nil];
+            if urls == nil {
+                return NO;
+            }
+
+            let count: usize = msg_send![urls, count];
+            let mut d = native_display().lock().unwrap();
+            d.dropped_files = Default::default();
+
+            for i in 0..count {
+                let url: ObjcId = msg_send![urls, objectAtIndex: i];
+                if url == nil {
+                    continue;
+                }
+
+                let is_file_url: BOOL = msg_send![url, isFileURL];
+                if is_file_url == NO {
+                    continue;
+                }
+
+                let path_nsstring: ObjcId = msg_send![url, path];
+                if path_nsstring == nil {
+                    continue;
+                }
+
+                let path = std::path::PathBuf::from(nsstring_to_string(path_nsstring));
+                if let Ok(bytes) = std::fs::read(&path) {
+                    d.dropped_files.paths.push(path);
+                    d.dropped_files.bytes.push(bytes);
+                }
+            }
+
+            let has_dropped_files = !d.dropped_files.paths.is_empty();
+
+            // Drop the native display lock before invoking user callbacks.
+            drop(d);
+
+            if !has_dropped_files {
+                return NO;
+            }
+
+            if let Some(event_handler) = payload.context() {
+                event_handler.files_dropped_event();
+            }
+
+            YES
+        }
+    }
+
     extern "C" fn flags_changed(this: &Object, _sel: Sel, event: ObjcId) {
         fn produce_event(
             payload: &mut MacosDisplay,
@@ -753,6 +822,14 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         flags_changed as extern "C" fn(&Object, Sel, ObjcId),
     );
     decl.add_method(sel!(keyUp:), key_up as extern "C" fn(&Object, Sel, ObjcId));
+    decl.add_method(
+        sel!(draggingEntered:),
+        dragging_entered as extern "C" fn(&Object, Sel, ObjcId) -> NSDragOperation,
+    );
+    decl.add_method(
+        sel!(performDragOperation:),
+        perform_drag_operation as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
+    );
 }
 
 pub fn define_opengl_view_class() -> *const Class {
@@ -1170,6 +1247,10 @@ where
         d.view = view;
     }
     (*view).set_ivar("display_ptr", &mut display as *mut _ as *mut c_void);
+
+    // Tell the view to accept file drops. Without this, dragging files onto the window will do nothing.
+    let dragged_types: ObjcId = msg_send![class!(NSArray), arrayWithObject: NSPasteboardTypeFileURL];
+    let () = msg_send![view, registerForDraggedTypes: dragged_types];
 
     display.window = window;
     display.view = view;
