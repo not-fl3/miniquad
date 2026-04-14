@@ -17,7 +17,8 @@ Miniquad aims to provide a graphics abstraction that works the same way on any p
 * macOS, OpenGL 3, Metal;
 * iOS, GLES 2, GLES 3, Metal;
 * WASM, WebGL 1 - tested on iOS Safari, Firefox, Chrome;
-* Android, GLES 2, GLES 3.
+* Android, GLES 2, GLES 3;
+* OpenHarmony, GLES 2, GLES 3.
 
 ## Examples
 
@@ -149,6 +150,79 @@ xcrun simctl launch booted com.mygame
 ```
 
 For details and instructions on provisioning for real iphone, check [https://macroquad.rs/articles/ios/](https://macroquad.rs/articles/ios/)
+
+## OpenHarmony (OHOS)
+
+Due to limitations in ohrs, running examples requires extracting the example project separately and marking the C entry point:
+
+Ensure your example crate type is set to `cdylib`
+
+```rust
+#[no_mangle]
+pub extern "C" fn quad_main()
+```
+
+Assume your project is named `nativerender`.
+
+### Prerequisites
+
+```bash
+rustup target add aarch64-unknown-linux-ohos
+rustup target add armv7-unknown-linux-ohos
+rustup target add x86_64-unknown-linux-ohos
+cargo install ohrs
+```
+
+### 1. Create an XComponent in Your App using DevEco Studio
+
+```typescript
+@Entry
+@Component
+struct Index {
+    @State message: string = 'Hello World'
+    xComponentContext: ESObject | undefined = undefined;
+    xComponentAttrs: XComponentAttrs = {
+        id: 'xcomponentId',
+        type: XComponentType.SURFACE,
+        libraryname: 'nativerender'
+    }
+
+    build() {
+        Row() {
+            Button("draw").onClick(() => {
+                this.xComponentContext!.drawXcomponent();
+            })
+            // ...
+            // Define XComponent
+            XComponent(this.xComponentAttrs)
+                .focusable(true) // Enable keyboard events
+                .onLoad((xComponentContext) => {
+                    this.xComponentContext = xComponentContext;
+                })
+                .onDestroy(() => {
+                    console.log("onDestroy");
+                })
+            // ...
+        }
+        .height('100%')
+    }
+}
+
+interface XComponentAttrs {
+    id: string;
+    type: number;
+    libraryname: string;
+}
+```
+
+### 2. Build with ohrs
+
+```bash
+ohrs build --arch aarch
+```
+
+Copy the `libnativerender.so` file from `dist/arm64-v8a` or `dist/x86_64` to your Harmony project.
+
 
 ## Cross Compilation
 
