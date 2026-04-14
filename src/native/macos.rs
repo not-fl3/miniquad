@@ -15,7 +15,10 @@ use {
     std::{
         collections::HashMap,
         os::raw::c_void,
-        sync::mpsc::Receiver,
+        sync::{
+            Condvar, Mutex,
+            mpsc::Receiver,
+        },
         time::{Duration, Instant},
     },
 };
@@ -1016,6 +1019,94 @@ impl crate::native::Clipboard for MacosClipboard {
     fn set(&mut self, _data: &str) {}
 }
 
+struct FrameSignal {
+    frame_ready: Mutex<bool>,
+    cond: Condvar,
+}
+
+extern "C" fn display_link_frame_ready_callback(
+    _display_link: CVDisplayLinkRef,
+    _now: *const CVTimeStamp,
+    _output_time: *const CVTimeStamp,
+    _flags_in: CVOptionFlags,
+    _flags_out: *mut CVOptionFlags,
+    display_link_context: *mut c_void,
+) -> i32 {
+    unsafe {
+        let frame_signal = &*(display_link_context as *const FrameSignal);
+        if let Ok(mut frame_ready) = frame_signal.frame_ready.lock() {
+            *frame_ready = true;
+            frame_signal.cond.notify_one();
+        }
+    }
+    0
+}
+
+struct FramePacer {
+    display_link: CVDisplayLinkRef,
+    frame_signal: Box<FrameSignal>,
+}
+
+impl FramePacer {
+    fn new() -> Option<Self> {
+        unsafe {
+            let mut display_link: CVDisplayLinkRef = std::ptr::null_mut();
+            if CVDisplayLinkCreateWithActiveCGDisplays(&mut display_link as *mut _) != 0
+                || display_link.is_null()
+            {
+                return None;
+            }
+
+            let frame_signal = Box::new(FrameSignal {
+                frame_ready: Mutex::new(false),
+                cond: Condvar::new(),
+            });
+
+            if CVDisplayLinkSetOutputCallback(
+                display_link,
+                display_link_frame_ready_callback,
+                (&*frame_signal as *const FrameSignal) as *mut c_void,
+            ) != 0
+            {
+                CVDisplayLinkRelease(display_link);
+                return None;
+            }
+
+            let _ = CVDisplayLinkStart(display_link);
+
+            Some(Self {
+                display_link,
+                frame_signal,
+            })
+        }
+    }
+
+    fn wait_next_frame(&self) {
+        let mut frame_ready = match self.frame_signal.frame_ready.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        while !*frame_ready {
+            frame_ready = match self.frame_signal.cond.wait(frame_ready) {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+        }
+        *frame_ready = false;
+    }
+}
+
+impl Drop for FramePacer {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.display_link.is_null() {
+                let _ = CVDisplayLinkStop(self.display_link);
+                CVDisplayLinkRelease(self.display_link);
+            }
+        }
+    }
+}
+
 unsafe extern "C" fn release_data(info: *mut c_void, _: *const c_void, _: usize) {
     drop(Box::from_raw(info as *mut &[u8]));
 }
@@ -1305,6 +1396,11 @@ where
     // Basically reimplementing msg_send![ns_app, run] here
     let distant_future: ObjcId = msg_send![class!(NSDate), distantFuture];
     let distant_past: ObjcId = msg_send![class!(NSDate), distantPast];
+    let frame_pacer = if conf.platform.blocking_event_loop {
+        None
+    } else {
+        FramePacer::new()
+    };
     let mut done = false;
     while !(done || crate::native_display().lock().unwrap().quit_ordered) {
         while let Ok(request) = display.native_requests.try_recv() {
@@ -1335,6 +1431,10 @@ where
 
         if !conf.platform.blocking_event_loop || display.update_requested {
             perform_redraw(&mut display, conf.platform.apple_gfx_api, false);
+        }
+
+        if let Some(frame_pacer) = frame_pacer.as_ref() {
+            frame_pacer.wait_next_frame();
         }
     }
 }
