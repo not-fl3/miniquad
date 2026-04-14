@@ -997,7 +997,9 @@ unsafe fn create_opengl_view(
 
     display.gl_context = msg_send![gl_context, initWithFormat: glpixelformat_obj shareContext: nil];
 
-    let mut swap_interval = 1;
+    // Set the swap interval to 0 to disable vsync, because we're using CVDisplayLink for frame pacing
+    // and we don't want to have an extra vsync delay on top of that.
+    let mut swap_interval = 0;
     let () = msg_send![display.gl_context,
                 setValues:&mut swap_interval
                 forParameter:NSOpenGLContextParameterSwapInterval];
@@ -1072,7 +1074,10 @@ impl FramePacer {
                 return None;
             }
 
-            let _ = CVDisplayLinkStart(display_link);
+            if CVDisplayLinkStart(display_link) != 0 {
+                CVDisplayLinkRelease(display_link);
+                return None;
+            }
 
             Some(Self {
                 display_link,
@@ -1081,18 +1086,26 @@ impl FramePacer {
         }
     }
 
-    fn wait_next_frame(&self) {
+    fn wait_next_frame(&self, timeout: Duration) -> bool {
         let mut frame_ready = match self.frame_signal.frame_ready.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
-        while !*frame_ready {
-            frame_ready = match self.frame_signal.cond.wait(frame_ready) {
-                Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
-            };
+        if *frame_ready {
+            *frame_ready = false;
+            return true;
         }
-        *frame_ready = false;
+
+        let (mut frame_ready, _) = match self.frame_signal.cond.wait_timeout(frame_ready, timeout) {
+            Ok(pair) => pair,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+
+        let ready = *frame_ready;
+        if ready {
+            *frame_ready = false;
+        }
+        ready
     }
 }
 
@@ -1403,6 +1416,14 @@ where
     };
     let mut done = false;
     while !(done || crate::native_display().lock().unwrap().quit_ordered) {
+
+        // Wait at the top for just in time rendering
+        if let Some(frame_pacer) = frame_pacer.as_ref() {
+            if !frame_pacer.wait_next_frame(Duration::from_millis(50)) {
+                std::thread::yield_now();
+            }
+        }
+
         while let Ok(request) = display.native_requests.try_recv() {
             display.process_request(request);
         }
@@ -1433,8 +1454,5 @@ where
             perform_redraw(&mut display, conf.platform.apple_gfx_api, false);
         }
 
-        if let Some(frame_pacer) = frame_pacer.as_ref() {
-            frame_pacer.wait_next_frame();
-        }
     }
 }
