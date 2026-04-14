@@ -238,6 +238,65 @@ extern "C" {
     pub fn MTLCopyAllDevices() -> ObjcId; //TODO: Array
 }
 
+#[cfg(target_os = "macos")]
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CVTime {
+    pub time_value: i64,
+    pub time_scale: i32,
+    pub flags: i32,
+    pub epoch: i64,
+}
+
+#[cfg(target_os = "macos")]
+pub type CVDisplayLinkRef = *mut c_void;
+
+#[cfg(target_os = "macos")]
+pub type CVOptionFlags = u64;
+
+#[cfg(target_os = "macos")]
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CVTimeStamp {
+    pub version: u32,
+    pub video_time_scale: i32,
+    pub video_time: i64,
+    pub host_time: u64,
+    pub rate_scalar: f64,
+    pub video_refresh_period: i64,
+    pub smpte_time: i64,
+    pub flags: u64,
+    pub reserved: u64,
+}
+
+#[cfg(target_os = "macos")]
+pub type CVDisplayLinkOutputCallback = extern "C" fn(
+    display_link: CVDisplayLinkRef,
+    now: *const CVTimeStamp,
+    output_time: *const CVTimeStamp,
+    flags_in: CVOptionFlags,
+    flags_out: *mut CVOptionFlags,
+    display_link_context: *mut c_void,
+) -> i32;
+
+#[cfg(target_os = "macos")]
+pub const kCVTimeIsIndefinite: i32 = 1 << 0;
+
+#[cfg(target_os = "macos")]
+#[link(name = "CoreVideo", kind = "framework")]
+extern "C" {
+    pub fn CVDisplayLinkCreateWithActiveCGDisplays(display_link_out: *mut CVDisplayLinkRef) -> i32;
+    pub fn CVDisplayLinkSetOutputCallback(
+        display_link: CVDisplayLinkRef,
+        callback: CVDisplayLinkOutputCallback,
+        user_info: *mut c_void,
+    ) -> i32;
+    pub fn CVDisplayLinkStart(display_link: CVDisplayLinkRef) -> i32;
+    pub fn CVDisplayLinkStop(display_link: CVDisplayLinkRef) -> i32;
+    pub fn CVDisplayLinkRelease(display_link: CVDisplayLinkRef);
+    pub fn CVDisplayLinkGetNominalOutputVideoRefreshPeriod(display_link: CVDisplayLinkRef) -> CVTime;
+}
+
 // Foundation
 
 #[repr(C)]
