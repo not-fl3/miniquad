@@ -410,7 +410,9 @@ pub mod window {
     /// # Arguments
     /// * `enabled` - `true` to enable IME (for text input), `false` to disable (for game controls)
     pub fn set_ime_enabled(enabled: bool) {
-        let d = native_display().lock().unwrap();
+        let mut d = native_display().lock().unwrap();
+        d.ime_enabled = enabled;
+        
         #[cfg(target_os = "android")]
         {
             let _ = enabled; // IME control not applicable on Android
@@ -422,6 +424,11 @@ pub mod window {
                 .send(native::Request::SetImeEnabled(enabled))
                 .unwrap();
         }
+    }
+    
+    pub fn is_ime_enabled() -> bool {
+        let d = native_display().lock().unwrap();
+        d.ime_enabled
     }
 
     #[cfg(target_vendor = "apple")]
