@@ -1086,14 +1086,14 @@ impl FramePacer {
         }
     }
 
-    fn wait_next_frame(&self, timeout: Duration) -> bool {
+    fn wait_next_frame(&self, timeout: Duration) {
         let mut frame_ready = match self.frame_signal.frame_ready.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
         if *frame_ready {
             *frame_ready = false;
-            return true;
+            return;
         }
 
         let (mut frame_ready, _) = match self.frame_signal.cond.wait_timeout(frame_ready, timeout) {
@@ -1101,11 +1101,9 @@ impl FramePacer {
             Err(poisoned) => poisoned.into_inner(),
         };
 
-        let ready = *frame_ready;
-        if ready {
+        if *frame_ready {
             *frame_ready = false;
         }
-        ready
     }
 }
 
@@ -1419,9 +1417,7 @@ where
 
         // Wait at the top for just in time rendering
         if let Some(frame_pacer) = frame_pacer.as_ref() {
-            if !frame_pacer.wait_next_frame(Duration::from_millis(50)) {
-                std::thread::yield_now();
-            }
+            frame_pacer.wait_next_frame(Duration::from_millis(50));
         }
 
         while let Ok(request) = display.native_requests.try_recv() {
