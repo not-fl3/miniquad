@@ -439,6 +439,15 @@ pub mod window {
         let d = native_display().lock().unwrap();
         d.view_ctrl
     }
+
+    /// Get the main window HWND as a raw pointer (`*mut c_void`).
+    ///
+    /// Returns `null_mut()` if the window has not been created yet.
+    /// Only available on Windows.
+    #[cfg(target_os = "windows")]
+    pub fn windows_hwnd() -> *mut std::ffi::c_void {
+        crate::native_display().lock().unwrap().hwnd
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]

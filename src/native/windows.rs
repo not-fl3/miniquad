@@ -1203,6 +1203,7 @@ where
             high_dpi: conf.high_dpi,
             dpi_scale: display.window_scale,
             blocking_event_loop: conf.platform.blocking_event_loop,
+            hwnd: wnd as *mut std::ffi::c_void,
             ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
         });
 

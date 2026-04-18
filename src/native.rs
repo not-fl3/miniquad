@@ -24,6 +24,9 @@ pub(crate) struct NativeDisplayData {
     pub dropped_files: DroppedFiles,
     pub blocking_event_loop: bool,
 
+    #[cfg(target_os = "windows")]
+    pub hwnd: *mut std::ffi::c_void,
+
     #[cfg(target_vendor = "apple")]
     pub view: crate::native::apple::frameworks::ObjcId,
     #[cfg(target_os = "ios")]
@@ -31,9 +34,9 @@ pub(crate) struct NativeDisplayData {
     #[cfg(target_vendor = "apple")]
     pub gfx_api: crate::conf::AppleGfxApi,
 }
-#[cfg(target_vendor = "apple")]
+#[cfg(any(target_vendor = "apple", target_os = "windows"))]
 unsafe impl Send for NativeDisplayData {}
-#[cfg(target_vendor = "apple")]
+#[cfg(any(target_vendor = "apple", target_os = "windows"))]
 unsafe impl Sync for NativeDisplayData {}
 
 impl NativeDisplayData {
@@ -56,6 +59,8 @@ impl NativeDisplayData {
             clipboard,
             dropped_files: Default::default(),
             blocking_event_loop: false,
+            #[cfg(target_os = "windows")]
+            hwnd: std::ptr::null_mut(),
             #[cfg(target_vendor = "apple")]
             gfx_api: crate::conf::AppleGfxApi::OpenGl,
             #[cfg(target_vendor = "apple")]
