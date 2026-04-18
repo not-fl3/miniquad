@@ -25,8 +25,13 @@ use winapi::{
     },
 };
 
-// IME constants
+// IME composition string flags
+/// Composition String
+const GCS_COMPSTR: DWORD = 0x0008;
+/// Result String
 const GCS_RESULTSTR: DWORD = 0x0800;
+const GCS_CURSORPOS: DWORD = 0x0100;
+const GCS_DELTASTART: DWORD = 0x0200;
 
 // IME message constants
 const WM_IME_SETCONTEXT: UINT = 0x0281;
@@ -202,6 +207,7 @@ impl WindowsDisplay {
 
         self.user_cursor = cursor_icon != CursorIcon::Default;
     }
+    
     fn set_window_size(&mut self, new_width: u32, new_height: u32) {
         let mut x = 0;
         let mut y = 0;
@@ -590,49 +596,74 @@ unsafe extern "system" fn win32_wndproc(
         }
         WM_IME_COMPOSITION => {
             let flags = lparam as u32;
+            let himc = ImmGetContext(hwnd);
             
-            // Extract and dispatch the result string manually to avoid duplicates
-            if (flags & GCS_RESULTSTR) != 0 {
-                let himc = ImmGetContext(hwnd);
-                if !himc.is_null() {
+            if !himc.is_null() {
+                let mut should_notify_end = false;
+                
+                // Composition String
+                if (flags & GCS_COMPSTR) != 0 {
+                    let len = ImmGetCompositionStringW(himc, GCS_COMPSTR, std::ptr::null_mut(), 0);
+                    if len > 0 {
+                        let mut buffer: Vec<u16> = vec![0; (len as usize / 2) + 1];
+                        ImmGetCompositionStringW(himc, GCS_COMPSTR, buffer.as_mut_ptr() as *mut _, len as u32);
+                        let char_count = len as usize / 2;
+                        let preedit_str = String::from_utf16_lossy(&buffer[..char_count]);
+                        
+                        event_handler.on_ime_preedit(&preedit_str);
+                    } else {
+                        should_notify_end = true;
+                    }
+                }
+                
+                
+                // Check Cursor
+                if (flags & GCS_CURSORPOS) != 0 || (flags & GCS_DELTASTART) != 0 {
+                    let cursor_pos_len = ImmGetCompositionStringW(himc, GCS_CURSORPOS, std::ptr::null_mut(), 0);
+                    let delta_start_len = ImmGetCompositionStringW(himc, GCS_DELTASTART, std::ptr::null_mut(), 0);
+                    
+                    if cursor_pos_len == 0 && delta_start_len == 0 {
+                        let comp_len = ImmGetCompositionStringW(himc, GCS_COMPSTR, std::ptr::null_mut(), 0);
+                        if comp_len == 0 {
+                            should_notify_end = true;
+                        }
+                    }
+                }
+                
+                // Result String
+                if (flags & GCS_RESULTSTR) != 0 {
                     let len = ImmGetCompositionStringW(himc, GCS_RESULTSTR, std::ptr::null_mut(), 0);
                     if len > 0 {
                         let mut buffer: Vec<u16> = vec![0; (len as usize / 2) + 1];
-                        let actual_len = ImmGetCompositionStringW(
-                            himc, 
-                            GCS_RESULTSTR, 
-                            buffer.as_mut_ptr() as *mut _, 
-                            len as u32
-                        );
-                        if actual_len > 0 {
-                            let char_count = actual_len as usize / 2;
-                            let mods = key_mods();
-                            // Send chars in order
-                            for i in 0..char_count {
-                                let chr = buffer[i];
-                                if let Some(c) = char::from_u32(chr as u32) {
-                                    event_handler.char_event(c, mods, false);
-                                }
-                            }
-                        }
+                        ImmGetCompositionStringW(himc, GCS_RESULTSTR, buffer.as_mut_ptr() as *mut _, len as u32);
+                        let char_count = len as usize / 2;
+                        let result_str = String::from_utf16_lossy(&buffer[..char_count]);
+                        event_handler.on_ime_commit(Some(&result_str));
+                        should_notify_end = false;
+                    } else {
+                        should_notify_end = true;
                     }
-                    ImmReleaseContext(hwnd, himc);
                 }
-                return 0;
+                
+                if should_notify_end {
+                    event_handler.on_ime_commit(None);
+                }
+                ImmReleaseContext(hwnd, himc);
             }
             
-            // For non-result messages (composition state updates), pass to DefWindowProc
-            return DefWindowProcW(hwnd, umsg, wparam, lparam);
+            return 0;
         }
         WM_IME_SETCONTEXT => {
+            let fShow = HIWORD(wparam as _) != 0;
+
             let user_disabled = IME_USER_DISABLED.load(std::sync::atomic::Ordering::Relaxed);
-            
-            // If user explicitly disabled IME, don't auto-restore
-            if user_disabled {
+            if !user_disabled {
+                // 返回 1 表示 "我处理了，别画默认框"
+                return 1;
+            } else {
                 return 0;
             }
             
-            // Must pass to DefWindowProc to enable IME properly
             return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         WM_IME_STARTCOMPOSITION => {
@@ -687,6 +718,8 @@ unsafe extern "system" fn win32_wndproc(
             return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         WM_INPUTLANGCHANGEREQUEST | WM_INPUTLANGCHANGE => {
+            event_handler.on_ime_commit(None);
+            
             // Pass input language change messages to default handler
             return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
@@ -797,6 +830,8 @@ unsafe extern "system" fn win32_wndproc(
             return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         WM_KILLFOCUS => {
+            event_handler.on_ime_commit(None);
+            
             return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         _ => {}
