@@ -271,7 +271,7 @@ impl WindowsDisplay {
         let win_style: DWORD = get_win_style(self.fullscreen, self.window_resizable);
 
         unsafe {
-            #[cfg(target_arch = "x86_64")]
+            #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
             SetWindowLongPtrA(self.wnd, GWL_STYLE, win_style as _);
             #[cfg(target_arch = "x86")]
             SetWindowLong(self.wnd, GWL_STYLE, win_style as _);
@@ -1238,7 +1238,7 @@ where
 
         display.event_handler = Some(f());
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         SetWindowLongPtrA(wnd, GWLP_USERDATA, &mut display as *mut _ as isize);
         #[cfg(target_arch = "x86")]
         SetWindowLong(wnd, GWLP_USERDATA, &mut display as *mut _ as isize);
