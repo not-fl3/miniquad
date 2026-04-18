@@ -93,6 +93,13 @@ where
         *g.borrow_mut() = Some(f());
     });
 
+    // set HTML favicon to icon
+    if let Some(icon) = &conf.icon {
+        unsafe {
+            set_favicon(icon.small.as_ptr(), icon.medium.as_ptr(), icon.big.as_ptr());
+        }
+    }
+
     // start requestAnimationFrame loop
     unsafe {
         run_animation_loop(conf.platform.blocking_event_loop);
@@ -138,6 +145,8 @@ extern "C" {
     pub fn sapp_schedule_update();
     pub fn init_webgl(version: i32);
     pub fn now() -> f64;
+
+    pub fn set_favicon(small: *const u8, medium: *const u8, big: *const u8);
 }
 
 unsafe fn show_mouse(shown: bool) {
