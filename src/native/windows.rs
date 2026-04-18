@@ -608,8 +608,7 @@ unsafe extern "system" fn win32_wndproc(
                             let char_count = actual_len as usize / 2;
                             let mods = key_mods();
                             // Send chars in order
-                            for i in 0..char_count {
-                                let chr = buffer[i];
+                            for &chr in &buffer[..char_count] {
                                 if let Some(c) = char::from_u32(chr as u32) {
                                     event_handler.char_event(c, mods, false);
                                 }

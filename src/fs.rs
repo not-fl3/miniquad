@@ -1,6 +1,9 @@
 #[cfg(target_os = "ios")]
 use crate::native::ios;
 
+#[cfg(target_os = "android")]
+use libc;
+
 #[derive(Debug)]
 pub enum Error {
     IOError(std::io::Error),
@@ -64,6 +67,7 @@ fn load_file_android<F: Fn(Response)>(path: &str, on_loaded: F) {
             let slice =
                 unsafe { std::slice::from_raw_parts(data.content, data.content_length as _) };
             let response = slice.iter().map(|c| *c as _).collect::<Vec<_>>();
+            unsafe { libc::free(data.content as *mut std::ffi::c_void); };
             Ok(response)
         } else {
             Err(Error::AndroidAssetLoadingError)
