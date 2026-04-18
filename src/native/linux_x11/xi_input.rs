@@ -124,9 +124,9 @@ impl LibXi {
         let raw_event = xcookie.data as *mut xi_input::XIRawEvent;
 
         // Data returned from Xlib is not guaranteed to be aligned
-        let ptr = (*raw_event).raw_values as *const f64;
-        let dx = std::ptr::read_unaligned(ptr);
-        let dy = std::ptr::read_unaligned(ptr.add(1));
+        let ptr = (*raw_event).raw_values as *const u8;
+        let dx = std::ptr::read_unaligned(ptr as *const f64);
+        let dy = std::ptr::read_unaligned(ptr.add(1) as *const f64);
 
         (self.XFreeEventData)(display, &mut (*xcookie) as *mut _);
 
