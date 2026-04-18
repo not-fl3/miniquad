@@ -1087,19 +1087,13 @@ impl FramePacer {
     }
 
     fn wait_next_frame(&self, timeout: Duration) {
-        let mut frame_ready = match self.frame_signal.frame_ready.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        let mut frame_ready = self.frame_signal.frame_ready.lock().unwrap();
         if *frame_ready {
             *frame_ready = false;
             return;
         }
 
-        let (mut frame_ready, _) = match self.frame_signal.cond.wait_timeout(frame_ready, timeout) {
-            Ok(pair) => pair,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        let (mut frame_ready, _) = self.frame_signal.cond.wait_timeout(frame_ready, timeout).unwrap();
 
         if *frame_ready {
             *frame_ready = false;
