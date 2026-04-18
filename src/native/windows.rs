@@ -173,20 +173,15 @@ impl WindowsDisplay {
     
     /// Enable or disable IME for the window.
     /// When disabled, the IME will not process keyboard input, useful for game controls.
-    // src/native/windows.rs (WindowsDisplay::set_ime_enabled)
     fn set_ime_enabled(&mut self, enabled: bool) {
         unsafe {
             if enabled {
                 IME_USER_DISABLED.store(false, std::sync::atomic::Ordering::Relaxed);
-                let himc = ImmGetContext(self.wnd);
-                if !himc.is_null() {
-                    // 强制打开并重置
-                    ImmSetOpenStatus(himc, 1);
-                    ImmAssociateContextEx(self.wnd, himc, IACE_DEFAULT);
-                    ImmReleaseContext(self.wnd, himc);
-                }
+                // Re-associate IME context with the window
+                ImmAssociateContextEx(self.wnd, std::ptr::null_mut(), IACE_DEFAULT);
             } else {
                 IME_USER_DISABLED.store(true, std::sync::atomic::Ordering::Relaxed);
+                // Disassociate IME context from the window
                 ImmAssociateContextEx(self.wnd, std::ptr::null_mut(), 0);
             }
         }
@@ -659,14 +654,8 @@ unsafe extern "system" fn win32_wndproc(
             return 0;
         }
         WM_IME_SETCONTEXT => {
-            // wparam 的高位 (HIWORD) 表示是否请求显示默认窗口
             let fShow = HIWORD(wparam as _) != 0;
-            
-            // 我们想要隐藏默认窗口（因为我们要自己画）
-            // 所以返回 1 (TRUE) 告诉系统："是的，我收到了，但我决定不显示默认窗口"
-            // 注意：这里不需要调用 DefWindowProc，直接返回即可，或者根据需求微调
-            
-            // 关键：如果用户没有禁用 IME，我们强制让系统不要画默认框
+
             let user_disabled = IME_USER_DISABLED.load(std::sync::atomic::Ordering::Relaxed);
             if !user_disabled {
                 // 返回 1 表示 "我处理了，别画默认框"
@@ -841,6 +830,8 @@ unsafe extern "system" fn win32_wndproc(
             return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         WM_KILLFOCUS => {
+            event_handler.on_ime_commit(None);
+            
             return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }
         _ => {}
