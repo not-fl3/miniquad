@@ -60,18 +60,17 @@ unsafe fn create_xdg_toplevel(display: &mut WaylandPayload) {
 }
 
 impl Decorations {
-    pub(super) fn new(
-        display: &mut WaylandPayload,
-        fallback: crate::conf::WaylandDecorations,
-    ) -> Self {
+    pub(super) fn new(display: &mut WaylandPayload, conf: &crate::conf::Conf) -> Self {
         use crate::conf::WaylandDecorations::*;
         unsafe {
             if !display.decoration_manager.is_null() {
                 Decorations::server(display)
             } else {
-                match fallback {
+                match conf.platform.wayland_decorations {
                     ServerOnly => Decorations::none(display),
-                    ServerWithLibDecorFallback => Decorations::try_libdecor(display),
+                    ServerWithLibDecorFallback => {
+                        Decorations::try_libdecor(display, conf.window_resizable)
+                    }
                     ServerWithMiniquadFallback => Decorations::fallback(display),
                 }
             }
@@ -140,7 +139,7 @@ impl Decorations {
         Decorations::Server
     }
 
-    unsafe fn try_libdecor(display: &mut WaylandPayload) -> Self {
+    unsafe fn try_libdecor(display: &mut WaylandPayload, resizable: bool) -> Self {
         if let Ok(libdecor) = LibDecor::try_load() {
             let context = (libdecor.libdecor_new)(display.display, &mut LIBDECOR_INTERFACE as _);
             let frame = (libdecor.libdecor_decorate)(
@@ -151,6 +150,12 @@ impl Decorations {
             );
             (libdecor.libdecor_frame_map)(frame);
             display.xdg_toplevel = (libdecor.libdecor_frame_get_xdg_toplevel)(frame);
+            use extensions::libdecor::LIBDECOR_ACTION_RESIZE as RESIZE;
+            if resizable {
+                (libdecor.libdecor_frame_set_capabilities)(frame, RESIZE);
+            } else {
+                (libdecor.libdecor_frame_unset_capabilities)(frame, RESIZE);
+            }
             Decorations::LibDecor {
                 libdecor,
                 context,

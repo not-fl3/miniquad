@@ -1177,8 +1177,7 @@ where
             (libegl.eglGetProcAddress)(name.as_ptr() as _)
         });
 
-        display.decorations =
-            decorations::Decorations::new(&mut display, conf.platform.wayland_decorations);
+        display.decorations = decorations::Decorations::new(&mut display, conf);
         assert!(!display.xdg_toplevel.is_null());
 
         display.decorations.set_title(

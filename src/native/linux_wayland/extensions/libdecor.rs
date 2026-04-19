@@ -51,6 +51,8 @@ pub struct libdecor_frame_interface {
 
 use core::ffi::{c_char, c_int, c_void};
 
+pub const LIBDECOR_ACTION_RESIZE: c_int = 1 << 1;
+
 declare_module! {
     LibDecor,
     "libdecor-0.so",
@@ -66,6 +68,8 @@ declare_module! {
     ) -> *mut libdecor_frame,
     pub fn libdecor_frame_set_app_id(*mut libdecor_frame, *const c_char),
     pub fn libdecor_frame_set_title(*mut libdecor_frame, *const c_char),
+    pub fn libdecor_frame_set_capabilities(*mut libdecor_frame, c_int),
+    pub fn libdecor_frame_unset_capabilities(*mut libdecor_frame, c_int),
     pub fn libdecor_frame_map(*mut libdecor_frame),
     pub fn libdecor_state_new(c_int, c_int) -> *mut libdecor_state,
     pub fn libdecor_frame_commit(
