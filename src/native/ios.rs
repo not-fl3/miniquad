@@ -803,7 +803,7 @@ pub fn log(message: &str) {
     let _: () = unsafe { frameworks::NSLog(nsstring) };
 }
 
-pub fn load_file<F: Fn(crate::fs::Response) + 'static>(path: &str, on_loaded: F) {
+pub fn load_file<F: FnOnce(crate::fs::Response) + 'static>(path: &str, on_loaded: F) {
     let path = std::path::Path::new(&path);
     let path_without_extension = path.with_extension("");
     let path_without_extension = path_without_extension.to_str().unwrap();
