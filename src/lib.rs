@@ -462,7 +462,7 @@ pub fn start<F>(conf: conf::Conf, f: F)
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
         let mut f = Some(f);
         let f = &mut f;
