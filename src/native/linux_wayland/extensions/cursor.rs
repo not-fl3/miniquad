@@ -108,7 +108,7 @@ crate::wl_listener!(
     ),
 );
 
-pub fn translate_cursor(icon: crate::CursorIcon) -> core::ffi::c_uint {
+pub const fn translate_cursor(icon: crate::CursorIcon) -> core::ffi::c_uint {
     // https://wayland.app/protocols/cursor-shape-v1#wp_cursor_shape_device_v1:enum:shape
     match icon {
         crate::CursorIcon::Default => 1,

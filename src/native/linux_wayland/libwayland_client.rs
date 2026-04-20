@@ -372,7 +372,7 @@ macro_rules! wl_listener {
         /// Implementation for the dummy event handlers
         mod $name_dummy {
             use super::*;
-            $(pub unsafe extern "C" fn $event(_: *mut core::ffi::c_void, _: *mut $name, $(_: $arg_ty),*) {})*
+            $(pub const unsafe extern "C" fn $event(_: *mut core::ffi::c_void, _: *mut $name, $(_: $arg_ty),*) {})*
         }
         impl $name_listener {
             /// Create a listener with dummy event handlers

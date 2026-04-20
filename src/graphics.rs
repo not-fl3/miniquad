@@ -42,7 +42,7 @@ pub enum UniformType {
 
 impl UniformType {
     /// Byte size for a given UniformType
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         match self {
             UniformType::Float1 => 4,
             UniformType::Float2 => 8,
@@ -134,7 +134,7 @@ impl VertexFormat {
     /// Number of components in this VertexFormat
     /// it is called size in OpenGl, but do not confuse this with bytes size
     /// basically, its an N from FloatN/IntN
-    pub fn components(&self) -> i32 {
+    pub const fn components(&self) -> i32 {
         match self {
             VertexFormat::Float1 => 1,
             VertexFormat::Float2 => 2,
@@ -157,7 +157,7 @@ impl VertexFormat {
     }
 
     /// Size in bytes
-    pub fn size_bytes(&self) -> i32 {
+    pub const fn size_bytes(&self) -> i32 {
         match self {
             VertexFormat::Float1 => 1 * 4,
             VertexFormat::Float2 => 2 * 4,
@@ -179,7 +179,7 @@ impl VertexFormat {
         }
     }
 
-    fn type_(&self) -> GLuint {
+    const fn type_(&self) -> GLuint {
         match self {
             VertexFormat::Float1 => GL_FLOAT,
             VertexFormat::Float2 => GL_FLOAT,
@@ -328,7 +328,7 @@ pub enum TextureFormat {
 }
 impl TextureFormat {
     /// Returns the size in bytes of texture with `dimensions`.
-    pub fn size(self, width: u32, height: u32) -> u32 {
+    pub const fn size(self, width: u32, height: u32) -> u32 {
         let square = width * height;
         match self {
             TextureFormat::RGB8 => 3 * square,
@@ -436,7 +436,7 @@ impl TextureId {
     /// Wrap raw platform texture into a TextureId acceptable for miniquad
     /// Without allocating any miniquad memory and without letting miniquad
     /// manage the texture.
-    pub fn from_raw_id(raw_id: RawId) -> TextureId {
+    pub const fn from_raw_id(raw_id: RawId) -> TextureId {
         TextureId(TextureIdInner::Raw(raw_id))
     }
 }
@@ -465,7 +465,7 @@ pub struct BlendState {
 }
 
 impl BlendState {
-    pub fn new(equation: Equation, sfactor: BlendFactor, dfactor: BlendFactor) -> BlendState {
+    pub const fn new(equation: Equation, sfactor: BlendFactor, dfactor: BlendFactor) -> BlendState {
         BlendState {
             equation,
             sfactor,
@@ -547,7 +547,7 @@ pub enum PassAction {
 }
 
 impl PassAction {
-    pub fn clear_color(r: f32, g: f32, b: f32, a: f32) -> PassAction {
+    pub const fn clear_color(r: f32, g: f32, b: f32, a: f32) -> PassAction {
         PassAction::Clear {
             color: Some((r, g, b, a)),
             depth: Some(1.),
@@ -789,14 +789,14 @@ pub enum BufferUsage {
     Stream,
 }
 
-fn gl_buffer_target(buffer_type: &BufferType) -> GLenum {
+const fn gl_buffer_target(buffer_type: &BufferType) -> GLenum {
     match buffer_type {
         BufferType::VertexBuffer => GL_ARRAY_BUFFER,
         BufferType::IndexBuffer => GL_ELEMENT_ARRAY_BUFFER,
     }
 }
 
-fn gl_usage(usage: &BufferUsage) -> GLenum {
+const fn gl_usage(usage: &BufferUsage) -> GLenum {
     match usage {
         BufferUsage::Immutable => GL_STATIC_DRAW,
         BufferUsage::Dynamic => GL_DYNAMIC_DRAW,
@@ -879,7 +879,7 @@ impl Default for ElapsedQuery {
 }
 
 impl ElapsedQuery {
-    pub fn new() -> ElapsedQuery {
+    pub const fn new() -> ElapsedQuery {
         ElapsedQuery { gl_query: 0 }
     }
 
@@ -919,7 +919,7 @@ impl ElapsedQuery {
     /// available for retrieval.
     ///
     /// Use [`ElapsedQuery::is_supported()`] to check if functionality is available and the method can be called.
-    pub fn get_result(&self) -> u64 {
+    pub const fn get_result(&self) -> u64 {
         // let mut time: GLuint64 = 0;
         // assert!(self.gl_query != 0);
         // unsafe { glGetQueryObjectui64v(self.gl_query, GL_QUERY_RESULT, &mut time) };
@@ -940,7 +940,7 @@ impl ElapsedQuery {
     /// command submission.
     ///
     /// Use [`ElapsedQuery::is_supported()`] to check if functionality is available and the method can be called.
-    pub fn is_available(&self) -> bool {
+    pub const fn is_available(&self) -> bool {
         // let mut available: GLint = 0;
 
         // // begin_query was not called yet
@@ -996,7 +996,7 @@ impl<'a> BufferSource<'a> {
     /// types are not supported.
     ///
     /// For vertex buffers it is OK to use `empty::<u8>(byte_size);`
-    pub fn empty<T>(size: usize) -> BufferSource<'a> {
+    pub const fn empty<T>(size: usize) -> BufferSource<'a> {
         let element_size = std::mem::size_of::<T>();
         BufferSource::Empty {
             size: size * std::mem::size_of::<T>(),
@@ -1014,7 +1014,11 @@ impl<'a> BufferSource<'a> {
         })
     }
 
-    pub unsafe fn pointer(ptr: *const u8, size: usize, element_size: usize) -> BufferSource<'a> {
+    pub const unsafe fn pointer(
+        ptr: *const u8,
+        size: usize,
+        element_size: usize,
+    ) -> BufferSource<'a> {
         BufferSource::Slice(Arg {
             ptr: ptr as _,
             size,
@@ -1087,7 +1091,7 @@ pub struct ContextInfo {
 }
 
 impl ContextInfo {
-    pub fn has_integer_attributes(&self) -> bool {
+    pub const fn has_integer_attributes(&self) -> bool {
         match self.backend {
             Backend::Metal => true,
             Backend::OpenGl => {

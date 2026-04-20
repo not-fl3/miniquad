@@ -287,7 +287,10 @@ unsafe extern "C" fn libdecor_frame_handle_close(_frame: *mut libdecor_frame, _d
     crate::native_display().try_lock().unwrap().quit_requested = true;
 }
 
-unsafe extern "C" fn libdecor_frame_handle_commit(_frame: *mut libdecor_frame, _data: *mut c_void) {
+const unsafe extern "C" fn libdecor_frame_handle_commit(
+    _frame: *mut libdecor_frame,
+    _data: *mut c_void,
+) {
 }
 unsafe extern "C" fn libdecor_handle_error(
     _context: *mut libdecor,

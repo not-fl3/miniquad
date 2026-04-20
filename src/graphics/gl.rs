@@ -51,13 +51,13 @@ enum TextureOrRenderbuffer {
     Renderbuffer(GLuint),
 }
 impl TextureOrRenderbuffer {
-    fn texture(&self) -> Option<GLuint> {
+    const fn texture(&self) -> Option<GLuint> {
         match self {
             TextureOrRenderbuffer::Texture(id) => Some(*id),
             _ => None,
         }
     }
-    fn renderbuffer(&self) -> Option<GLuint> {
+    const fn renderbuffer(&self) -> Option<GLuint> {
         match self {
             TextureOrRenderbuffer::Renderbuffer(id) => Some(*id),
             _ => None,
@@ -72,7 +72,7 @@ struct Texture {
 }
 
 impl TextureFormat {
-    fn sized_internal_format(&self) -> GLenum {
+    const fn sized_internal_format(&self) -> GLenum {
         match self {
             TextureFormat::RGB8 => GL_RGB8,
             TextureFormat::RGBA8 => GL_RGBA8,
@@ -446,11 +446,11 @@ impl Texture {
     }
 
     #[inline]
-    fn size(&self, width: u32, height: u32) -> usize {
+    const fn size(&self, width: u32, height: u32) -> usize {
         self.params.format.size(width, height) as usize
     }
 
-    fn gl_filter(filter: FilterMode, mipmap_filter: MipmapFilterMode) -> GLenum {
+    const fn gl_filter(filter: FilterMode, mipmap_filter: MipmapFilterMode) -> GLenum {
         match filter {
             FilterMode::Nearest => match mipmap_filter {
                 MipmapFilterMode::None => GL_NEAREST,
@@ -574,7 +574,7 @@ impl GlContext {
         }
     }
 
-    pub fn features(&self) -> &Features {
+    pub const fn features(&self) -> &Features {
         &self.info.features
     }
 }
