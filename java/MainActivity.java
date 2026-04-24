@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.Surface;
 import android.view.Window;
 import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.view.WindowManager.LayoutParams;
 import android.view.SurfaceView;
 import android.view.SurfaceHolder;
@@ -324,24 +325,28 @@ public class MainActivity extends Activity {
                     View decorView = getWindow().getDecorView();
 
                     if (fullscreen) {
-                        getWindow().setFlags(LayoutParams.FLAG_LAYOUT_NO_LIMITS, LayoutParams.FLAG_LAYOUT_NO_LIMITS);
-                        if (Build.VERSION.SDK_INT >= 28) {
-                            getWindow().getAttributes().layoutInDisplayCutoutMode = LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-                        }
                         if (Build.VERSION.SDK_INT >= 30) {
-                            getWindow().setDecorFitsSystemWindows(false);
+                            WindowInsetsController controller = getWindow().getInsetsController();
+                            controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                            controller.hide(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
                         } else {
+                            if (Build.VERSION.SDK_INT >= 28) {
+                                getWindow().getAttributes().layoutInDisplayCutoutMode = LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                            }
                             int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
                             decorView.setSystemUiVisibility(uiOptions);
                         }
-                    }
-                    else {
+                    } else {
                         if (Build.VERSION.SDK_INT >= 30) {
-                            getWindow().setDecorFitsSystemWindows(true);
+                            WindowInsetsController controller = getWindow().getInsetsController();
+                            controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_DEFAULT);
+                            controller.show(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
                         } else {
-                          decorView.setSystemUiVisibility(0);
+                            if (Build.VERSION.SDK_INT >= 28) {
+                                getWindow().getAttributes().layoutInDisplayCutoutMode = LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
+                            }
+                            decorView.setSystemUiVisibility(0);
                         }
-
                     }
                 }
             });
@@ -385,4 +390,3 @@ public class MainActivity extends Activity {
         clipboard.setPrimaryClip(clip);
     }
 }
-
