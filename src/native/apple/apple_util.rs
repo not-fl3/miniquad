@@ -43,8 +43,12 @@ pub fn load_undocumented_cursor(cursor_name: &str) -> ObjcId {
     unsafe {
         let class = class!(NSCursor);
         let sel = Sel::register(cursor_name);
-        let sel: ObjcId = msg_send![class, respondsToSelector: sel];
-        let id: ObjcId = msg_send![class, performSelector: sel];
+        let has_selector: BOOL = msg_send![class, respondsToSelector: sel];
+        let id: ObjcId = if has_selector != NO {
+            msg_send![class, performSelector: sel]
+        } else {
+            msg_send![class, arrowCursor]
+        };
         id
     }
 }
@@ -433,6 +437,9 @@ pub fn load_mouse_cursor(cursor: CursorIcon) -> ObjcId {
         CursorIcon::EWResize => load_native_cursor("resizeLeftRightCursor"),
         CursorIcon::NSResize => load_native_cursor("resizeUpDownCursor"),
 
+        CursorIcon::NESWResize => load_undocumented_cursor("_windowResizeNorthEastSouthWestCursor"),
+        CursorIcon::NWSEResize => load_undocumented_cursor("_windowResizeNorthWestSouthEastCursor"),
+
         // Undocumented cursors: https://stackoverflow.com/a/46635398/5435443
         // Unfortunately undocumented cursors requires NSTracking areas that
         // we do not use yet.
@@ -440,9 +447,6 @@ pub fn load_mouse_cursor(cursor: CursorIcon) -> ObjcId {
         // CursorIcon::Help => load_undocumented_cursor("_helpCursor"),
         // //CursorIcon::ZoomIn => load_undocumented_cursor("_zoomInCursor"),
         // //CursorIcon::ZoomOut => load_undocumented_cursor("_zoomOutCursor"),
-
-        // CursorIcon::NESWResize => load_undocumented_cursor("_windowResizeNorthEastSouthWestCursor"),
-        // CursorIcon::NWSEResize => load_undocumented_cursor("_windowResizeNorthWestSouthEastCursor"),
 
         // // While these are available, the former just loads a white arrow,
         // // and the latter loads an ugly deflated beachball!
