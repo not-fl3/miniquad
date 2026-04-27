@@ -131,6 +131,21 @@ impl MacosDisplay {
 
         Some(event_handler)
     }
+
+    // When the command key is pressed (super key), macOS swallows all key up events.
+    fn generate_swallowed_key_events(&mut self, event: ObjcId) {
+        let event_type: u64 = unsafe { msg_send![event, type] };
+        if event_type == NSEventType::NSKeyUp as u64 {
+            let mods = get_event_key_modifier(event);
+            if mods.logo {
+                if let Some(key) = get_event_keycode(event) {
+                    if let Some(event_handler) = self.context() {
+                        event_handler.key_up_event(key, mods);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl MacosDisplay {
@@ -1322,6 +1337,10 @@ where
         if block_on_wait {
             let event: ObjcId = msg_send![ns_app, nextEventMatchingMask: NSEventMask::NSAnyEventMask untilDate: distant_future inMode:NSDefaultRunLoopMode dequeue:YES];
 
+            if event != nil {
+                display.generate_swallowed_key_events(event);
+            }
+
             let () = msg_send![ns_app, sendEvent:event];
         } else {
             loop {
@@ -1329,6 +1348,8 @@ where
                 if event == nil {
                     break;
                 }
+                display.generate_swallowed_key_events(event);
+
                 let () = msg_send![ns_app, sendEvent:event];
             }
         }
