@@ -65,7 +65,7 @@ impl Drop for RcObjcId {
     }
 }
 
-#[link(name = "system")]
+#[link(name = "System")]
 extern "C" {
     pub static _NSConcreteStackBlock: [*const c_void; 32];
     pub static _NSConcreteBogusBlock: [*const c_void; 32];
