@@ -144,12 +144,46 @@ impl MacosDisplay {
 
     fn move_mouse_inside_window(&self, _window: *mut Object) {
         unsafe {
-            let frame: NSRect = msg_send![self.window, frame];
-            let origin = self.transform_mouse_point(&frame.origin);
-            let point = NSPoint {
-                x: (origin.0 as f64) + (frame.size.width / 2.0),
-                y: (origin.1 as f64) + (frame.size.height / 2.0),
+            // Use the drawable/content view, not the outer NSWindow frame.
+            // NSWindow frame includes titlebar/borders and uses AppKit's bottom-left
+            // screen coordinate system. CGWarpMouseCursorPosition expects CoreGraphics
+            // screen coordinates, whose Y axis is flipped.
+            let bounds: NSRect = msg_send![self.view, bounds];
+
+            let center_in_view = NSPoint {
+                x: bounds.origin.x + bounds.size.width * 0.5,
+                y: bounds.origin.y + bounds.size.height * 0.5,
             };
+
+            let center_in_window: NSPoint = msg_send![
+                self.view,
+                convertPoint: center_in_view
+                toView: nil
+            ];
+
+            let center_rect = NSRect {
+                origin: center_in_window,
+                size: NSSize {
+                    width: 0.0,
+                    height: 0.0,
+                },
+            };
+
+            let center_on_screen: NSRect = msg_send![
+                self.window,
+                convertRectToScreen: center_rect
+            ];
+
+            // AppKit screen coordinates are bottom-left origin.
+            // CoreGraphics cursor warp coordinates are top-left origin.
+            let main_screen: ObjcId = msg_send![class!(NSScreen), mainScreen];
+            let main_screen_frame: NSRect = msg_send![main_screen, frame];
+
+            let point = NSPoint {
+                x: center_on_screen.origin.x,
+                y: main_screen_frame.size.height - center_on_screen.origin.y,
+            };
+
             CGWarpMouseCursorPosition(point);
         }
     }
@@ -1249,7 +1283,8 @@ where
     (*view).set_ivar("display_ptr", &mut display as *mut _ as *mut c_void);
 
     // Tell the view to accept file drops. Without this, dragging files onto the window will do nothing.
-    let dragged_types: ObjcId = msg_send![class!(NSArray), arrayWithObject: NSPasteboardTypeFileURL];
+    let dragged_types: ObjcId =
+        msg_send![class!(NSArray), arrayWithObject: NSPasteboardTypeFileURL];
     let () = msg_send![view, registerForDraggedTypes: dragged_types];
 
     display.window = window;
