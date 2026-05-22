@@ -717,11 +717,6 @@ unsafe extern "system" fn win32_wndproc(
         }
         WM_TIMER => {
             if wparam == &mut payload.modal_resizing_timer as *mut _ as usize {
-                payload.event_handler.as_mut().unwrap().update();
-                payload.event_handler.as_mut().unwrap().draw();
-
-                SwapBuffers(payload.dc);
-
                 if payload.update_dimensions(hwnd) {
                     let d = crate::native_display().lock().unwrap();
                     let width = d.screen_width as f32;
@@ -733,6 +728,11 @@ unsafe extern "system" fn win32_wndproc(
                         .unwrap()
                         .resize_event(width, height);
                 }
+
+                payload.event_handler.as_mut().unwrap().update();
+                payload.event_handler.as_mut().unwrap().draw();
+
+                SwapBuffers(payload.dc);
             }
         }
         WM_EXITSIZEMOVE | WM_EXITMENULOOP => {
@@ -1268,14 +1268,6 @@ where
                 }
             }
 
-            if !conf.platform.blocking_event_loop || display.update_requested {
-                display.update_requested = false;
-                display.event_handler.as_mut().unwrap().update();
-                display.event_handler.as_mut().unwrap().draw();
-
-                SwapBuffers(display.dc);
-            }
-
             if display.update_dimensions(wnd) {
                 let d = crate::native_display().lock().unwrap();
                 let width = d.screen_width as f32;
@@ -1286,6 +1278,13 @@ where
                     .as_mut()
                     .unwrap()
                     .resize_event(width, height);
+            }
+            if !conf.platform.blocking_event_loop || display.update_requested {
+                display.update_requested = false;
+                display.event_handler.as_mut().unwrap().update();
+                display.event_handler.as_mut().unwrap().draw();
+
+                SwapBuffers(display.dc);
             }
             if crate::native_display().lock().unwrap().quit_requested {
                 PostMessageW(display.wnd, WM_CLOSE, 0, 0);
