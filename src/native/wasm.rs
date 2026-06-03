@@ -107,6 +107,7 @@ pub unsafe fn sapp_height() -> ::core::ffi::c_int {
     canvas_height()
 }
 
+#[link(wasm_import_module = "env")]
 extern "C" {
     pub fn setup_canvas_size(high_dpi: bool);
     pub fn run_animation_loop(blocking: bool);
