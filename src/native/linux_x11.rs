@@ -213,7 +213,11 @@ impl X11Display {
                     if let Ok(filenames) = std::str::from_utf8(&bytes) {
                         let mut d = crate::native_display().try_lock().unwrap();
                         d.dropped_files = Default::default();
-                        for filename in filenames.lines() {
+                        for mut filename in filenames.lines() {
+                            // On Linux X11, dropped file paths may contain `file://` prefix
+                            if let Some(stripped) = filename.strip_prefix("file://") {
+                                filename = stripped;
+                            }
                             let path = std::path::PathBuf::from(filename);
                             if let Ok(bytes) = std::fs::read(&path) {
                                 d.dropped_files.paths.push(path);

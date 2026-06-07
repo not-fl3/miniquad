@@ -869,6 +869,7 @@ declare_atoms!(
     xdnd_selection: "XdndSelection",
     xdnd_status: "XdndStatus",
     xdnd_type_list: "XdndTypeList",
+    mime_text_uri_lst: "text/uri-list",
 );
 
 use core::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, c_void};
