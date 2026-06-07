@@ -67,7 +67,8 @@ impl X11DnD {
         };
 
         for format in formats {
-            if format == libx11.extensions.utf8_string {
+            // On X11, file managers may yield `text/uri-list` for dragged files
+            if format == libx11.extensions.utf8_string || format == libx11.extensions.mime_text_uri_lst {
                 self.format = format;
                 break;
             }
