@@ -30,8 +30,8 @@ use {
 // `did_finish_launching_with_options` run on the main thread, so
 // `thread_local` storage is sound.
 thread_local! {
-    static PENDING_SCENE_VIEW: RefCell<Option<ObjcId>> = RefCell::new(None);
-    static PENDING_SCENE_VIEW_CTRL: RefCell<Option<ObjcId>> = RefCell::new(None);
+    static PENDING_SCENE_VIEW_AND_CTRL: RefCell<Option<(ObjcId, ObjcId)>> =
+        RefCell::new(None);
 }
 
 struct MainThreadState {
@@ -614,8 +614,8 @@ pub fn define_app_delegate() -> *const Class {
 
             // Stash view + view_ctrl for `scene_will_connect` to adopt
             // into a freshly-created `initWithWindowScene:` window.
-            PENDING_SCENE_VIEW.with(|v| *v.borrow_mut() = Some(view.view));
-            PENDING_SCENE_VIEW_CTRL.with(|v| *v.borrow_mut() = Some(view.view_ctrl));
+            PENDING_SCENE_VIEW_AND_CTRL
+                .with(|cell| *cell.borrow_mut() = Some((view.view, view.view_ctrl)));
 
             let notification_center: ObjcId =
                 msg_send![class!(NSNotificationCenter), defaultCenter];
@@ -726,10 +726,6 @@ pub fn define_app_delegate() -> *const Class {
         send_message(Message::Pause);
     }
 
-    extern "C" fn scene_did_activate(_: &Object, _: Sel, _: ObjcId) {
-        send_message(Message::Resume);
-    }
-
     extern "C" fn scene_will_connect(_: &Object, _: Sel, notification: ObjcId) {
         unsafe {
             let scene: ObjcId = msg_send![notification, object];
@@ -739,14 +735,11 @@ pub fn define_app_delegate() -> *const Class {
                 return;
             }
 
-            let view = match PENDING_SCENE_VIEW.with(|v| v.borrow_mut().take()) {
-                Some(v) => v,
-                None => return,
-            };
-            let view_ctrl = match PENDING_SCENE_VIEW_CTRL.with(|v| v.borrow_mut().take()) {
-                Some(c) => c,
-                None => return,
-            };
+            let (view, view_ctrl) =
+                match PENDING_SCENE_VIEW_AND_CTRL.with(|cell| cell.borrow_mut().take()) {
+                    Some(pair) => pair,
+                    None => return,
+                };
 
             let window: ObjcId = msg_send![class!(UIWindow), alloc];
             let window: ObjcId = msg_send![window, initWithWindowScene: scene];
@@ -754,6 +747,10 @@ pub fn define_app_delegate() -> *const Class {
             msg_send_![window, setRootViewController: view_ctrl];
             msg_send_![window, makeKeyAndVisible];
         }
+    }
+
+    extern "C" fn scene_did_activate(_: &Object, _: Sel, _: ObjcId) {
+        send_message(Message::Resume);
     }
 
     unsafe {
