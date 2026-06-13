@@ -1217,7 +1217,20 @@ impl RenderingBackend for MetalContext {
             let color_attachments = msg_send_![descriptor, colorAttachments];
             let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: 0];
 
-            msg_send_![color_attachment, setStoreAction: MTLStoreAction::Store];
+            // Pick the store action based on whether the attachment
+            // has a resolve texture. MTKView's
+            // `currentRenderPassDescriptor` already wires a
+            // `resolveTexture` when the view's `sampleCount > 1`, and
+            // `new_render_pass_mrt` does the same for offscreen MSAA
+            // targets. Both paths require `MultisampleResolve` —
+            // forcing `Store` here trips Metal validation.
+            let resolve_texture: ObjcId = msg_send![color_attachment, resolveTexture];
+            let store_action = if resolve_texture.is_null() {
+                MTLStoreAction::Store
+            } else {
+                MTLStoreAction::MultisampleResolve
+            };
+            msg_send_![color_attachment, setStoreAction: store_action];
 
             match action {
                 PassAction::Clear { color, .. } => {
