@@ -711,8 +711,14 @@ impl RenderingBackend for MetalContext {
 
             if access == TextureAccess::RenderTarget {
                 if params.format != TextureFormat::Depth {
-                    let pixel_format: MTLPixelFormat = params.format.into();
-                    msg_send_![descriptor, setPixelFormat: pixel_format];
+                    // Match the view's `colorPixelFormat` — pipelines
+                    // bake it and reject mismatched attachments, and
+                    // MTKView's presentable formats are all `BGRA*` /
+                    // `RGBA16Float` so honoring `RGBA8` literally
+                    // would break every offscreen color target.
+                    let view_pixel_format: MTLPixelFormat =
+                        msg_send![self.view, colorPixelFormat];
+                    msg_send_![descriptor, setPixelFormat: view_pixel_format];
                 }
                 msg_send_![descriptor, setStorageMode: MTLStorageMode::Private];
                 msg_send_![
