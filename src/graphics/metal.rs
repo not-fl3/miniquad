@@ -716,12 +716,9 @@ impl RenderingBackend for MetalContext {
                 }
                 msg_send_![descriptor, setStorageMode: MTLStorageMode::Private];
                 if params.sample_count > 1 {
-                    // MSAA render target. The matching single-sample
-                    // resolve texture is created with `sample_count = 1`
-                    // and passed alongside in `new_render_pass_mrt`'s
-                    // `resolve_img` slice. Multisample textures can't be
-                    // shader-sampled directly (they're sampled via the
-                    // resolve pass) and can't have mipmaps.
+                    // MSAA target — render-only, no mipmaps, no
+                    // shader-sample (the resolve texture is sampled
+                    // instead).
                     msg_send_![
                         descriptor,
                         setTextureType: MTLTextureType::D2Multisample
@@ -1004,12 +1001,9 @@ impl RenderingBackend for MetalContext {
                 descriptor,
                 setStencilAttachmentPixelFormat: MTLPixelFormat::Depth32Float_Stencil8
             ];
-            // Match the view's sample count. The pipeline's sampleCount
-            // must equal the sampleCount of every render-pass color
-            // attachment it draws to. We use the view's value as the
-            // canonical app-wide sample count: MSAA render targets
-            // (`render_target_msaa()`) match it, and the main drawable
-            // is configured from `Conf.sample_count` in the view setup.
+            // Pipeline sampleCount must match every render-pass
+            // color attachment it binds to; use the view's as the
+            // canonical app-wide value.
             let view_sample_count: u64 = msg_send![self.view, sampleCount];
             msg_send_![descriptor, setSampleCount: view_sample_count];
 
@@ -1217,18 +1211,17 @@ impl RenderingBackend for MetalContext {
             let color_attachments = msg_send_![descriptor, colorAttachments];
             let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: 0];
 
-            // Pick the store action based on whether the attachment
-            // has a resolve texture. MTKView's
-            // `currentRenderPassDescriptor` already wires a
-            // `resolveTexture` when the view's `sampleCount > 1`, and
-            // `new_render_pass_mrt` does the same for offscreen MSAA
-            // targets. Both paths require `MultisampleResolve` —
-            // forcing `Store` here trips Metal validation.
+            // If the attachment has a resolve texture, use
+            // `StoreAndMultisampleResolve` (not just
+            // `MultisampleResolve`) so the multisample texture
+            // survives target-switch boundaries within a frame —
+            // a later `Load` on the same target would otherwise
+            // read discarded memory.
             let resolve_texture: ObjcId = msg_send![color_attachment, resolveTexture];
             let store_action = if resolve_texture.is_null() {
                 MTLStoreAction::Store
             } else {
-                MTLStoreAction::MultisampleResolve
+                MTLStoreAction::StoreAndMultisampleResolve
             };
             msg_send_![color_attachment, setStoreAction: store_action];
 
