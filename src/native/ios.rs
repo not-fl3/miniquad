@@ -376,18 +376,30 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
         draw_in_rect(this, s, o, nil);
     }
 
-    // `MTKViewDelegate` requires both `drawInMTKView:` AND
-    // `mtkView:drawableSizeWillChange:`. MTKView invokes the
-    // size-change selector before the first `drawInMTKView:` after
-    // any drawable-size change (window resize, rotation under a
-    // non-locked orientation set, split-view drag on iPad). Without
-    // an implementation, `_resizeDrawable` raises
-    // `NSInvalidArgumentException` and crashes the process.
-    //
-    // The real resize handling lives in `draw_in_rect`, which polls
-    // `UIScreen.mainScreen.bounds` every frame and emits
-    // `Message::Resize` on a delta — so a stub is enough here.
-    extern "C" fn drawable_size_will_change(_: &Object, _: Sel, _: ObjcId, _: NSSize) {}
+    // `MTKViewDelegate` requires this alongside `drawInMTKView:`;
+    // missing it crashes `_resizeDrawable` with
+    // `NSInvalidArgumentException`. Sync `native_display` here so
+    // the next frame's `setScissorRect` (and anything else reading
+    // `screen_size`) matches the new drawable — `draw_in_rect`'s
+    // `UIScreen.bounds` poll is the fallback but lags drawableSize
+    // during rotation animations.
+    extern "C" fn drawable_size_will_change(_: &Object, _: Sel, _: ObjcId, size: NSSize) {
+        let width = size.width as i32;
+        let height = size.height as i32;
+        let changed = {
+            let mut display = native_display().lock().unwrap();
+            let changed =
+                display.screen_width != width || display.screen_height != height;
+            if changed {
+                display.screen_width = width;
+                display.screen_height = height;
+            }
+            changed
+        };
+        if changed {
+            send_message(Message::Resize { width, height });
+        }
+    }
 
     unsafe {
         decl.add_method(
