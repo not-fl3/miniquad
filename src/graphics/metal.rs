@@ -498,13 +498,21 @@ impl RenderingBackend for MetalContext {
         unimplemented!()
     }
     fn texture_generate_mipmaps(&mut self, texture: TextureId) {
+        let texture = self.textures.get(texture);
+        // Catch the bug at the call site instead of letting Metal
+        // assert on `mipmapLevelCount > 1` deep inside the blit
+        // encoder. Set `TextureParams::allocate_mipmaps = true` at
+        // creation to use this entry point.
+        assert!(
+            texture.params.allocate_mipmaps,
+            "texture_generate_mipmaps called on a texture allocated without mipmaps",
+        );
         unsafe {
             if self.command_buffer.is_none() {
                 self.command_buffer = Some(msg_send![self.command_queue, commandBuffer]);
             }
             let command_buffer = self.command_buffer.unwrap();
             let encoder = msg_send_![command_buffer, blitCommandEncoder];
-            let texture = self.textures.get(texture);
             msg_send_![encoder, generateMipmapsForTexture: texture.texture];
             msg_send_![encoder, endEncoding];
         }
