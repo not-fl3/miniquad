@@ -24,6 +24,16 @@ use {
     },
 };
 
+// iOS 27 / TN3187: windows must be created via `initWithWindowScene:`
+// or they stay invisible. Window creation defers to the
+// `UISceneWillConnectNotification` observer below; both that and
+// `did_finish_launching_with_options` run on the main thread, so
+// `thread_local` storage is sound.
+thread_local! {
+    static PENDING_SCENE_VIEW: RefCell<Option<ObjcId>> = RefCell::new(None);
+    static PENDING_SCENE_VIEW_CTRL: RefCell<Option<ObjcId>> = RefCell::new(None);
+}
+
 struct MainThreadState {
     quit: bool,
     paused: bool,
@@ -493,7 +503,7 @@ pub fn define_app_delegate() -> *const Class {
     let mut decl = ClassDecl::new("NSAppDelegate", superclass).unwrap();
 
     extern "C" fn did_finish_launching_with_options(
-        _: &Object,
+        delegate_self: &Object,
         _: Sel,
         _: ObjcId,
         _: ObjcId,
@@ -518,9 +528,8 @@ pub fn define_app_delegate() -> *const Class {
                 )
             };
 
-            let window_obj: ObjcId = msg_send![class!(UIWindow), alloc];
-            let window_obj: ObjcId = msg_send![window_obj, initWithFrame: screen_rect];
-
+            // Window creation defers to `scene_will_connect`; view +
+            // view_ctrl built now so the render thread has them ready.
             let view = match conf.platform.apple_gfx_api {
                 AppleGfxApi::OpenGl => {
                     create_opengl_view(screen_rect, conf.sample_count, conf.high_dpi)
@@ -603,11 +612,34 @@ pub fn define_app_delegate() -> *const Class {
             (*view.view_dlg).set_ivar("display_ptr", payload_ptr);
             (*textfield_dlg).set_ivar("display_ptr", payload_ptr);
 
-            msg_send_![window_obj, addSubview: view.view];
+            // Stash view + view_ctrl for `scene_will_connect` to adopt
+            // into a freshly-created `initWithWindowScene:` window.
+            PENDING_SCENE_VIEW.with(|v| *v.borrow_mut() = Some(view.view));
+            PENDING_SCENE_VIEW_CTRL.with(|v| *v.borrow_mut() = Some(view.view_ctrl));
 
-            msg_send_![window_obj, setRootViewController: view.view_ctrl];
+            let notification_center: ObjcId =
+                msg_send![class!(NSNotificationCenter), defaultCenter];
+            let scene_will_connect_name =
+                apple_util::str_to_nsstring("UISceneWillConnectNotification");
+            let _: () = msg_send![notification_center,
+                addObserver: delegate_self
+                selector: sel!(sceneWillConnect:)
+                name: scene_will_connect_name
+                object: nil];
 
-            msg_send_![window_obj, makeKeyAndVisible];
+            // iOS 27 fires `applicationWillResignActive:` during the
+            // scene-attach handoff (legacy lifecycle compat path), which
+            // sends `Message::Pause` and blocks the render thread. There's
+            // no follow-up `applicationDidBecomeActive:` because the scene
+            // lifecycle drives the real activation. Re-Resume on every
+            // scene activation to recover.
+            let scene_did_activate_name =
+                apple_util::str_to_nsstring("UISceneDidActivateNotification");
+            let _: () = msg_send![notification_center,
+                addObserver: delegate_self
+                selector: sel!(sceneDidActivate:)
+                name: scene_did_activate_name
+                object: nil];
 
             struct SendHack<F>(F);
             unsafe impl<F> Send for SendHack<F> {}
@@ -694,6 +726,36 @@ pub fn define_app_delegate() -> *const Class {
         send_message(Message::Pause);
     }
 
+    extern "C" fn scene_did_activate(_: &Object, _: Sel, _: ObjcId) {
+        send_message(Message::Resume);
+    }
+
+    extern "C" fn scene_will_connect(_: &Object, _: Sel, notification: ObjcId) {
+        unsafe {
+            let scene: ObjcId = msg_send![notification, object];
+            let is_window_scene: BOOL =
+                msg_send![scene, isKindOfClass: class!(UIWindowScene)];
+            if is_window_scene == NO {
+                return;
+            }
+
+            let view = match PENDING_SCENE_VIEW.with(|v| v.borrow_mut().take()) {
+                Some(v) => v,
+                None => return,
+            };
+            let view_ctrl = match PENDING_SCENE_VIEW_CTRL.with(|v| v.borrow_mut().take()) {
+                Some(c) => c,
+                None => return,
+            };
+
+            let window: ObjcId = msg_send![class!(UIWindow), alloc];
+            let window: ObjcId = msg_send![window, initWithWindowScene: scene];
+            msg_send_![window, addSubview: view];
+            msg_send_![window, setRootViewController: view_ctrl];
+            msg_send_![window, makeKeyAndVisible];
+        }
+    }
+
     unsafe {
         decl.add_method(
             sel!(application: didFinishLaunchingWithOptions:),
@@ -707,6 +769,14 @@ pub fn define_app_delegate() -> *const Class {
         decl.add_method(
             sel!(applicationWillResignActive:),
             application_will_resign_active as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(sceneWillConnect:),
+            scene_will_connect as extern "C" fn(&Object, Sel, ObjcId),
+        );
+        decl.add_method(
+            sel!(sceneDidActivate:),
+            scene_did_activate as extern "C" fn(&Object, Sel, ObjcId),
         );
     }
     decl.register()
