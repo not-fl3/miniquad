@@ -278,6 +278,10 @@ pub struct MetalContext {
     command_queue: ObjcId,
     command_buffer: Option<ObjcId>,
     render_encoder: Option<ObjcId>,
+    /// Active pass's color-attachment dimensions in pixels — pivot
+    /// for `apply_scissor_rect`'s Y-flip + clamp.
+    current_pass_width: u32,
+    current_pass_height: u32,
     view: ObjcId,
     device: ObjcId,
     current_frame_index: usize,
@@ -369,6 +373,8 @@ impl MetalContext {
                 command_queue,
                 command_buffer: None,
                 render_encoder: None,
+                current_pass_width: 0,
+                current_pass_height: 0,
                 view,
                 device,
                 buffers: vec![],
@@ -420,12 +426,25 @@ impl RenderingBackend for MetalContext {
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
         assert!(self.render_encoder.is_some());
 
-        let (_, screen_height) = crate::window::screen_size();
+        // Flip against the active pass height, not the screen —
+        // they diverge for off-screen targets at high DPI. Then
+        // clamp into `[0, pass_size]` on both axes: callers
+        // (macroquad) can briefly request a scissor sized against
+        // a stale screen cache (e.g. mid-rotation, where the
+        // caller's `screen_size()` lags MTKView's drawable
+        // dimensions by a frame), and an unclamped scissor would
+        // trip Metal validation.
+        let pass_width = self.current_pass_width as i32;
+        let pass_height = self.current_pass_height as i32;
+        let x_clamped = x.clamp(0, pass_width);
+        let y_metal = (pass_height - (y + h)).clamp(0, pass_height);
+        let w_clamped = (pass_width - x_clamped).clamp(0, w.max(0));
+        let h_clamped = (pass_height - y_metal).clamp(0, h.max(0));
         let r = MTLScissorRect {
-            x: x as _,
-            y: (screen_height as i32 - (y + h)) as u64,
-            width: w as _,
-            height: h as _,
+            x: x_clamped as u64,
+            y: y_metal as u64,
+            width: w_clamped as u64,
+            height: h_clamped as u64,
         };
         unsafe { msg_send_![self.render_encoder.unwrap(), setScissorRect: r] };
     }
@@ -1190,14 +1209,23 @@ impl RenderingBackend for MetalContext {
                 self.command_buffer = Some(msg_send![self.command_queue, commandBuffer]);
             }
 
-            let (descriptor, _, _) = match pass {
+            let (descriptor, width_px, height_px) = match pass {
                 None => {
-                    let (screen_width, screen_height) = crate::window::screen_size();
-                    (
-                        msg_send_![self.view, currentRenderPassDescriptor],
-                        screen_width as f64,
-                        screen_height as f64,
-                    )
+                    // Read dimensions from the actual pass attachment
+                    // texture, not `screen_size()`. MTKView's
+                    // `drawableSize` and our cached screen size can
+                    // both transition to the new size one frame before
+                    // `currentDrawable`'s texture is recreated; reading
+                    // the attachment directly avoids the gap.
+                    let descriptor: ObjcId =
+                        msg_send_![self.view, currentRenderPassDescriptor];
+                    let color_attachments: ObjcId = msg_send_![descriptor, colorAttachments];
+                    let attachment: ObjcId =
+                        msg_send_![color_attachments, objectAtIndexedSubscript: 0];
+                    let texture: ObjcId = msg_send_![attachment, texture];
+                    let width: u64 = msg_send![texture, width];
+                    let height: u64 = msg_send![texture, height];
+                    (descriptor, width as u32, height as u32)
                 }
                 Some(pass) => {
                     let pass = &self.passes[pass.0];
@@ -1212,12 +1240,14 @@ impl RenderingBackend for MetalContext {
 
                     (
                         pass.render_pass_desc,
-                        self.textures.get(texture).params.width as f64,
-                        self.textures.get(texture).params.height as f64,
+                        self.textures.get(texture).params.width,
+                        self.textures.get(texture).params.height,
                     )
                 }
             };
             assert!(!descriptor.is_null());
+            self.current_pass_width = width_px;
+            self.current_pass_height = height_px;
 
             let color_attachments = msg_send_![descriptor, colorAttachments];
             let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: 0];
