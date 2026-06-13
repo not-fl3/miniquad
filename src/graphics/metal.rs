@@ -10,9 +10,18 @@ use super::*;
 // https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
 const MAX_UNIFORM_BUFFER_SIZE: u64 = 4 * 1024 * 1024;
 const NUM_INFLIGHT_FRAMES: usize = 3;
-#[cfg(any(target_os = "macos", all(target_os = "ios", target_arch = "x86_64")))]
+// iOS simulator on Apple Silicon Macs (`target_abi = "sim"`) runs
+// iOS arm64 code but issues Metal commands against the host Mac's
+// GPU — which validates with the 256-byte rule, not iOS arm64's
+// 16-byte. Without breaking the simulator out of the iOS-arm64
+// branch below, the first draw fails Metal validation on
+// uniform-buffer offset alignment.
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "ios", any(target_arch = "x86_64", target_abi = "sim")),
+))]
 const UNIFORM_BUFFER_ALIGN: u64 = 256;
-#[cfg(all(target_os = "ios", not(target_arch = "x86_64")))]
+#[cfg(all(target_os = "ios", target_arch = "aarch64", not(target_abi = "sim")))]
 const UNIFORM_BUFFER_ALIGN: u64 = 16;
 
 impl From<VertexFormat> for MTLVertexFormat {
