@@ -715,12 +715,31 @@ impl RenderingBackend for MetalContext {
                     msg_send_![descriptor, setPixelFormat: pixel_format];
                 }
                 msg_send_![descriptor, setStorageMode: MTLStorageMode::Private];
-                msg_send_![
-                    descriptor,
-                    setUsage: MTLTextureUsage::RenderTarget as u64
-                        | MTLTextureUsage::ShaderRead as u64
-                        | MTLTextureUsage::ShaderWrite as u64
-                ];
+                if params.sample_count > 1 {
+                    // MSAA render target. The matching single-sample
+                    // resolve texture is created with `sample_count = 1`
+                    // and passed alongside in `new_render_pass_mrt`'s
+                    // `resolve_img` slice. Multisample textures can't be
+                    // shader-sampled directly (they're sampled via the
+                    // resolve pass) and can't have mipmaps.
+                    msg_send_![
+                        descriptor,
+                        setTextureType: MTLTextureType::D2Multisample
+                    ];
+                    msg_send_![descriptor, setSampleCount: params.sample_count as u64];
+                    msg_send_![descriptor, setMipmapLevelCount: 1u64];
+                    msg_send_![
+                        descriptor,
+                        setUsage: MTLTextureUsage::RenderTarget as u64
+                    ];
+                } else {
+                    msg_send_![
+                        descriptor,
+                        setUsage: MTLTextureUsage::RenderTarget as u64
+                            | MTLTextureUsage::ShaderRead as u64
+                            | MTLTextureUsage::ShaderWrite as u64
+                    ];
+                }
             } else {
                 #[cfg(target_os = "macos")]
                 {
@@ -985,6 +1004,14 @@ impl RenderingBackend for MetalContext {
                 descriptor,
                 setStencilAttachmentPixelFormat: MTLPixelFormat::Depth32Float_Stencil8
             ];
+            // Match the view's sample count. The pipeline's sampleCount
+            // must equal the sampleCount of every render-pass color
+            // attachment it draws to. We use the view's value as the
+            // canonical app-wide sample count: MSAA render targets
+            // (`render_target_msaa()`) match it, and the main drawable
+            // is configured from `Conf.sample_count` in the view setup.
+            let view_sample_count: u64 = msg_send![self.view, sampleCount];
+            msg_send_![descriptor, setSampleCount: view_sample_count];
 
             let mut error: ObjcId = nil;
             let pipeline_state: ObjcId = msg_send![
