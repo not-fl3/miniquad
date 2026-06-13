@@ -282,6 +282,10 @@ pub struct MetalContext {
     /// for `apply_scissor_rect`'s Y-flip + clamp.
     current_pass_width: u32,
     current_pass_height: u32,
+    // Bookkeeping for the deferred-end pass-merge in `begin_pass`
+    // / `end_render_pass`.
+    current_pass_target: Option<Option<RenderPass>>,
+    pending_end_encoder: bool,
     view: ObjcId,
     device: ObjcId,
     current_frame_index: usize,
@@ -375,6 +379,8 @@ impl MetalContext {
                 render_encoder: None,
                 current_pass_width: 0,
                 current_pass_height: 0,
+                current_pass_target: None,
+                pending_end_encoder: false,
                 view,
                 device,
                 buffers: vec![],
@@ -389,6 +395,17 @@ impl MetalContext {
                 current_ub_offset: 0,
             }
         }
+    }
+
+    /// Actually call `endEncoding` and clear deferred-end state.
+    /// `end_render_pass` defers this so consecutive same-target
+    /// begin/end pairs can collapse into one Metal pass.
+    fn really_end_encoder(&mut self) {
+        if let Some(render_encoder) = self.render_encoder.take() {
+            unsafe { msg_send_!(render_encoder, endEncoding) };
+        }
+        self.current_pass_target = None;
+        self.pending_end_encoder = false;
     }
 }
 
@@ -525,6 +542,10 @@ impl RenderingBackend for MetalContext {
         unimplemented!()
     }
     fn texture_generate_mipmaps(&mut self, texture: TextureId) {
+        // Close any deferred render encoder before opening a blit
+        // encoder on the same command buffer — Metal asserts
+        // "encoding in progress" otherwise.
+        self.really_end_encoder();
         unsafe {
             if self.command_buffer.is_none() {
                 self.command_buffer = Some(msg_send![self.command_queue, commandBuffer]);
@@ -1205,6 +1226,22 @@ impl RenderingBackend for MetalContext {
 
     fn begin_pass(&mut self, pass: Option<RenderPass>, action: PassAction) {
         unsafe {
+            // Reuse the deferred encoder if this begin continues the
+            // same target with a load-style action — collapses the
+            // per-draw-call begin/end pattern (e.g. macroquad's) into
+            // one Metal pass, avoiding a store + (for MSAA) resolve
+            // per draw on tile-based GPUs.
+            if self.pending_end_encoder
+                && self.current_pass_target == Some(pass)
+                && matches!(action, PassAction::Nothing)
+            {
+                self.pending_end_encoder = false;
+                return;
+            }
+            if self.pending_end_encoder {
+                self.really_end_encoder();
+            }
+
             if self.command_buffer.is_none() {
                 self.command_buffer = Some(msg_send![self.command_queue, commandBuffer]);
             }
@@ -1288,6 +1325,8 @@ impl RenderingBackend for MetalContext {
             // });
 
             self.render_encoder = Some(render_encoder);
+            self.current_pass_target = Some(pass);
+            self.pending_end_encoder = false;
         }
     }
 
@@ -1297,10 +1336,10 @@ impl RenderingBackend for MetalContext {
             "end_render_pass unpaired with begin_render_pass!"
         );
 
-        let render_encoder = self.render_encoder.unwrap();
-        unsafe { msg_send_!(render_encoder, endEncoding) };
-
-        self.render_encoder = None;
+        // Defer `endEncoding`; see `begin_pass` for the reuse rule.
+        // Anything that breaks the merge invariant runs
+        // `really_end_encoder` first.
+        self.pending_end_encoder = true;
         self.index_buffer = None;
     }
 
@@ -1332,6 +1371,11 @@ impl RenderingBackend for MetalContext {
     }
 
     fn commit_frame(&mut self) {
+        // Flush the deferred `endEncoding` from the last
+        // `end_render_pass`.
+        if self.pending_end_encoder {
+            self.really_end_encoder();
+        }
         unsafe {
             assert!(!self.command_queue.is_null());
             let drawable: ObjcId = msg_send!(self.view, currentDrawable);
