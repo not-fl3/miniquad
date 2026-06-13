@@ -371,6 +371,19 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
         draw_in_rect(this, s, o, nil);
     }
 
+    // `MTKViewDelegate` requires both `drawInMTKView:` AND
+    // `mtkView:drawableSizeWillChange:`. MTKView invokes the
+    // size-change selector before the first `drawInMTKView:` after
+    // any drawable-size change (window resize, rotation under a
+    // non-locked orientation set, split-view drag on iPad). Without
+    // an implementation, `_resizeDrawable` raises
+    // `NSInvalidArgumentException` and crashes the process.
+    //
+    // The real resize handling lives in `draw_in_rect`, which polls
+    // `UIScreen.mainScreen.bounds` every frame and emits
+    // `Message::Resize` on a delta — so a stub is enough here.
+    extern "C" fn drawable_size_will_change(_: &Object, _: Sel, _: ObjcId, _: NSSize) {}
+
     unsafe {
         decl.add_method(
             sel!(glkView: drawInRect:),
@@ -380,6 +393,11 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
         decl.add_method(
             sel!(drawInMTKView:),
             draw_in_rect2 as extern "C" fn(&Object, Sel, ObjcId),
+        );
+
+        decl.add_method(
+            sel!(mtkView: drawableSizeWillChange:),
+            drawable_size_will_change as extern "C" fn(&Object, Sel, ObjcId, NSSize),
         );
     }
 
