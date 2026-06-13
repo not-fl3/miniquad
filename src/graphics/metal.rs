@@ -191,20 +191,19 @@ fn roundup_ub_buffer(current_buffer: u64) -> u64 {
     ((current_buffer) + ((UNIFORM_BUFFER_ALIGN) - 1)) & !((UNIFORM_BUFFER_ALIGN) - 1)
 }
 
-// this scenario:
-// buffer.update(); draw(buffer); buffer.update(); draw(buffer);
-// is very problematic with metal's ownership model.
-// buffer.update() half-update buffer - it doesn't really send data to the GPU claiming ownership,
-// it postpone reading the CPU memory until drawcall will actually happen.
-// There is no way to flush the buffer and makes metal's "update" function to update GPU memory right away.
-// Thus miniquad keeps a lot of buffer's copies...
-const BUFFERS_IN_ROTATION: usize = 30;
-
-#[derive(Clone, Copy, Debug)]
+// Per-buffer rotation pool for the within-frame update-draw-update-draw
+// pattern. Metal's `update` doesn't synchronously claim ownership, so
+// each within-frame update needs its own backing `MTLBuffer` to keep
+// the previous update's data alive until the draw consumes it. `raw`
+// grows on demand, so memory tracks actual per-frame usage rather
+// than a fixed worst-case ceiling.
+#[derive(Clone, Debug)]
 pub struct Buffer {
-    raw: [ObjcId; BUFFERS_IN_ROTATION],
+    raw: Vec<ObjcId>,
     //buffer_type: BufferType,
     size: usize,
+    /// Cached `MTLResourceOptions` for grow-on-demand allocations.
+    options: u64,
     //index_type: Option<IndexType>,
     value: usize,
     next_value: usize,
@@ -590,43 +589,48 @@ impl RenderingBackend for MetalContext {
     }
 
     fn new_buffer(&mut self, _: BufferType, _usage: BufferUsage, data: BufferSource) -> BufferId {
-        let mut raw = [nil; BUFFERS_IN_ROTATION];
         let size = match &data {
             BufferSource::Slice(data) => data.size,
             BufferSource::Empty { size, .. } => *size,
         };
-        #[allow(clippy::needless_range_loop)]
-        for i in 0..BUFFERS_IN_ROTATION {
-            let buffer: ObjcId = if let BufferSource::Slice(data) = &data {
-                debug_assert!(data.is_slice);
-                let size = data.size as u64;
-                unsafe {
-                    msg_send![self.device,
-                              newBufferWithBytes:data.ptr
-                              length:size
-                              options:MTLResourceOptions::StorageModeShared]
-                }
-            } else {
-                #[cfg(target_os = "macos")]
-                let options = MTLResourceOptions::CPUCacheModeWriteCombined
-                    | MTLResourceOptions::StorageModeManaged;
-                #[cfg(target_os = "ios")]
-                let options = MTLResourceOptions::CPUCacheModeWriteCombined;
-                unsafe {
-                    msg_send![self.device,
-                              newBufferWithLength:size
-                              options:options]
-                }
-            };
-
-            unsafe {
-                msg_send_![buffer, retain];
+        // Cached on the `Buffer` so grow-on-demand allocations in
+        // `buffer_update` match the original storage mode.
+        let options = if matches!(data, BufferSource::Slice(_)) {
+            MTLResourceOptions::StorageModeShared
+        } else {
+            #[cfg(target_os = "macos")]
+            {
+                MTLResourceOptions::CPUCacheModeWriteCombined
+                    | MTLResourceOptions::StorageModeManaged
             }
-            raw[i] = buffer;
+            #[cfg(target_os = "ios")]
+            {
+                MTLResourceOptions::CPUCacheModeWriteCombined
+            }
+        };
+        let buffer: ObjcId = if let BufferSource::Slice(data) = &data {
+            debug_assert!(data.is_slice);
+            let size = data.size as u64;
+            unsafe {
+                msg_send![self.device,
+                          newBufferWithBytes:data.ptr
+                          length:size
+                          options:options]
+            }
+        } else {
+            unsafe {
+                msg_send![self.device,
+                          newBufferWithLength:size
+                          options:options]
+            }
+        };
+        unsafe {
+            msg_send_![buffer, retain];
         }
         let buffer = Buffer {
-            raw,
+            raw: vec![buffer],
             size,
+            options,
             value: 0,
             next_value: 0,
         };
@@ -641,6 +645,19 @@ impl RenderingBackend for MetalContext {
         };
         let buffer = &mut self.buffers[buffer.0];
         assert!(data.size <= buffer.size);
+
+        // Grow `raw` lazily on first hit of a new per-frame max.
+        if buffer.next_value >= buffer.raw.len() {
+            let new_slot: ObjcId = unsafe {
+                msg_send![self.device,
+                          newBufferWithLength:buffer.size
+                          options:buffer.options]
+            };
+            unsafe {
+                msg_send_![new_slot, retain];
+            }
+            buffer.raw.push(new_slot);
+        }
 
         unsafe {
             let dest: *mut std::ffi::c_void = msg_send![buffer.raw[buffer.next_value], contents];
