@@ -539,8 +539,12 @@ impl RenderingBackend for MetalContext {
         resolve_img: Option<&[TextureId]>,
         depth_img: Option<TextureId>,
     ) -> RenderPass {
-        if resolve_img.is_some() {
-            unimplemented!("resolve textures are not yet implemented on metal");
+        if let Some(resolve_img) = resolve_img {
+            assert_eq!(
+                resolve_img.len(),
+                color_img.len(),
+                "resolve_img must have one entry per color attachment"
+            );
         }
         unsafe {
             let render_pass_desc =
@@ -552,7 +556,19 @@ impl RenderingBackend for MetalContext {
                 let color_attachment = msg_send_![msg_send_![render_pass_desc, colorAttachments], objectAtIndexedSubscript:i];
                 msg_send_![color_attachment, setTexture: color_texture];
                 msg_send_![color_attachment, setLoadAction: MTLLoadAction::Clear];
-                msg_send_![color_attachment, setStoreAction: MTLStoreAction::Store];
+                // Multisample resolve: when the caller passes a resolve
+                // texture for this attachment, downsample into it on
+                // store. Required for any MSAA render target.
+                if let Some(resolve_img) = resolve_img {
+                    let resolve_texture = self.textures.get(resolve_img[i]).texture;
+                    msg_send_![color_attachment, setResolveTexture: resolve_texture];
+                    msg_send_![
+                        color_attachment,
+                        setStoreAction: MTLStoreAction::MultisampleResolve
+                    ];
+                } else {
+                    msg_send_![color_attachment, setStoreAction: MTLStoreAction::Store];
+                }
             }
             if let Some(depth_img) = depth_img {
                 let depth_texture = self.textures.get(depth_img).texture;
