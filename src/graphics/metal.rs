@@ -988,8 +988,11 @@ impl RenderingBackend for MetalContext {
             msg_send_![descriptor, setVertexFunction:shader_internal.vertex_function];
             msg_send_![descriptor, setFragmentFunction:shader_internal.fragment_function];
             msg_send_![descriptor, setVertexDescriptor: vertex_descriptor];
+            // Only attachment 0 — the backend has no MRT path and
+            // setting attachment 1 to a non-Invalid pixelFormat
+            // fails Metal validation when no texture is bound.
             let color_attachments = msg_send_![descriptor, colorAttachments];
-            for i in 0..2 {
+            for i in 0..1usize {
                 let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: i];
                 let view_pixel_format: MTLPixelFormat = msg_send![self.view, colorPixelFormat];
                 msg_send_![color_attachment, setPixelFormat: view_pixel_format];
@@ -1036,14 +1039,23 @@ impl RenderingBackend for MetalContext {
                     ];
                 }
             }
-            msg_send_![
-                descriptor,
-                setDepthAttachmentPixelFormat: MTLPixelFormat::Depth32Float_Stencil8
-            ];
-            msg_send_![
-                descriptor,
-                setStencilAttachmentPixelFormat: MTLPixelFormat::Depth32Float_Stencil8
-            ];
+            // Pipeline depth/stencil formats must match whatever
+            // render pass uses this pipeline. MTKView reports
+            // `Invalid` when no depth/stencil is configured —
+            // leave the descriptor's defaults (also `Invalid`)
+            // alone in that case; otherwise mirror the view.
+            let view_depth_stencil_format: MTLPixelFormat =
+                msg_send![self.view, depthStencilPixelFormat];
+            if view_depth_stencil_format != MTLPixelFormat::Invalid {
+                msg_send_![
+                    descriptor,
+                    setDepthAttachmentPixelFormat: view_depth_stencil_format
+                ];
+                msg_send_![
+                    descriptor,
+                    setStencilAttachmentPixelFormat: view_depth_stencil_format
+                ];
+            }
 
             let mut error: ObjcId = nil;
             let pipeline_state: ObjcId = msg_send![
