@@ -336,32 +336,27 @@ pub fn define_glk_or_mtk_view_dlg(superclass: &Class) -> *const Class {
             payload.init_event_handler();
         }
 
-        let main_screen: ObjcId = unsafe { msg_send![class!(UIScreen), mainScreen] };
-        let screen_rect: NSRect = unsafe { msg_send![main_screen, bounds] };
-        let high_dpi = native_display().lock().unwrap().high_dpi;
+        // Measure the view, not the device screen — iOS-on-Mac
+        // windowed mode has view < UIScreen.
+        let view_bounds: NSRect = unsafe { msg_send![payload.view, bounds] };
+        let content_scale_factor: f64 =
+            unsafe { msg_send![payload.view, contentScaleFactor] };
+        let screen_width = (view_bounds.size.width * content_scale_factor) as i32;
+        let screen_height = (view_bounds.size.height * content_scale_factor) as i32;
+        let dpi_scale = content_scale_factor as f32;
 
-        let (screen_width, screen_height) = if high_dpi {
-            let scale: f64 = unsafe { msg_send![main_screen, scale] };
-
-            (
-                (screen_rect.size.width * scale) as i32,
-                (screen_rect.size.height * scale) as i32,
-            )
-        } else {
-            let content_scale_factor: f64 = unsafe { msg_send![payload.view, contentScaleFactor] };
-            (
-                (screen_rect.size.width * content_scale_factor) as i32,
-                (screen_rect.size.height * content_scale_factor) as i32,
-            )
+        let needs_update = {
+            let d = native_display().lock().unwrap();
+            d.screen_width != screen_width
+                || d.screen_height != screen_height
+                || d.dpi_scale != dpi_scale
         };
-
-        if native_display().lock().unwrap().screen_width != screen_width
-            || native_display().lock().unwrap().screen_height != screen_height
-        {
+        if needs_update {
             {
                 let mut d = native_display().lock().unwrap();
                 d.screen_width = screen_width;
                 d.screen_height = screen_height;
+                d.dpi_scale = dpi_scale;
             }
             send_message(Message::Resize {
                 width: screen_width,
