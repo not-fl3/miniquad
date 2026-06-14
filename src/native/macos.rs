@@ -214,8 +214,11 @@ impl MacosDisplay {
             }
         }
         if d.high_dpi {
+            // 0.0 before the window is on-screen; skip until a real value lands.
             let dpi_scale: f64 = msg_send![self.window, backingScaleFactor];
-            d.dpi_scale = dpi_scale as f32;
+            if dpi_scale > 0.0 {
+                d.dpi_scale = dpi_scale as f32;
+            }
         } else {
             let bounds: NSRect = msg_send![self.view, bounds];
             let backing_size: NSSize = msg_send![self.view, convertSizeToBacking: NSSize {width: bounds.size.width, height: bounds.size.height}];
@@ -954,6 +957,13 @@ pub fn define_metal_view_class() -> *const Class {
     extern "C" fn draw_rect(this: &Object, _sel: Sel, _: ObjcId) {
         let payload = get_window_payload(this);
         unsafe {
+            // Per-frame refresh matching the OpenGL path — otherwise
+            // dpi_scale stays at the startup 1.0 default on Retina.
+            if let Some((w, h)) = payload.update_dimensions() {
+                if let Some(event_handler) = payload.context() {
+                    event_handler.resize_event(w as _, h as _);
+                }
+            }
             let current_runloop = msg_send_![class!(NSRunLoop), currentRunLoop];
             let current_mode: ObjcId = msg_send![current_runloop, currentMode];
             // Not checking name, assuming that this is NSEventTrackingRunLoopMode
