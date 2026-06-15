@@ -461,7 +461,7 @@ unsafe fn create_opengl_view(screen_rect: NSRect, _sample_count: i32, high_dpi: 
     }
 }
 
-unsafe fn create_metal_view(screen_rect: NSRect, _sample_count: i32, _high_dpi: bool) -> View {
+unsafe fn create_metal_view(screen_rect: NSRect, sample_count: i32, _high_dpi: bool) -> View {
     let mtk_view_obj: ObjcId = msg_send![define_glk_or_mtk_view(class!(MTKView)), alloc];
     let mtk_view_obj: ObjcId = msg_send![mtk_view_obj, initWithFrame: screen_rect];
 
@@ -480,6 +480,9 @@ unsafe fn create_metal_view(screen_rect: NSRect, _sample_count: i32, _high_dpi: 
     let device = MTLCreateSystemDefaultDevice();
     msg_send_![mtk_view_obj, setDevice: device];
     msg_send_![mtk_view_obj, setUserInteractionEnabled: YES];
+    if sample_count > 1 {
+        msg_send_![mtk_view_obj, setSampleCount: sample_count as u64];
+    }
 
     View {
         view: mtk_view_obj,
