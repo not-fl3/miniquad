@@ -632,6 +632,7 @@ impl MTLClearColor {
 #[allow(non_camel_case_types)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum MTLPixelFormat {
+    Invalid = 0,
     BGRA8Unorm = 80,
     Depth32Float = 252,
     Stencil8 = 253,
