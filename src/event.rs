@@ -233,4 +233,10 @@ pub trait EventHandler {
     /// `ctx.dropped_file_path()`, and for wasm targets the file bytes
     /// can be requested with `ctx.dropped_file_bytes()`.
     fn files_dropped_event(&mut self) {}
+
+    /// Get ime preedit text
+    fn on_ime_preedit(&mut self, _text: &str) {}
+    
+    /// Get ime commit text before preedit
+    fn on_ime_commit(&mut self, _text: Option<&str>) {}
 }

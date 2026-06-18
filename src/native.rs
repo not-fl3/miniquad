@@ -12,6 +12,7 @@ pub(crate) struct NativeDisplayData {
     pub screen_width: i32,
     pub screen_height: i32,
     pub screen_position: (u32, u32),
+    pub ime_enabled: bool,
     pub dpi_scale: f32,
     pub high_dpi: bool,
     pub quit_requested: bool,
@@ -23,7 +24,7 @@ pub(crate) struct NativeDisplayData {
     pub clipboard: Box<dyn Clipboard>,
     pub dropped_files: DroppedFiles,
     pub blocking_event_loop: bool,
-
+    
     #[cfg(target_vendor = "apple")]
     pub view: crate::native::apple::frameworks::ObjcId,
     #[cfg(target_os = "ios")]
@@ -48,6 +49,7 @@ impl NativeDisplayData {
             screen_width,
             screen_height,
             screen_position: (0, 0),
+            ime_enabled: false,
             dpi_scale: 1.,
             high_dpi: false,
             quit_requested: false,
