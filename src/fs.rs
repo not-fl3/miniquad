@@ -1,5 +1,7 @@
 #[cfg(target_os = "ios")]
 use crate::native::ios;
+#[cfg(target_env = "ohos")]
+use crate::native::ohos;
 
 #[derive(Debug)]
 pub enum Error {
@@ -45,7 +47,15 @@ pub fn load_file<F: Fn(Response) + 'static>(path: &str, on_loaded: F) {
     #[cfg(target_os = "ios")]
     ios::load_file(path, on_loaded);
 
-    #[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
+    #[cfg(target_env = "ohos")]
+    ohos::load_file(path, on_loaded);
+
+    #[cfg(not(any(
+        target_arch = "wasm32",
+        target_os = "android",
+        target_os = "ios",
+        target_env = "ohos"
+    )))]
     load_file_desktop(path, on_loaded);
 }
 
@@ -122,7 +132,7 @@ mod wasm {
     }
 }
 
-#[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios", target_env = "ohos")))]
 fn load_file_desktop<F: Fn(Response)>(path: &str, on_loaded: F) {
     fn load_file_sync(path: &str) -> Response {
         use std::fs::File;
