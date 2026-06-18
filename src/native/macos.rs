@@ -21,6 +21,7 @@ use {
         },
         time::{Duration, Instant},
     },
+    objc::rc::autoreleasepool,
 };
 
 pub struct MacosDisplay {
@@ -1507,7 +1508,9 @@ where
         }
 
         if !conf.platform.blocking_event_loop || display.update_requested {
-            perform_redraw(&mut display, conf.platform.apple_gfx_api, false);
+            autoreleasepool(|| {
+                perform_redraw(&mut display, conf.platform.apple_gfx_api, false);
+            });
         }
 
     }
