@@ -233,7 +233,7 @@ pub struct Conf {
     /// Optional icon data used by the OS where applicable:
     /// - On Windows, taskbar/title bar icon
     /// - On macOS, Dock/title bar icon
-    /// - TODO: Favicon on HTML5
+    /// - On wasm, HTML5 favicon
     /// - TODO: Taskbar/title bar icon on Linux (depends on WM)
     /// - Note: on gnome, icon is determined using `WM_CLASS` (can be set under [`Platform`]) and
     ///   an external `.desktop` file
