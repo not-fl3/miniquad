@@ -13,7 +13,7 @@ impl Display for Error {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))]
 pub mod linux {
     use super::Error;
     use libc::{dlclose, dlopen, dlsym, RTLD_LAZY, RTLD_LOCAL};
@@ -90,13 +90,13 @@ mod windows {
 
 use std::fmt::Display;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))]
 pub use linux::*;
 
 #[cfg(target_os = "windows")]
 pub use windows::Module;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))]
 #[macro_export]
 macro_rules! declare_module {
     ($name:ident,

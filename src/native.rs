@@ -87,10 +87,10 @@ pub trait Clipboard: Send + Sync {
 
 pub mod module;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 pub mod linux_x11;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 pub mod linux_wayland;
 
 #[cfg(target_os = "android")]
@@ -114,7 +114,7 @@ pub mod macos;
 #[cfg(target_os = "ios")]
 pub mod ios;
 
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "freebsd"))]
 pub mod egl;
 
 // there is no glGetProcAddr on webgl, so its impossible to make "gl" module work
