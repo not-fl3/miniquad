@@ -435,7 +435,7 @@ pub mod window {
         let d = native_display().lock().unwrap();
         d.view
     }
-    #[cfg(target_os = "ios")]
+    #[cfg(any(target_os = "ios", target_os = "tvos"))]
     pub fn apple_view_ctrl() -> crate::native::apple::frameworks::ObjcId {
         let d = native_display().lock().unwrap();
         d.view_ctrl
@@ -510,7 +510,7 @@ where
         native::macos::run(conf, f);
     }
 
-    #[cfg(target_os = "ios")]
+    #[cfg(any(target_os = "ios", target_os = "tvos"))]
     unsafe {
         native::ios::run(conf, f);
     }

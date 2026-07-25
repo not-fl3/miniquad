@@ -18,10 +18,17 @@ const NUM_INFLIGHT_FRAMES: usize = 3;
 // uniform-buffer offset alignment.
 #[cfg(any(
     target_os = "macos",
-    all(target_os = "ios", any(target_arch = "x86_64", target_abi = "sim")),
+    all(
+        any(target_os = "ios", target_os = "tvos"),
+        any(target_arch = "x86_64", target_abi = "sim"),
+    ),
 ))]
 const UNIFORM_BUFFER_ALIGN: u64 = 256;
-#[cfg(all(target_os = "ios", target_arch = "aarch64", not(target_abi = "sim")))]
+#[cfg(all(
+    any(target_os = "ios", target_os = "tvos"),
+    target_arch = "aarch64",
+    not(target_abi = "sim"),
+))]
 const UNIFORM_BUFFER_ALIGN: u64 = 16;
 
 impl From<VertexFormat> for MTLVertexFormat {
@@ -357,7 +364,7 @@ impl MetalContext {
                 MTLResourceOptions::CPUCacheModeWriteCombined
                     | MTLResourceOptions::StorageModeManaged
             };
-            #[cfg(target_os = "ios")]
+            #[cfg(any(target_os = "ios", target_os = "tvos"))]
             let options = { MTLResourceOptions::CPUCacheModeWriteCombined };
 
             let uniform_buffers = [
@@ -655,7 +662,7 @@ impl RenderingBackend for MetalContext {
                 MTLResourceOptions::CPUCacheModeWriteCombined
                     | MTLResourceOptions::StorageModeManaged
             }
-            #[cfg(target_os = "ios")]
+            #[cfg(any(target_os = "ios", target_os = "tvos"))]
             {
                 MTLResourceOptions::CPUCacheModeWriteCombined
             }
@@ -822,7 +829,7 @@ impl RenderingBackend for MetalContext {
                         setResourceOptions: MTLResourceOptions::StorageModeManaged
                     ];
                 }
-                #[cfg(target_os = "ios")]
+                #[cfg(any(target_os = "ios", target_os = "tvos"))]
                 {
                     msg_send_![descriptor, setStorageMode: MTLStorageMode::Shared];
                     msg_send_![

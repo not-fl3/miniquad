@@ -134,7 +134,7 @@ pub enum GLKViewDrawableStencilFormat {
     FormatNone = 0,
     Format8,
 }
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "ios", target_os = "tvos"))]
 #[link(name = "UIKit", kind = "framework")]
 extern "C" {
     pub static UIKeyboardDidShowNotification: ObjcId;
