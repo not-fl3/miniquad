@@ -26,7 +26,7 @@ pub(crate) struct NativeDisplayData {
 
     #[cfg(target_vendor = "apple")]
     pub view: crate::native::apple::frameworks::ObjcId,
-    #[cfg(target_os = "ios")]
+    #[cfg(any(target_os = "ios", target_os = "tvos"))]
     pub view_ctrl: crate::native::apple::frameworks::ObjcId,
     #[cfg(target_vendor = "apple")]
     pub gfx_api: crate::conf::AppleGfxApi,
@@ -60,7 +60,7 @@ impl NativeDisplayData {
             gfx_api: crate::conf::AppleGfxApi::OpenGl,
             #[cfg(target_vendor = "apple")]
             view: std::ptr::null_mut(),
-            #[cfg(target_os = "ios")]
+            #[cfg(any(target_os = "ios", target_os = "tvos"))]
             view_ctrl: std::ptr::null_mut(),
         }
     }
@@ -105,13 +105,13 @@ pub use android::*;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
 pub mod apple;
 
 #[cfg(target_os = "macos")]
 pub mod macos;
 
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "ios", target_os = "tvos"))]
 pub mod ios;
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
