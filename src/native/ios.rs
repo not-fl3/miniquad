@@ -503,7 +503,7 @@ unsafe fn create_opengl_view(screen_rect: NSRect, _sample_count: i32, high_dpi: 
     }
 }
 
-unsafe fn create_metal_view(screen_rect: NSRect, sample_count: i32, _high_dpi: bool) -> View {
+unsafe fn create_metal_view(screen_rect: NSRect, sample_count: i32) -> View {
     let mtk_view_obj: ObjcId = msg_send![define_glk_or_mtk_view(class!(MTKView)), alloc];
     let mtk_view_obj: ObjcId = msg_send![mtk_view_obj, initWithFrame: screen_rect];
 
@@ -586,7 +586,7 @@ pub fn define_app_delegate() -> *const Class {
                     create_opengl_view(screen_rect, conf.sample_count, conf.high_dpi)
                 }
                 AppleGfxApi::Metal => {
-                    create_metal_view(screen_rect, conf.sample_count, conf.high_dpi)
+                    create_metal_view(screen_rect, conf.sample_count)
                 }
             };
 
@@ -728,6 +728,14 @@ pub fn define_app_delegate() -> *const Class {
             msg_send_![window, addSubview: view];
             msg_send_![window, setRootViewController: view_ctrl];
             msg_send_![window, makeKeyAndVisible];
+
+            // `MTKView` loses a `contentScaleFactor` set before it has a window: moving it in
+            // re-derives the scale from that window's screen. A no-op for `GLKView`, which keeps
+            // what `create_opengl_view` set. Here rather than at creation because the resize this
+            // triggers reaches the backend, which is initialized by now.
+            if !crate::native_display().lock().unwrap().high_dpi {
+                msg_send_![view, setContentScaleFactor: 1.0];
+            }
         }
     }
 
