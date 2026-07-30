@@ -1383,11 +1383,12 @@ impl RenderingBackend for GlContext {
         BufferId(self.buffers.add(buffer))
     }
 
-    fn buffer_update(&mut self, buffer: BufferId, data: BufferSource) {
+    fn buffer_update_part(&mut self, buffer: BufferId, offset: usize, data: BufferSource) {
         let data = match data {
             BufferSource::Slice(data) => data,
-            _ => panic!("buffer_update expects BufferSource::slice"),
+            _ => panic!("buffer_update_part expects BufferSource::slice"),
         };
+
         debug_assert!(data.is_slice);
         let buffer = &self.buffers[buffer.0];
 
@@ -1398,13 +1399,18 @@ impl RenderingBackend for GlContext {
 
         let size = data.size;
 
-        assert!(size <= buffer.size);
+        // Make sure that the offset isn't larger than the buffer's size itself
+        assert!(offset < buffer.size);
+        
+        // And that our data actually fits into the buffer with this offset
+        assert!(size <= buffer.size-offset);
 
         let gl_target = gl_buffer_target(&buffer.buffer_type);
         self.cache.store_buffer_binding(gl_target);
         self.cache
             .bind_buffer(gl_target, buffer.gl_buf, buffer.index_type);
-        unsafe { glBufferSubData(gl_target, 0, size as _, data.ptr as _) };
+
+        unsafe { glBufferSubData(gl_target, offset as _, size as _, data.ptr as _) };
         self.cache.restore_buffer_binding(gl_target);
     }
 
