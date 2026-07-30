@@ -1458,6 +1458,48 @@ var importObject = {
             }
             animation_frame_timeout = window.requestAnimationFrame(animation);
         },
+        set_favicon: function (small, medium, big) {
+            function make_and_add_favicon(ptr, size) {
+                const temp_canvas = document.createElement("canvas");
+
+                // TODO: this could be more efficient by either:
+                //       1. sending already encoded image data instead of raw pixels
+                //       2. or using a raw image format like bmp
+                //          (would have to manually write the header of the ico container)
+                function get_data_url(data, dimension) {
+                    temp_canvas.width  = dimension;
+                    temp_canvas.height = dimension;
+
+                    const ctx        = temp_canvas.getContext("2d");
+                    const clamped    = new Uint8ClampedArray(data);
+                    const image_data = new ImageData(clamped, dimension, dimension);
+                    ctx.putImageData(image_data, 0, 0);
+
+                    return temp_canvas.toDataURL("image/png");
+                }
+
+                // NOTE: this could also delete old favicons,
+                //       but right now set_favicon is only called once
+                //       (from `run` in `src/native/wasm.rs`)
+                function append_favicon(url, dimension) {
+                    const link = document.createElement("link");
+                    link.rel   = "icon";
+                    link.type  = "image/png";
+                    link.sizes = `${dimension}x${dimension}`;
+                    link.href  = url;
+
+                    document.head.appendChild(link);
+                }
+
+                const pixels = new Uint8Array(wasm_memory.buffer, ptr, size * size * 4);
+                const url    = get_data_url(pixels, size);
+                append_favicon(url, size);
+            }
+
+            make_and_add_favicon(small,  16);
+            make_and_add_favicon(medium, 32);
+            make_and_add_favicon(big,    64);
+        },
         init_webgl
     }
 };
