@@ -137,8 +137,7 @@ impl X11Display {
                     _ if (state & Button3MotionMask) != 0 => MouseButton::Right,
                     _ => MouseButton::Unknown,
                 };
-                event_handler.mouse_enter_event( btn , x, y);
-
+                event_handler.mouse_enter_event(btn, x, y);
             }
             8 => {
                 event_handler.mouse_leave_event();

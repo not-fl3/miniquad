@@ -24,6 +24,28 @@ log-impl = []
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
 
+[target.'cfg(target_env = "ohos")'.dependencies]
+ohos-xcomponent-binding = "0.1"
+raw-window-handle = "0.6"
+napi-ohos = { version = "1.1.3", default-features = false, features = [
+    "napi8",
+    "async",
+] }
+napi-derive-ohos = { version = "1.1.3" }
+ohos-hilog-binding = { version = "0.1.2", features = [
+    "redirect"
+] }
+xcomponent-sys = { version = "0.3.4", features = ["api-14", "keyboard-types"] }
+keyboard-types = "0.8.3"
+ohos-xcomponent-sys = { version = "0.0.2" }
+ohos_enum_macro = { version = "0.0.2" }
+ohos-input-sys = { version = "0.3.2", features = ["api-17"] }
+ohos-qos-sys = { version = "0.0.1", features = ["api-20"] }
+ohos-native-window-sys = { version = "0.0.1" }
+
+[target.'cfg(target_env = "ohos")'.build-dependencies]
+napi-build-ohos = { version = "1.1.3" }
+
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = [
     "wingdi",
