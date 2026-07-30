@@ -1529,53 +1529,34 @@ function load(wasm_path) {
 
     register_plugins(plugins);
 
+    var module_promise;
     if (typeof WebAssembly.compileStreaming === 'function') {
-        WebAssembly.compileStreaming(req)
-            .then(obj => {
-                add_missing_functions_stabs(obj);
-                return WebAssembly.instantiate(obj, importObject);
-            })
-            .then(
-                obj => {
-                    wasm_memory = obj.exports.memory;
-                    wasm_exports = obj.exports;
-
-                    var crate_version = wasm_exports.crate_version();
-                    if (version != crate_version) {
-                        console.error(
-                            "Version mismatch: gl.js version is: " + version +
-                            ", miniquad crate version is: " + crate_version);
-                    }
-                    init_plugins(plugins);
-                    obj.exports.main();
-                })
-            .catch(err => {
-                console.error(err);
-            })
+        module_promise = WebAssembly.compileStreaming(req);
     } else {
-        req
-            .then(function (x) { return x.arrayBuffer(); })
-            .then(function (bytes) { return WebAssembly.compile(bytes); })
-            .then(function (obj) {
-                add_missing_functions_stabs(obj);
-                return WebAssembly.instantiate(obj, importObject);
-            })
-            .then(function (obj) {
-                wasm_memory = obj.exports.memory;
-                wasm_exports = obj.exports;
-
-                var crate_version = wasm_exports.crate_version();
-                if (version != crate_version) {
-                    console.error(
-                        "Version mismatch: gl.js version is: " + version +
-                        ", rust sapp-wasm crate version is: " + crate_version);
-                }
-                init_plugins(plugins);
-                obj.exports.main();
-            })
-            .catch(err => {
-                console.error("WASM failed to load, probably incompatible gl.js version");
-                console.error(err);
-            });
+        module_promise = req
+            .then(response => response.arrayBuffer())
+            .then(bytes => WebAssembly.compile(bytes));
     }
+
+    module_promise
+        .then(obj => {
+            add_missing_functions_stabs(obj);
+            return WebAssembly.instantiate(obj, importObject);
+        })
+        .then(obj => {
+            wasm_memory = obj.exports.memory;
+            wasm_exports = obj.exports;
+            
+            var crate_version = wasm_exports.crate_version();
+            if (version != crate_version) {
+                console.error(
+                    "Version mismatch: gl.js version is: " + version +
+                    ", miniquad crate version is: " + crate_version);
+            }
+            init_plugins(plugins);
+            obj.exports.main();
+        })
+        .catch(err => {
+            console.error(err);
+        });
 }
