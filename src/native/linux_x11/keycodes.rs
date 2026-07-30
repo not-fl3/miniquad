@@ -156,7 +156,7 @@ pub unsafe fn translate_mod(x11_mods: i32) -> KeyMods {
     mods
 }
 
-pub unsafe fn translate_mouse_button(button: i32) -> MouseButton {
+pub const unsafe fn translate_mouse_button(button: i32) -> MouseButton {
     match button {
         1 => MouseButton::Left,
         2 => MouseButton::Middle,

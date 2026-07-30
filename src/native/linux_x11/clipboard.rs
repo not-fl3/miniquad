@@ -218,7 +218,7 @@ unsafe impl Send for X11Clipboard {}
 unsafe impl Sync for X11Clipboard {}
 
 impl X11Clipboard {
-    pub fn new(libx11: LibX11, display: *mut Display, window: Window) -> X11Clipboard {
+    pub const fn new(libx11: LibX11, display: *mut Display, window: Window) -> X11Clipboard {
         X11Clipboard {
             libx11,
             display,
