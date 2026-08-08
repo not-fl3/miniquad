@@ -781,6 +781,8 @@ pub mod Xutil_h {
         pub colormap_size: libc::c_int,
         pub bits_per_rgb: libc::c_int,
     }
+    pub const USPosition: libc::c_long = (1 as libc::c_long) << 0 as libc::c_int;
+    pub const PPosition: libc::c_long = (1 as libc::c_long) << 2 as libc::c_int;
     pub const PMinSize: libc::c_long = (1 as libc::c_long) << 4 as libc::c_int;
     pub const PMaxSize: libc::c_long = (1 as libc::c_long) << 5 as libc::c_int;
     pub const PWinGravity: libc::c_long = (1 as libc::c_long) << 9 as libc::c_int;

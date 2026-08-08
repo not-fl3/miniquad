@@ -1430,7 +1430,18 @@ where
 
     assert!(!view.is_null());
 
-    let () = msg_send![window, center];
+    if let (Some(x), Some(y)) = (conf.window_x, conf.window_y) {
+        // Conf uses top-left screen coords; Cocoa screen origin is bottom-left.
+        let main_screen: ObjcId = msg_send![class!(NSScreen), mainScreen];
+        let screen_frame: NSRect = msg_send![main_screen, frame];
+        let top_left = NSPoint {
+            x: x as f64,
+            y: screen_frame.size.height - (y as f64),
+        };
+        let () = msg_send![window, setFrameTopLeftPoint: top_left];
+    } else {
+        let () = msg_send![window, center];
+    }
     let () = msg_send![window, setAcceptsMouseMovedEvents: YES];
 
     if conf.fullscreen {

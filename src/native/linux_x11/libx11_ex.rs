@@ -202,11 +202,14 @@ impl LibX11 {
             | PropertyChangeMask;
         self.grab_error_handler();
 
+        let pos_x = conf.window_x.map(|x| x as libc::c_int).unwrap_or(0);
+        let pos_y = conf.window_y.map(|y| y as libc::c_int).unwrap_or(0);
+
         let window = (self.XCreateWindow)(
             display,
             root,
-            0 as libc::c_int,
-            0 as libc::c_int,
+            pos_x,
+            pos_y,
             conf.window_width as _,
             conf.window_height as _,
             0 as libc::c_int as libc::c_uint,
@@ -223,6 +226,12 @@ impl LibX11 {
         (self.XSetWMProtocols)(display, window, protocols.as_mut_ptr(), 1 as libc::c_int);
         let hints = (self.XAllocSizeHints)();
         (*hints).flags |= PWinGravity;
+        if conf.window_x.is_some() || conf.window_y.is_some() {
+            // Ask the WM to honor create-time coordinates instead of its own placement.
+            (*hints).flags |= USPosition | PPosition;
+            (*hints).x = pos_x;
+            (*hints).y = pos_y;
+        }
         if !conf.window_resizable {
             (*hints).flags |= PMinSize | PMaxSize;
             (*hints).min_width = conf.window_width;

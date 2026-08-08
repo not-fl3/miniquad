@@ -897,6 +897,8 @@ unsafe fn create_window(
     resizable: bool,
     width: i32,
     height: i32,
+    window_x: Option<u32>,
+    window_y: Option<u32>,
 ) -> (HWND, HDC) {
     let mut wndclassw: WNDCLASSW = std::mem::zeroed();
 
@@ -948,13 +950,19 @@ unsafe fn create_window(
     let class_name = "MINIQUADAPP\0".encode_utf16().collect::<Vec<u16>>();
     let mut window_name = window_title.encode_utf16().collect::<Vec<u16>>();
     window_name.push(0);
+    let (pos_x, pos_y) = match (window_x, window_y) {
+        (Some(x), Some(y)) => (x as i32, y as i32),
+        (Some(x), None) => (x as i32, CW_USEDEFAULT),
+        (None, Some(y)) => (CW_USEDEFAULT, y as i32),
+        (None, None) => (CW_USEDEFAULT, CW_USEDEFAULT),
+    };
     let hwnd = CreateWindowExW(
         win_ex_style,                // dwExStyle
         class_name.as_ptr(),         // lpClassName
         window_name.as_ptr(),        // lpWindowName
         win_style,                   // dwStyle
-        CW_USEDEFAULT,               // X
-        CW_USEDEFAULT,               // Y
+        pos_x,                       // X
+        pos_y,                       // Y
         win_width,                   // nWidth
         win_height,                  // nHeight
         NULL as _,                   // hWndParent
@@ -1164,6 +1172,8 @@ where
             conf.window_resizable,
             conf.window_width as _,
             conf.window_height as _,
+            conf.window_x,
+            conf.window_y,
         );
         if let Some(icon) = &conf.icon {
             set_icon(wnd, icon);

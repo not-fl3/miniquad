@@ -215,6 +215,19 @@ pub struct Conf {
     /// Defaults to `600`.
     pub window_height: i32,
 
+    /// Optional top-left window position in screen coordinates.
+    ///
+    /// `None` (default) lets the platform / window manager place the window.
+    /// Applied at window creation on Windows, Linux X11, and macOS.
+    /// Ignored on Wayland (compositor-owned placement), WASM, Android, and iOS.
+    ///
+    /// Using create-time position avoids a visible jump that happens when moving
+    /// the window with [`crate::window::set_window_position`] after it is mapped.
+    pub window_x: Option<u32>,
+
+    /// See [`Conf::window_x`].
+    pub window_y: Option<u32>,
+
     /// If `true`, the rendering canvas is scaled for HighDPI displays.
     /// Defaults to `false`.
     pub high_dpi: bool,
@@ -279,6 +292,8 @@ impl Default for Conf {
             window_title: "".to_owned(),
             window_width: 800,
             window_height: 600,
+            window_x: None,
+            window_y: None,
             high_dpi: false,
             fullscreen: false,
             sample_count: 1,
@@ -296,6 +311,8 @@ impl Default for Conf {
             window_title: "".to_owned(),
             window_width: 800,
             window_height: 600,
+            window_x: None,
+            window_y: None,
             high_dpi: true,
             fullscreen: true, //
             sample_count: 1,

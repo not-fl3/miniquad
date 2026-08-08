@@ -1180,6 +1180,12 @@ where
         display.decorations = decorations::Decorations::new(&mut display, conf);
         assert!(!display.xdg_toplevel.is_null());
 
+        if conf.window_x.is_some() || conf.window_y.is_some() {
+            // Wayland compositors own toplevel placement; there is no portable
+            // absolute position API for regular windows.
+            eprintln!("miniquad: Conf.window_x/window_y ignored on Wayland");
+        }
+
         display.decorations.set_title(
             &mut display.client,
             display.xdg_toplevel,
