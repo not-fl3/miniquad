@@ -1,6 +1,4 @@
-#[derive(
-    Debug, Copy, Clone, PartialEq, Hash, Eq, num_enum::FromPrimitive, num_enum::IntoPrimitive,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq, num_enum::FromPrimitive)]
 #[repr(u8)]
 pub enum MouseButton {
     Left = 0,
@@ -10,6 +8,12 @@ pub enum MouseButton {
     Unknown = 255,
 }
 
+impl From<MouseButton> for u8 {
+    fn from(button: MouseButton) -> Self {
+        button as u8
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Touch {
     pub id: u32,
@@ -17,9 +21,7 @@ pub struct Touch {
     pub y: f32,
 }
 
-#[derive(
-    Debug, Copy, Clone, PartialEq, Hash, Eq, num_enum::FromPrimitive, num_enum::IntoPrimitive,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq, num_enum::FromPrimitive)]
 #[repr(u16)]
 /// These keycode values are based off of X11's `keysymdef.h`.
 /// Missing keycodes from that list are given the prefix 0x01.
@@ -148,6 +150,12 @@ pub enum KeyCode {
     Back = 0xff04,
     #[num_enum(default)]
     Unknown = 0x01ff,
+}
+
+impl From<KeyCode> for u16 {
+    fn from(keycode: KeyCode) -> Self {
+        keycode as u16
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
