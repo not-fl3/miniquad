@@ -1,10 +1,17 @@
-#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq, num_enum::FromPrimitive)]
 #[repr(u8)]
 pub enum MouseButton {
     Left = 0,
     Middle = 1,
     Right = 2,
+    #[num_enum(default)]
     Unknown = 255,
+}
+
+impl From<MouseButton> for u8 {
+    fn from(button: MouseButton) -> Self {
+        button as u8
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -14,7 +21,7 @@ pub struct Touch {
     pub y: f32,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq, num_enum::FromPrimitive)]
 #[repr(u16)]
 /// These keycode values are based off of X11's `keysymdef.h`.
 /// Missing keycodes from that list are given the prefix 0x01.
@@ -141,7 +148,14 @@ pub enum KeyCode {
     Menu = 0xff67,
     // Android back button
     Back = 0xff04,
+    #[num_enum(default)]
     Unknown = 0x01ff,
+}
+
+impl From<KeyCode> for u16 {
+    fn from(keycode: KeyCode) -> Self {
+        keycode as u16
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
@@ -177,7 +191,7 @@ pub trait EventHandler {
     fn mouse_button_down_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
     fn mouse_button_up_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
     fn mouse_leave_event(&mut self) {}
-    fn mouse_enter_event(&mut self, _button: MouseButton ,_x: f32, _y: f32 ) {}
+    fn mouse_enter_event(&mut self, _button: MouseButton, _x: f32, _y: f32) {}
 
     fn char_event(&mut self, _character: char, _keymods: KeyMods, _repeat: bool) {}
 
@@ -233,4 +247,34 @@ pub trait EventHandler {
     /// `ctx.dropped_file_path()`, and for wasm targets the file bytes
     /// can be requested with `ctx.dropped_file_bytes()`.
     fn files_dropped_event(&mut self) {}
+}
+
+#[test]
+fn test_mouse_button_from_u8() {
+    assert_eq!(MouseButton::from(0), MouseButton::Left);
+    assert_eq!(MouseButton::from(1), MouseButton::Middle);
+    assert_eq!(MouseButton::from(2), MouseButton::Right);
+    assert_eq!(MouseButton::from(3), MouseButton::Unknown);
+}
+
+#[test]
+fn test_mouse_button_into_u8() {
+    assert_eq!(u8::from(MouseButton::Left), 0);
+    assert_eq!(u8::from(MouseButton::Middle), 1);
+    assert_eq!(u8::from(MouseButton::Right), 2);
+    assert_eq!(u8::from(MouseButton::Unknown), 255);
+}
+
+#[test]
+fn test_keycode_from_u16() {
+    assert_eq!(KeyCode::from(0x0020), KeyCode::Space);
+    assert_eq!(KeyCode::from(0x0041), KeyCode::A);
+    assert_eq!(KeyCode::from(0x0), KeyCode::Unknown);
+}
+
+#[test]
+fn test_keycode_into_u16() {
+    assert_eq!(u16::from(KeyCode::Space), 0x0020);
+    assert_eq!(u16::from(KeyCode::A), 0x0041);
+    assert_eq!(u16::from(KeyCode::Unknown), 0x01ff);
 }

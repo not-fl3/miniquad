@@ -15,6 +15,9 @@ exclude = ["examples/"]
 keywords = ["graphics", "3D", "opengl", "gamedev", "windowing"]
 categories = ["rendering::graphics-api"]
 
+[dependencies]
+num_enum = "0.7.6"
+
 [features]
 
 # Optional log-rs like macros implementation
