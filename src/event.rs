@@ -14,7 +14,7 @@ pub struct Touch {
     pub y: f32,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq, num_enum::IntoPrimitive)]
 #[repr(u16)]
 /// These keycode values are based off of X11's `keysymdef.h`.
 /// Missing keycodes from that list are given the prefix 0x01.
