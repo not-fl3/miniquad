@@ -233,4 +233,21 @@ pub trait EventHandler {
     /// `ctx.dropped_file_path()`, and for wasm targets the file bytes
     /// can be requested with `ctx.dropped_file_bytes()`.
     fn files_dropped_event(&mut self) {}
+
+    /// Get ime preedit text
+    fn on_ime_preedit(&mut self, _text: &str) {}
+    
+    /// Called when IME composition is committed with final text
+    fn on_ime_commit(&mut self, _text: Option<&str>) {}
+
+    /// Called when IME state changes on mobile (text, selection, composing range)
+    fn on_ime_state_changed(
+        &mut self,
+        _text: &str,
+        _selection_start: usize,
+        _selection_end: usize,
+        _composing_start: Option<usize>,
+        _composing_end: Option<usize>,
+        _element_id: u64,
+    ) {}
 }

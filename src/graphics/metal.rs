@@ -1455,10 +1455,13 @@ impl RenderingBackend for MetalContext {
         unsafe {
             assert!(!self.command_queue.is_null());
             let drawable: ObjcId = msg_send!(self.view, currentDrawable);
-            //msg_send_![drawable, retain];
-            msg_send_![self.command_buffer.unwrap(), presentDrawable: drawable];
-            msg_send_![self.command_buffer.unwrap(), commit];
-            msg_send_![self.command_buffer.unwrap(), waitUntilCompleted];
+            if let Some(command_buffer) = self.command_buffer {
+                if !drawable.is_null() {
+                    msg_send_![command_buffer, presentDrawable: drawable];
+                }
+                msg_send_![command_buffer, commit];
+                msg_send_![command_buffer, waitUntilCompleted];
+            }
         }
         for buffer in &mut self.buffers {
             buffer.next_value = 0;

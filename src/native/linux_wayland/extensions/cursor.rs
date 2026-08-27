@@ -68,7 +68,7 @@ wayland_interface!(
         (set_cursor_position_hint, "ff", ()),
         (set_region, "?o", ())
     ],
-    [("locked", ""), ("unlocked", "")]
+    [(locked, "", ()), (unlocked, "", ())]
 );
 
 #[rustfmt::skip]
@@ -80,7 +80,7 @@ wayland_interface!(
         (destroy, "", ()),
         (set_region, "?o", ())
     ],
-    [("confined", ""), ("unconfined", "")]
+    [(confined, "", ()), (unconfined, "", ())]
 );
 
 #[rustfmt::skip]
@@ -91,7 +91,7 @@ wayland_interface!(
     [
         (destroy, "", ())
     ],
-    [("relative_motion", "uuffff")]
+    [(relative_motion, "uuffff", ())]
 );
 
 crate::wl_listener!(

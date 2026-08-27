@@ -31,5 +31,5 @@ wayland_interface!(
         (destroy, "", ()),
         (set_mode, "u", ()),
         (unset_mode, "", ())],
-    [("configure", "u")]
+    [(configure, "u", ())]
 );

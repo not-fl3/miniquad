@@ -12,6 +12,7 @@ pub(crate) struct NativeDisplayData {
     pub screen_width: i32,
     pub screen_height: i32,
     pub screen_position: (u32, u32),
+    pub ime_enabled: bool,
     pub dpi_scale: f32,
     pub high_dpi: bool,
     pub quit_requested: bool,
@@ -48,6 +49,7 @@ impl NativeDisplayData {
             screen_width,
             screen_height,
             screen_position: (0, 0),
+            ime_enabled: false,
             dpi_scale: 1.,
             high_dpi: false,
             quit_requested: false,
@@ -78,6 +80,15 @@ pub(crate) enum Request {
     ShowKeyboard(bool),
     SetImePosition { x: i32, y: i32 },
     SetImeEnabled(bool),
+    UpdateTextInputState {
+        text: String,
+        selection_start: usize,
+        selection_end: usize,
+        is_password: bool,
+        is_multiline: bool,
+        element_id: u64,
+        max_length: usize,
+    },
 }
 
 pub trait Clipboard: Send + Sync {

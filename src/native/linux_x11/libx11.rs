@@ -817,6 +817,75 @@ pub struct XColor {
 pub const XC_crosshair: libc::c_ushort = 34;
 pub const XC_fleur: libc::c_ushort = 52;
 pub const XC_hand2: libc::c_ushort = 60;
+pub type XIM = *mut libc::c_void;
+pub type XIC = *mut libc::c_void;
+pub const XIMPreeditCallbacks: libc::c_ulong = 0x0002;
+pub const XIMPreeditPosition: libc::c_ulong = 0x0004;
+pub const XIMPreeditNothing: libc::c_ulong = 0x0008;
+pub const XIMStatusNothing: libc::c_ulong = 0x0400;
+pub const XLookupNone: libc::c_int = 1;
+pub const XLookupChars: libc::c_int = 2;
+pub const XLookupKeySym: libc::c_int = 3;
+pub const XLookupBoth: libc::c_int = 4;
+pub const XBufferOverflow: libc::c_int = -1;
+pub const XNInputStyle: &[u8] = b"inputStyle\0";
+pub const XNClientWindow: &[u8] = b"clientWindow\0";
+pub const XNFocusWindow: &[u8] = b"focusWindow\0";
+pub const XNSpotLocation: &[u8] = b"spotLocation\0";
+pub const XNPreeditAttributes: &[u8] = b"preeditAttributes\0";
+pub const XNPreeditStartCallback: &[u8] = b"preeditStartCallback\0";
+pub const XNPreeditDoneCallback: &[u8] = b"preeditDoneCallback\0";
+pub const XNPreeditDrawCallback: &[u8] = b"preeditDrawCallback\0";
+pub const XNPreeditCaretCallback: &[u8] = b"preeditCaretCallback\0";
+pub const XNQueryInputStyle: &[u8] = b"queryInputStyle\0";
+pub const XNFilterEvents: &[u8] = b"filterEvents\0";
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct XIMStyles {
+    pub count_styles: libc::c_ushort,
+    pub supported_styles: *mut libc::c_ulong,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct XIMCallback {
+    pub client_data: *mut libc::c_void,
+    pub callback: Option<unsafe extern "C" fn(XIC, *mut libc::c_void, *mut libc::c_void) -> libc::c_int>,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct XIMText {
+    pub length: libc::c_ushort,
+    pub feedback: *mut libc::c_ulong,
+    pub encoding_is_wchar: libc::c_int,
+    pub string: XIMTextString,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union XIMTextString {
+    pub multi_byte: *mut libc::c_char,
+    pub wide_char: *mut libc::wchar_t,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct XIMPreeditDrawCallbackStruct {
+    pub caret: libc::c_int,
+    pub chg_first: libc::c_int,
+    pub chg_length: libc::c_int,
+    pub text: *mut XIMText,
+}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct XPoint {
+    pub x: libc::c_short,
+    pub y: libc::c_short,
+}
+
 pub const XC_left_ptr: libc::c_ushort = 68;
 pub const XC_pirate: libc::c_ushort = 88;
 pub const XC_question_arrow: libc::c_ushort = 92;
@@ -929,7 +998,21 @@ crate::declare_module!(
     pub fn XCreatePixmapCursor(*mut Display, Pixmap, Pixmap, *mut XColor, *mut XColor, c_uint, c_uint) -> Cursor,
     pub fn XFreePixmap(*mut Display, Pixmap) -> c_int,
     pub fn XDefineCursor(*mut Display, Window, Cursor) -> c_int,
+    pub fn XFilterEvent(*mut XEvent, Window) -> c_int,
+    pub fn XSetLocaleModifiers(*const c_char) -> *mut c_char,
+    pub fn XSelectInput(*mut Display, Window, c_long) -> c_int,
+    pub fn XOpenIM(*mut Display, *mut c_void, *mut c_char, *mut c_char) -> XIM,
+    pub fn XCloseIM(XIM) -> c_int,
+    pub fn XDestroyIC(XIC),
+    pub fn XSetICFocus(XIC),
+    pub fn XUnsetICFocus(XIC),
+    pub fn Xutf8LookupString(XIC, *mut XKeyEvent, *mut c_char, c_int, *mut KeySym, *mut c_int) -> c_int,
     ...
+    pub fn XCreateIC(XIM, ...) -> XIC,
+    pub fn XSetICValues(XIC, ...) -> *const c_char,
+    pub fn XGetICValues(XIC, ...) -> *const c_char,
+    pub fn XGetIMValues(XIM, ...) -> *const c_char,
+    pub fn XVaCreateNestedList(c_int, ...) -> *mut c_void,
     ...
     pub extensions: X11Extensions,
 );

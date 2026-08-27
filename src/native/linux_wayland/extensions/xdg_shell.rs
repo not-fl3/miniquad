@@ -16,7 +16,7 @@ wayland_interface!(
         (get_xdg_surface, "no", (xdg_surface_interface)),
         (pong, "u", ())
     ],
-    [("ping", "u")]
+    [(ping, "u", ())]
 );
 
 wayland_interface!(
@@ -30,7 +30,7 @@ wayland_interface!(
         (set_window_geometry, "iiii", ()),
         (ack_configure, "u", ())
     ],
-    [("configure", "u")]
+    [(configure, "u", ())]
 );
 
 wayland_interface!(
@@ -53,7 +53,7 @@ wayland_interface!(
         (unset_fullscreen, "", ()),
         (set_minimized, "", ())
     ],
-    [("configure", "iia"), ("close", "")]
+    [(configure, "iia", ()), (close, "", ())]
 );
 
 wayland_interface!(
@@ -84,7 +84,7 @@ wayland_interface!(
         (grab, "ou", (wl_seat_interface)),
         (reposition, "3ou", (xdg_positioner_interface))
     ],
-    [("configure", "iiii"), ("popup_done", "")]
+    [(configure, "iiii", ()), (popup_done, "", ())]
 );
 
 crate::wl_listener!(

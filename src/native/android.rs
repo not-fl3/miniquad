@@ -68,6 +68,17 @@ enum Message {
     Pause,
     Resume,
     Destroy,
+    ImePreedit(String),
+    ImeCommit(Option<String>),
+    ImeStateChanged {
+        text: String,
+        selection_start: usize,
+        selection_end: usize,
+        composing_start: Option<usize>,
+        composing_end: Option<usize>,
+        element_id: u64,
+    },
+    ImeAction(i32),
     Request(crate::native::Request),
 }
 unsafe impl Send for Message {}
@@ -233,6 +244,19 @@ impl MainThreadState {
                 }
                 self.event_handler.key_up_event(keycode, self.keymods);
             }
+            Message::ImePreedit(text) => {
+                self.event_handler.on_ime_preedit(&text);
+            }
+            Message::ImeCommit(text) => {
+                self.event_handler.on_ime_commit(text.as_deref());
+            }
+            Message::ImeStateChanged { text, selection_start, selection_end, composing_start, composing_end, element_id } => {
+                self.event_handler.on_ime_state_changed(&text, selection_start, selection_end, composing_start, composing_end, element_id);
+            }
+            Message::ImeAction(_action_code) => {
+                self.event_handler.key_down_event(KeyCode::Enter, self.keymods, false);
+                self.event_handler.key_up_event(KeyCode::Enter, self.keymods);
+            }
             Message::Pause => self.event_handler.window_minimized_event(),
             Message::Resume => {
                 if self.fullscreen {
@@ -282,6 +306,33 @@ impl MainThreadState {
             ShowKeyboard(show) => unsafe {
                 let env = attach_jni_env();
                 ndk_utils::call_void_method!(env, ACTIVITY, "showKeyboard", "(Z)V", show as i32);
+            },
+            UpdateTextInputState {
+                text,
+                selection_start,
+                selection_end,
+                is_password,
+                is_multiline,
+                element_id,
+                max_length,
+            } => unsafe {
+                let env = attach_jni_env();
+                let c_text = std::ffi::CString::new(text).unwrap_or_default();
+                let text_jstring = (**env).NewStringUTF.unwrap()(env, c_text.as_ptr());
+                ndk_utils::call_void_method!(
+                    env,
+                    ACTIVITY,
+                    "updateTextInputState",
+                    "(Ljava/lang/String;IIZZJI)V",
+                    text_jstring,
+                    selection_start as i32,
+                    selection_end as i32,
+                    is_password as i32,
+                    is_multiline as i32,
+                    element_id as i64,
+                    max_length as i32
+                );
+                (**env).DeleteLocalRef.unwrap()(env, text_jstring);
             },
             SetImePosition { .. } => {
                 // IME position control not applicable on Android
@@ -681,9 +732,9 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnTouch(
     y: ndk_sys::jfloat,
 ) {
     let phase = match action {
-        0 => TouchPhase::Moved,
-        1 => TouchPhase::Ended,
-        2 => TouchPhase::Started,
+        0 => TouchPhase::Started,
+        1 => TouchPhase::Moved,
+        2 => TouchPhase::Ended,
         3 => TouchPhase::Cancelled,
         x => panic!("Unsupported touch phase: {}", x),
     };
@@ -727,6 +778,81 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnCharacter(
     send_message(Message::Character {
         character: character as u32,
     });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Java_quad_1native_QuadNative_surfaceOnImePreedit(
+    env: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+    text: ndk_sys::jstring,
+) {
+    let s = jstring_to_string(env, text).unwrap_or_default();
+    send_message(Message::ImePreedit(s));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Java_quad_1native_QuadNative_surfaceOnImeCommit(
+    env: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+    text: ndk_sys::jstring,
+) {
+    let s = if text.is_null() {
+        None
+    } else {
+        jstring_to_string(env, text)
+    };
+    send_message(Message::ImeCommit(s));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Java_quad_1native_QuadNative_surfaceOnImeStateChanged(
+    env: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jclass,
+    text: ndk_sys::jstring,
+    selection_start: ndk_sys::jint,
+    selection_end: ndk_sys::jint,
+    composing_start: ndk_sys::jint,
+    composing_end: ndk_sys::jint,
+    element_id: ndk_sys::jlong,
+) {
+    let s = jstring_to_string(env, text).unwrap_or_default();
+    let sel_start = if selection_start >= 0 { selection_start as usize } else { 0 };
+    let sel_end = if selection_end >= 0 { selection_end as usize } else { 0 };
+    send_message(Message::ImeStateChanged {
+        text: s,
+        selection_start: sel_start,
+        selection_end: sel_end,
+        composing_start: if composing_start >= 0 { Some(composing_start as usize) } else { None },
+        composing_end: if composing_end >= 0 { Some(composing_end as usize) } else { None },
+        element_id: element_id as u64,
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Java_quad_1native_QuadNative_surfaceOnImeAction(
+    _: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jclass,
+    action_code: ndk_sys::jint,
+) {
+    send_message(Message::ImeAction(action_code as i32));
+}
+
+unsafe fn jstring_to_string(env: *mut ndk_sys::JNIEnv, jstr: ndk_sys::jstring) -> Option<String> {
+    if jstr.is_null() {
+        return None;
+    }
+    let get_string_utf_chars = (**env).GetStringUTFChars.unwrap();
+    let release_string_utf_chars = (**env).ReleaseStringUTFChars.unwrap();
+    let chars = get_string_utf_chars(env, jstr, std::ptr::null_mut());
+    if chars.is_null() {
+        return None;
+    }
+    let s = std::ffi::CStr::from_ptr(chars)
+        .to_str()
+        .ok()
+        .map(|s| s.to_string());
+    release_string_utf_chars(env, jstr, chars);
+    s
 }
 
 unsafe fn set_full_screen(env: *mut ndk_sys::JNIEnv, fullscreen: bool) {

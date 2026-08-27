@@ -16,11 +16,38 @@ pub struct xkb_state {
     _unused: [u8; 0],
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct xkb_compose_table {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct xkb_compose_state {
+    _unused: [u8; 0],
+}
+
 pub const XKB_STATE_MODS_EFFECTIVE: c_int = 1 << 3;
 pub const XKB_MOD_NAME_SHIFT: &str = "Shift";
 pub const XKB_MOD_NAME_CTRL: &str = "Control";
 pub const XKB_MOD_NAME_ALT: &str = "Mod1";
 pub const XKB_MOD_NAME_LOGO: &str = "Mod4";
+
+pub type xkb_compose_flags = c_uint;
+pub const XKB_COMPOSE_COMPILE_NO_FLAGS: xkb_compose_flags = 0;
+
+pub type xkb_compose_state_flags = c_uint;
+pub const XKB_COMPOSE_STATE_NO_FLAGS: xkb_compose_state_flags = 0;
+
+pub type xkb_compose_status = c_uint;
+pub const XKB_COMPOSE_NOTHING: xkb_compose_status = 0;
+pub const XKB_COMPOSE_COMPOSING: xkb_compose_status = 1;
+pub const XKB_COMPOSE_COMPOSED: xkb_compose_status = 2;
+pub const XKB_COMPOSE_CANCELLED: xkb_compose_status = 3;
+
+pub type xkb_compose_feed_result = c_uint;
+pub const XKB_COMPOSE_FEED_IGNORED: xkb_compose_feed_result = 0;
+pub const XKB_COMPOSE_FEED_ACCEPTED: xkb_compose_feed_result = 1;
 
 use core::ffi::{c_char, c_int, c_uint};
 pub type xkb_keycode_t = c_uint;
@@ -46,6 +73,14 @@ crate::declare_module!(
     pub fn xkb_state_mod_index_is_active(*mut xkb_state, xkb_mod_index_t, c_int) -> c_int,
     pub fn xkb_state_update_mask(*mut xkb_state, c_uint, c_uint, c_uint, c_uint, c_uint, c_uint) -> c_int,
     pub fn xkb_keysym_to_utf32(xkb_keysym_t) -> c_uint,
+    pub fn xkb_compose_table_new_from_locale(*mut xkb_context, *const c_char, xkb_compose_flags) -> *mut xkb_compose_table,
+    pub fn xkb_compose_table_unref(*mut xkb_compose_table),
+    pub fn xkb_compose_state_new(*mut xkb_compose_table, xkb_compose_state_flags) -> *mut xkb_compose_state,
+    pub fn xkb_compose_state_unref(*mut xkb_compose_state),
+    pub fn xkb_compose_state_feed(*mut xkb_compose_state, xkb_keysym_t) -> xkb_compose_feed_result,
+    pub fn xkb_compose_state_reset(*mut xkb_compose_state),
+    pub fn xkb_compose_state_get_status(*mut xkb_compose_state) -> xkb_compose_status,
+    pub fn xkb_compose_state_get_utf8(*mut xkb_compose_state, *mut c_char, usize) -> c_int,
     ...
     ...
 );

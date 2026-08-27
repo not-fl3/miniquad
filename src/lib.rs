@@ -384,6 +384,46 @@ pub mod window {
         }
     }
 
+    /// Update text input state (text content, selection start/end).
+    /// Only works on Android right now.
+    pub fn update_text_input_state(
+        text: String,
+        selection_start: usize,
+        selection_end: usize,
+        is_password: bool,
+        is_multiline: bool,
+        element_id: u64,
+        max_length: usize,
+    ) {
+        let d = native_display().lock().unwrap();
+        #[cfg(target_os = "android")]
+        {
+            (d.native_requests)(native::Request::UpdateTextInputState {
+                text,
+                selection_start,
+                selection_end,
+                is_password,
+                is_multiline,
+                element_id,
+                max_length,
+            });
+        }
+
+        #[cfg(not(target_os = "android"))]
+        {
+            let _ = d.native_requests
+                .send(native::Request::UpdateTextInputState {
+                    text,
+                    selection_start,
+                    selection_end,
+                    is_password,
+                    is_multiline,
+                    element_id,
+                    max_length,
+                });
+        }
+    }
+
     /// Set the position of the IME candidate window.
     /// The position is in window client coordinates (pixels).
     /// This should be called when the text cursor moves to keep the IME
@@ -411,7 +451,9 @@ pub mod window {
     /// # Arguments
     /// * `enabled` - `true` to enable IME (for text input), `false` to disable (for game controls)
     pub fn set_ime_enabled(enabled: bool) {
-        let d = native_display().lock().unwrap();
+        let mut d = native_display().lock().unwrap();
+        d.ime_enabled = enabled;
+        
         #[cfg(target_os = "android")]
         {
             let _ = enabled; // IME control not applicable on Android
@@ -423,6 +465,11 @@ pub mod window {
                 .send(native::Request::SetImeEnabled(enabled))
                 .unwrap();
         }
+    }
+    
+    pub fn is_ime_enabled() -> bool {
+        let d = native_display().lock().unwrap();
+        d.ime_enabled
     }
 
     #[cfg(target_vendor = "apple")]

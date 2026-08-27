@@ -53,10 +53,282 @@ pub struct X11Display {
     cursor_visible: bool,
     update_requested: bool,
     drag_n_drop: drag_n_drop::X11DnD,
+    xim: libx11::XIM,
+    xic: libx11::XIC,
+    ime_pos: (i32, i32),
+    preedit_text: String,
+    pending_preedit_update: bool,
+    xim_callbacks: [libx11::XIMCallback; 4],
+}
+
+unsafe extern "C" fn preedit_start_callback(
+    _xic: libx11::XIC,
+    _client_data: *mut libc::c_void,
+    _call_data: *mut libc::c_void,
+) -> libc::c_int {
+    -1
+}
+
+unsafe extern "C" fn preedit_done_callback(
+    _xic: libx11::XIC,
+    client_data: *mut libc::c_void,
+    _call_data: *mut libc::c_void,
+) {
+    let display_ptr = client_data as *mut X11Display;
+    if !display_ptr.is_null() {
+        (*display_ptr).preedit_text.clear();
+        (*display_ptr).pending_preedit_update = true;
+    }
+}
+
+unsafe extern "C" fn preedit_draw_callback(
+    _xic: libx11::XIC,
+    client_data: *mut libc::c_void,
+    call_data: *mut libc::c_void,
+) {
+    let display_ptr = client_data as *mut X11Display;
+    if display_ptr.is_null() || call_data.is_null() {
+        return;
+    }
+    let draw_data = &*(call_data as *const libx11::XIMPreeditDrawCallbackStruct);
+    let display = &mut *display_ptr;
+
+    let chg_first = draw_data.chg_first as usize;
+    let chg_length = draw_data.chg_length as usize;
+
+    let mut chars: Vec<char> = display.preedit_text.chars().collect();
+    if chg_first <= chars.len() {
+        let drain_end = (chg_first + chg_length).min(chars.len());
+        chars.drain(chg_first..drain_end);
+    }
+
+    if !draw_data.text.is_null() {
+        let text_struct = &*draw_data.text;
+        if text_struct.length > 0 && !text_struct.string.multi_byte.is_null() {
+            let new_str = if text_struct.encoding_is_wchar != 0 {
+                let wslice = std::slice::from_raw_parts(
+                    text_struct.string.wide_char,
+                    text_struct.length as usize,
+                );
+                wslice.iter().map(|&wc| char::from_u32(wc as u32).unwrap_or('?')).collect::<String>()
+            } else {
+                let bslice = std::slice::from_raw_parts(
+                    text_struct.string.multi_byte as *const u8,
+                    text_struct.length as usize,
+                );
+                std::str::from_utf8(bslice).unwrap_or("").to_string()
+            };
+
+            let insert_idx = chg_first.min(chars.len());
+            for (i, ch) in new_str.chars().enumerate() {
+                chars.insert(insert_idx + i, ch);
+            }
+        }
+    }
+
+    display.preedit_text = chars.into_iter().collect();
+    display.pending_preedit_update = true;
+}
+
+unsafe extern "C" fn preedit_caret_callback(
+    _xic: libx11::XIC,
+    _client_data: *mut libc::c_void,
+    _call_data: *mut libc::c_void,
+) -> libc::c_int {
+    0
 }
 
 impl X11Display {
+    pub unsafe fn init_xim(&mut self, window: Window) {
+        libc::setlocale(libc::LC_ALL, b"\0".as_ptr() as _);
+        libc::setlocale(libc::LC_CTYPE, b"\0".as_ptr() as _);
+
+        let mod_res = (self.libx11.XSetLocaleModifiers)(b"\0".as_ptr() as _);
+        if mod_res.is_null() {
+            eprintln!("WARNING: XSetLocaleModifiers returned NULL! XIM may not work properly with current $XMODIFIERS.");
+        }
+
+        self.xim = (self.libx11.XOpenIM)(
+            self.display,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        );
+        if self.xim.is_null() {
+            eprintln!("XOpenIM returned NULL! XIM initialization failed.");
+            return;
+        }
+
+        let mut styles_ptr: *mut libx11::XIMStyles = std::ptr::null_mut();
+        let res_im = (self.libx11.XGetIMValues)(
+            self.xim,
+            libx11::XNQueryInputStyle.as_ptr() as *const core::ffi::c_char,
+            &mut styles_ptr as *mut *mut libx11::XIMStyles,
+            std::ptr::null::<core::ffi::c_void>(),
+        );
+        if res_im.is_null() && !styles_ptr.is_null() {
+            (self.libx11.XFree)(styles_ptr as *mut libc::c_void);
+        }
+
+        self.xim_callbacks = [
+            libx11::XIMCallback {
+                client_data: self as *mut _ as *mut libc::c_void,
+                callback: Some(std::mem::transmute(preedit_start_callback as *const ())),
+            },
+            libx11::XIMCallback {
+                client_data: self as *mut _ as *mut libc::c_void,
+                callback: Some(std::mem::transmute(preedit_done_callback as *const ())),
+            },
+            libx11::XIMCallback {
+                client_data: self as *mut _ as *mut libc::c_void,
+                callback: Some(std::mem::transmute(preedit_draw_callback as *const ())),
+            },
+            libx11::XIMCallback {
+                client_data: self as *mut _ as *mut libc::c_void,
+                callback: Some(std::mem::transmute(preedit_caret_callback as *const ())),
+            },
+        ];
+
+        let pt = libx11::XPoint {
+            x: self.ime_pos.0 as libc::c_short,
+            y: self.ime_pos.1 as libc::c_short,
+        };
+
+        let preedit_attr = (self.libx11.XVaCreateNestedList)(
+            0,
+            libx11::XNSpotLocation.as_ptr() as *const core::ffi::c_char,
+            &pt as *const libx11::XPoint,
+            libx11::XNPreeditStartCallback.as_ptr() as *const core::ffi::c_char,
+            &self.xim_callbacks[0] as *const libx11::XIMCallback,
+            libx11::XNPreeditDoneCallback.as_ptr() as *const core::ffi::c_char,
+            &self.xim_callbacks[1] as *const libx11::XIMCallback,
+            libx11::XNPreeditDrawCallback.as_ptr() as *const core::ffi::c_char,
+            &self.xim_callbacks[2] as *const libx11::XIMCallback,
+            libx11::XNPreeditCaretCallback.as_ptr() as *const core::ffi::c_char,
+            &self.xim_callbacks[3] as *const libx11::XIMCallback,
+            std::ptr::null::<core::ffi::c_void>(),
+        );
+
+        if !preedit_attr.is_null() {
+            // Try On-the-Spot mode (XIMPreeditCallbacks) first
+            self.xic = (self.libx11.XCreateIC)(
+                self.xim,
+                libx11::XNInputStyle.as_ptr() as *const core::ffi::c_char,
+                libx11::XIMPreeditCallbacks | libx11::XIMStatusNothing,
+                libx11::XNClientWindow.as_ptr() as *const core::ffi::c_char,
+                window,
+                libx11::XNFocusWindow.as_ptr() as *const core::ffi::c_char,
+                window,
+                libx11::XNPreeditAttributes.as_ptr() as *const core::ffi::c_char,
+                preedit_attr,
+                std::ptr::null::<core::ffi::c_void>(),
+            );
+            (self.libx11.XFree)(preedit_attr);
+        }
+
+        if self.xic.is_null() {
+            let preedit_pos_attr = (self.libx11.XVaCreateNestedList)(
+                0,
+                libx11::XNSpotLocation.as_ptr() as *const core::ffi::c_char,
+                &pt as *const libx11::XPoint,
+                std::ptr::null::<core::ffi::c_void>(),
+            );
+            if !preedit_pos_attr.is_null() {
+                self.xic = (self.libx11.XCreateIC)(
+                    self.xim,
+                    libx11::XNInputStyle.as_ptr() as *const core::ffi::c_char,
+                    libx11::XIMPreeditPosition | libx11::XIMStatusNothing,
+                    libx11::XNClientWindow.as_ptr() as *const core::ffi::c_char,
+                    window,
+                    libx11::XNFocusWindow.as_ptr() as *const core::ffi::c_char,
+                    window,
+                    libx11::XNPreeditAttributes.as_ptr() as *const core::ffi::c_char,
+                    preedit_pos_attr,
+                    std::ptr::null::<core::ffi::c_void>(),
+                );
+                (self.libx11.XFree)(preedit_pos_attr);
+            }
+        }
+
+        if self.xic.is_null() {
+            self.xic = (self.libx11.XCreateIC)(
+                self.xim,
+                libx11::XNInputStyle.as_ptr() as *const core::ffi::c_char,
+                libx11::XIMPreeditNothing | libx11::XIMStatusNothing,
+                libx11::XNClientWindow.as_ptr() as *const core::ffi::c_char,
+                window,
+                libx11::XNFocusWindow.as_ptr() as *const core::ffi::c_char,
+                window,
+                std::ptr::null::<core::ffi::c_void>(),
+            );
+        }
+
+        if self.xic.is_null() {
+            eprintln!("WARNING: XCreateIC returned NULL! (unsupported style or invalid arguments)");
+            return;
+        }
+
+        (self.libx11.XSetICFocus)(self.xic);
+
+        let mut fe_mask: libc::c_long = 0;
+        let res = (self.libx11.XGetICValues)(
+            self.xic,
+            libx11::XNFilterEvents.as_ptr() as *const core::ffi::c_char,
+            &mut fe_mask as *mut libc::c_long,
+            std::ptr::null::<core::ffi::c_void>(),
+        );
+        if !res.is_null() {
+            let err = std::ffi::CStr::from_ptr(res).to_string_lossy();
+            eprintln!("WARNING: XGetICValues(XNFilterEvents) failed, returned attribute: {}", err);
+        }
+
+        let base_mask: libc::c_long = KeyPressMask
+            | KeyReleaseMask
+            | ButtonPressMask
+            | ButtonReleaseMask
+            | PointerMotionMask
+            | StructureNotifyMask
+            | FocusChangeMask
+            | ExposureMask
+            | VisibilityChangeMask
+            | EnterWindowMask
+            | LeaveWindowMask
+            | PropertyChangeMask;
+        let combined_mask = base_mask | fe_mask;
+        (self.libx11.XSelectInput)(self.display, window, combined_mask);
+    }
+
     unsafe fn process_event(&mut self, event: &mut XEvent, event_handler: &mut dyn EventHandler) {
+        if !self.xic.is_null() {
+            let win = if event.xany.window != 0 {
+                event.xany.window
+            } else {
+                self.window
+            };
+            let filtered = (self.libx11.XFilterEvent)(event as *mut _, win);
+            if self.pending_preedit_update {
+                self.pending_preedit_update = false;
+                let ime_active = crate::native_display()
+                    .try_lock()
+                    .map(|d| d.ime_enabled)
+                    .unwrap_or(false);
+                if ime_active {
+                    event_handler.on_ime_preedit(&self.preedit_text);
+                }
+            }
+            if filtered != 0 {
+                return;
+            }
+        } else if self.pending_preedit_update {
+            self.pending_preedit_update = false;
+            let ime_active = crate::native_display()
+                .try_lock()
+                .map(|d| d.ime_enabled)
+                .unwrap_or(false);
+            if ime_active {
+                event_handler.on_ime_preedit(&self.preedit_text);
+            }
+        }
         match event.type_0 {
             2 => {
                 let keycode = event.xkey.keycode as libc::c_int;
@@ -64,21 +336,59 @@ impl X11Display {
                 let repeat = self.repeated_keycodes[(keycode & 0xff) as usize];
                 self.repeated_keycodes[(keycode & 0xff) as usize] = true;
                 let mods = keycodes::translate_mod(event.xkey.state as libc::c_int);
-                let mut keysym: KeySym = 0;
-                (self.libx11.XLookupString)(
-                    &mut event.xkey,
-                    std::ptr::null_mut(),
-                    0 as libc::c_int,
-                    &mut keysym,
-                    std::ptr::null_mut(),
-                );
-                let chr = keycodes::keysym_to_unicode(&mut self.libxkbcommon, keysym);
-                if chr > 0 {
-                    if let Some(chr) = char::from_u32(chr as u32) {
-                        event_handler.char_event(chr, mods, repeat);
+                event_handler.key_down_event(key, mods, repeat);
+
+                if !self.xic.is_null() {
+                    let mut buf = [0u8; 64];
+                    let mut keysym: KeySym = 0;
+                    let mut status: libc::c_int = 0;
+                    let n = (self.libx11.Xutf8LookupString)(
+                        self.xic,
+                        &mut event.xkey,
+                        buf.as_mut_ptr() as *mut libc::c_char,
+                        buf.len() as libc::c_int,
+                        &mut keysym,
+                        &mut status,
+                    );
+                    if status == libx11::XLookupChars || status == libx11::XLookupBoth {
+                        if let Ok(s) = std::str::from_utf8(&buf[..n as usize]) {
+                            self.preedit_text.clear();
+                            let ime_active = crate::native_display()
+                                .try_lock()
+                                .map(|d| d.ime_enabled)
+                                .unwrap_or(false);
+                            if ime_active {
+                                event_handler.on_ime_preedit("");
+                                if s.chars().count() > 1 {
+                                    event_handler.on_ime_commit(Some(s));
+                                } else {
+                                    for chr in s.chars() {
+                                        event_handler.char_event(chr, mods, repeat);
+                                    }
+                                }
+                            } else {
+                                for chr in s.chars() {
+                                    event_handler.char_event(chr, mods, repeat);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    let mut keysym: KeySym = 0;
+                    (self.libx11.XLookupString)(
+                        &mut event.xkey,
+                        std::ptr::null_mut(),
+                        0 as libc::c_int,
+                        &mut keysym,
+                        std::ptr::null_mut(),
+                    );
+                    let chr = keycodes::keysym_to_unicode(&mut self.libxkbcommon, keysym);
+                    if chr > 0 {
+                        if let Some(chr) = char::from_u32(chr as u32) {
+                            event_handler.char_event(chr, mods, repeat);
+                        }
                     }
                 }
-                event_handler.key_down_event(key, mods, repeat);
             }
             3 => {
                 let keycode = event.xkey.keycode;
@@ -144,9 +454,15 @@ impl X11Display {
                 event_handler.mouse_leave_event();
             }
             9 => {
+                if !self.xic.is_null() {
+                    (self.libx11.XSetICFocus)(self.xic);
+                }
                 event_handler.window_restored_event();
             }
             10 => {
+                if !self.xic.is_null() {
+                    (self.libx11.XUnsetICFocus)(self.xic);
+                }
                 event_handler.window_minimized_event();
             }
             22 => {
@@ -433,12 +749,50 @@ impl X11Display {
                 ShowKeyboard(..) => {
                     eprintln!("Not implemented for X11")
                 }
-                SetImePosition { .. } => {
-                    // IME position control not implemented for X11 yet
+                SetImePosition { x, y } => {
+                    if self.ime_pos != (x as i32, y as i32) {
+                        self.ime_pos = (x as i32, y as i32);
+                        if !self.xic.is_null() {
+                            let pt = libx11::XPoint {
+                                x: x as libc::c_short,
+                                y: y as libc::c_short,
+                            };
+                            let preedit_attr = (self.libx11.XVaCreateNestedList)(
+                                0,
+                                libx11::XNSpotLocation.as_ptr() as *const core::ffi::c_char,
+                                &pt as *const libx11::XPoint,
+                                std::ptr::null::<core::ffi::c_void>(),
+                            );
+                            if !preedit_attr.is_null() {
+                                let ret = (self.libx11.XSetICValues)(
+                                    self.xic,
+                                    libx11::XNPreeditAttributes.as_ptr() as *const core::ffi::c_char,
+                                    preedit_attr,
+                                    std::ptr::null::<core::ffi::c_void>(),
+                                );
+                                if !ret.is_null() {
+                                    let err_str = std::ffi::CStr::from_ptr(ret).to_string_lossy();
+                                    eprintln!("WARNING: XSetICValues(XNPreeditAttributes) returned attribute: {}", err_str);
+                                }
+                                (self.libx11.XFree)(preedit_attr);
+                            }
+                        }
+                    }
                 }
-                SetImeEnabled(..) => {
-                    // IME enable/disable not implemented for X11 yet
+                SetImeEnabled(enabled) => {
+                    if !enabled {
+                        self.preedit_text.clear();
+                        self.pending_preedit_update = true;
+                    }
+                    if !self.xic.is_null() {
+                        if enabled {
+                            (self.libx11.XSetICFocus)(self.xic);
+                        } else {
+                            (self.libx11.XUnsetICFocus)(self.xic);
+                        }
+                    }
                 }
+                UpdateTextInputState { .. } => {}
             }
         }
     }
@@ -475,6 +829,7 @@ where
 
     display.init_drag_n_drop();
     display.libx11.show_window(display.display, display.window);
+    display.init_xim(display.window);
 
     (display.libx11.XFlush)(display.display);
 
@@ -588,6 +943,7 @@ where
 
     display.init_drag_n_drop();
     display.libx11.show_window(display.display, display.window);
+    display.init_xim(display.window);
     let (w, h) = display
         .libx11
         .query_window_size(display.display, display.window);
@@ -658,6 +1014,14 @@ where
         (libx11.XInitThreads)();
         (libx11.XrmInitialize)();
 
+        libc::setlocale(libc::LC_ALL, b"\0".as_ptr() as _);
+        let loc_res = libc::setlocale(libc::LC_CTYPE, b"\0".as_ptr() as _);
+
+        let mod_res = (libx11.XSetLocaleModifiers)(b"\0".as_ptr() as _);
+        if mod_res.is_null() {
+            eprintln!("WARNING: XSetLocaleModifiers returned NULL! (check $XMODIFIERS)");
+        }
+
         let x11_display = (libx11.XOpenDisplay)(std::ptr::null());
         if x11_display.is_null() {
             panic!("XOpenDisplay() failed!");
@@ -695,6 +1059,15 @@ where
             drag_n_drop: Default::default(),
             cursor_icon: CursorIcon::Default,
             cursor_visible: true,
+            xim: std::ptr::null_mut(),
+            xic: std::ptr::null_mut(),
+            ime_pos: (0, 0),
+            preedit_text: String::new(),
+            pending_preedit_update: false,
+            xim_callbacks: [libx11::XIMCallback {
+                client_data: std::ptr::null_mut(),
+                callback: None,
+            }; 4],
         };
 
         display

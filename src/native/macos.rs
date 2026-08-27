@@ -45,6 +45,9 @@ pub struct MacosDisplay {
     native_requests: Receiver<Request>,
     update_requested: bool,
     last_paint_start_time: Instant,
+    ime_enabled: bool,
+    ime_position: (i32, i32),
+    marked_text: String,
 }
 
 impl MacosDisplay {
@@ -111,7 +114,12 @@ impl MacosDisplay {
     fn clipboard_get(&mut self) -> Option<String> {
         unsafe {
             let pasteboard: ObjcId = msg_send![class!(NSPasteboard), generalPasteboard];
-            let content: ObjcId = msg_send![pasteboard, stringForType: NSStringPboardType];
+            let pboard_type = str_to_nsstring("public.utf8-plain-text");
+            let mut content: ObjcId = msg_send![pasteboard, stringForType: pboard_type];
+            if content == nil {
+                let legacy_type = str_to_nsstring("NSStringPboardType");
+                content = msg_send![pasteboard, stringForType: legacy_type];
+            }
             let string = nsstring_to_string(content);
             if string.is_empty() {
                 return None;
@@ -124,8 +132,12 @@ impl MacosDisplay {
         unsafe {
             let pasteboard: ObjcId = msg_send![class!(NSPasteboard), generalPasteboard];
             let () = msg_send![pasteboard, clearContents];
-            let arr: ObjcId = msg_send![class!(NSArray), arrayWithObject: str];
-            let () = msg_send![pasteboard, writeObjects: arr];
+            let pboard_type = str_to_nsstring("public.utf8-plain-text");
+            let legacy_type = str_to_nsstring("NSStringPboardType");
+            let types: ObjcId = msg_send![class!(NSArray), arrayWithObject: pboard_type];
+            let () = msg_send![pasteboard, declareTypes: types owner: nil];
+            let () = msg_send![pasteboard, setString: str forType: pboard_type];
+            let () = msg_send![pasteboard, setString: str forType: legacy_type];
         }
     }
 
@@ -262,12 +274,44 @@ impl MacosDisplay {
             ShowKeyboard(..) => {
                 // Not applicable on macOS desktop
             }
-            SetImePosition { .. } => {
-                // IME position control not implemented for macOS yet
+            SetImePosition { x, y } => {
+                self.ime_position = (x, y);
+                unsafe {
+                    let input_context: ObjcId = msg_send![self.view, inputContext];
+                    let current_context: ObjcId = msg_send![class!(NSTextInputContext), currentInputContext];
+                    let ctx = if input_context != nil { input_context } else { current_context };
+                    if ctx != nil {
+                        let _: () = msg_send![ctx, invalidateCharacterCoordinates];
+                    }
+                }
             }
-            SetImeEnabled(..) => {
-                // IME enable/disable not implemented for macOS yet
+            SetImeEnabled(enabled) => {
+                self.ime_enabled = enabled;
+                unsafe {
+                    if enabled && self.window != nil && self.view != nil {
+                        let _: () = msg_send![self.window, makeFirstResponder: self.view];
+                    }
+                    let input_context: ObjcId = msg_send![self.view, inputContext];
+                    let current_context: ObjcId = msg_send![class!(NSTextInputContext), currentInputContext];
+                    let ctx = if input_context != nil { input_context } else { current_context };
+                    if ctx != nil {
+                        if enabled {
+                            let _: () = msg_send![ctx, activate];
+                            let _: () = msg_send![ctx, invalidateCharacterCoordinates];
+                        } else {
+                            let _: () = msg_send![ctx, deactivate];
+                            let _: () = msg_send![ctx, discardMarkedText];
+                        }
+                    }
+                }
+                if !enabled && !self.marked_text.is_empty() {
+                    self.marked_text.clear();
+                    if let Some(event_handler) = self.context() {
+                        event_handler.on_ime_preedit("");
+                    }
+                }
             }
+            UpdateTextInputState { .. } => {}
         }
     }
 }
@@ -285,28 +329,42 @@ struct Modifiers {
 }
 
 impl Modifiers {
-    const NS_RIGHT_SHIFT_KEY_MASK: u64 = 0x020004;
-    const NS_LEFT_SHIFT_KEY_MASK: u64 = 0x020002;
-    const NS_RIGHT_COMMAND_KEY_MASK: u64 = 0x100010;
-    const NS_LEFT_COMMAND_KEY_MASK: u64 = 0x100008;
-    const NS_RIGHT_ALTERNATE_KEY_MASK: u64 = 0x080040;
-    const NS_LEFT_ALTERNATE_KEY_MASK: u64 = 0x080020;
-    const NS_RIGHT_CONTROL_KEY_MASK: u64 = 0x042000;
-    const NS_LEFT_CONTROL_KEY_MASK: u64 = 0x040001;
-
     pub fn new(flags: u64) -> Self {
+        let has_shift = (flags & (1 << 17)) != 0;
+        let has_control = (flags & (1 << 18)) != 0;
+        let has_alt = (flags & (1 << 19)) != 0;
+        let has_command = (flags & (1 << 20)) != 0;
+
+        let right_shift = (flags & 0x04) != 0;
+        let left_shift = (flags & 0x02) != 0 || (has_shift && !right_shift);
+
+        let right_control = (flags & 0x2000) != 0;
+        let left_control = (flags & 0x01) != 0 || (has_control && !right_control);
+
+        let right_alt = (flags & 0x40) != 0;
+        let left_alt = (flags & 0x20) != 0 || (has_alt && !right_alt);
+
+        let right_command = (flags & 0x10) != 0;
+        let left_command = (flags & 0x08) != 0 || (has_command && !right_command);
+
         Self {
-            left_shift: flags & Self::NS_LEFT_SHIFT_KEY_MASK == Self::NS_LEFT_SHIFT_KEY_MASK,
-            right_shift: flags & Self::NS_RIGHT_SHIFT_KEY_MASK == Self::NS_RIGHT_SHIFT_KEY_MASK,
-            left_alt: flags & Self::NS_LEFT_ALTERNATE_KEY_MASK == Self::NS_LEFT_ALTERNATE_KEY_MASK,
-            right_alt: flags & Self::NS_RIGHT_ALTERNATE_KEY_MASK
-                == Self::NS_RIGHT_ALTERNATE_KEY_MASK,
-            left_control: flags & Self::NS_LEFT_CONTROL_KEY_MASK == Self::NS_LEFT_CONTROL_KEY_MASK,
-            right_control: flags & Self::NS_RIGHT_CONTROL_KEY_MASK
-                == Self::NS_RIGHT_CONTROL_KEY_MASK,
-            left_command: flags & Self::NS_LEFT_COMMAND_KEY_MASK == Self::NS_LEFT_COMMAND_KEY_MASK,
-            right_command: flags & Self::NS_RIGHT_COMMAND_KEY_MASK
-                == Self::NS_RIGHT_COMMAND_KEY_MASK,
+            left_shift,
+            right_shift,
+            left_control,
+            right_control,
+            left_alt,
+            right_alt,
+            left_command,
+            right_command,
+        }
+    }
+
+    pub fn to_keymods(&self) -> crate::KeyMods {
+        crate::KeyMods {
+            shift: self.left_shift || self.right_shift,
+            ctrl: self.left_control || self.right_control,
+            alt: self.left_alt || self.right_alt,
+            logo: self.left_command || self.right_command,
         }
     }
 }
@@ -639,10 +697,203 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
             }
         }
 
-        if let Some(character) = get_event_char(event) {
-            if let Some(event_handler) = payload.context() {
-                event_handler.char_event(character, mods, repeat);
+        unsafe {
+            let array: ObjcId = msg_send![class!(NSArray), arrayWithObject: event];
+            let _: () = msg_send![this, interpretKeyEvents: array];
+        }
+    }
+
+    extern "C" fn has_marked_text(this: &Object, _sel: Sel) -> BOOL {
+        let payload = get_window_payload(this);
+        if !payload.marked_text.is_empty() {
+            YES
+        } else {
+            NO
+        }
+    }
+
+    extern "C" fn marked_range(this: &Object, _sel: Sel) -> NSRange {
+        let payload = get_window_payload(this);
+        if payload.marked_text.is_empty() {
+            NSRange {
+                location: u64::MAX, // NSNotFound
+                length: 0,
             }
+        } else {
+            NSRange {
+                location: 0,
+                length: payload.marked_text.encode_utf16().count() as u64,
+            }
+        }
+    }
+
+    extern "C" fn selected_range(_this: &Object, _sel: Sel) -> NSRange {
+        NSRange {
+            location: 0,
+            length: 0,
+        }
+    }
+
+    extern "C" fn set_marked_text(
+        this: &Object,
+        _sel: Sel,
+        string: ObjcId,
+        _selected_range: NSRange,
+        _replacement_range: NSRange,
+    ) {
+        let payload = get_window_payload(this);
+        unsafe {
+            let is_nsstring: BOOL = msg_send![string, isKindOfClass: class!(NSString)];
+            let text = if is_nsstring != NO {
+                nsstring_to_string(string)
+            } else {
+                let string_obj: ObjcId = msg_send![string, string];
+                nsstring_to_string(string_obj)
+            };
+
+            payload.marked_text = text.clone();
+            if let Some(event_handler) = payload.context() {
+                event_handler.on_ime_preedit(&text);
+            }
+        }
+    }
+
+    extern "C" fn unmark_text(this: &Object, _sel: Sel) {
+        let payload = get_window_payload(this);
+        payload.marked_text.clear();
+        if let Some(event_handler) = payload.context() {
+            event_handler.on_ime_preedit("");
+        }
+    }
+
+    extern "C" fn insert_text(
+        this: &Object,
+        _sel: Sel,
+        string: ObjcId,
+        _replacement_range: NSRange,
+    ) {
+        let payload = get_window_payload(this);
+        unsafe {
+            let is_nsstring: BOOL = msg_send![string, isKindOfClass: class!(NSString)];
+            let text = if is_nsstring != NO {
+                nsstring_to_string(string)
+            } else {
+                let string_obj: ObjcId = msg_send![string, string];
+                nsstring_to_string(string_obj)
+            };
+
+            let is_ime_commit = !payload.marked_text.is_empty();
+            payload.marked_text.clear();
+            let mods = payload.modifiers.to_keymods();
+            if let Some(event_handler) = payload.context() {
+                if is_ime_commit {
+                    event_handler.on_ime_preedit("");
+                    event_handler.on_ime_commit(Some(&text));
+                } else {
+                    for c in text.chars() {
+                        event_handler.char_event(c, mods, false);
+                    }
+                }
+            }
+        }
+    }
+
+    extern "C" fn valid_attributes_for_marked_text(_this: &Object, _sel: Sel) -> ObjcId {
+        unsafe { msg_send![class!(NSArray), array] }
+    }
+
+    extern "C" fn is_flipped(_this: &Object, _sel: Sel) -> BOOL {
+        YES
+    }
+
+    extern "C" fn attributed_substring_for_proposed_range(
+        this: &Object,
+        _sel: Sel,
+        range: NSRange,
+        actual_range: *mut c_void,
+    ) -> ObjcId {
+        let payload = get_window_payload(this);
+        unsafe {
+            let ns_str: ObjcId = if !payload.marked_text.is_empty() {
+                str_to_nsstring(&payload.marked_text)
+            } else {
+                str_to_nsstring(" ")
+            };
+            let length: u64 = msg_send![ns_str, length];
+            if !actual_range.is_null() {
+                let actual_loc = if range.location <= length { range.location } else { 0 };
+                let actual_len = if actual_loc + range.length <= length { range.length } else { length.saturating_sub(actual_loc) };
+                *(actual_range as *mut NSRange) = NSRange { location: actual_loc, length: actual_len };
+            }
+            let attr_str: ObjcId = msg_send![class!(NSAttributedString), alloc];
+            let attr_str: ObjcId = msg_send![attr_str, initWithString: ns_str];
+            let attr_str: ObjcId = msg_send![attr_str, autorelease];
+            attr_str
+        }
+    }
+
+    extern "C" fn first_rect_for_character_range_single(
+        this: &Object,
+        sel: Sel,
+        range: NSRange,
+    ) -> NSRect {
+        first_rect_for_character_range(this, sel, range, std::ptr::null_mut())
+    }
+
+    extern "C" fn first_rect_for_character_range(
+        this: &Object,
+        _sel: Sel,
+        range: NSRange,
+        actual_range: *mut c_void,
+    ) -> NSRect {
+        let payload = get_window_payload(this);
+        unsafe {
+            if !actual_range.is_null() {
+                *(actual_range as *mut NSRange) = range;
+            }
+            let (ime_x, ime_y) = payload.ime_position;
+
+            let scale = native_display().lock().unwrap().dpi_scale;
+            let view_bounds: NSRect = msg_send![this, bounds];
+
+            let point_in_view = NSPoint {
+                x: (ime_x as f32 / scale) as f64,
+                y: view_bounds.size.height - (ime_y as f32 / scale) as f64,
+            };
+
+            let window: ObjcId = {
+                let w: ObjcId = msg_send![this, window];
+                if w != nil {
+                    w
+                } else {
+                    payload.window
+                }
+            };
+
+            if window == nil {
+                return NSRect::new(0.0, 0.0, 0.0, 20.0);
+            }
+
+            let point_in_window: NSPoint = msg_send![
+                this,
+                convertPoint: point_in_view
+                toView: nil
+            ];
+
+            let rect_in_window = NSRect {
+                origin: point_in_window,
+                size: NSSize {
+                    width: 0.0,
+                    height: 20.0,
+                },
+            };
+
+            let rect_on_screen: NSRect = msg_send![
+                window,
+                convertRectToScreen: rect_in_window
+            ];
+
+            rect_on_screen
         }
     }
 
@@ -811,6 +1062,10 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         payload.modifiers = new_modifiers;
     }
 
+    if let Some(proto) = objc::runtime::Protocol::get("NSTextInputClient") {
+        decl.add_protocol(proto);
+    }
+
     decl.add_method(
         sel!(canBecomeKey),
         yes as extern "C" fn(&Object, Sel) -> BOOL,
@@ -884,6 +1139,49 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
     decl.add_method(
         sel!(performDragOperation:),
         perform_drag_operation as extern "C" fn(&Object, Sel, ObjcId) -> BOOL,
+    );
+    decl.add_method(
+        sel!(hasMarkedText),
+        has_marked_text as extern "C" fn(&Object, Sel) -> BOOL,
+    );
+    decl.add_method(
+        sel!(markedRange),
+        marked_range as extern "C" fn(&Object, Sel) -> NSRange,
+    );
+    decl.add_method(
+        sel!(selectedRange),
+        selected_range as extern "C" fn(&Object, Sel) -> NSRange,
+    );
+    decl.add_method(
+        sel!(setMarkedText:selectedRange:replacementRange:),
+        set_marked_text as extern "C" fn(&Object, Sel, ObjcId, NSRange, NSRange),
+    );
+    decl.add_method(
+        sel!(unmarkText),
+        unmark_text as extern "C" fn(&Object, Sel),
+    );
+    decl.add_method(
+        sel!(insertText:replacementRange:),
+        insert_text as extern "C" fn(&Object, Sel, ObjcId, NSRange),
+    );
+    decl.add_method(
+        sel!(validAttributesForMarkedText),
+        valid_attributes_for_marked_text as extern "C" fn(&Object, Sel) -> ObjcId,
+    );
+    decl.add_method(
+        sel!(attributedSubstringForProposedRange:actualRange:),
+        attributed_substring_for_proposed_range
+            as extern "C" fn(&Object, Sel, NSRange, *mut c_void) -> ObjcId,
+    );
+    decl.add_method(
+        sel!(firstRectForCharacterRange:actualRange:),
+        first_rect_for_character_range
+            as extern "C" fn(&Object, Sel, NSRange, *mut c_void) -> NSRect,
+    );
+    decl.add_method(
+        sel!(firstRectForCharacterRange:),
+        first_rect_for_character_range_single
+            as extern "C" fn(&Object, Sel, NSRange) -> NSRect,
     );
 }
 
@@ -1075,9 +1373,34 @@ unsafe fn create_opengl_view(
 struct MacosClipboard;
 impl crate::native::Clipboard for MacosClipboard {
     fn get(&mut self) -> Option<String> {
-        None
+        unsafe {
+            let pasteboard: ObjcId = msg_send![class!(NSPasteboard), generalPasteboard];
+            let pboard_type = str_to_nsstring("public.utf8-plain-text");
+            let mut content: ObjcId = msg_send![pasteboard, stringForType: pboard_type];
+            if content == nil {
+                let legacy_type = str_to_nsstring("NSStringPboardType");
+                content = msg_send![pasteboard, stringForType: legacy_type];
+            }
+            let string = nsstring_to_string(content);
+            if string.is_empty() {
+                return None;
+            }
+            Some(string)
+        }
     }
-    fn set(&mut self, _data: &str) {}
+    fn set(&mut self, data: &str) {
+        let str: ObjcId = str_to_nsstring(data);
+        unsafe {
+            let pasteboard: ObjcId = msg_send![class!(NSPasteboard), generalPasteboard];
+            let () = msg_send![pasteboard, clearContents];
+            let pboard_type = str_to_nsstring("public.utf8-plain-text");
+            let legacy_type = str_to_nsstring("NSStringPboardType");
+            let types: ObjcId = msg_send![class!(NSArray), arrayWithObject: pboard_type];
+            let () = msg_send![pasteboard, declareTypes: types owner: nil];
+            let () = msg_send![pasteboard, setString: str forType: pboard_type];
+            let () = msg_send![pasteboard, setString: str forType: legacy_type];
+        }
+    }
 }
 
 struct FrameSignal {
@@ -1337,6 +1660,9 @@ where
         modifiers: Modifiers::default(),
         update_requested: true,
         last_paint_start_time: Instant::now(),
+        ime_enabled: false,
+        ime_position: (0, 0),
+        marked_text: String::new(),
     };
 
     let app_delegate_class = define_app_delegate();

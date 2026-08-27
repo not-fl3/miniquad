@@ -114,6 +114,7 @@ extern "C" {
     pub static NSPasteboardURLReadingFileURLsOnlyKey: ObjcId;
     pub static NSTrackingArea: ObjcId;
     pub static NSStringPboardType: ObjcId;
+    pub static NSPasteboardTypeString: ObjcId;
     pub static NSPasteboardTypeFileURL: ObjcId;
 }
 
@@ -140,6 +141,7 @@ extern "C" {
     pub static UIKeyboardDidShowNotification: ObjcId;
     pub static UIKeyboardWillHideNotification: ObjcId;
     pub static UIKeyboardDidChangeFrameNotification: ObjcId;
+    pub static UIPasteboardNameGeneral: ObjcId;
     pub fn UIApplicationMain(
         argc: i32,
         argv: *mut *mut i8,
@@ -374,6 +376,28 @@ unsafe impl Encode for NSRect {
     }
 }
 
+#[repr(C)]
+#[derive(Copy, Debug, Clone, Default, PartialEq)]
+pub struct UIEdgeInsets {
+    pub top: f64,
+    pub left: f64,
+    pub bottom: f64,
+    pub right: f64,
+}
+
+unsafe impl Encode for UIEdgeInsets {
+    fn encode() -> Encoding {
+        let encoding = format!(
+            "{{UIEdgeInsets={}{}{}{}}}",
+            f64::encode().as_str(),
+            f64::encode().as_str(),
+            f64::encode().as_str(),
+            f64::encode().as_str()
+        );
+        unsafe { Encoding::from_str(&encoding) }
+    }
+}
+
 #[repr(u64)] // NSUInteger
 pub enum NSEventModifierFlags {
     NSAlphaShiftKeyMask = 1 << 16,
@@ -522,6 +546,7 @@ pub enum NSBackingStoreType {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone, Debug)]
 pub struct NSRange {
     pub location: u64,
     pub length: u64,

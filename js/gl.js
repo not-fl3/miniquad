@@ -619,6 +619,118 @@ function mouse_relative_position(clientX, clientY) {
 
 var emscripten_shaders_hack = false;
 
+var html_input_element = null;
+var html_input_is_multiline = false;
+var html_input_is_password = false;
+var html_input_element_id = 0;
+var html_input_is_composing = false;
+var html_input_composition_text = "";
+var html_input_composition_start = -1;
+var html_input_syncing = false;
+
+function get_or_create_html_input(is_multiline, is_password) {
+    var tag = is_multiline ? "textarea" : "input";
+    if (html_input_element) {
+        if (html_input_element.tagName.toLowerCase() !== tag || html_input_is_password !== is_password) {
+            html_input_element.remove();
+            html_input_element = null;
+        }
+    }
+    if (!html_input_element) {
+        html_input_element = document.createElement(tag);
+        html_input_element.id = "miniquad-text-input";
+        if (!is_multiline) {
+            html_input_element.type = is_password ? "password" : "text";
+        }
+        html_input_element.setAttribute("autocomplete", "on");
+        html_input_element.setAttribute("autocapitalize", "off");
+        html_input_element.setAttribute("spellcheck", "false");
+        html_input_element.style.cssText =
+            "position:fixed;left:0;top:0;width:1px;height:20px;opacity:0.001;" +
+            "pointer-events:none;z-index:-1;border:none;outline:none;background:transparent;" +
+            "padding:0;margin:0;font-size:16px;";
+        document.body.appendChild(html_input_element);
+
+        html_input_is_multiline = is_multiline;
+        html_input_is_password = is_password;
+
+        function notify_rust_state() {
+            if (html_input_syncing || !wasm_exports.on_ime_state_changed) return;
+            var text = html_input_element.value;
+            var sel_start = html_input_element.selectionStart || 0;
+            var sel_end = html_input_element.selectionEnd || 0;
+            if (html_input_element.selectionDirection === "backward") {
+                var tmp = sel_start;
+                sel_start = sel_end;
+                sel_end = tmp;
+            }
+            var comp_start = -1;
+            var comp_end = -1;
+            if (html_input_is_composing && html_input_composition_text.length > 0) {
+                if (html_input_composition_start < 0) {
+                    var s_pos = html_input_element.selectionStart || 0;
+                    html_input_composition_start = Math.max(0, s_pos - html_input_composition_text.length);
+                }
+                comp_start = html_input_composition_start;
+                comp_end = html_input_composition_start + html_input_composition_text.length;
+            }
+            var text_bytes = (new TextEncoder()).encode(text);
+            var ptr = wasm_exports.allocate_vec_u8(text_bytes.length);
+            var heap = new Uint8Array(wasm_memory.buffer, ptr, text_bytes.length);
+            heap.set(text_bytes);
+            wasm_exports.on_ime_state_changed(ptr, text_bytes.length, sel_start, sel_end, comp_start, comp_end, html_input_element_id);
+        }
+
+        html_input_element.addEventListener("compositionstart", function (e) {
+            html_input_is_composing = true;
+            html_input_composition_start = html_input_element.selectionStart || 0;
+        });
+
+        html_input_element.addEventListener("compositionupdate", function (e) {
+            html_input_is_composing = true;
+            html_input_composition_text = e.data || "";
+            if (html_input_composition_start < 0) {
+                var s_pos = html_input_element.selectionStart || 0;
+                html_input_composition_start = Math.max(0, s_pos - html_input_composition_text.length);
+            }
+            if (wasm_exports.on_ime_preedit) {
+                var bytes = (new TextEncoder()).encode(html_input_composition_text);
+                var ptr = wasm_exports.allocate_vec_u8(bytes.length);
+                new Uint8Array(wasm_memory.buffer, ptr, bytes.length).set(bytes);
+                wasm_exports.on_ime_preedit(ptr, bytes.length);
+            }
+            notify_rust_state();
+        });
+
+        html_input_element.addEventListener("compositionend", function (e) {
+            html_input_is_composing = false;
+            var text = e.data || "";
+            html_input_composition_text = "";
+            html_input_composition_start = -1;
+            if (wasm_exports.on_ime_commit) {
+                var bytes = (new TextEncoder()).encode(text);
+                var ptr = wasm_exports.allocate_vec_u8(bytes.length);
+                new Uint8Array(wasm_memory.buffer, ptr, bytes.length).set(bytes);
+                wasm_exports.on_ime_commit(ptr, bytes.length);
+            }
+            notify_rust_state();
+        });
+
+        html_input_element.addEventListener("input", function (e) {
+            notify_rust_state();
+        });
+
+        html_input_element.addEventListener("selectionchange", function (e) {
+            notify_rust_state();
+        });
+
+        html_input_element.addEventListener("keyup", function (e) {
+            notify_rust_state();
+        });
+    }
+    return html_input_element;
+}
+
 var importObject = {
     env: {
         console_debug: function (ptr) {
@@ -1457,6 +1569,48 @@ var importObject = {
                 window.cancelAnimationFrame(animation_frame_timeout);
             }
             animation_frame_timeout = window.requestAnimationFrame(animation);
+        },
+        sapp_show_keyboard: function (show) {
+            if (show) {
+                var elem = get_or_create_html_input(html_input_is_multiline, html_input_is_password);
+                elem.focus({ preventScroll: true });
+            } else {
+                if (html_input_element) {
+                    html_input_element.blur();
+                }
+                canvas.focus();
+            }
+        },
+        sapp_update_text_input_state: function (text_ptr, text_len, sel_start, sel_end, is_password, is_multiline, element_id, max_length) {
+            var text = UTF8ToString(text_ptr, text_len);
+            html_input_element_id = element_id;
+            var elem = get_or_create_html_input(!!is_multiline, !!is_password);
+            html_input_syncing = true;
+            elem.value = text;
+            if (max_length > 0) {
+                elem.setAttribute("maxlength", max_length);
+            } else {
+                elem.removeAttribute("maxlength");
+            }
+            try {
+                var s_min = Math.min(sel_start, sel_end);
+                var s_max = Math.max(sel_start, sel_end);
+                var dir = sel_start > sel_end ? "backward" : "forward";
+                elem.setSelectionRange(Math.min(s_min, text.length), Math.min(s_max, text.length), dir);
+            } catch (e) {}
+            html_input_syncing = false;
+        },
+        sapp_set_ime_position: function (x, y) {
+            if (!html_input_element) return;
+            var scale = dpi_scale();
+            var css_x = x / scale;
+            var css_y = y / scale;
+            var canvas_rect = canvas.getBoundingClientRect();
+            html_input_element.style.left = (canvas_rect.left + css_x) + "px";
+            html_input_element.style.top = (canvas_rect.top + css_y) + "px";
+        },
+        sapp_set_ime_enabled: function (enabled) {
+            // Can toggle IME behavior if needed
         },
         init_webgl
     }

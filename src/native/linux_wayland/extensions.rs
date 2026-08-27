@@ -2,6 +2,7 @@
 
 pub mod cursor;
 pub mod libdecor;
+pub mod text_input;
 pub mod viewporter;
 pub mod xdg_decoration;
 pub mod xdg_shell;
@@ -32,7 +33,7 @@ macro_rules! wayland_interface {
      ],
      [
          $(
-             ($event_name:expr, $event_sign:expr)
+             ($event_name:ident, $event_sign:expr, ($($event_argument_name:expr),*))
          ),*
      ]) => {
         mod $name {
@@ -55,10 +56,20 @@ macro_rules! wayland_interface {
                 types: unsafe { $method_name::METHOD_ARGUMENTS_TYPES.as_ptr() as _ }
             }), *];
 
+            $(
+                mod $event_name {
+                    use super::*;
+
+                    pub static mut EVENT_ARGUMENTS_TYPES:
+                        [*const wl_interface; $crate::count!($($event_argument_name)*)] =
+                        [$(unsafe { &$event_argument_name as *const _},)*];
+                }
+            )*
+
             static mut events: [wl_message; $crate::count!($($event_name)*)] = [$(wl_message {
-                name: concat!($event_name, '\0').as_ptr() as _,
+                name: concat!(stringify!($event_name), '\0').as_ptr() as _,
                 signature: concat!($event_sign, '\0').as_ptr() as _,
-                types: std::ptr::null_mut()
+                types: unsafe { $event_name::EVENT_ARGUMENTS_TYPES.as_ptr() as _ }
             }),*];
 
             pub static mut $name: wl_interface = wl_interface {
@@ -90,15 +101,23 @@ pub mod wayland_protocol {
     use super::super::{wl_interface, wl_message};
 
     wayland_interface!(
+        wl_surface_interface,
+        wl_surface,
+        1,
+        [],
+        []
+    );
+
+    wayland_interface!(
         wl_output_interface,
         wl_output,
         3,
         [(release, "3", ())],
         [
-            ("geometry", "iiiiissi"),
-            ("mode", "uiii"),
-            ("done", "2"),
-            ("scale", "2i")
+            (geometry, "iiiiissi", ()),
+            (mode, "uiii", ()),
+            (done, "2", ()),
+            (scale, "2i", ())
         ]
     );
 
@@ -112,6 +131,6 @@ pub mod wayland_protocol {
             (get_touch, "n", ()),
             (release, "5", ())
         ],
-        [("capabilities", "u"), ("name", "2s")]
+        [(capabilities, "u", ()), (name, "2s", ())]
     );
 }

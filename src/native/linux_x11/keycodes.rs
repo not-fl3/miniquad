@@ -8,10 +8,15 @@ use crate::event::{KeyCode, KeyMods, MouseButton};
 use crate::native::linux_x11::libx11::LibXkbCommon;
 
 pub unsafe fn translate_key(libx11: &mut LibX11, display: *mut Display, scancode: i32) -> KeyCode {
+    if scancode < 8 || scancode > 255 {
+        return KeyCode::Unknown;
+    }
     let mut dummy: libc::c_int = 0;
     let keysyms =
         (libx11.XGetKeyboardMapping)(display, scancode as _, 1 as libc::c_int, &mut dummy);
-    assert!(!keysyms.is_null());
+    if keysyms.is_null() {
+        return KeyCode::Unknown;
+    }
 
     let keysym = *keysyms.offset(0 as libc::c_int as isize);
     (libx11.XFree)(keysyms as *mut libc::c_void);

@@ -7,8 +7,10 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.os.Build;
 import android.util.Log;
+import android.util.TypedValue;
 
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Surface;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -30,6 +32,13 @@ import android.graphics.Insets;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.widget.LinearLayout;
+import android.widget.FrameLayout;
+import android.widget.EditText;
+import android.widget.TextView;
+import android.text.Editable;
+import android.text.Selection;
+import android.text.TextWatcher;
+import android.text.InputType;
 
 import quad_native.QuadNative;
 
@@ -38,6 +47,126 @@ import quad_native.QuadNative;
 // before compiling
 
 //% IMPORTS
+
+class HiddenEditText extends EditText {
+    private boolean mIgnoreUpdates = false;
+    private boolean mInitialized = false;
+
+    public HiddenEditText(Context context) {
+        super(context);
+        setBackgroundColor(Color.TRANSPARENT);
+        setTextColor(Color.TRANSPARENT);
+        setAlpha(0.01f); // Visible to WindowManager, but transparent to user
+        setFocusable(true);
+        setFocusableInTouchMode(true);
+        setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        setLayoutParams(new android.widget.FrameLayout.LayoutParams(1, 1));
+
+        addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                sendStateToRust();
+            }
+        });
+
+        setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                QuadNative.surfaceOnImeAction(actionId);
+                return false;
+            }
+        });
+
+        mInitialized = true;
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+                || keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                || keyCode == KeyEvent.KEYCODE_MOVE_HOME || keyCode == KeyEvent.KEYCODE_MOVE_END
+                || keyCode == KeyEvent.KEYCODE_PAGE_UP || keyCode == KeyEvent.KEYCODE_PAGE_DOWN) {
+            if (event.isShiftPressed()) {
+                QuadNative.surfaceOnKeyDown(KeyEvent.KEYCODE_SHIFT_LEFT);
+            }
+            QuadNative.surfaceOnKeyDown(keyCode);
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+                || keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                || keyCode == KeyEvent.KEYCODE_MOVE_HOME || keyCode == KeyEvent.KEYCODE_MOVE_END
+                || keyCode == KeyEvent.KEYCODE_PAGE_UP || keyCode == KeyEvent.KEYCODE_PAGE_DOWN) {
+            QuadNative.surfaceOnKeyUp(keyCode);
+            if (!event.isShiftPressed()) {
+                QuadNative.surfaceOnKeyUp(KeyEvent.KEYCODE_SHIFT_LEFT);
+            }
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
+    }
+
+    @Override
+    protected void onSelectionChanged(int selStart, int selEnd) {
+        super.onSelectionChanged(selStart, selEnd);
+        sendStateToRust();
+    }
+
+    public void setIgnoreUpdates(boolean ignore) {
+        mIgnoreUpdates = ignore;
+    }
+
+    public void updateStateFromRust(String text, int selectionStart, int selectionEnd) {
+        mIgnoreUpdates = true;
+        try {
+            String currentText = getText() != null ? getText().toString() : "";
+            if (!currentText.equals(text)) {
+                setText(text);
+            }
+            int len = getText().length();
+            int start = Math.max(0, Math.min(len, selectionStart));
+            int end = Math.max(0, Math.min(len, selectionEnd));
+            setSelection(start, end);
+        } finally {
+            mIgnoreUpdates = false;
+        }
+    }
+
+    private void sendStateToRust() {
+        if (!mInitialized || mIgnoreUpdates) return;
+        if (MainActivity.sFocusedElementId == -1 || MainActivity.sFocusedElementId == 0) return;
+
+        Editable editable = getText();
+        if (editable == null) return;
+
+        String text = editable.toString();
+        int selectionStart = Math.max(0, Selection.getSelectionStart(editable));
+        int selectionEnd = Math.max(0, Selection.getSelectionEnd(editable));
+        int composingStart = android.view.inputmethod.BaseInputConnection.getComposingSpanStart(editable);
+        int composingEnd = android.view.inputmethod.BaseInputConnection.getComposingSpanEnd(editable);
+
+        MainActivity.sTextInputText = text;
+        MainActivity.sTextInputSelectionStart = selectionStart;
+        MainActivity.sTextInputSelectionEnd = selectionEnd;
+
+        QuadNative.surfaceOnImeStateChanged(text, selectionStart, selectionEnd, composingStart, composingEnd, MainActivity.sFocusedElementId);
+    }
+}
 
 class QuadSurface
     extends
@@ -60,75 +189,104 @@ class QuadSurface
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        Log.i("SAPP", "surfaceCreated");
-        Surface surface = holder.getSurface();
-        QuadNative.surfaceOnSurfaceCreated(surface);
+        QuadNative.surfaceOnSurfaceCreated(getNativeSurface());
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        Log.i("SAPP", "surfaceDestroyed");
-        Surface surface = holder.getSurface();
-        QuadNative.surfaceOnSurfaceDestroyed(surface);
+        QuadNative.surfaceOnSurfaceDestroyed(getNativeSurface());
     }
 
     @Override
-    public void surfaceChanged(SurfaceHolder holder,
-                               int format,
-                               int width,
-                               int height) {
-        Log.i("SAPP", "surfaceChanged");
-        Surface surface = holder.getSurface();
-        QuadNative.surfaceOnSurfaceChanged(surface, width, height);
-
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        QuadNative.surfaceOnSurfaceChanged(getNativeSurface(), width, height);
     }
+
+    private float mDownX = 0;
+    private float mDownY = 0;
+    private boolean mIsLongPress = false;
+    private Runnable mLongPressRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (MainActivity.sFocusedElementId != 0 && MainActivity.sFocusedElementId != -1 && MainActivity.sHiddenEditText != null) {
+                mIsLongPress = true;
+                final float x = mDownX;
+                final float y = mDownY;
+                MainActivity.sHiddenEditText.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (MainActivity.sHiddenEditText != null) {
+                            MainActivity.sHiddenEditText.requestFocus();
+                            if (android.os.Build.VERSION.SDK_INT >= 24) {
+                                MainActivity.sHiddenEditText.showContextMenu(x, y);
+                            } else {
+                                MainActivity.sHiddenEditText.showContextMenu();
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    };
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         int pointerCount = event.getPointerCount();
-        int action = event.getActionMasked();
 
-        switch(action) {
+        int action = event.getActionMasked();
+        switch (action) {
+        case MotionEvent.ACTION_DOWN:
+        case MotionEvent.ACTION_POINTER_DOWN: {
+            int pointerIndex = event.getActionIndex();
+            int id = event.getPointerId(pointerIndex);
+            final float x = event.getX(pointerIndex);
+            final float y = event.getY(pointerIndex);
+            mDownX = x;
+            mDownY = y;
+            mIsLongPress = false;
+            if (getHandler() != null) {
+                getHandler().removeCallbacks(mLongPressRunnable);
+                getHandler().postDelayed(mLongPressRunnable, 500);
+            }
+            QuadNative.surfaceOnTouch(id, 0, x, y);
+
+            break;
+        }
         case MotionEvent.ACTION_MOVE: {
             for (int i = 0; i < pointerCount; i++) {
                 final int id = event.getPointerId(i);
                 final float x = event.getX(i);
                 final float y = event.getY(i);
-                QuadNative.surfaceOnTouch(id, 0, x, y);
+                if (Math.hypot(x - mDownX, y - mDownY) > 25 && getHandler() != null) {
+                    getHandler().removeCallbacks(mLongPressRunnable);
+                }
+                QuadNative.surfaceOnTouch(id, 1, x, y);
             }
             break;
         }
-        case MotionEvent.ACTION_UP: {
-            final int id = event.getPointerId(0);
-            final float x = event.getX(0);
-            final float y = event.getY(0);
-            QuadNative.surfaceOnTouch(id, 1, x, y);
-            break;
-        }
-        case MotionEvent.ACTION_DOWN: {
-            final int id = event.getPointerId(0);
-            final float x = event.getX(0);
-            final float y = event.getY(0);
-            QuadNative.surfaceOnTouch(id, 2, x, y);
-            break;
-        }
+        case MotionEvent.ACTION_UP:
         case MotionEvent.ACTION_POINTER_UP: {
-            final int pointerIndex = event.getActionIndex();
-            final int id = event.getPointerId(pointerIndex);
+            if (getHandler() != null) {
+                getHandler().removeCallbacks(mLongPressRunnable);
+            }
+            int pointerIndex = event.getActionIndex();
+            int id = event.getPointerId(pointerIndex);
             final float x = event.getX(pointerIndex);
             final float y = event.getY(pointerIndex);
-            QuadNative.surfaceOnTouch(id, 1, x, y);
-            break;
-        }
-        case MotionEvent.ACTION_POINTER_DOWN: {
-            final int pointerIndex = event.getActionIndex();
-            final int id = event.getPointerId(pointerIndex);
-            final float x = event.getX(pointerIndex);
-            final float y = event.getY(pointerIndex);
-            QuadNative.surfaceOnTouch(id, 2, x, y);
+            if (!mIsLongPress && MainActivity.sHiddenEditText != null && MainActivity.sFocusedElementId != 0 && MainActivity.sFocusedElementId != -1) {
+                InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.viewClicked(MainActivity.sHiddenEditText);
+                }
+            }
+            int phase = mIsLongPress ? 3 : 2;
+            QuadNative.surfaceOnTouch(id, phase, x, y);
             break;
         }
         case MotionEvent.ACTION_CANCEL: {
+            if (getHandler() != null) {
+                getHandler().removeCallbacks(mLongPressRunnable);
+            }
             for (int i = 0; i < pointerCount; i++) {
                 final int id = event.getPointerId(i);
                 final float x = event.getX(i);
@@ -144,12 +302,13 @@ class QuadSurface
         return true;
     }
 
-    // docs says getCharacters are deprecated
-    // but somehow on non-latyn input all keyCode and all the relevant fields in the KeyEvent are zeros
-    // and only getCharacters has some usefull data
     @SuppressWarnings("deprecation")
     @Override
     public boolean onKey(View v, int keyCode, KeyEvent event) {
+        if (MainActivity.sFocusedElementId != -1 && MainActivity.sFocusedElementId != 0) {
+            return false;
+        }
+
         if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode != 0) {
             QuadNative.surfaceOnKeyDown(keyCode);
         }
@@ -175,18 +334,12 @@ class QuadSurface
         return true;
     }
 
-    // There is an Android bug when screen is in landscape,
-    // the keyboard inset height is reported as 0.
-    // This code is a workaround which fixes the bug.
-    // See https://groups.google.com/g/android-developers/c/50XcWooqk7I
-    // For some reason it only works if placed here and not in the parent layout.
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
-        //% QUAD_SURFACE_ON_CREATE_INPUT_CONNECTION
-
-        InputConnection connection = super.onCreateInputConnection(outAttrs);
-        outAttrs.imeOptions |= EditorInfo.IME_FLAG_NO_FULLSCREEN;
-        return connection;
+        if (MainActivity.sHiddenEditText != null && MainActivity.sFocusedElementId != -1 && MainActivity.sFocusedElementId != 0) {
+            return MainActivity.sHiddenEditText.onCreateInputConnection(outAttrs);
+        }
+        return null;
     }
 
     public Surface getNativeSurface() {
@@ -196,15 +349,13 @@ class QuadSurface
 
 class ResizingLayout
     extends
-        LinearLayout
+        FrameLayout
     implements
         View.OnApplyWindowInsetsListener {
     //% RESIZING_LAYOUT_BODY
 
     public ResizingLayout(MainActivity activity){
         super(activity);
-        // When viewing in landscape mode with keyboard shown, there are
-        // gaps on both sides so we fill the negative space with black.
         setBackgroundColor(Color.BLACK);
         setOnApplyWindowInsetsListener(this);
 
@@ -213,31 +364,15 @@ class ResizingLayout
 
     @Override
     public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
-        // This handler provides a default impl which resizes content when the
-        // IME is shown or hidden.
-        //
-        // However this will lead to flickers in your app as the content is
-        // resized before you have a chance to redraw it.
-        //
-        // The workaround for now is:
-        // * Get IME and system insets and send them to your app.
-        // * Notify your app to draw and apply the insets to fit.
-        // * Disable this function by returning early.
-
-        //% RESIZING_LAYOUT_ON_APPLY_WINDOW_INSETS
-
         if (Build.VERSION.SDK_INT >= 30) {
             Insets imeInsets = insets.getInsets(WindowInsets.Type.ime());
             Insets sysInsets = insets.getInsets(WindowInsets.Type.systemBars());
 
-            // When IME is visible then we dont need bottom inset
             int bottomPadding = sysInsets.bottom;
             if (imeInsets.bottom > 0) {
                 bottomPadding = imeInsets.bottom;
             }
 
-            // The sys insets change when orientation changes and sys bars
-            // change position.
             v.setPadding(
                 sysInsets.left,
                 sysInsets.top,
@@ -254,20 +389,127 @@ public class MainActivity extends Activity {
 
     private QuadSurface view;
 
+    public static MainActivity sInstance = null;
+    public static HiddenEditText sHiddenEditText = null;
+    public static String sTextInputText = "";
+    public static int sTextInputSelectionStart = 0;
+    public static int sTextInputSelectionEnd = 0;
+    public static boolean sTextInputIsPassword = false;
+    public static boolean sTextInputIsMultiline = false;
+    public static long sFocusedElementId = -1;
+
+    public static String getClipboardTextStatic() {
+        if (sInstance != null) {
+            return sInstance.getClipboardText();
+        }
+        return null;
+    }
+
+    public static void setClipboardTextStatic(String text) {
+        if (sInstance != null) {
+            sInstance.setClipboardText(text);
+        }
+    }
+
+    public void updateTextInputState(final String text, final int selectionStart, final int selectionEnd, final boolean isPassword, final boolean isMultiline, final long elementId, final int maxLength) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (sHiddenEditText == null) return;
+
+                sHiddenEditText.setIgnoreUpdates(true);
+                try {
+                    boolean focusChanged = (sFocusedElementId != elementId);
+                    boolean paramsChanged = (sTextInputIsPassword != isPassword) || (sTextInputIsMultiline != isMultiline);
+
+                    sTextInputText = text != null ? text : "";
+                    sTextInputSelectionStart = selectionStart;
+                    sTextInputSelectionEnd = selectionEnd;
+                    sTextInputIsPassword = isPassword;
+                    sTextInputIsMultiline = isMultiline;
+                    sFocusedElementId = elementId;
+
+                    if (maxLength > 0) {
+                        sHiddenEditText.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(maxLength) });
+                    } else {
+                        sHiddenEditText.setFilters(new android.text.InputFilter[0]);
+                    }
+
+                    int inputType = EditorInfo.TYPE_CLASS_TEXT;
+                    int imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN;
+                    if (isPassword) {
+                        inputType |= EditorInfo.TYPE_TEXT_VARIATION_PASSWORD;
+                        imeOptions |= EditorInfo.IME_ACTION_DONE;
+                    } else if (isMultiline) {
+                        inputType |= EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE;
+                        imeOptions |= EditorInfo.IME_ACTION_NONE;
+                    } else {
+                        imeOptions |= EditorInfo.IME_ACTION_DONE;
+                    }
+
+                    sHiddenEditText.setInputType(inputType);
+                    sHiddenEditText.setImeOptions(imeOptions);
+
+                    Editable editable = sHiddenEditText.getText();
+                    String currentText = editable != null ? editable.toString() : "";
+                    boolean textChanged = !currentText.equals(sTextInputText);
+                    if (textChanged) {
+                        if (editable != null) {
+                            int compStart = android.view.inputmethod.BaseInputConnection.getComposingSpanStart(editable);
+                            int compEnd = android.view.inputmethod.BaseInputConnection.getComposingSpanEnd(editable);
+                            if (compStart != -1 || compEnd != -1) {
+                                android.view.inputmethod.BaseInputConnection.removeComposingSpans(editable);
+                            }
+                        }
+                        sHiddenEditText.setText(sTextInputText);
+                    }
+
+                    int len = sHiddenEditText.getText().length();
+                    int start = Math.max(0, Math.min(len, sTextInputSelectionStart));
+                    int end = Math.max(0, Math.min(len, sTextInputSelectionEnd));
+
+                    sHiddenEditText.setSelection(start, end);
+
+                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    if (elementId != 0 && elementId != -1) {
+                        sHiddenEditText.requestFocus();
+                        if (imm != null) {
+                            if (focusChanged || paramsChanged) {
+                                imm.restartInput(sHiddenEditText);
+                            }
+                            imm.showSoftInput(sHiddenEditText, InputMethodManager.SHOW_IMPLICIT);
+                            imm.updateSelection(sHiddenEditText, start, end, -1, -1);
+                        }
+                    } else {
+                        sHiddenEditText.clearFocus();
+                        if (imm != null) {
+                            imm.hideSoftInputFromWindow(sHiddenEditText.getWindowToken(), 0);
+                        }
+                    }
+                } finally {
+                    sHiddenEditText.setIgnoreUpdates(false);
+                }
+            }
+        });
+    }
+
     static {
         System.loadLibrary("LIBRARY_NAME");
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        sInstance = this;
         super.onCreate(savedInstanceState);
 
         this.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
         view = new QuadSurface(this);
-        // Put it inside a parent layout which can resize it using padding
+        sHiddenEditText = new HiddenEditText(this);
+
         ResizingLayout layout = new ResizingLayout(this);
         layout.addView(view);
+        layout.addView(sHiddenEditText);
         setContentView(layout);
 
         QuadNative.activityOnCreate(this);
@@ -351,12 +593,16 @@ public class MainActivity extends Activity {
         runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
+                    if (sHiddenEditText == null) return;
+                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    if (imm == null) return;
+
                     if (show) {
-                        InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                        imm.showSoftInput(view, 0);
+                        sHiddenEditText.requestFocus();
+                        imm.showSoftInput(sHiddenEditText, InputMethodManager.SHOW_IMPLICIT);
                     } else {
-                        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                        imm.hideSoftInputFromWindow(view.getWindowToken(),0);
+                        sHiddenEditText.clearFocus();
+                        imm.hideSoftInputFromWindow(sHiddenEditText.getWindowToken(), 0);
                     }
                 }
             });

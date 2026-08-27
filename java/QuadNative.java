@@ -21,4 +21,8 @@ public class QuadNative {
     public native static void surfaceOnKeyDown(int keycode);
     public native static void surfaceOnKeyUp(int keycode);
     public native static void surfaceOnCharacter(int character);
+    public native static void surfaceOnImePreedit(String text);
+    public native static void surfaceOnImeCommit(String text);
+    public native static void surfaceOnImeStateChanged(String text, int selectionStart, int selectionEnd, int composingStart, int composingEnd, long elementId);
+    public native static void surfaceOnImeAction(int actionCode);
 }

@@ -139,6 +139,20 @@ extern "C" {
     pub fn sapp_schedule_update();
     pub fn init_webgl(version: i32);
     pub fn now() -> f64;
+
+    pub fn sapp_show_keyboard(show: bool);
+    pub fn sapp_update_text_input_state(
+        text_ptr: *const u8,
+        text_len: usize,
+        sel_start: usize,
+        sel_end: usize,
+        is_password: bool,
+        is_multiline: bool,
+        element_id: u64,
+        max_length: usize,
+    );
+    pub fn sapp_set_ime_position(x: i32, y: i32);
+    pub fn sapp_set_ime_enabled(enabled: bool);
 }
 
 unsafe fn show_mouse(shown: bool) {
@@ -232,6 +246,35 @@ pub extern "C" fn frame() {
                 Request::SetFullscreen(fullscreen) => unsafe {
                     sapp_set_fullscreen(fullscreen);
                 },
+                Request::ShowKeyboard(show) => unsafe {
+                    sapp_show_keyboard(show);
+                },
+                Request::UpdateTextInputState {
+                    text,
+                    selection_start,
+                    selection_end,
+                    is_password,
+                    is_multiline,
+                    element_id,
+                    max_length,
+                } => unsafe {
+                    sapp_update_text_input_state(
+                        text.as_ptr(),
+                        text.len(),
+                        selection_start,
+                        selection_end,
+                        is_password,
+                        is_multiline,
+                        element_id,
+                        max_length,
+                    );
+                },
+                Request::SetImePosition { x, y } => unsafe {
+                    sapp_set_ime_position(x, y);
+                },
+                Request::SetImeEnabled(enabled) => unsafe {
+                    sapp_set_ime_enabled(enabled);
+                },
                 _ => {}
             }
         }
@@ -239,6 +282,51 @@ pub extern "C" fn frame() {
     tl_event_handler(|event_handler| {
         event_handler.update();
         event_handler.draw();
+    });
+}
+
+#[no_mangle]
+pub extern "C" fn on_ime_state_changed(
+    text_ptr: *mut u8,
+    text_len: usize,
+    sel_start: usize,
+    sel_end: usize,
+    comp_start: i32,
+    comp_end: i32,
+    element_id: u64,
+) {
+    let text = unsafe { String::from_raw_parts(text_ptr, text_len, text_len) };
+    let composing_start = if comp_start >= 0 { Some(comp_start as usize) } else { None };
+    let composing_end = if comp_end >= 0 { Some(comp_end as usize) } else { None };
+    tl_event_handler(|event_handler| {
+        event_handler.on_ime_state_changed(
+            &text,
+            sel_start,
+            sel_end,
+            composing_start,
+            composing_end,
+            element_id,
+        );
+    });
+}
+
+#[no_mangle]
+pub extern "C" fn on_ime_preedit(text_ptr: *mut u8, text_len: usize) {
+    let text = unsafe { String::from_raw_parts(text_ptr, text_len, text_len) };
+    tl_event_handler(|event_handler| {
+        event_handler.on_ime_preedit(&text);
+    });
+}
+
+#[no_mangle]
+pub extern "C" fn on_ime_commit(text_ptr: *mut u8, text_len: usize) {
+    let text = if text_ptr.is_null() || text_len == 0 {
+        None
+    } else {
+        Some(unsafe { String::from_raw_parts(text_ptr, text_len, text_len) })
+    };
+    tl_event_handler(|event_handler| {
+        event_handler.on_ime_commit(text.as_deref());
     });
 }
 

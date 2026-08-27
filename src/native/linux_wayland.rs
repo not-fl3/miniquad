@@ -49,6 +49,10 @@ struct WaylandPayload {
     data_device: *mut wl_data_device,
     xkb_context: *mut xkb_context,
     xkb_state: *mut xkb_state,
+    xkb_compose_table: *mut xkb_compose_table,
+    xkb_compose_state: *mut xkb_compose_state,
+    compose_preediting: bool,
+    external_ime_active: bool,
     keymap: XkbKeymap,
 
     egl_window: *mut wl_egl_window,
@@ -60,13 +64,129 @@ struct WaylandPayload {
     decoration_manager: *mut extensions::xdg_decoration::zxdg_decoration_manager_v1,
     decorations: decorations::Decorations,
 
+    text_input_manager: *mut extensions::text_input::zwp_text_input_manager_v3,
+    text_input: *mut extensions::text_input::zwp_text_input_v3,
+
     events: Vec<WaylandEvent>,
     keyboard_context: KeyboardContext,
     drag_n_drop: drag_n_drop::WaylandDnD,
     update_requested: bool,
 }
 
+fn dead_keysym_to_char(keysym: u32) -> Option<char> {
+    match keysym {
+        0xfe50 => Some('`'),
+        0xfe51 => Some('´'),
+        0xfe52 => Some('^'),
+        0xfe53 => Some('~'),
+        0xfe54 => Some('¯'),
+        0xfe55 => Some('˘'),
+        0xfe56 => Some('˙'),
+        0xfe57 => Some('¨'),
+        0xfe58 => Some('˚'),
+        0xfe59 => Some('˝'),
+        0xfe5a => Some('ˇ'),
+        0xfe5b => Some('¸'),
+        0xfe5c => Some('˛'),
+        _ => None,
+    }
+}
+
 impl WaylandPayload {
+    unsafe fn process_key_event(
+        &mut self,
+        key: core::ffi::c_uint,
+        repeat: bool,
+    ) {
+        let libxkb = &mut self.xkb;
+        let keymap = &self.keymap;
+        let xkb_state = self.xkb_state;
+        let keymods = keymap.get_keymods(libxkb, xkb_state);
+
+        let keysym_raw = libxkb.keymap_key_get_sym_without_mod(keymap.xkb_keymap, key + 8);
+        let keycode = keycodes::translate_keysym(keysym_raw);
+        self.events.push(WaylandEvent::KeyDown(keycode, keymods, repeat));
+
+        if self.external_ime_active {
+            return;
+        }
+
+        let keysym = (libxkb.xkb_state_key_get_one_sym)(xkb_state, key + 8);
+
+        let compose_state = self.xkb_compose_state;
+        if !compose_state.is_null() {
+            (libxkb.xkb_compose_state_feed)(compose_state, keysym);
+            let status = (libxkb.xkb_compose_state_get_status)(compose_state);
+            match status {
+                XKB_COMPOSE_COMPOSING => {
+                    let mut buf = [0u8; 64];
+                    let len = (libxkb.xkb_compose_state_get_utf8)(
+                        compose_state,
+                        buf.as_mut_ptr() as *mut _,
+                        buf.len(),
+                    );
+                    let preedit_str = if len > 0 {
+                        std::str::from_utf8(&buf[..len as usize]).unwrap_or("").to_string()
+                    } else if let Some(c) = dead_keysym_to_char(keysym) {
+                        c.to_string()
+                    } else {
+                        let chr = (libxkb.xkb_keysym_to_utf32)(keysym);
+                        if chr > 0 && chr < 0xFE00 {
+                            char::from_u32(chr).map(|c| c.to_string()).unwrap_or_default()
+                        } else {
+                            String::new()
+                        }
+                    };
+                    self.compose_preediting = true;
+                    self.events.push(WaylandEvent::ImePreedit(preedit_str));
+                    return;
+                }
+                XKB_COMPOSE_COMPOSED => {
+                    let mut buf = [0u8; 64];
+                    let len = (libxkb.xkb_compose_state_get_utf8)(
+                        compose_state,
+                        buf.as_mut_ptr() as *mut _,
+                        buf.len(),
+                    );
+                    if self.compose_preediting {
+                        self.compose_preediting = false;
+                        self.events.push(WaylandEvent::ImePreedit(String::new()));
+                    }
+                    (libxkb.xkb_compose_state_reset)(compose_state);
+
+                    if len > 0 {
+                        if let Ok(composed_str) = std::str::from_utf8(&buf[..len as usize]) {
+                            for ch in composed_str.chars() {
+                                self.events.push(WaylandEvent::Char(ch, keymods, repeat));
+                            }
+                            return;
+                        }
+                    }
+                }
+                XKB_COMPOSE_CANCELLED => {
+                    if self.compose_preediting {
+                        self.compose_preediting = false;
+                        self.events.push(WaylandEvent::ImePreedit(String::new()));
+                    }
+                    (libxkb.xkb_compose_state_reset)(compose_state);
+                }
+                XKB_COMPOSE_NOTHING => {
+                    if self.compose_preediting {
+                        self.compose_preediting = false;
+                        self.events.push(WaylandEvent::ImePreedit(String::new()));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let chr = (libxkb.xkb_keysym_to_utf32)(keysym);
+        if chr > 0 {
+            if let Some(chr) = char::from_u32(chr) {
+                self.events.push(WaylandEvent::Char(chr, keymods, repeat));
+            }
+        }
+    }
     /// Poll new events, `blocking` specifies whether it should block until a new event is
     /// available
     // needs to combine both the Wayland events and the key repeat events
@@ -87,6 +207,7 @@ impl WaylandPayload {
         (self.client.wl_display_flush)(self.display);
         while (self.client.wl_display_prepare_read)(self.display) != 0 {
             (self.client.wl_display_dispatch_pending)(self.display);
+            (self.client.wl_display_flush)(self.display);
         }
         if libc::poll(fds.as_mut_ptr(), 2, if blocking { i32::MAX } else { 0 }) > 0 {
             // if the Wayland display has events available
@@ -109,12 +230,9 @@ impl WaylandPayload {
                     n_bits as _
                 );
                 for _ in 0..count[0] {
-                    self.keyboard_context.generate_key_repeat_events(
-                        &mut self.xkb,
-                        &self.keymap,
-                        self.xkb_state,
-                        &mut self.events,
-                    );
+                    if let Some(key) = self.keyboard_context.repeated_key {
+                        self.process_key_event(key, true);
+                    }
                 }
             }
         } else {
@@ -182,6 +300,34 @@ impl WaylandPayload {
             eprintln!("Wayland compositor does not support cursor shape");
         }
     }
+    unsafe fn init_text_input(&mut self) {
+        if self.text_input_manager.is_null() || self.seat.is_null() {
+            return;
+        }
+        self.text_input = wl_request_constructor!(
+            self.client,
+            self.text_input_manager,
+            extensions::text_input::zwp_text_input_manager_v3::get_text_input,
+            &extensions::text_input::zwp_text_input_v3_interface,
+            self.seat
+        ) as *mut extensions::text_input::zwp_text_input_v3;
+        if self.text_input.is_null() {
+            eprintln!("Failed to create zwp_text_input_v3");
+            return;
+        }
+        TEXT_INPUT_LISTENER.enter = text_input_handle_enter;
+        TEXT_INPUT_LISTENER.leave = text_input_handle_leave;
+        TEXT_INPUT_LISTENER.preedit_string = text_input_handle_preedit_string;
+        TEXT_INPUT_LISTENER.commit_string = text_input_handle_commit_string;
+        TEXT_INPUT_LISTENER.delete_surrounding_text = text_input_handle_delete_surrounding_text;
+        TEXT_INPUT_LISTENER.done = text_input_handle_done;
+        (self.client.wl_proxy_add_listener)(
+            self.text_input as _,
+            &TEXT_INPUT_LISTENER as *const _ as _,
+            self as *mut _ as _,
+        );
+    }
+
     unsafe fn set_fullscreen(&mut self, full: bool) {
         if full {
             wl_request!(
@@ -460,6 +606,8 @@ static mut XDG_WM_BASE_LISTENER: extensions::xdg_shell::xdg_wm_base_listener =
     extensions::xdg_shell::xdg_wm_base_listener::dummy();
 static mut RELATIVE_POINTER_LISTENER: extensions::cursor::zwp_relative_pointer_v1_listener =
     extensions::cursor::zwp_relative_pointer_v1_listener::dummy();
+static mut TEXT_INPUT_LISTENER: extensions::text_input::zwp_text_input_v3_listener =
+    extensions::text_input::zwp_text_input_v3_listener::dummy();
 
 unsafe extern "C" fn seat_handle_capabilities(
     data: *mut std::ffi::c_void,
@@ -542,6 +690,9 @@ enum WaylandEvent {
     Resize(f32, f32),
     WindowMinimized,
     WindowRestored,
+    FrameCompleted,
+    ImePreedit(String),
+    ImeCommit(Option<String>),
 }
 
 unsafe extern "C" fn keyboard_handle_keymap(
@@ -573,6 +724,9 @@ unsafe extern "C" fn keyboard_handle_keymap(
     display.keymap.cache_mod_indices(&mut display.xkb);
     (display.xkb.xkb_state_unref)(display.xkb_state);
     display.xkb_state = (display.xkb.xkb_state_new)(display.keymap.xkb_keymap);
+    if !display.xkb_compose_state.is_null() {
+        (display.xkb.xkb_compose_state_reset)(display.xkb_compose_state);
+    }
 }
 unsafe extern "C" fn keyboard_handle_enter(
     data: *mut ::core::ffi::c_void,
@@ -597,6 +751,13 @@ unsafe extern "C" fn keyboard_handle_leave(
     (display.xkb.xkb_state_update_mask)(display.xkb_state, 0, 0, 0, 0, 0, 0);
     display.keyboard_context.repeated_key = None;
     display.keyboard_context.enter_serial = None;
+    if display.compose_preediting {
+        display.compose_preediting = false;
+        display.events.push(WaylandEvent::ImePreedit(String::new()));
+    }
+    if !display.xkb_compose_state.is_null() {
+        (display.xkb.xkb_compose_state_reset)(display.xkb_compose_state);
+    }
     display.events.push(WaylandEvent::WindowMinimized);
 }
 unsafe extern "C" fn keyboard_handle_key(
@@ -627,14 +788,7 @@ unsafe extern "C" fn keyboard_handle_key(
             if !repeat && should_repeat {
                 display.keyboard_context.track_key_down(key);
             }
-            display.keyboard_context.generate_key_events(
-                libxkb,
-                &display.keymap,
-                xkb_state,
-                key,
-                repeat,
-                &mut display.events,
-            );
+            display.process_key_event(key, repeat);
         }
         _ => {
             eprintln!("Unknown wl_keyboard::key_state");
@@ -873,6 +1027,85 @@ unsafe extern "C" fn touch_handle_cancel(data: *mut std::ffi::c_void, _touch: *m
     }
 }
 
+unsafe extern "C" fn text_input_handle_enter(
+    _data: *mut core::ffi::c_void,
+    _text_input: *mut extensions::text_input::zwp_text_input_v3,
+    _surface: *mut wl_surface,
+) {
+    // IME focus entered
+}
+
+unsafe extern "C" fn text_input_handle_leave(
+    _data: *mut core::ffi::c_void,
+    _text_input: *mut extensions::text_input::zwp_text_input_v3,
+    _surface: *mut wl_surface,
+) {
+    // IME focus left
+}
+
+unsafe extern "C" fn text_input_handle_preedit_string(
+    data: *mut core::ffi::c_void,
+    _text_input: *mut extensions::text_input::zwp_text_input_v3,
+    text: *const core::ffi::c_char,
+    _cursor_begin: core::ffi::c_int,
+    _cursor_end: core::ffi::c_int,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    display.external_ime_active = true;
+    let preedit = if text.is_null() {
+        String::new()
+    } else {
+        core::ffi::CStr::from_ptr(text)
+            .to_str()
+            .unwrap_or("")
+            .to_string()
+    };
+    display.events.push(WaylandEvent::ImePreedit(preedit));
+}
+
+unsafe extern "C" fn text_input_handle_commit_string(
+    data: *mut core::ffi::c_void,
+    _text_input: *mut extensions::text_input::zwp_text_input_v3,
+    text: *const core::ffi::c_char,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    display.external_ime_active = true;
+    let commit = if text.is_null() {
+        None
+    } else {
+        let s = core::ffi::CStr::from_ptr(text)
+            .to_str()
+            .unwrap_or("")
+            .to_string();
+        if s.is_empty() { None } else { Some(s) }
+    };
+    display.events.push(WaylandEvent::ImeCommit(commit));
+}
+
+unsafe extern "C" fn text_input_handle_delete_surrounding_text(
+    _data: *mut core::ffi::c_void,
+    _text_input: *mut extensions::text_input::zwp_text_input_v3,
+    _before_length: core::ffi::c_uint,
+    _after_length: core::ffi::c_uint,
+) {
+    // We don't track surrounding text
+}
+
+unsafe extern "C" fn text_input_handle_done(
+    data: *mut core::ffi::c_void,
+    _text_input: *mut extensions::text_input::zwp_text_input_v3,
+    _serial: core::ffi::c_uint,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    if !display.text_input.is_null() {
+        wl_request!(
+            display.client,
+            display.text_input,
+            extensions::text_input::zwp_text_input_v3::commit
+        );
+    }
+}
+
 unsafe extern "C" fn registry_add_object(
     data: *mut std::ffi::c_void,
     registry: *mut wl_registry,
@@ -1011,6 +1244,14 @@ unsafe extern "C" fn registry_add_object(
             ) as _;
             assert!(!display.data_device_manager.is_null());
         }
+        "zwp_text_input_manager_v3" => {
+            display.text_input_manager = display.client.wl_registry_bind(
+                registry,
+                name,
+                &extensions::text_input::zwp_text_input_manager_v3_interface,
+                1.min(version),
+            ) as _;
+        }
 
         _ => {}
     }
@@ -1072,6 +1313,28 @@ where
 
         let xkb_context = (xkb.xkb_context_new)(0);
 
+        let locale = std::env::var("LC_ALL")
+            .or_else(|_| std::env::var("LC_CTYPE"))
+            .or_else(|_| std::env::var("LANG"))
+            .unwrap_or_else(|_| "C".to_string());
+        let locale_c = std::ffi::CString::new(locale).unwrap_or_else(|_| std::ffi::CString::new("C").unwrap());
+
+        let xkb_compose_table = if !xkb_context.is_null() {
+            (xkb.xkb_compose_table_new_from_locale)(
+                xkb_context,
+                locale_c.as_ptr(),
+                XKB_COMPOSE_COMPILE_NO_FLAGS,
+            )
+        } else {
+            std::ptr::null_mut()
+        };
+
+        let xkb_compose_state = if !xkb_compose_table.is_null() {
+            (xkb.xkb_compose_state_new)(xkb_compose_table, XKB_COMPOSE_STATE_NO_FLAGS)
+        } else {
+            std::ptr::null_mut()
+        };
+
         let mut display = WaylandPayload {
             client,
             display: wdisplay,
@@ -1091,6 +1354,10 @@ where
             xkb_context,
             keymap: Default::default(),
             xkb_state: std::ptr::null_mut(),
+            xkb_compose_table,
+            xkb_compose_state,
+            compose_preediting: false,
+            external_ime_active: false,
             egl_window: std::ptr::null_mut(),
             keyboard: std::ptr::null_mut(),
             touch: std::ptr::null_mut(),
@@ -1098,6 +1365,8 @@ where
             focused_window: std::ptr::null_mut(),
             decoration_manager: std::ptr::null_mut(),
             decorations: decorations::Decorations::None,
+            text_input_manager: std::ptr::null_mut(),
+            text_input: std::ptr::null_mut(),
             events: Vec::new(),
             pointer_context: PointerContext::new(),
             keyboard_context: KeyboardContext::new(),
@@ -1127,6 +1396,7 @@ where
 
         display.init_data_device();
         display.init_pointer_context();
+        display.init_text_input();
 
         let mut libegl = egl::LibEgl::try_load().ok()?;
         let (context, config, egl_display) = egl::create_egl_context(
@@ -1246,6 +1516,49 @@ where
                             .pointer_context
                             .set_cursor(&mut display.client, cursor_visible.then_some(cursor_icon));
                     }
+                    Request::SetImeEnabled(enabled) => {
+                        if !enabled {
+                            display.external_ime_active = false;
+                        }
+                        if !display.text_input.is_null() {
+                            if enabled {
+                                wl_request!(
+                                    display.client,
+                                    display.text_input,
+                                    extensions::text_input::zwp_text_input_v3::enable
+                                );
+                            } else {
+                                wl_request!(
+                                    display.client,
+                                    display.text_input,
+                                    extensions::text_input::zwp_text_input_v3::disable
+                                );
+                            }
+                            wl_request!(
+                                display.client,
+                                display.text_input,
+                                extensions::text_input::zwp_text_input_v3::commit
+                            );
+                        }
+                    }
+                    Request::SetImePosition { x, y } => {
+                        if !display.text_input.is_null() {
+                            wl_request!(
+                                display.client,
+                                display.text_input,
+                                extensions::text_input::zwp_text_input_v3::set_cursor_rectangle,
+                                x,
+                                y,
+                                0,
+                                0
+                            );
+                            wl_request!(
+                                display.client,
+                                display.text_input,
+                                extensions::text_input::zwp_text_input_v3::commit
+                            );
+                        }
+                    }
                     // TODO: implement the other events
                     _ => (),
                 }
@@ -1290,6 +1603,17 @@ where
                     }
                     WaylandEvent::WindowMinimized => event_handler.window_minimized_event(),
                     WaylandEvent::WindowRestored => event_handler.window_restored_event(),
+                    WaylandEvent::FrameCompleted => {
+                        if !conf.platform.blocking_event_loop {
+                            display.update_requested = true;
+                        }
+                    }
+                    WaylandEvent::ImePreedit(text) => {
+                        event_handler.on_ime_preedit(&text);
+                    }
+                    WaylandEvent::ImeCommit(text) => {
+                        event_handler.on_ime_commit(text.as_deref());
+                    }
                     WaylandEvent::FilesDropped(filenames) => {
                         let mut d = crate::native_display().try_lock().unwrap();
                         d.dropped_files = Default::default();
