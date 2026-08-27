@@ -61,14 +61,14 @@ pub enum LinuxX11Gl {
 /// Defaults to `X11Only`. The Wayland implementation is currently unstable
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum LinuxBackend {
-    /// Use only the X11 backend. Panics if unavailable. This is the default choice.
-    #[default]
+    /// Use only the X11 backend. Panics if unavailable.
     X11Only,
     /// Use only the Wayland backend. Panics if unavailable.
     WaylandOnly,
     /// Prefer X11, fall back to Wayland if X11 is unavailable.
     X11WithWaylandFallback,
-    /// Prefer Wayland, fall back to X11 if Wayland is unavailable.
+    /// Prefer Wayland, fall back to X11 if Wayland is unavailable. This is the default choice.
+    #[default]
     WaylandWithX11Fallback,
 }
 

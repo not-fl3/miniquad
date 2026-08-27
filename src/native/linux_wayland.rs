@@ -64,6 +64,9 @@ struct WaylandPayload {
     keyboard_context: KeyboardContext,
     drag_n_drop: drag_n_drop::WaylandDnD,
     update_requested: bool,
+    frame_callback: *mut wl_callback,
+    background_timerfd: core::ffi::c_int,
+    blocking_event_loop: bool,
 }
 
 impl WaylandPayload {
@@ -83,12 +86,17 @@ impl WaylandPayload {
                 events: libc::POLLIN,
                 revents: 0,
             },
+            libc::pollfd {
+                fd: self.background_timerfd,
+                events: libc::POLLIN,
+                revents: 0,
+            },
         ];
         (self.client.wl_display_flush)(self.display);
         while (self.client.wl_display_prepare_read)(self.display) != 0 {
             (self.client.wl_display_dispatch_pending)(self.display);
         }
-        if libc::poll(fds.as_mut_ptr(), 2, if blocking { i32::MAX } else { 0 }) > 0 {
+        if libc::poll(fds.as_mut_ptr(), 3, if blocking { i32::MAX } else { 0 }) > 0 {
             // if the Wayland display has events available
             if fds[0].revents & libc::POLLIN == 1 {
                 (self.client.wl_display_read_events)(self.display);
@@ -115,6 +123,18 @@ impl WaylandPayload {
                         self.xkb_state,
                         &mut self.events,
                     );
+                }
+            }
+            if fds[2].revents & libc::POLLIN == 1 {
+                let mut count: [libc::size_t; 1] = [0];
+                let n_bits = core::mem::size_of::<libc::size_t>();
+                let _ = libc::read(
+                    self.background_timerfd,
+                    count.as_mut_ptr() as _,
+                    n_bits,
+                );
+                if !self.blocking_event_loop {
+                    self.update_requested = true;
                 }
             }
         } else {
@@ -237,6 +257,19 @@ fn new_itimerspec() -> libc::itimerspec {
             tv_sec: 0,
             tv_nsec: 0,
         },
+    }
+}
+
+fn new_timerfd(interval: Duration) -> core::ffi::c_int {
+    unsafe {
+        let fd = libc::timerfd_create(libc::CLOCK_MONOTONIC, libc::TFD_CLOEXEC);
+        let mut timer = new_itimerspec();
+        timer.it_interval.tv_sec = interval.as_secs() as _;
+        timer.it_interval.tv_nsec = interval.subsec_nanos() as _;
+        timer.it_value.tv_sec = interval.as_secs() as _;
+        timer.it_value.tv_nsec = interval.subsec_nanos() as _;
+        libc::timerfd_settime(fd, 0, &timer, core::ptr::null_mut());
+        fd
     }
 }
 
@@ -542,7 +575,23 @@ enum WaylandEvent {
     Resize(f32, f32),
     WindowMinimized,
     WindowRestored,
+    FrameCompleted,
 }
+
+unsafe extern "C" fn frame_handle_done(
+    data: *mut ::core::ffi::c_void,
+    callback: *mut wl_callback,
+    _time: u32,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    (display.client.wl_proxy_destroy)(callback as _);
+    display.frame_callback = std::ptr::null_mut();
+    display.events.push(WaylandEvent::FrameCompleted);
+}
+
+static mut FRAME_LISTENER: wl_callback_listener = wl_callback_listener {
+    done: frame_handle_done,
+};
 
 unsafe extern "C" fn keyboard_handle_keymap(
     data: *mut ::core::ffi::c_void,
@@ -1103,6 +1152,9 @@ where
             keyboard_context: KeyboardContext::new(),
             drag_n_drop: Default::default(),
             update_requested: true,
+            frame_callback: std::ptr::null_mut(),
+            background_timerfd: new_timerfd(Duration::from_millis(2000)),
+            blocking_event_loop: conf.platform.blocking_event_loop,
         };
 
         let mut registry_listener = wl_registry_listener::dummy();
@@ -1168,7 +1220,7 @@ where
             panic!("eglMakeCurrent failed");
         }
 
-        if (libegl.eglSwapInterval)(egl_display, conf.platform.swap_interval.unwrap_or(1)) == 0 {
+        if (libegl.eglSwapInterval)(egl_display, 0) == 0 {
             eprintln!("eglSwapInterval failed");
         }
 
@@ -1251,9 +1303,7 @@ where
                 }
             }
 
-            // If `blocking_event_loop` is set but an update is requested, we should still poll the
-            // new events but continue without blocking
-            let blocking = conf.platform.blocking_event_loop && !display.update_requested;
+            let blocking = !display.update_requested;
             display.poll_new_event(blocking);
 
             for event in display.events.drain(..) {
@@ -1290,6 +1340,11 @@ where
                     }
                     WaylandEvent::WindowMinimized => event_handler.window_minimized_event(),
                     WaylandEvent::WindowRestored => event_handler.window_restored_event(),
+                    WaylandEvent::FrameCompleted => {
+                        if !conf.platform.blocking_event_loop {
+                            display.update_requested = true;
+                        }
+                    }
                     WaylandEvent::FilesDropped(filenames) => {
                         let mut d = crate::native_display().try_lock().unwrap();
                         d.dropped_files = Default::default();
@@ -1319,10 +1374,27 @@ where
                 }
             }
 
-            if !conf.platform.blocking_event_loop || display.update_requested {
+            if display.update_requested {
                 display.update_requested = false;
                 event_handler.update();
                 event_handler.draw();
+
+                if display.frame_callback.is_null() {
+                    display.frame_callback = wl_request_constructor!(
+                        display.client,
+                        display.surface,
+                        WL_SURFACE_FRAME,
+                        display.client.wl_callback_interface
+                    );
+                    if !display.frame_callback.is_null() {
+                        (display.client.wl_proxy_add_listener)(
+                            display.frame_callback as _,
+                            &FRAME_LISTENER as *const _ as _,
+                            &mut display as *mut _ as _,
+                        );
+                    }
+                }
+
                 (libegl.eglSwapBuffers)(egl_display, egl_surface);
             }
         }

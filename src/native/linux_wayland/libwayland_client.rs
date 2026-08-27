@@ -589,6 +589,7 @@ crate::declare_module!(
     pub wl_data_device_manager_interface: *mut wl_interface,
     pub wl_data_device_interface: *mut wl_interface,
     pub wl_data_source_interface: *mut wl_interface,
+    pub wl_callback_interface: *mut wl_interface,
     ...
     pub fn wl_display_connect(*const c_char) -> *mut wl_display,
     pub fn wl_display_disconnect(*mut wl_display),

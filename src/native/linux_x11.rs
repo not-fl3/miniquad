@@ -660,7 +660,7 @@ where
 
         let x11_display = (libx11.XOpenDisplay)(std::ptr::null());
         if x11_display.is_null() {
-            panic!("XOpenDisplay() failed!");
+            return Err(X11Error::GLXError("XOpenDisplay() failed".to_string()));
         }
 
         // screen selection process. The place to do something about
