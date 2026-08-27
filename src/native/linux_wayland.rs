@@ -45,6 +45,7 @@ struct WaylandPayload {
     viewporter: *mut extensions::viewporter::wp_viewporter,
     shm: *mut wl_shm,
     seat: *mut wl_seat,
+    seat_version: u32,
     data_device_manager: *mut wl_data_device_manager,
     data_device: *mut wl_data_device,
     xkb_context: *mut xkb_context,
@@ -327,6 +328,9 @@ struct PointerContext {
     locked_pointer: *mut extensions::cursor::zwp_locked_pointer_v1,
     relative_pointer_manager: *mut extensions::cursor::zwp_relative_pointer_manager_v1,
     relative_pointer: *mut extensions::cursor::zwp_relative_pointer_v1,
+    axis_v120: (Option<f32>, Option<f32>),
+    axis_discrete: (Option<f32>, Option<f32>),
+    axis_value: (Option<f32>, Option<f32>),
 }
 impl PointerContext {
     fn new() -> Self {
@@ -342,6 +346,9 @@ impl PointerContext {
             locked_pointer: std::ptr::null_mut(),
             relative_pointer_manager: std::ptr::null_mut(),
             relative_pointer: std::ptr::null_mut(),
+            axis_v120: (None, None),
+            axis_discrete: (None, None),
+            axis_value: (None, None),
         }
     }
     unsafe fn set_cursor_with_serial(
@@ -481,6 +488,9 @@ unsafe extern "C" fn seat_handle_capabilities(
         POINTER_LISTENER.motion = pointer_handle_motion;
         POINTER_LISTENER.button = pointer_handle_button;
         POINTER_LISTENER.leave = pointer_handle_leave;
+        POINTER_LISTENER.frame = pointer_handle_frame;
+        POINTER_LISTENER.axis_discrete = pointer_handle_axis_discrete;
+        POINTER_LISTENER.axis_value120 = pointer_handle_axis_value120;
         (display.client.wl_proxy_add_listener)(
             display.pointer_context.pointer as _,
             &POINTER_LISTENER as *const _ as _,
@@ -744,6 +754,36 @@ unsafe extern "C" fn pointer_handle_button(
             .push(WaylandEvent::PointerButton(button, state == 1));
     }
 }
+unsafe extern "C" fn pointer_handle_axis_value120(
+    data: *mut ::core::ffi::c_void,
+    _wl_pointer: *mut wl_pointer,
+    axis: u32,
+    value120: i32,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    let delta = (value120 as f32) / 120.0;
+    if axis == 0 {
+        display.pointer_context.axis_v120.1 = Some(-delta);
+    } else if axis == 1 {
+        display.pointer_context.axis_v120.0 = Some(-delta);
+    }
+}
+
+unsafe extern "C" fn pointer_handle_axis_discrete(
+    data: *mut ::core::ffi::c_void,
+    _wl_pointer: *mut wl_pointer,
+    axis: u32,
+    discrete: i32,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    let delta = discrete as f32;
+    if axis == 0 {
+        display.pointer_context.axis_discrete.1 = Some(-delta);
+    } else if axis == 1 {
+        display.pointer_context.axis_discrete.0 = Some(-delta);
+    }
+}
+
 unsafe extern "C" fn pointer_handle_axis(
     data: *mut ::core::ffi::c_void,
     _wl_pointer: *mut wl_pointer,
@@ -752,16 +792,44 @@ unsafe extern "C" fn pointer_handle_axis(
     value: i32,
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
-    let mut value = wl_fixed_to_double(value);
-    // https://wayland-book.com/seat/pointer.html
-    if axis == 0 {
-        // Vertical scroll
-        // Wayland defines the direction differently to miniquad so lets flip it
-        value = -value;
-        display.events.push(WaylandEvent::PointerAxis(0.0, value));
-    } else if axis == 1 {
-        // Horizontal scroll
-        display.events.push(WaylandEvent::PointerAxis(value, 0.0));
+    let value = (wl_fixed_to_double(value) as f32) / 15.0;
+    if display.seat_version < 5 {
+        if axis == 0 {
+            display.events.push(WaylandEvent::PointerAxis(0.0, -value));
+        } else if axis == 1 {
+            display.events.push(WaylandEvent::PointerAxis(-value, 0.0));
+        }
+    } else {
+        if axis == 0 {
+            display.pointer_context.axis_value.1 = Some(-value);
+        } else if axis == 1 {
+            display.pointer_context.axis_value.0 = Some(-value);
+        }
+    }
+}
+
+unsafe extern "C" fn pointer_handle_frame(
+    data: *mut ::core::ffi::c_void,
+    _wl_pointer: *mut wl_pointer,
+) {
+    let display: &mut WaylandPayload = &mut *(data as *mut _);
+    let ctx = &mut display.pointer_context;
+
+    let scroll_x = ctx.axis_v120.0
+        .or(ctx.axis_discrete.0)
+        .or(ctx.axis_value.0)
+        .unwrap_or(0.0);
+    let scroll_y = ctx.axis_v120.1
+        .or(ctx.axis_discrete.1)
+        .or(ctx.axis_value.1)
+        .unwrap_or(0.0);
+
+    ctx.axis_v120 = (None, None);
+    ctx.axis_discrete = (None, None);
+    ctx.axis_value = (None, None);
+
+    if scroll_x != 0.0 || scroll_y != 0.0 {
+        display.events.push(WaylandEvent::PointerAxis(scroll_x, scroll_y));
     }
 }
 
@@ -987,7 +1055,8 @@ unsafe extern "C" fn registry_add_object(
                     as _;
         }
         "wl_seat" => {
-            let seat_version = 4.min(version);
+            let seat_version = 8.min(version);
+            display.seat_version = seat_version;
             display.seat = display.client.wl_registry_bind(
                 registry,
                 name,
@@ -1086,6 +1155,7 @@ where
             viewporter: std::ptr::null_mut(),
             shm: std::ptr::null_mut(),
             seat: std::ptr::null_mut(),
+            seat_version: 0,
             data_device_manager: std::ptr::null_mut(),
             data_device: std::ptr::null_mut(),
             xkb_context,

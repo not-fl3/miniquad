@@ -275,9 +275,9 @@ pub extern "C" fn mouse_up(x: i32, y: i32, btn: i32) {
 }
 
 #[no_mangle]
-pub extern "C" fn mouse_wheel(dx: i32, dy: i32) {
+pub extern "C" fn mouse_wheel(dx: f32, dy: f32) {
     tl_event_handler(|event_handler| {
-        event_handler.mouse_wheel_event(dx as _, dy as _);
+        event_handler.mouse_wheel_event(dx, dy);
     });
 }
 

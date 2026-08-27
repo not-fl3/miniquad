@@ -1201,7 +1201,15 @@ var importObject = {
             canvas.addEventListener('wheel',
                 function (event) {
                     event.preventDefault();
-                    wasm_exports.mouse_wheel(-event.deltaX, -event.deltaY);
+                    var scale = 1.0;
+                    if (event.deltaMode === 1) { // DOM_DELTA_LINE
+                        scale = 1.0 / 3.0;
+                    } else if (event.deltaMode === 2) { // DOM_DELTA_PAGE
+                        scale = 10.0;
+                    } else { // DOM_DELTA_PIXEL
+                        scale = 1.0 / 100.0;
+                    }
+                    wasm_exports.mouse_wheel(-event.deltaX * scale, -event.deltaY * scale);
                 });
             canvas.onmouseup = function (event) {
                 var relative_position = mouse_relative_position(event.clientX, event.clientY);

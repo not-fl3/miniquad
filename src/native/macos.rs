@@ -597,9 +597,10 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
             let mut dx: f64 = msg_send![event, scrollingDeltaX];
             let mut dy: f64 = msg_send![event, scrollingDeltaY];
 
-            if !msg_send![event, hasPreciseScrollingDeltas] {
-                dx *= 10.0;
-                dy *= 10.0;
+            let has_precise: BOOL = msg_send![event, hasPreciseScrollingDeltas];
+            if has_precise != 0 {
+                dx /= 48.0;
+                dy /= 48.0;
             }
             if let Some(event_handler) = payload.context() {
                 event_handler.mouse_wheel_event(dx as f32, dy as f32);

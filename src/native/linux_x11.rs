@@ -53,6 +53,9 @@ pub struct X11Display {
     cursor_visible: bool,
     update_requested: bool,
     drag_n_drop: drag_n_drop::X11DnD,
+    scroll_valuators: HashMap<(i32, i32), xi_input::ScrollValuator>,
+    has_smooth_scrolling: bool,
+    last_xi_scroll_time: Option<std::time::Instant>,
 }
 
 impl X11Display {
@@ -95,20 +98,26 @@ impl X11Display {
                 if btn != crate::event::MouseButton::Unknown {
                     event_handler.mouse_button_down_event(btn, x, y);
                 } else {
-                    match event.xbutton.button {
-                        4 => {
-                            event_handler.mouse_wheel_event(0.0, 1.0);
+                    let is_duplicate_xi = self
+                        .last_xi_scroll_time
+                        .map(|t| t.elapsed().as_millis() < 25)
+                        .unwrap_or(false);
+                    if !is_duplicate_xi {
+                        match event.xbutton.button {
+                            4 => {
+                                event_handler.mouse_wheel_event(0.0, 1.0);
+                            }
+                            5 => {
+                                event_handler.mouse_wheel_event(0.0, -1.0);
+                            }
+                            6 => {
+                                event_handler.mouse_wheel_event(1.0, 0.0);
+                            }
+                            7 => {
+                                event_handler.mouse_wheel_event(-1.0, 0.0);
+                            }
+                            _ => {}
                         }
-                        5 => {
-                            event_handler.mouse_wheel_event(0.0, -1.0);
-                        }
-                        6 => {
-                            event_handler.mouse_wheel_event(1.0, 0.0);
-                        }
-                        7 => {
-                            event_handler.mouse_wheel_event(-1.0, 0.0);
-                        }
-                        _ => {}
                     }
                 }
             }
@@ -247,6 +256,13 @@ impl X11Display {
                 if event.xcookie.evtype == xi_input::XI_RawMotion {
                     let (dx, dy) = self.libxi.read_cookie(&mut event.xcookie, self.display);
                     event_handler.raw_mouse_motion(dx as f32, dy as f32);
+                } else if event.xcookie.evtype == xi_input::XI_Motion {
+                    let (dx, dy, x, y) = self.libxi.read_motion_cookie(&mut event.xcookie, self.display, &mut self.scroll_valuators);
+                    event_handler.mouse_motion_event(x as f32, y as f32);
+                    if dx != 0.0 || dy != 0.0 {
+                        self.last_xi_scroll_time = Some(std::time::Instant::now());
+                        event_handler.mouse_wheel_event(dx as f32, dy as f32);
+                    }
                 }
             }
             _ => {}
@@ -464,6 +480,13 @@ where
             .libx11
             .create_window(display.root, display.display, visual, depth, conf);
 
+    display.has_smooth_scrolling = display.libxi.query_xi_extension(
+        &mut display.libx11,
+        display.display,
+        display.window,
+        &mut display.scroll_valuators,
+    );
+
     let (glx_context, glx_window) = glx.create_context(display.display, display.window);
     glx.swap_interval(
         display.display,
@@ -557,6 +580,13 @@ where
         display
             .libx11
             .create_window(display.root, display.display, std::ptr::null_mut(), 0, conf);
+
+    display.has_smooth_scrolling = display.libxi.query_xi_extension(
+        &mut display.libx11,
+        display.display,
+        display.window,
+        &mut display.scroll_valuators,
+    );
 
     let (context, config, egl_display) = egl::create_egl_context(
         &mut egl_lib,
@@ -695,11 +725,10 @@ where
             drag_n_drop: Default::default(),
             cursor_icon: CursorIcon::Default,
             cursor_visible: true,
+            scroll_valuators: HashMap::new(),
+            has_smooth_scrolling: false,
+            last_xi_scroll_time: None,
         };
-
-        display
-            .libxi
-            .query_xi_extension(&mut display.libx11, display.display);
 
         match conf.platform.linux_x11_gl {
             crate::conf::LinuxX11Gl::GLXOnly => {
