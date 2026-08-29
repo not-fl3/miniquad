@@ -113,7 +113,7 @@ docker run --rm -v $(pwd)":/root/src" -w /root/src notfl3/cargo-apk cargo quad-a
 APK file will be in `target/android-artifacts/(debug|release)/apk`
 
 With "log-impl" enabled all log calls will be forwarded to adb console.
-No code modifications for Android required, everything should just works.
+No code modifications for Android required, everything should just work.
 
 ## iOS
 
