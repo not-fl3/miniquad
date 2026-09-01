@@ -1283,41 +1283,50 @@ pub trait RenderingBackend {
     fn buffer_update(&mut self, buffer: BufferId, data: BufferSource);
 
     /// Size of buffer in bytes.
-    /// For 1 element, u16 buffer this will return 2.
+    ///
+    /// for exemple: given a buffer containing one u16 item, this will return 2.
     fn buffer_size(&mut self, buffer: BufferId) -> usize;
 
     /// Delete GPU buffer, leaving handle unmodified.
     ///
-    /// More high-level code on top of miniquad probably is going to call this in Drop
-    /// implementation of some more RAII buffer object.
+    /// This provides no protection against using the deleted buffer.
     ///
-    /// There is no protection against using deleted buffers later. However its not an UB in OpenGl
-    /// and thats why this function is not marked as unsafe
+    /// Higher level code on top of miniquad will probably call this in a `Drop`
+    /// implementation.
+    ///
+    /// Using a deleted buffer is not UB, so this function isn't marked as
+    /// unsafe.
     fn delete_buffer(&mut self, buffer: BufferId);
 
     /// Delete GPU texture, leaving handle unmodified.
     ///
-    /// More high-level code on top of miniquad probably is going to call this in Drop
-    /// implementation of some more RAII buffer object.
+    /// This provides no protection against using the deleted texture.
     ///
-    /// There is no protection against using deleted textures later. However its not a CPU-level UB
-    /// and thats why this function is not marked as unsafe
+    /// Higher level code on top of miniquad will probably call this in a `Drop`
+    /// implementation.
+    ///
+    /// Using a deleted texture is not a CPU-level UB, so this function isn't
+    /// marked as unsafe.
     fn delete_texture(&mut self, texture: TextureId);
 
     /// Delete GPU program, leaving handle unmodified.
     ///
-    /// More high-level code on top of miniquad probably is going to call this in Drop
-    /// implementation of some more RAII buffer object.
+    /// This provides no protection against using the deleted program.
     ///
-    /// There is no protection against using deleted programs later. However its not a CPU-level
-    /// Porgram and thats why this function is not marked as unsafe
+    /// Higher level code on top of miniquad will probably call this in a `Drop`
+    /// implementation.
+    ///
+    /// Using a deleted program is not a CPU-level UB, so this function isn't
+    /// marked as unsafe.
     fn delete_shader(&mut self, program: ShaderId);
 
     /// Set a new viewport rectangle.
+    /// 
     /// Should be applied after begin_pass.
     fn apply_viewport(&mut self, x: i32, y: i32, w: i32, h: i32);
 
     /// Set a new scissor rectangle.
+    /// 
     /// Should be applied after begin_pass.
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32);
 
