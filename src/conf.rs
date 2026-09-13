@@ -239,6 +239,20 @@ pub struct Conf {
     ///   an external `.desktop` file
     pub icon: Option<Icon>,
 
+    /// If `true`, create no window and run without a display. The default
+    /// framebuffer is an offscreen one of `window_width` x `window_height`
+    /// pixels at a dpi scale of 1; `update` and `draw` run at roughly 60 Hz;
+    /// no input or window events ever arrive; `window::screen_size()`, render
+    /// passes and framebuffer readback all work as usual. Meant for tests
+    /// and CI machines with no display attached.
+    ///
+    /// Currently honored on macOS with [`AppleGfxApi::OpenGl`] (where it also
+    /// creates no `NSApplication`, so nothing appears in the Dock and no
+    /// focus moves). Other backends ignore it and open a window as usual.
+    /// `sample_count` is ignored for a headless run.
+    /// Defaults to `false`.
+    pub headless: bool,
+
     /// Platform-specific hints (e.g., context creation, driver settings).
     pub platform: Platform,
 }
@@ -284,6 +298,7 @@ impl Default for Conf {
             sample_count: 1,
             window_resizable: true,
             icon: Some(Icon::miniquad_logo()),
+            headless: false,
             platform: Default::default(),
         }
     }
@@ -301,6 +316,7 @@ impl Default for Conf {
             sample_count: 1,
             window_resizable: false, //
             icon: Some(Icon::miniquad_logo()),
+            headless: false,
             platform: Default::default(),
         }
     }
