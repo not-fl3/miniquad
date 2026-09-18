@@ -45,6 +45,73 @@ pub struct MacosDisplay {
     native_requests: Receiver<Request>,
     update_requested: bool,
     last_paint_start_time: Instant,
+    /// `Conf::headless`: no window, no `NSApplication`; `offscreen` is the
+    /// framebuffer that stands in for the window's.
+    headless: bool,
+    offscreen: Option<OffscreenTarget>,
+}
+
+/// The framebuffer a headless run draws into. It is bound before the
+/// rendering backend is created, so `GlContext::new` adopts it as the default
+/// framebuffer and every default pass, and every readback of the screen,
+/// lands here. Its object ids never change: a resize re-specifies the
+/// renderbuffers' storage in place, because the backend holds the fbo id.
+struct OffscreenTarget {
+    fbo: gl::GLuint,
+    color: gl::GLuint,
+    depth_stencil: gl::GLuint,
+}
+
+impl OffscreenTarget {
+    /// A complete RGBA8 + depth24/stencil8 framebuffer, left bound.
+    unsafe fn new(width: i32, height: i32) -> Self {
+        let mut fbo = 0;
+        gl::glGenFramebuffers(1, &mut fbo);
+        gl::glBindFramebuffer(gl::GL_FRAMEBUFFER, fbo);
+
+        let mut color = 0;
+        gl::glGenRenderbuffers(1, &mut color);
+        let mut depth_stencil = 0;
+        gl::glGenRenderbuffers(1, &mut depth_stencil);
+
+        let target = Self {
+            fbo,
+            color,
+            depth_stencil,
+        };
+        target.allocate(width, height);
+
+        gl::glFramebufferRenderbuffer(
+            gl::GL_FRAMEBUFFER,
+            gl::GL_COLOR_ATTACHMENT0,
+            gl::GL_RENDERBUFFER,
+            color,
+        );
+        gl::glFramebufferRenderbuffer(
+            gl::GL_FRAMEBUFFER,
+            gl::GL_DEPTH_STENCIL_ATTACHMENT,
+            gl::GL_RENDERBUFFER,
+            depth_stencil,
+        );
+
+        let status = gl::glCheckFramebufferStatus(gl::GL_FRAMEBUFFER);
+        assert!(
+            status == gl::GL_FRAMEBUFFER_COMPLETE,
+            "miniquad: the headless framebuffer is incomplete (status {:#x})",
+            status
+        );
+        target
+    }
+
+    /// (Re)specify both renderbuffers at a size. Storage may be respecified
+    /// on an existing renderbuffer, so the ids the backend knows stay valid.
+    unsafe fn allocate(&self, width: i32, height: i32) {
+        gl::glBindRenderbuffer(gl::GL_RENDERBUFFER, self.color);
+        gl::glRenderbufferStorage(gl::GL_RENDERBUFFER, gl::GL_RGBA8, width, height);
+        gl::glBindRenderbuffer(gl::GL_RENDERBUFFER, self.depth_stencil);
+        gl::glRenderbufferStorage(gl::GL_RENDERBUFFER, gl::GL_DEPTH24_STENCIL8, width, height);
+        gl::glBindRenderbuffer(gl::GL_RENDERBUFFER, 0);
+    }
 }
 
 impl MacosDisplay {
@@ -1010,12 +1077,9 @@ unsafe fn create_metal_view(_: &mut MacosDisplay, sample_count: i32, _: bool) ->
     view
 }
 
+/// The pixel format both the windowed and the headless context are made from.
 #[allow(clippy::vec_init_then_push)]
-unsafe fn create_opengl_view(
-    display: &mut MacosDisplay,
-    sample_count: i32,
-    high_dpi: bool,
-) -> ObjcId {
+unsafe fn opengl_pixel_format(sample_count: i32) -> ObjcId {
     use NSOpenGLPixelFormatAttribute::*;
 
     let mut attrs: Vec<u32> = vec![];
@@ -1047,6 +1111,15 @@ unsafe fn create_opengl_view(
     let glpixelformat_obj = msg_send_![class!(NSOpenGLPixelFormat), alloc];
     let glpixelformat_obj = msg_send_![glpixelformat_obj, initWithAttributes: attrs.as_ptr()];
     assert!(!glpixelformat_obj.is_null());
+    glpixelformat_obj
+}
+
+unsafe fn create_opengl_view(
+    display: &mut MacosDisplay,
+    sample_count: i32,
+    high_dpi: bool,
+) -> ObjcId {
+    let glpixelformat_obj = opengl_pixel_format(sample_count);
 
     let view_class = define_opengl_view_class();
     let view: ObjcId = msg_send![view_class, alloc];
@@ -1273,7 +1346,7 @@ unsafe fn perform_redraw(
 
     {
         let d = native_display().lock().unwrap();
-        if d.quit_requested || d.quit_ordered {
+        if (d.quit_requested || d.quit_ordered) && !display.headless {
             drop(d);
             let () = msg_send![display.window, performClose: nil];
         }
@@ -1295,6 +1368,11 @@ unsafe fn perform_redraw(
             }
         }
         match apple_gfx_api {
+            AppleGfxApi::OpenGl if display.headless => {
+                // There is no drawable to swap; make the frame observable to
+                // whoever reads the framebuffer back.
+                gl::glFlush();
+            }
             AppleGfxApi::OpenGl => {
                 msg_send_!(display.gl_context, flushBuffer);
             }
@@ -1337,7 +1415,13 @@ where
         modifiers: Modifiers::default(),
         update_requested: true,
         last_paint_start_time: Instant::now(),
+        headless: conf.headless,
+        offscreen: None,
     };
+
+    if conf.headless {
+        return run_headless(&conf, display);
+    }
 
     let app_delegate_class = define_app_delegate();
     let app_delegate_instance: ObjcId = msg_send![app_delegate_class, new];
@@ -1510,5 +1594,94 @@ where
             perform_redraw(&mut display, conf.platform.apple_gfx_api, false);
         }
 
+    }
+}
+
+/// `run` without a window.
+///
+/// An `NSOpenGLContext` with no drawable is made current — Apple discards
+/// drawing to its framebuffer 0, but framebuffer objects work — and an
+/// [`OffscreenTarget`] is bound in its place before the event handler is
+/// built, so the rendering backend adopts it as the default framebuffer.
+/// No `NSApplication` is created: nothing appears in the Dock, no focus
+/// moves, and there is no event queue to pump. `update`/`draw` run at
+/// roughly 60 Hz, the same cadence a display would give, so frame counts
+/// keep their meaning, until the handler orders or requests a quit.
+unsafe fn run_headless(conf: &crate::conf::Conf, mut display: MacosDisplay) {
+    assert!(
+        conf.platform.apple_gfx_api == AppleGfxApi::OpenGl,
+        "miniquad: Conf::headless is only implemented for AppleGfxApi::OpenGl on macOS"
+    );
+
+    let pixel_format = opengl_pixel_format(conf.sample_count);
+    let gl_context = msg_send_![class!(NSOpenGLContext), alloc];
+    display.gl_context = msg_send![gl_context, initWithFormat: pixel_format shareContext: nil];
+    assert!(
+        !display.gl_context.is_null(),
+        "miniquad: could not create an OpenGL context for a headless run"
+    );
+    msg_send_![display.gl_context, makeCurrentContext];
+
+    gl::load_gl_funcs(|proc| {
+        let name = std::ffi::CString::new(proc).unwrap();
+
+        get_proc_address(name.as_ptr() as _)
+    });
+
+    let (width, height) = {
+        let d = native_display().lock().unwrap();
+        (d.screen_width, d.screen_height)
+    };
+    display.offscreen = Some(OffscreenTarget::new(width, height));
+
+    let frame = Duration::from_secs_f64(1.0 / 60.0);
+    while !native_display().lock().unwrap().quit_ordered {
+        let started = Instant::now();
+
+        while let Ok(request) = display.native_requests.try_recv() {
+            match request {
+                Request::ScheduleUpdate => display.update_requested = true,
+                Request::SetWindowSize {
+                    new_width,
+                    new_height,
+                } => {
+                    let (w, h) = (new_width as i32, new_height as i32);
+                    if let Some(offscreen) = &display.offscreen {
+                        offscreen.allocate(w, h);
+                    }
+                    {
+                        let mut d = native_display().lock().unwrap();
+                        d.screen_width = w;
+                        d.screen_height = h;
+                    }
+                    if let Some(event_handler) = display.context() {
+                        event_handler.resize_event(w as f32, h as f32);
+                    }
+                }
+                // Cursor, fullscreen, position, keyboard, IME: nothing to do
+                // them to.
+                _ => {}
+            }
+        }
+
+        // With no window there is nothing to `performClose:`, so the quit
+        // handshake happens here: ask the handler, and go unless it cancelled.
+        if native_display().lock().unwrap().quit_requested {
+            if let Some(event_handler) = display.context() {
+                event_handler.quit_requested_event();
+            }
+            let mut d = native_display().lock().unwrap();
+            if d.quit_requested {
+                d.quit_ordered = true;
+            }
+        }
+
+        if !conf.platform.blocking_event_loop || display.update_requested {
+            perform_redraw(&mut display, AppleGfxApi::OpenGl, false);
+        }
+
+        if let Some(rest) = frame.checked_sub(started.elapsed()) {
+            std::thread::sleep(rest);
+        }
     }
 }

@@ -467,6 +467,13 @@ where
     {
         let mut f = Some(f);
         let f = &mut f;
+        // Before `linux_backend` is consulted at all: a headless run wants no
+        // window system, and on a machine with neither X11 nor Wayland
+        // running, both of those backends fail at connect time.
+        if conf.headless {
+            native::linux_headless::run(&conf, f).expect("headless EGL backend failed");
+            return;
+        }
         match conf.platform.linux_backend {
             conf::LinuxBackend::X11Only => {
                 native::linux_x11::run(&conf, f).expect("X11 backend failed")

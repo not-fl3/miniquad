@@ -20,6 +20,10 @@ use std::fmt::Display;
 pub const EGL_SUCCESS: u32 = 12288;
 
 pub const EGL_WINDOW_BIT: u32 = 4;
+pub const EGL_PBUFFER_BIT: u32 = 1;
+
+pub const EGL_RENDERABLE_TYPE: u32 = 12352;
+pub const EGL_OPENGL_ES2_BIT: u32 = 4;
 
 pub const EGL_ALPHA_SIZE: u32 = 12321;
 pub const EGL_BLUE_SIZE: u32 = 12322;
@@ -34,6 +38,27 @@ pub const EGL_HEIGHT: u32 = 12374;
 pub const EGL_SURFACE_TYPE: u32 = 12339;
 pub const EGL_NONE: u32 = 12344;
 pub const EGL_CONTEXT_CLIENT_VERSION: u32 = 12440;
+
+pub const EGL_NO_DISPLAY: EGLDisplay = null_mut();
+pub const EGL_NO_SURFACE: EGLSurface = null_mut();
+/// `EGL_DEFAULT_DISPLAY` is the null native display handle: it asks the
+/// driver for whatever display it can provide without a window system, which
+/// is what a headless run wants.
+pub const EGL_DEFAULT_DISPLAY: EGLNativeDisplayType = null_mut();
+
+/// `EGL_MESA_platform_surfaceless`: a platform that is not a window system at
+/// all. `EGL_DEFAULT_DISPLAY` asks the driver for its *default* display, which
+/// on a Linux box built for a desktop means the X11 one — so it resolves, and
+/// then `eglInitialize` fails when there is no X server behind it. This asks
+/// for the display that never had a window system to begin with.
+pub const EGL_PLATFORM_SURFACELESS_MESA: u32 = 0x31DD;
+
+/// `eglGetPlatformDisplayEXT`, from `EGL_EXT_platform_base`. Resolved through
+/// `eglGetProcAddress` rather than declared in [`LibEgl`]: it is an extension,
+/// and `declare_module!` unwraps every symbol it names, so a driver without it
+/// would fail to load libEGL at all rather than fall back.
+pub type GetPlatformDisplayExt =
+    unsafe extern "C" fn(EGLint, *mut ::core::ffi::c_void, *const EGLint) -> EGLDisplay;
 
 pub type NativeDisplayType = EGLNativeDisplayType;
 pub type NativePixmapType = EGLNativePixmapType;
