@@ -227,7 +227,7 @@ struct KeyboardContext {
     timerfd: core::ffi::c_int,
 }
 
-fn new_itimerspec() -> libc::itimerspec {
+const fn new_itimerspec() -> libc::itimerspec {
     libc::itimerspec {
         it_interval: libc::timespec {
             tv_sec: 0,
@@ -329,7 +329,7 @@ struct PointerContext {
     relative_pointer: *mut extensions::cursor::zwp_relative_pointer_v1,
 }
 impl PointerContext {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             pointer: std::ptr::null_mut(),
             enter_serial: None,
