@@ -184,28 +184,37 @@ pub unsafe fn create_egl_context(
     }
 
     let alpha_size = if alpha { 8 } else { 0 };
-    #[rustfmt::skip]
-    let cfg_attributes = [
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        EGL_RED_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,
-        EGL_ALPHA_SIZE, alpha_size,
-        EGL_DEPTH_SIZE, 16,
-        EGL_STENCIL_SIZE, 0,
-        EGL_SAMPLES, sample_count as u32,
-        EGL_NONE,
-    ];
     let mut available_cfgs: Vec<EGLConfig> = vec![null_mut(); 32];
     let mut cfg_count = 0;
 
-    (egl.eglChooseConfig)(
-        display,
-        cfg_attributes.as_ptr() as _,
-        available_cfgs.as_ptr() as _,
-        32,
-        &mut cfg_count as *mut _ as *mut _,
-    );
+    // Fall back to fewer samples when no config offers the requested count
+    // (the Android emulator has none with 2 or 4) instead of failing.
+    let mut samples = sample_count;
+    loop {
+        #[rustfmt::skip]
+        let cfg_attributes = [
+            EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+            EGL_RED_SIZE, 8,
+            EGL_GREEN_SIZE, 8,
+            EGL_BLUE_SIZE, 8,
+            EGL_ALPHA_SIZE, alpha_size,
+            EGL_DEPTH_SIZE, 16,
+            EGL_STENCIL_SIZE, 0,
+            EGL_SAMPLES, samples as u32,
+            EGL_NONE,
+        ];
+        (egl.eglChooseConfig)(
+            display,
+            cfg_attributes.as_ptr() as _,
+            available_cfgs.as_ptr() as _,
+            32,
+            &mut cfg_count as *mut _ as *mut _,
+        );
+        if cfg_count > 0 || samples == 0 {
+            break;
+        }
+        samples /= 2;
+    }
     assert!(cfg_count > 0);
     assert!(cfg_count <= 32);
 
