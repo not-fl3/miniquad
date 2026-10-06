@@ -1706,7 +1706,12 @@ impl RenderingBackend for GlContext {
                     }
                 }
             }
-            glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
+            // Leave the pass's framebuffer bound; the next pass binds its
+            // own. Tile-based GPUs, such as Mali, end a framebuffer's
+            // render pass when another one is bound, writing its tiles out
+            // to memory and reading them back in the next time it's drawn
+            // to, so binding the default framebuffer here did that after
+            // every pass.
             self.cache.bind_buffer(GL_ARRAY_BUFFER, 0, None);
             self.cache.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0, None);
 
@@ -1718,6 +1723,11 @@ impl RenderingBackend for GlContext {
     }
 
     fn commit_frame(&mut self) {
+        // Frames end on the default framebuffer, as code reading the
+        // screen back expects.
+        unsafe {
+            glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
+        }
         self.cache.clear_buffer_bindings();
         self.cache.clear_texture_bindings();
     }
