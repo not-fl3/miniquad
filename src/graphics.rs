@@ -1280,6 +1280,8 @@ pub trait RenderingBackend {
     /// ```
     fn new_buffer(&mut self, type_: BufferType, usage: BufferUsage, data: BufferSource)
         -> BufferId;
+    /// Replace the buffer's contents with `data`, which can be shorter than
+    /// the buffer: what lies past it is undefined afterwards.
     fn buffer_update(&mut self, buffer: BufferId, data: BufferSource);
 
     /// Size of buffer in bytes.
