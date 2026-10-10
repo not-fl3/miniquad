@@ -31,6 +31,19 @@ const UNIFORM_BUFFER_ALIGN: u64 = 256;
 ))]
 const UNIFORM_BUFFER_ALIGN: u64 = 16;
 
+/// What a color attachment keeps as its pass ends. A multisampled one
+/// that isn't transient keeps its samples as well as resolving them
+/// (`StoreAndMultisampleResolve`), so a later pass into the same target
+/// can load them back.
+fn color_store_action(resolves: bool, transient: bool) -> MTLStoreAction {
+    match (resolves, transient) {
+        (true, true) => MTLStoreAction::MultisampleResolve,
+        (true, false) => MTLStoreAction::StoreAndMultisampleResolve,
+        (false, true) => MTLStoreAction::DontCare,
+        (false, false) => MTLStoreAction::Store,
+    }
+}
+
 impl From<VertexFormat> for MTLVertexFormat {
     fn from(vf: VertexFormat) -> Self {
         match vf {
@@ -295,6 +308,9 @@ pub struct MetalContext {
     pending_end_encoder: bool,
     view: ObjcId,
     device: ObjcId,
+    /// Whether the GPU can keep a texture in tile memory alone, for
+    /// transient textures.
+    memoryless: bool,
     current_frame_index: usize,
     uniform_buffers: [ObjcId; 3],
     // cached index_buffer from apply_bindings
@@ -371,6 +387,17 @@ impl MetalContext {
             #[cfg(any(target_os = "ios", target_os = "tvos"))]
             let options = { MTLResourceOptions::CPUCacheModeWriteCombined };
 
+            // Apple's own GPUs, which are all tile-based, can keep a
+            // texture in tile memory alone. `supportsFamily:` came with
+            // iOS 13 and macOS 10.15.
+            let memoryless = {
+                let responds: BOOL = msg_send![device, respondsToSelector: sel!(supportsFamily:)];
+                responds == YES && {
+                    let apple: BOOL = msg_send![device, supportsFamily: MTLGPUFamily::Apple1];
+                    apple == YES
+                }
+            };
+
             let uniform_buffers = [
                 msg_send![device, newBufferWithLength:MAX_UNIFORM_BUFFER_SIZE
                           options:options],
@@ -390,6 +417,7 @@ impl MetalContext {
                 pending_end_encoder: false,
                 view,
                 device,
+                memoryless,
                 buffers: vec![],
                 shaders: vec![],
                 pipelines: vec![],
@@ -615,9 +643,9 @@ impl RenderingBackend for MetalContext {
             msg_send_![render_pass_desc, retain];
             assert!(!render_pass_desc.is_null());
             for (i, color_img) in color_img.iter().enumerate() {
-                let color_texture = self.textures.get(*color_img).texture;
+                let color = self.textures.get(*color_img);
                 let color_attachment = msg_send_![msg_send_![render_pass_desc, colorAttachments], objectAtIndexedSubscript:i];
-                msg_send_![color_attachment, setTexture: color_texture];
+                msg_send_![color_attachment, setTexture: color.texture];
                 msg_send_![color_attachment, setLoadAction: MTLLoadAction::Clear];
                 // Multisample resolve: when the caller passes a resolve
                 // texture for this attachment, downsample into it on
@@ -629,17 +657,25 @@ impl RenderingBackend for MetalContext {
                         color_attachment,
                         setStoreAction: MTLStoreAction::MultisampleResolve
                     ];
+                } else if color.params.transient {
+                    msg_send_![color_attachment, setStoreAction: MTLStoreAction::DontCare];
                 } else {
                     msg_send_![color_attachment, setStoreAction: MTLStoreAction::Store];
                 }
             }
             if let Some(depth_img) = depth_img {
-                let depth_texture = self.textures.get(depth_img).texture;
+                let depth = self.textures.get(depth_img);
+                let depth_texture = depth.texture;
 
                 let depth_attachment = msg_send_![render_pass_desc, depthAttachment];
                 msg_send_![depth_attachment, setTexture: depth_texture];
                 msg_send_![depth_attachment, setLoadAction: MTLLoadAction::Clear];
-                msg_send_![depth_attachment, setStoreAction: MTLStoreAction::Store];
+                let depth_store_action = if depth.params.transient {
+                    MTLStoreAction::DontCare
+                } else {
+                    MTLStoreAction::Store
+                };
+                msg_send_![depth_attachment, setStoreAction: depth_store_action];
                 msg_send_![depth_attachment, setClearDepth:1.];
 
                 let stencil_attachment = msg_send_![render_pass_desc, stencilAttachment];
@@ -817,7 +853,12 @@ impl RenderingBackend for MetalContext {
                         msg_send![self.view, colorPixelFormat];
                     msg_send_![descriptor, setPixelFormat: view_pixel_format];
                 }
-                msg_send_![descriptor, setStorageMode: MTLStorageMode::Private];
+                let storage_mode = if params.transient && self.memoryless {
+                    MTLStorageMode::Memoryless
+                } else {
+                    MTLStorageMode::Private
+                };
+                msg_send_![descriptor, setStorageMode: storage_mode];
                 if params.sample_count > 1 {
                     // MSAA target — render-only, no mipmaps, no
                     // shader-sample (the resolve texture is sampled
@@ -1310,7 +1351,7 @@ impl RenderingBackend for MetalContext {
                 self.command_buffer = Some(msg_send![self.command_queue, commandBuffer]);
             }
 
-            let (descriptor, width_px, height_px) = match pass {
+            let (descriptor, width_px, height_px, transient) = match pass {
                 None => {
                     // Read dimensions from the actual pass attachment
                     // texture, not `screen_size()`. MTKView's
@@ -1326,7 +1367,7 @@ impl RenderingBackend for MetalContext {
                     let texture: ObjcId = msg_send_![attachment, texture];
                     let width: u64 = msg_send![texture, width];
                     let height: u64 = msg_send![texture, height];
-                    (descriptor, width as u32, height as u32)
+                    (descriptor, width as u32, height as u32, false)
                 }
                 Some(pass) => {
                     let pass = &self.passes[pass.0];
@@ -1338,11 +1379,13 @@ impl RenderingBackend for MetalContext {
                         .copied()
                         //.or(pass.depth_texture)
                         .unwrap();
+                    let params = self.textures.get(texture).params;
 
                     (
                         pass.render_pass_desc,
-                        self.textures.get(texture).params.width,
-                        self.textures.get(texture).params.height,
+                        params.width,
+                        params.height,
+                        params.transient,
                     )
                 }
             };
@@ -1353,19 +1396,11 @@ impl RenderingBackend for MetalContext {
             let color_attachments = msg_send_![descriptor, colorAttachments];
             let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: 0];
 
-            // If the attachment has a resolve texture, use
-            // `StoreAndMultisampleResolve` (not just
-            // `MultisampleResolve`) so the multisample texture
-            // survives target-switch boundaries within a frame —
-            // a later `Load` on the same target would otherwise
-            // read discarded memory.
             let resolve_texture: ObjcId = msg_send![color_attachment, resolveTexture];
-            let store_action = if resolve_texture.is_null() {
-                MTLStoreAction::Store
-            } else {
-                MTLStoreAction::StoreAndMultisampleResolve
-            };
-            msg_send_![color_attachment, setStoreAction: store_action];
+            msg_send_![
+                color_attachment,
+                setStoreAction: color_store_action(!resolve_texture.is_null(), transient)
+            ];
 
             match action {
                 PassAction::Clear { color, .. } => {
@@ -1376,7 +1411,12 @@ impl RenderingBackend for MetalContext {
                     }
                 }
                 PassAction::Nothing => {
-                    msg_send_![color_attachment, setLoadAction: MTLLoadAction::Load];
+                    let load_action = if transient {
+                        MTLLoadAction::DontCare
+                    } else {
+                        MTLLoadAction::Load
+                    };
+                    msg_send_![color_attachment, setLoadAction: load_action];
                 }
             }
 

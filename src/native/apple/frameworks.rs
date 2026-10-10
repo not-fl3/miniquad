@@ -827,6 +827,12 @@ pub enum MTLTextureUsage {
     PixelFormatView = 0x0010,
 }
 
+#[repr(i64)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum MTLGPUFamily {
+    Apple1 = 1001,
+}
+
 #[repr(u64)]
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

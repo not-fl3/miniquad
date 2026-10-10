@@ -400,6 +400,15 @@ pub struct TextureParams {
     /// be created instead of a regulat texture.
     ///
     pub sample_count: i32,
+    /// Only used for render textures. A transient render texture's contents
+    /// last only as long as the pass drawing into it: a pass that doesn't
+    /// clear it starts with them undefined, and only what a multisampled one
+    /// resolves into outlives the pass.
+    ///
+    /// On Metal, a GPU with tile memory keeps them there alone, so the
+    /// texture takes up no memory, and no pass stores them. OpenGL keeps them
+    /// as it does any texture's.
+    pub transient: bool,
 }
 
 impl Default for TextureParams {
@@ -415,6 +424,7 @@ impl Default for TextureParams {
             height: 0,
             allocate_mipmaps: false,
             sample_count: 1,
+            transient: false,
         }
     }
 }
@@ -1160,6 +1170,7 @@ pub trait RenderingBackend {
                 mipmap_filter: MipmapFilterMode::None,
                 allocate_mipmaps: false,
                 sample_count: 1,
+                transient: false,
             },
         )
     }
