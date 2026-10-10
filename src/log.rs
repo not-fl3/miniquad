@@ -178,7 +178,12 @@ macro_rules! __log_line {
     };
 }
 
-#[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
+#[cfg(not(any(
+    target_arch = "wasm32",
+    target_os = "android",
+    target_os = "ios",
+    target_os = "tvos"
+)))]
 pub fn __private_api_log_lit(
     message: &str,
     _level: Level,
@@ -228,7 +233,7 @@ pub fn __private_api_log_lit(
     unsafe { log_fn(msg.as_ptr()) };
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "ios", target_os = "tvos"))]
 pub fn __private_api_log_lit(
     message: &str,
     _level: Level,
