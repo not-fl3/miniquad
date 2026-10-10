@@ -6,7 +6,15 @@ use crate::{
     },
 };
 
-use std::{cell::RefCell, sync::mpsc, thread, time::Duration};
+use std::{
+    cell::RefCell,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
+    thread,
+    time::Duration,
+};
 
 pub use crate::native::gl::{self, *};
 
@@ -67,6 +75,9 @@ enum Message {
     },
     Pause,
     Resume,
+    ActivityCreated {
+        activity: ndk_sys::jobject,
+    },
     Destroy,
     Request(crate::native::Request),
 }
@@ -83,8 +94,13 @@ fn send_message(message: Message) {
     })
 }
 
+/// A global reference to the activity the app runs in. Replaced on the
+/// render thread when Android recreates the activity.
 pub static mut ACTIVITY: ndk_sys::jobject = std::ptr::null_mut();
 static mut VM: *mut ndk_sys::JavaVM = std::ptr::null_mut();
+/// Whether the app is fullscreen, which a recreated activity reads on the UI
+/// thread when it takes over.
+static FULLSCREEN: AtomicBool = AtomicBool::new(false);
 
 pub unsafe fn console_debug(msg: *const ::core::ffi::c_char) {
     ndk_sys::__android_log_write(
@@ -135,7 +151,6 @@ struct MainThreadState {
     window: *mut ndk_sys::ANativeWindow,
     event_handler: Box<dyn EventHandler>,
     quit: bool,
-    fullscreen: bool,
     update_requested: bool,
     keymods: KeyMods,
 }
@@ -235,18 +250,32 @@ impl MainThreadState {
             }
             Message::Pause => self.event_handler.window_minimized_event(),
             Message::Resume => {
-                if self.fullscreen {
+                if FULLSCREEN.load(Ordering::Relaxed) {
                     unsafe {
                         let env = attach_jni_env();
-                        set_full_screen(env, true);
+                        set_full_screen(env, ACTIVITY, true);
                     }
                 }
 
                 self.event_handler.window_restored_event()
             }
+            Message::ActivityCreated { activity } => unsafe {
+                let env = attach_jni_env();
+                (**env).DeleteGlobalRef.unwrap()(env, ACTIVITY);
+                ACTIVITY = activity;
+            },
             Message::Destroy => {
-                self.quit = true;
-                self.event_handler.quit_requested_event()
+                // Android also destroys an activity it's about to recreate, after a
+                // configuration change the activity doesn't handle itself or under
+                // "Don't keep activities". The app keeps running for the new one.
+                let finishing = unsafe {
+                    let env = attach_jni_env();
+                    ndk_utils::call_bool_method!(env, ACTIVITY, "isFinishing", "()Z") != 0
+                };
+                if finishing {
+                    self.quit = true;
+                    self.event_handler.quit_requested_event()
+                }
             }
             Message::Request(req) => self.process_request(req),
         }
@@ -275,9 +304,9 @@ impl MainThreadState {
             SetFullscreen(fullscreen) => {
                 unsafe {
                     let env = attach_jni_env();
-                    set_full_screen(env, fullscreen);
+                    set_full_screen(env, ACTIVITY, fullscreen);
                 }
-                self.fullscreen = fullscreen;
+                FULLSCREEN.store(fullscreen, Ordering::Relaxed);
             }
             ShowKeyboard(show) => unsafe {
                 let env = attach_jni_env();
@@ -436,9 +465,10 @@ where
         }));
     }
 
+    FULLSCREEN.store(conf.fullscreen, Ordering::Relaxed);
     if conf.fullscreen {
         let env = attach_jni_env();
-        set_full_screen(env, true);
+        set_full_screen(env, ACTIVITY, true);
     }
 
     // yeah, just adding Send to outer F will do it, but it will brake the API
@@ -524,7 +554,6 @@ where
             window,
             event_handler,
             quit: false,
-            fullscreen: conf.fullscreen,
             update_requested: true,
             keymods: KeyMods {
                 shift: false,
@@ -611,8 +640,23 @@ pub unsafe extern "C" fn Java_quad_1native_QuadNative_activityOnCreate(
     activity: ndk_sys::jobject,
 ) {
     let env = attach_jni_env();
-    ACTIVITY = (**env).NewGlobalRef.unwrap()(env, activity);
-    quad_main();
+    let activity = (**env).NewGlobalRef.unwrap()(env, activity);
+    // A recreated activity takes over the running app. Only a first activity,
+    // or one that follows an app that quit, starts a new one.
+    let taken_over = MESSAGES_TX.with(|tx| {
+        tx.borrow()
+            .as_ref()
+            .is_some_and(|tx| tx.send(Message::ActivityCreated { activity }).is_ok())
+    });
+    if !taken_over {
+        ACTIVITY = activity;
+        quad_main();
+    } else if FULLSCREEN.load(Ordering::Relaxed) {
+        // Before its window opens, as `run` does for the first activity. Made
+        // fullscreen on resume instead, it kept an opaque 3-button navigation
+        // bar on Android 15.
+        set_full_screen(env, activity, true);
+    }
 }
 
 #[no_mangle]
@@ -729,8 +773,8 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnCharacter(
     });
 }
 
-unsafe fn set_full_screen(env: *mut ndk_sys::JNIEnv, fullscreen: bool) {
-    ndk_utils::call_void_method!(env, ACTIVITY, "setFullScreen", "(Z)V", fullscreen as i32);
+unsafe fn set_full_screen(env: *mut ndk_sys::JNIEnv, activity: ndk_sys::jobject, fullscreen: bool) {
+    ndk_utils::call_void_method!(env, activity, "setFullScreen", "(Z)V", fullscreen as i32);
 }
 
 #[repr(C)]

@@ -224,7 +224,7 @@ pub trait EventHandler {
     /// handler callback code can handle this event by calling
     /// ctx.cancel_quit() to cancel the quit.
     /// If the event is ignored, the application will quit as usual.
-    /// On Andoid quit_requested_event is called on a Destroy ndk callback
+    /// On Android quit_requested_event is called when the activity finishes
     fn quit_requested_event(&mut self) {}
 
     /// A file has been dropped over the application.
