@@ -194,7 +194,6 @@ pub fn __private_api_log_lit(
     &(_target, _module_path, _file, _line): &(&str, &'static str, &'static str, u32),
 ) {
     use crate::native::wasm;
-    use std::ffi::CString;
 
     let log_fn = match level {
         Level::Debug => wasm::console_debug,
@@ -203,7 +202,7 @@ pub fn __private_api_log_lit(
         Level::Trace => wasm::console_debug,
         Level::Error => wasm::console_error,
     };
-    let msg = CString::new(message).unwrap_or_else(|_| panic!());
+    let msg = c_string(message);
 
     unsafe { log_fn(msg.as_ptr()) };
 }
@@ -214,8 +213,6 @@ pub fn __private_api_log_lit(
     level: Level,
     &(_target, _module_path, _file, _line): &(&str, &'static str, &'static str, u32),
 ) {
-    use std::ffi::CString;
-
     let log_fn = match level {
         Level::Debug => crate::native::android::console_debug,
         Level::Warn => crate::native::android::console_warn,
@@ -223,9 +220,16 @@ pub fn __private_api_log_lit(
         Level::Trace => crate::native::android::console_debug,
         Level::Error => crate::native::android::console_error,
     };
-    let msg = CString::new(message).unwrap_or_else(|_| panic!());
+    let msg = c_string(message);
 
     unsafe { log_fn(msg.as_ptr()) };
+}
+
+/// Android's log and the browser's console take C strings, which end at the
+/// first NUL, so each NUL in `message` is replaced instead of panicking.
+#[cfg(any(target_arch = "wasm32", target_os = "android", test))]
+fn c_string(message: &str) -> std::ffi::CString {
+    std::ffi::CString::new(message.replace('\0', "\u{FFFD}")).unwrap()
 }
 
 #[cfg(target_os = "ios")]
@@ -253,4 +257,9 @@ fn test_logs() {
 
     error!("info");
     error!("info: {}", 1);
+}
+
+#[test]
+fn test_c_string_replaces_nul() {
+    assert_eq!(c_string("a\0b").to_str(), Ok("a\u{FFFD}b"));
 }
