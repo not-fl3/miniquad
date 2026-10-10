@@ -1256,6 +1256,12 @@ pub trait RenderingBackend {
         shader: ShaderId,
         params: PipelineParams,
     ) -> Pipeline;
+    /// Starts getting `pipeline` ready to draw into `pass`, or the screen
+    /// if `None`, so its first draw there waits less, or not at all. Metal
+    /// builds a pipeline state for each set of attachment formats a
+    /// pipeline draws into, which takes milliseconds, and builds the ones
+    /// started together at once. Other backends have nothing to build.
+    fn prepare_pipeline(&mut self, _pipeline: &Pipeline, _pass: Option<RenderPass>) {}
     fn apply_pipeline(&mut self, pipeline: &Pipeline);
     fn delete_pipeline(&mut self, pipeline: Pipeline);
 

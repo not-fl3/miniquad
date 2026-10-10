@@ -7,6 +7,9 @@ use crate::native::apple::{
 
 use super::*;
 
+use std::ffi::c_void;
+use std::sync::{Arc, Condvar, Mutex};
+
 // https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
 const MAX_UNIFORM_BUFFER_SIZE: u64 = 4 * 1024 * 1024;
 const NUM_INFLIGHT_FRAMES: usize = 3;
@@ -240,14 +243,214 @@ struct RenderPassInternal {
     _depth_texture: Option<TextureId>,
 }
 
-#[derive(Clone, Debug)]
-struct PipelineInternal {
+/// The pixel formats and sample count of a render pass's attachments.
+/// Metal only draws with a pipeline state built for exactly these.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct AttachmentFormats {
+    color: MTLPixelFormat,
+    depth: MTLPixelFormat,
+    stencil: MTLPixelFormat,
+    sample_count: u64,
+}
+
+impl AttachmentFormats {
+    /// The formats of the view's own render passes.
+    unsafe fn of_view(view: ObjcId) -> Self {
+        // `Invalid` when the view has no depth/stencil buffer.
+        let depth_stencil_format: MTLPixelFormat = msg_send![view, depthStencilPixelFormat];
+        AttachmentFormats {
+            color: msg_send![view, colorPixelFormat],
+            depth: depth_stencil_format,
+            stencil: depth_stencil_format,
+            sample_count: msg_send![view, sampleCount],
+        }
+    }
+
+    unsafe fn of_pass(render_pass_desc: ObjcId) -> Self {
+        let format_of = |attachment: ObjcId| {
+            let texture: ObjcId = msg_send![attachment, texture];
+            if texture.is_null() {
+                MTLPixelFormat::Invalid
+            } else {
+                msg_send![texture, pixelFormat]
+            }
+        };
+        let color_attachment = msg_send_![
+            msg_send_![render_pass_desc, colorAttachments],
+            objectAtIndexedSubscript: 0usize
+        ];
+        let color_texture: ObjcId = msg_send![color_attachment, texture];
+        AttachmentFormats {
+            color: format_of(color_attachment),
+            depth: format_of(msg_send_![render_pass_desc, depthAttachment]),
+            stencil: format_of(msg_send_![render_pass_desc, stencilAttachment]),
+            sample_count: msg_send![color_texture, sampleCount],
+        }
+    }
+}
+
+/// A pipeline state for one set of attachment formats.
+#[derive(Debug)]
+enum PipelineState {
+    /// Being built by Metal, on threads of its own.
+    Building(Arc<BuildingPipelineState>),
+    Built(ObjcId),
+}
+
+/// Where Metal's completion handler leaves the pipeline state it built,
+/// or why it couldn't.
+#[derive(Debug, Default)]
+struct BuildingPipelineState {
+    result: Mutex<Option<BuildResult>>,
+    finished: Condvar,
+}
+
+#[derive(Debug)]
+struct BuildResult(Result<ObjcId, String>);
+
+// SAFETY: a built pipeline state is immutable, and Metal objects are
+// reference counted atomically.
+unsafe impl Send for BuildResult {}
+
+impl BuildingPipelineState {
+    fn wait(&self) -> Result<ObjcId, String> {
+        let mut result = self.result.lock().unwrap();
+        loop {
+            if let Some(BuildResult(built)) = result.take() {
+                return built;
+            }
+            result = self.finished.wait(result).unwrap();
+        }
+    }
+}
+
+/// The block Metal calls once a pipeline state is built, laid out as
+/// the blocks runtime expects. It needs no copy or dispose helpers, as
+/// what it holds it releases when called, which Metal does once.
+#[repr(C)]
+struct CompletionBlock {
+    isa: *const c_void,
+    flags: i32,
+    reserved: i32,
+    invoke: unsafe extern "C" fn(*mut CompletionBlock, ObjcId, ObjcId),
+    descriptor: *const CompletionBlockDescriptor,
+    /// The descriptor the state is built from, which the build may read
+    /// until it's done.
+    pipeline_descriptor: ObjcId,
+    /// Where the state goes, from `Arc::into_raw`.
+    building: *const BuildingPipelineState,
+}
+
+#[repr(C)]
+struct CompletionBlockDescriptor {
+    reserved: u64,
+    size: u64,
+}
+
+static COMPLETION_BLOCK_DESCRIPTOR: CompletionBlockDescriptor = CompletionBlockDescriptor {
+    reserved: 0,
+    size: std::mem::size_of::<CompletionBlock>() as u64,
+};
+
+unsafe extern "C" fn pipeline_state_built(
+    block: *mut CompletionBlock,
     pipeline_state: ObjcId,
+    error: ObjcId,
+) {
+    let block = &*block;
+    msg_send_![block.pipeline_descriptor, release];
+    let building = Arc::from_raw(block.building);
+    let result = if pipeline_state.is_null() {
+        let description: ObjcId = msg_send![error, localizedDescription];
+        Err(apple_util::nsstring_to_string(description))
+    } else {
+        // Metal only lends it to the handler.
+        msg_send_![pipeline_state, retain];
+        Ok(pipeline_state)
+    };
+    *building.result.lock().unwrap() = Some(BuildResult(result));
+    building.finished.notify_all();
+}
+
+#[derive(Debug)]
+struct PipelineInternal {
+    /// Everything but the attachment formats, which each pipeline state
+    /// fills in with its own.
+    descriptor: ObjcId,
+    /// The view's, started with the pipeline, then one for each other
+    /// set of formats it's been prepared for or drawn with.
+    pipeline_states: Vec<(AttachmentFormats, PipelineState)>,
     depth_stencil_state: ObjcId,
     //layout: Vec<BufferLayout>,
     //attributes: Vec<VertexAttributeInternal>,
     _shader: ShaderId,
     //params: PipelineParams,
+}
+
+impl PipelineInternal {
+    /// Starts building the pipeline state for `formats`, unless it's
+    /// built or being built already. Metal builds it on threads of its
+    /// own, so states started together build at once.
+    fn start_building(&mut self, device: ObjcId, formats: AttachmentFormats) {
+        if self
+            .pipeline_states
+            .iter()
+            .any(|(built_for, _)| *built_for == formats)
+        {
+            return;
+        }
+        let building = Arc::new(BuildingPipelineState::default());
+        unsafe {
+            // A copy, so the next build's formats don't change this one's.
+            let descriptor = msg_send_![self.descriptor, copy];
+            let color_attachment = msg_send_![
+                msg_send_![descriptor, colorAttachments],
+                objectAtIndexedSubscript: 0usize
+            ];
+            msg_send_![color_attachment, setPixelFormat: formats.color];
+            msg_send_![descriptor, setDepthAttachmentPixelFormat: formats.depth];
+            msg_send_![descriptor, setStencilAttachmentPixelFormat: formats.stencil];
+            msg_send_![descriptor, setSampleCount: formats.sample_count];
+
+            let block = CompletionBlock {
+                isa: _NSConcreteStackBlock.as_ptr() as *const c_void,
+                flags: 0,
+                reserved: 0,
+                invoke: pipeline_state_built,
+                descriptor: &COMPLETION_BLOCK_DESCRIPTOR,
+                pipeline_descriptor: descriptor,
+                building: Arc::into_raw(building.clone()),
+            };
+            msg_send_![
+                device,
+                newRenderPipelineStateWithDescriptor: descriptor
+                completionHandler: &block
+            ];
+        }
+        self.pipeline_states
+            .push((formats, PipelineState::Building(building)));
+    }
+
+    /// The pipeline state for `formats`, waiting for it to finish
+    /// building, or building it now if it hasn't started.
+    fn pipeline_state(&mut self, device: ObjcId, formats: AttachmentFormats) -> ObjcId {
+        self.start_building(device, formats);
+        let (_, state) = self
+            .pipeline_states
+            .iter_mut()
+            .find(|(built_for, _)| *built_for == formats)
+            .unwrap();
+        if let PipelineState::Building(building) = state {
+            let built = building.wait().unwrap_or_else(|error| {
+                panic!("newRenderPipelineStateWithDescriptor error: {}", error)
+            });
+            *state = PipelineState::Built(built);
+        }
+        let PipelineState::Built(pipeline_state) = state else {
+            unreachable!()
+        };
+        *pipeline_state
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -289,6 +492,7 @@ pub struct MetalContext {
     /// for `apply_scissor_rect`'s Y-flip + clamp.
     current_pass_width: u32,
     current_pass_height: u32,
+    current_pass_formats: Option<AttachmentFormats>,
     // Bookkeeping for the deferred-end pass-merge in `begin_pass`
     // / `end_render_pass`.
     current_pass_target: Option<Option<RenderPass>>,
@@ -386,6 +590,7 @@ impl MetalContext {
                 render_encoder: None,
                 current_pass_width: 0,
                 current_pass_height: 0,
+                current_pass_formats: None,
                 current_pass_target: None,
                 pending_end_encoder: false,
                 view,
@@ -1054,8 +1259,6 @@ impl RenderingBackend for MetalContext {
             let color_attachments = msg_send_![descriptor, colorAttachments];
             for i in 0..1usize {
                 let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: i];
-                let view_pixel_format: MTLPixelFormat = msg_send![self.view, colorPixelFormat];
-                msg_send_![color_attachment, setPixelFormat: view_pixel_format];
                 if let Some(color_blend) = params.color_blend {
                     msg_send_![color_attachment, setBlendingEnabled: true];
 
@@ -1099,40 +1302,6 @@ impl RenderingBackend for MetalContext {
                     ];
                 }
             }
-            // Pipeline depth/stencil formats must match whatever
-            // render pass uses this pipeline. MTKView reports
-            // `Invalid` when no depth/stencil is configured —
-            // leave the descriptor's defaults (also `Invalid`)
-            // alone in that case; otherwise mirror the view.
-            let view_depth_stencil_format: MTLPixelFormat =
-                msg_send![self.view, depthStencilPixelFormat];
-            if view_depth_stencil_format != MTLPixelFormat::Invalid {
-                msg_send_![
-                    descriptor,
-                    setDepthAttachmentPixelFormat: view_depth_stencil_format
-                ];
-                msg_send_![
-                    descriptor,
-                    setStencilAttachmentPixelFormat: view_depth_stencil_format
-                ];
-            }
-            // Pipeline sampleCount must match every render-pass
-            // color attachment it binds to; use the view's as the
-            // canonical app-wide value.
-            let view_sample_count: u64 = msg_send![self.view, sampleCount];
-            msg_send_![descriptor, setSampleCount: view_sample_count];
-
-            let mut error: ObjcId = nil;
-            let pipeline_state: ObjcId = msg_send![
-                self.device,
-                newRenderPipelineStateWithDescriptor: descriptor
-                error: &mut error
-            ];
-            if pipeline_state.is_null() {
-                let description: ObjcId = msg_send![error, localizedDescription];
-                let string = apple_util::nsstring_to_string(description);
-                panic!("newRenderPipelineStateWithDescriptor error: {}", string);
-            }
 
             let depth_stencil_desc = msg_send_![class!(MTLDepthStencilDescriptor), new];
             msg_send_![depth_stencil_desc, setDepthWriteEnabled: BOOL::from(params.depth_write)];
@@ -1167,19 +1336,34 @@ impl RenderingBackend for MetalContext {
                 newDepthStencilStateWithDescriptor: depth_stencil_desc
             ];
 
-            let pipeline = PipelineInternal {
-                pipeline_state,
+            let mut pipeline = PipelineInternal {
+                descriptor,
+                pipeline_states: vec![],
                 depth_stencil_state,
                 //layout: buffer_layout.to_vec(),
                 //attributes: vertex_layout,
                 _shader: shader,
                 //params,
             };
+            // Building a pipeline state takes milliseconds, so the view's
+            // starts now rather than at the first draw. A render target's
+            // formats aren't known until it's prepared for or drawn into.
+            pipeline.start_building(self.device, AttachmentFormats::of_view(self.view));
 
             self.pipelines.push(pipeline);
 
             Pipeline(self.pipelines.len() - 1)
         }
+    }
+
+    fn prepare_pipeline(&mut self, pipeline: &Pipeline, pass: Option<RenderPass>) {
+        let formats = unsafe {
+            match pass {
+                None => AttachmentFormats::of_view(self.view),
+                Some(pass) => AttachmentFormats::of_pass(self.passes[pass.0].render_pass_desc),
+            }
+        };
+        self.pipelines[pipeline.0].start_building(self.device, formats);
     }
 
     fn apply_pipeline(&mut self, pipeline: &Pipeline) {
@@ -1191,9 +1375,11 @@ impl RenderingBackend for MetalContext {
 
         unsafe {
             self.current_pipeline = Some(*pipeline);
-            let pipeline = &self.pipelines[pipeline.0];
+            let pipeline = &mut self.pipelines[pipeline.0];
+            let formats = self.current_pass_formats.unwrap();
+            let pipeline_state = pipeline.pipeline_state(self.device, formats);
 
-            msg_send_![render_encoder, setRenderPipelineState: pipeline.pipeline_state];
+            msg_send_![render_encoder, setRenderPipelineState: pipeline_state];
             msg_send_![render_encoder, setDepthStencilState:pipeline.depth_stencil_state];
             // render_encoder.set_front_facing_winding(pipeline.params.front_face_order.into());
             // render_encoder.set_cull_mode(pipeline.params.cull_face.into());
@@ -1349,6 +1535,7 @@ impl RenderingBackend for MetalContext {
             assert!(!descriptor.is_null());
             self.current_pass_width = width_px;
             self.current_pass_height = height_px;
+            self.current_pass_formats = Some(AttachmentFormats::of_pass(descriptor));
 
             let color_attachments = msg_send_![descriptor, colorAttachments];
             let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: 0];
