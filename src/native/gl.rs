@@ -400,6 +400,26 @@ gl_loader!(
         width: GLsizei,
         height: GLsizei
     ) -> (),
+    fn glRenderbufferStorageMultisampleEXT(
+        target: GLenum,
+        samples: GLsizei,
+        internalformat: GLenum,
+        width: GLsizei,
+        height: GLsizei
+    ) -> (),
+    fn glFramebufferTexture2DMultisampleEXT(
+        target: GLenum,
+        attachment: GLenum,
+        textarget: GLenum,
+        texture: GLuint,
+        level: GLint,
+        samples: GLsizei
+    ) -> (),
+    fn glInvalidateFramebuffer(
+        target: GLenum,
+        numAttachments: GLsizei,
+        attachments: *const GLenum
+    ) -> (),
     fn glDrawBuffers(n: GLsizei, bufs: *const GLenum) -> (),
     fn glVertexAttribDivisor(index: GLuint, divisor: GLuint) -> (),
     fn glBufferSubData(

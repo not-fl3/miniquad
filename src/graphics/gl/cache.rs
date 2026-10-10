@@ -37,6 +37,9 @@ pub struct GlCache {
     pub textures: [CachedTexture; MAX_SHADERSTAGE_IMAGES],
     pub cur_pipeline: Option<Pipeline>,
     pub cur_pass: Option<RenderPass>,
+    /// The pass begun last this frame, `Some(None)` for the default one,
+    /// which drawing carries on into while the next pass begun is the same.
+    pub last_pass: Option<Option<RenderPass>>,
     pub color_blend: Option<BlendState>,
     pub alpha_blend: Option<BlendState>,
     pub stencil: Option<StencilState>,

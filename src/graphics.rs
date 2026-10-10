@@ -400,6 +400,18 @@ pub struct TextureParams {
     /// be created instead of a regulat texture.
     ///
     pub sample_count: i32,
+    /// Only used for render textures. A transient render texture's contents
+    /// last only as long as the pass drawing into it: a pass that doesn't
+    /// clear it starts with them undefined, and only what a multisampled one
+    /// resolves into outlives the pass.
+    ///
+    /// On Metal, a GPU with tile memory keeps them there alone, so the
+    /// texture takes up no memory, and no pass stores them. On OpenGL ES with
+    /// [`Features::multisampled_render_to_texture`], a pass resolving a
+    /// multisampled one keeps its samples in tile memory, and a pass that
+    /// doesn't clear one doesn't load it. Elsewhere, OpenGL keeps them as it
+    /// does any texture's.
+    pub transient: bool,
 }
 
 impl Default for TextureParams {
@@ -415,6 +427,7 @@ impl Default for TextureParams {
             height: 0,
             allocate_mipmaps: false,
             sample_count: 1,
+            transient: false,
         }
     }
 }
@@ -582,6 +595,13 @@ pub struct Features {
     /// With resolve_attachments: false, not-none resolve_img in new_render_pass will
     /// result in a runtime panic.
     pub resolve_attachments: bool,
+    /// Whether the context is OpenGL ES 3 with
+    /// `GL_EXT_multisampled_render_to_texture`. A pass that resolves a
+    /// [transient](TextureParams::transient) multisampled color texture
+    /// then draws into its resolve texture, keeping the samples in tile
+    /// memory and resolving them as the GPU writes the tile out, rather
+    /// than copying them at every `end_render_pass`. Always false on Metal.
+    pub multisampled_render_to_texture: bool,
 }
 
 impl Default for Features {
@@ -589,6 +609,7 @@ impl Default for Features {
         Features {
             instancing: true,
             resolve_attachments: true,
+            multisampled_render_to_texture: false,
         }
     }
 }
@@ -1160,6 +1181,7 @@ pub trait RenderingBackend {
                 mipmap_filter: MipmapFilterMode::None,
                 allocate_mipmaps: false,
                 sample_count: 1,
+                transient: false,
             },
         )
     }

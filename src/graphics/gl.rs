@@ -7,6 +7,46 @@ mod cache;
 use super::*;
 use cache::*;
 
+#[cfg(target_arch = "wasm32")]
+use webgl_stand_ins::{
+    glFramebufferTexture2DMultisampleEXT, glInvalidateFramebuffer,
+    glRenderbufferStorageMultisampleEXT,
+};
+
+/// WebGL has no `GL_EXT_multisampled_render_to_texture`, so
+/// `Features::multisampled_render_to_texture` is false there and these
+/// never run. They keep the module from importing them from `gl.js`.
+#[cfg(target_arch = "wasm32")]
+#[allow(non_snake_case)]
+mod webgl_stand_ins {
+    use super::{GLenum, GLint, GLsizei, GLuint};
+
+    pub unsafe fn glRenderbufferStorageMultisampleEXT(
+        _: GLenum,
+        _: GLsizei,
+        _: GLenum,
+        _: GLsizei,
+        _: GLsizei,
+    ) {
+        unreachable!()
+    }
+
+    pub unsafe fn glFramebufferTexture2DMultisampleEXT(
+        _: GLenum,
+        _: GLenum,
+        _: GLenum,
+        _: GLuint,
+        _: GLint,
+        _: GLsizei,
+    ) {
+        unreachable!()
+    }
+
+    pub unsafe fn glInvalidateFramebuffer(_: GLenum, _: GLsizei, _: *const GLenum) {
+        unreachable!()
+    }
+}
+
 /// Raw OpenGL bindings
 /// Highly unsafe, some of the functions could be missing due to incompatible GL version
 /// or all of them might be missing alltogether if rendering context is not a GL one.
@@ -197,13 +237,27 @@ impl Texture {
                 glGenRenderbuffers(1, &mut renderbuffer as *mut _);
                 glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer as _);
                 let internal_format = params.format.sized_internal_format();
-                glRenderbufferStorageMultisample(
-                    GL_RENDERBUFFER,
-                    params.sample_count,
-                    internal_format,
-                    params.width as _,
-                    params.height as _,
-                );
+                let (width, height) = (params.width as _, params.height as _);
+                if params.transient && ctx.info.features.multisampled_render_to_texture {
+                    // An implicit multisample buffer, which can share a
+                    // framebuffer with a texture drawn into multisampled,
+                    // and can live in tile memory alone.
+                    glRenderbufferStorageMultisampleEXT(
+                        GL_RENDERBUFFER,
+                        params.sample_count,
+                        internal_format,
+                        width,
+                        height,
+                    );
+                } else {
+                    glRenderbufferStorageMultisample(
+                        GL_RENDERBUFFER,
+                        params.sample_count,
+                        internal_format,
+                        width,
+                        height,
+                    );
+                }
             }
             return Texture {
                 raw: TextureOrRenderbuffer::Renderbuffer(renderbuffer),
@@ -493,6 +547,9 @@ pub(crate) struct RenderPassInternal {
     gl_fb: GLuint,
     color_textures: Vec<TextureId>,
     resolves: Option<Vec<(u32, TextureId)>>,
+    /// The texture the pass's color resolves into on the tile, drawn into
+    /// multisampled in its place, with nothing to copy as the pass ends.
+    resolved_on_tile: Option<TextureId>,
     depth_texture: Option<TextureId>,
 }
 
@@ -557,6 +614,7 @@ impl GlContext {
                     vertex_buffer: 0,
                     cur_pipeline: None,
                     cur_pass: None,
+                    last_pass: None,
                     color_blend: None,
                     alpha_blend: None,
                     stencil: None,
@@ -576,6 +634,46 @@ impl GlContext {
 
     pub fn features(&self) -> &Features {
         &self.info.features
+    }
+
+    /// Whether a pass can draw `color` into the texture it resolves into,
+    /// its samples kept on the tile: it's transient and multisampled, and
+    /// so is any depth beside it, which can then share its framebuffer.
+    fn resolves_on_tile(&self, color: TextureId, depth: Option<TextureId>) -> bool {
+        let transient = |texture| {
+            let params = self.textures.get(texture).params;
+            params.transient && params.sample_count > 1
+        };
+        self.info.features.multisampled_render_to_texture
+            && transient(color)
+            && depth.map_or(true, transient)
+    }
+
+    /// Spare a pass that drawing has just come to, without clearing it,
+    /// from loading what its transient textures held.
+    fn invalidate_transient_attachments(&self, pass: RenderPass) {
+        if !self.info.features.multisampled_render_to_texture {
+            return;
+        }
+        let pass = &self.passes[pass.0];
+        let transient = |texture: &TextureId| self.textures.get(*texture).params.transient;
+        let mut attachments: Vec<GLenum> = (GL_COLOR_ATTACHMENT0..)
+            .zip(&pass.color_textures)
+            .filter(|(_, texture)| transient(texture))
+            .map(|(attachment, _)| attachment)
+            .collect();
+        if pass.depth_texture.as_ref().is_some_and(transient) {
+            attachments.push(GL_DEPTH_ATTACHMENT);
+        }
+        if !attachments.is_empty() {
+            unsafe {
+                glInvalidateFramebuffer(
+                    GL_FRAMEBUFFER,
+                    attachments.len() as _,
+                    attachments.as_ptr(),
+                )
+            };
+        }
     }
 }
 
@@ -830,9 +928,17 @@ fn gl_info() -> ContextInfo {
         || gl_version_string.starts_with("OpenGL ES 2");
     let webgl1 = gl_version_string == "WebGL 1.0";
 
+    // WebGL has no `GL_EXT_multisampled_render_to_texture`.
+    #[cfg(target_arch = "wasm32")]
+    let multisampled_render_to_texture = false;
+    #[cfg(not(target_arch = "wasm32"))]
+    let multisampled_render_to_texture = gl_version_string.contains("OpenGL ES 3")
+        && has_extension("GL_EXT_multisampled_render_to_texture");
+
     let features = Features {
         instancing: !gl2,
         resolve_attachments: !webgl1 && !gl2,
+        multisampled_render_to_texture,
     };
 
     let mut glsl_support = GlslSupport::default();
@@ -879,6 +985,18 @@ fn gl_info() -> ContextInfo {
         glsl_support,
         features,
     }
+}
+
+/// Whether the context lists `name` among its extensions.
+#[cfg(not(target_arch = "wasm32"))]
+fn has_extension(name: &str) -> bool {
+    let mut count = 0;
+    unsafe { glGetIntegerv(GL_NUM_EXTENSIONS, &mut count) };
+    (0..count as GLuint).any(|index| {
+        let extension = unsafe { glGetStringi(GL_EXTENSIONS, index) };
+        !extension.is_null()
+            && unsafe { std::ffi::CStr::from_ptr(extension as _) }.to_bytes() == name.as_bytes()
+    })
 }
 
 impl RenderingBackend for GlContext {
@@ -1068,13 +1186,29 @@ impl RenderingBackend for GlContext {
         }
         let mut gl_fb = 0;
 
+        let resolved_on_tile = match (color_img, resolve_img) {
+            ([color], Some([resolve])) if self.resolves_on_tile(*color, depth_img) => {
+                Some(*resolve)
+            }
+            _ => None,
+        };
         let mut resolves = None;
         unsafe {
             glGenFramebuffers(1, &mut gl_fb as *mut _);
             glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
             for (i, color_img) in color_img.iter().enumerate() {
                 let texture = self.textures.get(*color_img);
-                if texture.params.sample_count > 1 {
+                if let Some(resolved) = resolved_on_tile {
+                    let raw = self.textures.get(resolved).raw.texture().unwrap();
+                    glFramebufferTexture2DMultisampleEXT(
+                        GL_FRAMEBUFFER,
+                        GL_COLOR_ATTACHMENT0 + i as u32,
+                        GL_TEXTURE_2D,
+                        raw,
+                        0,
+                        texture.params.sample_count,
+                    );
+                } else if texture.params.sample_count > 1 {
                     let raw = texture.raw.renderbuffer().unwrap();
                     glFramebufferRenderbuffer(
                         GL_FRAMEBUFFER,
@@ -1123,7 +1257,7 @@ impl RenderingBackend for GlContext {
                 glDrawBuffers(color_img.len() as _, attachments.as_ptr() as _);
             }
 
-            if let Some(resolve_img) = resolve_img {
+            if let Some(resolve_img) = resolve_img.filter(|_| resolved_on_tile.is_none()) {
                 resolves = Some(vec![]);
                 let resolves = resolves.as_mut().unwrap();
                 for (i, resolve_img) in resolve_img.iter().enumerate() {
@@ -1151,6 +1285,7 @@ impl RenderingBackend for GlContext {
             gl_fb,
             color_textures: color_img.to_vec(),
             resolves,
+            resolved_on_tile,
             depth_texture: depth_img,
         };
 
@@ -1174,6 +1309,9 @@ impl RenderingBackend for GlContext {
                 unsafe { glDeleteFramebuffers(1, &fb as *const _) }
                 self.delete_texture(texture);
             }
+        }
+        if let Some(texture) = render_pass.resolved_on_tile {
+            self.delete_texture(texture);
         }
         if let Some(depth_texture) = render_pass.depth_texture {
             self.delete_texture(depth_texture);
@@ -1635,6 +1773,7 @@ impl RenderingBackend for GlContext {
 
     fn begin_pass(&mut self, pass: Option<RenderPass>, action: PassAction) {
         self.cache.cur_pass = pass;
+        let carries_on = self.cache.last_pass.replace(pass) == Some(pass);
         let (framebuffer, w, h) = match pass {
             None => {
                 let (screen_width, screen_height) = window::screen_size();
@@ -1668,7 +1807,11 @@ impl RenderingBackend for GlContext {
             glScissor(0, 0, w, h);
         }
         match action {
-            PassAction::Nothing => {}
+            PassAction::Nothing => {
+                if let (Some(pass), false) = (pass, carries_on) {
+                    self.invalidate_transient_attachments(pass);
+                }
+            }
             PassAction::Clear {
                 color,
                 depth,
@@ -1720,6 +1863,7 @@ impl RenderingBackend for GlContext {
     fn commit_frame(&mut self) {
         self.cache.clear_buffer_bindings();
         self.cache.clear_texture_bindings();
+        self.cache.last_pass = None;
     }
 
     fn draw(&self, base_element: i32, num_elements: i32, num_instances: i32) {
