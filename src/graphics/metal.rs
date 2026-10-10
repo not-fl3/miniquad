@@ -755,18 +755,37 @@ impl RenderingBackend for MetalContext {
         _meta: ShaderMeta,
     ) -> Result<ShaderId, ShaderError> {
         unsafe {
-            let program = match shader {
-                ShaderSource::Msl { program } => program,
+            let mut error: ObjcId = nil;
+            let library: ObjcId = match shader {
+                ShaderSource::Msl { program } => {
+                    let shader = apple_util::str_to_nsstring(program);
+                    msg_send![
+                        self.device,
+                        newLibraryWithSource: shader
+                        options:nil
+                        error: &mut error
+                    ]
+                }
+                ShaderSource::MetalLibrary { data } => {
+                    let data = dispatch_data_create(
+                        data.as_ptr() as *const c_void,
+                        data.len(),
+                        nil,
+                        DISPATCH_DATA_DESTRUCTOR_DEFAULT,
+                    );
+                    let library: ObjcId =
+                        msg_send![self.device, newLibraryWithData: data error: &mut error];
+                    dispatch_release(data);
+                    if library.is_null() {
+                        let description: ObjcId = msg_send![error, localizedDescription];
+                        return Err(ShaderError::LinkError(apple_util::nsstring_to_string(
+                            description,
+                        )));
+                    }
+                    library
+                }
                 _ => panic!("OpenGl source on Metal context"),
             };
-            let shader = apple_util::str_to_nsstring(program);
-            let mut error: ObjcId = nil;
-            let library: ObjcId = msg_send![
-                self.device,
-                newLibraryWithSource: shader
-                options:nil
-                error: &mut error
-            ];
             if library.is_null() {
                 let description: ObjcId = msg_send![error, localizedDescription];
                 let string = apple_util::nsstring_to_string(description);

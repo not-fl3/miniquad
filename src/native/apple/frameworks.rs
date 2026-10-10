@@ -69,7 +69,17 @@ impl Drop for RcObjcId {
 extern "C" {
     pub static _NSConcreteStackBlock: [*const c_void; 32];
     pub static _NSConcreteBogusBlock: [*const c_void; 32];
+    pub fn dispatch_data_create(
+        buffer: *const c_void,
+        size: usize,
+        queue: ObjcId,
+        destructor: ObjcId,
+    ) -> ObjcId;
+    pub fn dispatch_release(object: ObjcId);
 }
+
+/// Has `dispatch_data_create` copy the buffer it's given.
+pub const DISPATCH_DATA_DESTRUCTOR_DEFAULT: ObjcId = nil;
 
 #[link(name = "Foundation", kind = "framework")]
 extern "C" {
