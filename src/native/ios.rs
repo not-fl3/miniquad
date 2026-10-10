@@ -848,8 +848,11 @@ fn define_textfield_dlg() -> *const Class {
 }
 
 pub fn log(message: &str) {
+    // `NSLog` reads its first argument as a format string, so the message
+    // goes in as an argument, where a `%` in it can't be read as a specifier.
+    let format = apple_util::str_to_nsstring("%@");
     let nsstring = apple_util::str_to_nsstring(message);
-    let _: () = unsafe { frameworks::NSLog(nsstring) };
+    let _: () = unsafe { frameworks::NSLog(format, nsstring) };
 }
 
 pub fn load_file<F: Fn(crate::fs::Response) + 'static>(path: &str, on_loaded: F) {
@@ -858,13 +861,12 @@ pub fn load_file<F: Fn(crate::fs::Response) + 'static>(path: &str, on_loaded: F)
     let path_without_extension = path_without_extension.to_str().unwrap();
     let extension = path.extension().unwrap_or_default().to_str().unwrap();
 
-    unsafe {
-        let nsstring = apple_util::str_to_nsstring(&format!(
-            "loading: {} {}",
-            path_without_extension, extension
-        ));
-        let _: () = frameworks::NSLog(nsstring);
+    log(&format!(
+        "loading: {} {}",
+        path_without_extension, extension
+    ));
 
+    unsafe {
         let main_bundle: ObjcId = msg_send![class!(NSBundle), mainBundle];
         let resource = apple_util::str_to_nsstring(path_without_extension);
         let type_ = apple_util::str_to_nsstring(extension);
@@ -900,10 +902,7 @@ where
 {
     RUN_ARGS = Some((Box::new(f), conf));
 
-    std::panic::set_hook(Box::new(|info| {
-        let nsstring = apple_util::str_to_nsstring(&format!("{:?}", info));
-        let _: () = frameworks::NSLog(nsstring);
-    }));
+    std::panic::set_hook(Box::new(|info| log(&format!("{:?}", info))));
 
     let argc = 1;
     let mut argv = b"Miniquad\0" as *const u8 as *mut i8;
