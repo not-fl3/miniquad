@@ -416,6 +416,34 @@ impl MetalContext {
     }
 }
 
+/// Flips a bottom-left-origin scissor rect to Metal's top-left origin
+/// against the active pass, not the screen (they diverge for off-screen
+/// targets at high DPI), and intersects it with the pass, as Metal
+/// validation rejects a scissor that reaches past it. Callers (macroquad)
+/// can pass one that does, e.g. sized against a screen size that lags
+/// the drawable's by a frame mid-rotation.
+fn scissor_within_pass(
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    pass_width: i32,
+    pass_height: i32,
+) -> MTLScissorRect {
+    let left = x.clamp(0, pass_width);
+    let right = x.saturating_add(w).clamp(0, pass_width).max(left);
+    let top = pass_height
+        .saturating_sub(y.saturating_add(h))
+        .clamp(0, pass_height);
+    let bottom = pass_height.saturating_sub(y).clamp(0, pass_height).max(top);
+    MTLScissorRect {
+        x: left as u64,
+        y: top as u64,
+        width: (right - left) as u64,
+        height: (bottom - top) as u64,
+    }
+}
+
 impl RenderingBackend for MetalContext {
     fn info(&self) -> ContextInfo {
         ContextInfo {
@@ -450,26 +478,14 @@ impl RenderingBackend for MetalContext {
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
         assert!(self.render_encoder.is_some());
 
-        // Flip against the active pass height, not the screen —
-        // they diverge for off-screen targets at high DPI. Then
-        // clamp into `[0, pass_size]` on both axes: callers
-        // (macroquad) can briefly request a scissor sized against
-        // a stale screen cache (e.g. mid-rotation, where the
-        // caller's `screen_size()` lags MTKView's drawable
-        // dimensions by a frame), and an unclamped scissor would
-        // trip Metal validation.
-        let pass_width = self.current_pass_width as i32;
-        let pass_height = self.current_pass_height as i32;
-        let x_clamped = x.clamp(0, pass_width);
-        let y_metal = (pass_height - (y + h)).clamp(0, pass_height);
-        let w_clamped = (pass_width - x_clamped).clamp(0, w.max(0));
-        let h_clamped = (pass_height - y_metal).clamp(0, h.max(0));
-        let r = MTLScissorRect {
-            x: x_clamped as u64,
-            y: y_metal as u64,
-            width: w_clamped as u64,
-            height: h_clamped as u64,
-        };
+        let r = scissor_within_pass(
+            x,
+            y,
+            w,
+            h,
+            self.current_pass_width as i32,
+            self.current_pass_height as i32,
+        );
         unsafe { msg_send_![self.render_encoder.unwrap(), setScissorRect: r] };
     }
     fn texture_set_min_filter(
@@ -1469,5 +1485,42 @@ impl RenderingBackend for MetalContext {
         if (self.current_frame_index + 1) >= 3 {
             self.current_frame_index = 0;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::scissor_within_pass;
+
+    fn scissor(x: i32, y: i32, w: i32, h: i32) -> (u64, u64, u64, u64) {
+        let r = scissor_within_pass(x, y, w, h, 804, 1748);
+        (r.x, r.y, r.width, r.height)
+    }
+
+    #[test]
+    fn flips_a_rect_inside_the_pass() {
+        assert_eq!(scissor(10, 20, 100, 200), (10, 1528, 100, 200));
+    }
+
+    #[test]
+    fn keeps_the_part_of_a_taller_rect_inside_the_pass() {
+        assert_eq!(scissor(0, -6992, 804, 8304), (0, 436, 804, 1312));
+        assert_eq!(scissor(0, 436, 804, 8304), (0, 0, 804, 1312));
+    }
+
+    #[test]
+    fn keeps_the_part_of_a_wider_rect_inside_the_pass() {
+        assert_eq!(scissor(-100, 0, 300, 1748), (0, 0, 200, 1748));
+        assert_eq!(scissor(700, 0, 300, 1748), (700, 0, 104, 1748));
+    }
+
+    #[test]
+    fn empties_a_rect_outside_the_pass() {
+        assert_eq!(scissor(-300, 0, 200, 1748).2, 0);
+        assert_eq!(scissor(900, 0, 200, 1748).2, 0);
+        assert_eq!(scissor(0, -300, 804, 200).3, 0);
+        assert_eq!(scissor(0, 1800, 804, 200).3, 0);
+        let (_, _, width, height) = scissor(10, 20, -5, -5);
+        assert_eq!((width, height), (0, 0));
     }
 }
