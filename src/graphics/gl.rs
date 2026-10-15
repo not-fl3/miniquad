@@ -911,12 +911,11 @@ impl RenderingBackend for GlContext {
     }
 
     fn delete_texture(&mut self, texture: TextureId) {
-        //self.cache.clear_texture_bindings();
-
         let t = self.textures.get(texture);
         match &t.raw {
             TextureOrRenderbuffer::Texture(raw) => unsafe {
                 glDeleteTextures(1, raw as *const _);
+                self.cache.forget_texture(*raw);
             },
             TextureOrRenderbuffer::Renderbuffer(raw) => unsafe {
                 glDeleteRenderbuffers(1, raw as *const _);

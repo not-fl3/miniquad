@@ -116,6 +116,25 @@ impl GlCache {
         self.index_buffer = 0;
     }
 
+    /// Forgets `texture` wherever the cache records it as bound. Deleting a
+    /// texture already rebinds those units to 0 in GL, so no GL call is
+    /// needed; but if the cache kept the name, a texture created later with
+    /// the same name would be taken as already bound and never be bound.
+    pub fn forget_texture(&mut self, texture: GLuint) {
+        for cached in &mut self.textures {
+            if cached.texture == texture {
+                *cached = CachedTexture {
+                    target: 0,
+                    texture: 0,
+                };
+            }
+        }
+        if self.stored_texture == texture {
+            self.stored_target = 0;
+            self.stored_texture = 0;
+        }
+    }
+
     pub fn clear_texture_bindings(&mut self) {
         for ix in 0..MAX_SHADERSTAGE_IMAGES {
             if self.textures[ix].texture != 0 {
