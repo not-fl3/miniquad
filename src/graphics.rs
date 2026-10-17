@@ -282,6 +282,15 @@ impl Display for ShaderType {
     }
 }
 
+/// A shader [`RenderingBackend::start_shader`] started, for
+/// [`RenderingBackend::finish_shader`] to finish.
+pub struct PendingShader(PendingShaderInner);
+
+enum PendingShaderInner {
+    Finished(Result<ShaderId, ShaderError>),
+    Gl(gl::LinkingProgram),
+}
+
 #[derive(Clone, Debug)]
 pub enum ShaderError {
     CompilationError {
@@ -1128,6 +1137,26 @@ pub trait RenderingBackend {
         shader: ShaderSource,
         meta: ShaderMeta,
     ) -> Result<ShaderId, ShaderError>;
+    /// Starts making a shader as [`new_shader`](Self::new_shader) does, without
+    /// waiting for it to compile, so the shaders started before any is finished
+    /// compile at once where the driver can. [`finish_shader`](Self::finish_shader)
+    /// then returns what `new_shader` would have.
+    fn start_shader(&mut self, shader: ShaderSource, meta: ShaderMeta) -> PendingShader {
+        PendingShader(PendingShaderInner::Finished(self.new_shader(shader, meta)))
+    }
+    /// Whether `shader` is still compiling, so [`finish_shader`](Self::finish_shader)
+    /// would wait for it. Only OpenGL with `KHR_parallel_shader_compile` can tell;
+    /// otherwise this is `false`.
+    fn is_shader_compiling(&self, _shader: &PendingShader) -> bool {
+        false
+    }
+    /// Waits for `shader` to compile, if it still is, and returns it.
+    fn finish_shader(&mut self, shader: PendingShader) -> Result<ShaderId, ShaderError> {
+        match shader.0 {
+            PendingShaderInner::Finished(result) => result,
+            PendingShaderInner::Gl(_) => panic!("OpenGL shader on another context"),
+        }
+    }
     fn new_texture(
         &mut self,
         access: TextureAccess,

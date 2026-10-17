@@ -795,7 +795,10 @@ var importObject = {
                 name = name.slice(0, leftBrace);
             }
 
-            var uniformInfo = GL.programInfos[program] && GL.programInfos[program].uniforms[name]; // returns pair [ dimension_of_uniform_array, uniform_location ]
+            if (!GL.programInfos[program]) {
+                GL.populateUniformTable(program);
+            }
+            var uniformInfo = GL.programInfos[program].uniforms[name]; // returns pair [ dimension_of_uniform_array, uniform_location ]
             if (uniformInfo && arrayIndex >= 0 && arrayIndex < uniformInfo[0]) { // Check if user asked for an out-of-bounds element, i.e. for 'vec4 colors[3];' user could ask for 'colors[10]' which should return -1.
                 return uniformInfo[1] + arrayIndex;
             } else {
@@ -891,7 +894,9 @@ var importObject = {
         glLinkProgram: function (program) {
             GL.validateGLObjectID(GL.programs, program, 'glLinkProgram', 'program');
             gl.linkProgram(GL.programs[program]);
-            GL.populateUniformTable(program);
+            // Reading the uniforms waits for the link to finish, so the
+            // table fills once a uniform is first asked for.
+            delete GL.programInfos[program];
         },
         glPixelStorei: function (pname, param) {
             gl.pixelStorei(pname, param);
@@ -907,8 +912,7 @@ var importObject = {
                 console.error("GL_INVALID_VALUE in glGetProgramiv");
                 return;
             }
-            var ptable = GL.programInfos[program];
-            if (!ptable) {
+            if (!GL.programs[program]) {
                 console.error('GL_INVALID_OPERATION in glGetProgramiv(program=' + program + ', pname=' + pname + ', p=0x' + p.toString(16) + '): The specified GL object name does not refer to a program object!');
                 return;
             }
@@ -1009,6 +1013,9 @@ var importObject = {
             array[parameter.length] = 0;
             stringToUTF8(parameter, array, 0, len);
             return msg;
+        },
+        webgl_enable_extension: function (name, length) {
+            return gl.getExtension(UTF8ToString(name, length)) !== null;
         },
         glCompileShader: function (shader, count, string, length) {
             GL.validateGLObjectID(GL.shaders, shader, 'glCompileShader', 'shader');

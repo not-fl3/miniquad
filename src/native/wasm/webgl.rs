@@ -58,6 +58,7 @@ pub const GL_SHORT: u32 = 0x1402;
 pub const GL_DEPTH_TEST: u32 = 0x0B71;
 pub const GL_TEXTURE_CUBE_MAP_NEGATIVE_Y: u32 = 0x8518;
 pub const GL_LINK_STATUS: u32 = 0x8B82;
+pub const GL_COMPLETION_STATUS_KHR: u32 = 0x91B1;
 pub const GL_TEXTURE_CUBE_MAP_POSITIVE_Y: u32 = 0x8517;
 pub const GL_SAMPLE_ALPHA_TO_COVERAGE: u32 = 0x809E;
 pub const GL_RGBA16F: u32 = 0x881A;
@@ -853,6 +854,8 @@ extern "C" {
     pub fn glClearBufferfv(buffer: GLenum, drawbuffer: GLint, value: *const GLfloat);
     pub fn glClearBufferfi(buffer: GLenum, drawbuffer: GLint, depth: GLfloat, stencil: GLint);
     pub fn glGetStringi(name: GLenum, index: GLuint) -> *const GLubyte;
+    /// Enables the WebGL extension `name`, and says whether the context has it.
+    pub fn webgl_enable_extension(name: *const u8, length: usize) -> bool;
     pub fn glCopyBufferSubData(
         readTarget: GLenum,
         writeTarget: GLenum,

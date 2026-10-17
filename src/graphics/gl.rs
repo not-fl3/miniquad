@@ -519,6 +519,9 @@ pub struct GlContext {
     default_framebuffer: GLuint,
     pub(crate) cache: GlCache,
     pub(crate) info: ContextInfo,
+    /// Whether the driver says when a program is done compiling and
+    /// linking, with `KHR_parallel_shader_compile`.
+    parallel_shader_compile: bool,
 }
 
 impl Default for GlContext {
@@ -548,6 +551,8 @@ impl GlContext {
                 buffers: ResourceManager::default(),
                 textures: Textures(vec![]),
                 info,
+                parallel_shader_compile: has_extension("GL_KHR_parallel_shader_compile")
+                    || has_extension("GL_ARB_parallel_shader_compile"),
                 cache: GlCache {
                     stored_index_buffer: 0,
                     stored_index_type: None,
@@ -579,19 +584,50 @@ impl GlContext {
     }
 }
 
-fn load_shader_internal(
+/// A program linking, and the shaders it links, which [`finish_program`] checks.
+pub(super) struct LinkingProgram {
+    program: GLuint,
+    vertex_shader: GLuint,
+    fragment_shader: GLuint,
+    meta: ShaderMeta,
+}
+
+/// Compiles and links a program without asking how either went, which
+/// would wait for them.
+fn start_program(
     vertex_shader: &str,
     fragment_shader: &str,
     meta: ShaderMeta,
-) -> Result<ShaderInternal, ShaderError> {
+) -> Result<LinkingProgram, ShaderError> {
     unsafe {
-        let vertex_shader = load_shader(GL_VERTEX_SHADER, vertex_shader)?;
-        let fragment_shader = load_shader(GL_FRAGMENT_SHADER, fragment_shader)?;
+        let vertex_shader = compile_shader(GL_VERTEX_SHADER, vertex_shader)?;
+        let fragment_shader = compile_shader(GL_FRAGMENT_SHADER, fragment_shader)?;
 
         let program = glCreateProgram();
         glAttachShader(program, vertex_shader);
         glAttachShader(program, fragment_shader);
         glLinkProgram(program);
+
+        Ok(LinkingProgram {
+            program,
+            vertex_shader,
+            fragment_shader,
+            meta,
+        })
+    }
+}
+
+/// Waits for `linking` to compile and link, and finds its uniforms.
+fn finish_program(linking: LinkingProgram) -> Result<ShaderInternal, ShaderError> {
+    let LinkingProgram {
+        program,
+        vertex_shader,
+        fragment_shader,
+        meta,
+    } = linking;
+    unsafe {
+        check_shader(GL_VERTEX_SHADER, vertex_shader)?;
+        check_shader(GL_FRAGMENT_SHADER, fragment_shader)?;
 
         // delete no longer used shaders
         glDetachShader(program, vertex_shader);
@@ -643,7 +679,7 @@ fn load_shader_internal(
     }
 }
 
-pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderError> {
+fn compile_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderError> {
     unsafe {
         let shader = glCreateShader(shader_type);
         assert!(shader != 0);
@@ -653,6 +689,12 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderEr
         glShaderSource(shader, 1, csource.as_ptr() as *const _, std::ptr::null());
         glCompileShader(shader);
 
+        Ok(shader)
+    }
+}
+
+fn check_shader(shader_type: GLenum, shader: GLuint) -> Result<(), ShaderError> {
+    unsafe {
         let mut is_compiled = 0;
         glGetShaderiv(shader, GL_COMPILE_STATUS, &mut is_compiled as *mut _);
         if is_compiled == 0 {
@@ -686,8 +728,7 @@ pub fn load_shader(shader_type: GLenum, source: &str) -> Result<GLuint, ShaderEr
                 error_message,
             });
         }
-
-        Ok(shader)
+        Ok(())
     }
 }
 
@@ -881,6 +922,26 @@ fn gl_info() -> ContextInfo {
     }
 }
 
+/// Whether the context lists `name` among its extensions.
+#[cfg(not(target_arch = "wasm32"))]
+fn has_extension(name: &str) -> bool {
+    let mut count = 0;
+    unsafe { glGetIntegerv(GL_NUM_EXTENSIONS, &mut count) };
+    (0..count as GLuint).any(|index| {
+        let extension = unsafe { glGetStringi(GL_EXTENSIONS, index) };
+        !extension.is_null()
+            && unsafe { std::ffi::CStr::from_ptr(extension as _) }.to_bytes() == name.as_bytes()
+    })
+}
+
+/// Whether the context has extension `name`, which WebGL names without
+/// its `GL_` prefix, and enables only once it's asked for.
+#[cfg(target_arch = "wasm32")]
+fn has_extension(name: &str) -> bool {
+    let name = name.strip_prefix("GL_").unwrap_or(name);
+    unsafe { webgl_enable_extension(name.as_ptr(), name.len()) }
+}
+
 impl RenderingBackend for GlContext {
     fn info(&self) -> ContextInfo {
         self.info.clone()
@@ -891,12 +952,42 @@ impl RenderingBackend for GlContext {
         shader: ShaderSource,
         meta: ShaderMeta,
     ) -> Result<ShaderId, ShaderError> {
+        let shader = self.start_shader(shader, meta);
+        self.finish_shader(shader)
+    }
+
+    fn start_shader(&mut self, shader: ShaderSource, meta: ShaderMeta) -> PendingShader {
         let (fragment, vertex) = match shader {
             ShaderSource::Glsl { fragment, vertex } => (fragment, vertex),
             _ => panic!("Metal source on OpenGl context"),
         };
-        let shader = load_shader_internal(vertex, fragment, meta)?;
-        Ok(ShaderId(self.shaders.add(shader)))
+        PendingShader(match start_program(vertex, fragment, meta) {
+            Ok(linking) => PendingShaderInner::Gl(linking),
+            Err(error) => PendingShaderInner::Finished(Err(error)),
+        })
+    }
+
+    fn is_shader_compiling(&self, shader: &PendingShader) -> bool {
+        match &shader.0 {
+            PendingShaderInner::Gl(linking) if self.parallel_shader_compile => {
+                let mut completed = 0;
+                unsafe {
+                    glGetProgramiv(linking.program, GL_COMPLETION_STATUS_KHR, &mut completed)
+                };
+                completed == 0
+            }
+            _ => false,
+        }
+    }
+
+    fn finish_shader(&mut self, shader: PendingShader) -> Result<ShaderId, ShaderError> {
+        match shader.0 {
+            PendingShaderInner::Finished(result) => result,
+            PendingShaderInner::Gl(linking) => {
+                let shader = finish_program(linking)?;
+                Ok(ShaderId(self.shaders.add(shader)))
+            }
+        }
     }
 
     fn new_texture(
