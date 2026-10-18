@@ -1341,15 +1341,18 @@ where
 
     let app_delegate_class = define_app_delegate();
     let app_delegate_instance: ObjcId = msg_send![app_delegate_class, new];
-    (*app_delegate_instance).set_ivar("activated", false);
+    let in_background = conf.platform.macos_launch_in_background;
+    // Starting out marked as activated skips the activation on the first update.
+    (*app_delegate_instance).set_ivar("activated", in_background);
 
     let ns_app: ObjcId = msg_send![class!(NSApplication), sharedApplication];
     let () = msg_send![ns_app, setDelegate: app_delegate_instance];
-    let () = msg_send![
-        ns_app,
-        setActivationPolicy: NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular
-            as i64
-    ];
+    let activation_policy = if in_background {
+        NSApplicationActivationPolicy::NSApplicationActivationPolicyAccessory
+    } else {
+        NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular
+    };
+    let () = msg_send![ns_app, setActivationPolicy: activation_policy as i64];
 
     if let Some(icon) = &conf.icon {
         set_icon(ns_app, icon);
@@ -1437,8 +1440,12 @@ where
         let () = msg_send![window, toggleFullScreen: nil];
     }
 
-    msg_send_![window, orderFront: nil];
-    let () = msg_send![window, makeKeyAndOrderFront: nil];
+    if in_background {
+        msg_send_![window, orderBack: nil];
+    } else {
+        msg_send_![window, orderFront: nil];
+        let () = msg_send![window, makeKeyAndOrderFront: nil];
+    }
 
     let () = msg_send![ns_app, finishLaunching];
 

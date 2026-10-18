@@ -181,6 +181,12 @@ pub struct Platform {
     /// Whether to automatically setup the panic hook for Android.
     /// Set this to false if your app does its own panic_hook setup to avoid conflicts.
     pub android_panic_hook: bool,
+
+    /// If `true`, on macOS the app starts without activating, showing no Dock icon and
+    /// leaving the menu bar alone, and its window opens behind other windows without
+    /// becoming key. Meant for windows nobody interacts with, such as one a tool only
+    /// screenshots.
+    pub macos_launch_in_background: bool,
 }
 
 impl Default for Platform {
@@ -197,6 +203,7 @@ impl Default for Platform {
             wayland_decorations: WaylandDecorations::default(),
             linux_wm_class: "miniquad-application",
             android_panic_hook: true,
+            macos_launch_in_background: false,
         }
     }
 }
