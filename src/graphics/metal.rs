@@ -1431,10 +1431,10 @@ impl RenderingBackend for MetalContext {
                        indexCount:num_elements as u64
                        indexType:MTLIndexType::UInt16
                        indexBuffer:index_buffer
-                       indexBufferOffset:0
+                       indexBufferOffset:0u64
                        instanceCount:num_instances as u64
-                       baseVertex:0
-                       baseInstance:0
+                       baseVertex:0i64
+                       baseInstance:0u64
             ];
         }
     }
