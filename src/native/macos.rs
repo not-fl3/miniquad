@@ -1468,6 +1468,10 @@ where
     };
     let mut done = false;
     while !(done || crate::native_display().lock().unwrap().quit_ordered) {
+        // `[NSApp run]` drains an autorelease pool each time round. Without
+        // one, nothing a frame autoreleases is ever freed: its command
+        // buffers, and with them every texture they drew with.
+        let pool = objc::runtime::objc_autoreleasePoolPush();
 
         // Wait at the top for just in time rendering
         if let Some(frame_pacer) = frame_pacer.as_ref() {
@@ -1510,5 +1514,6 @@ where
             perform_redraw(&mut display, conf.platform.apple_gfx_api, false);
         }
 
+        objc::runtime::objc_autoreleasePoolPop(pool);
     }
 }
