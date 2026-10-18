@@ -219,6 +219,8 @@ impl MacosDisplay {
             if dpi_scale > 0.0 {
                 d.dpi_scale = dpi_scale as f32;
             }
+        } else if self.gfx_api == AppleGfxApi::Metal {
+            d.dpi_scale = 1.0;
         } else {
             let bounds: NSRect = msg_send![self.view, bounds];
             let backing_size: NSSize = msg_send![self.view, convertSizeToBacking: NSSize {width: bounds.size.width, height: bounds.size.height}];
@@ -229,6 +231,20 @@ impl MacosDisplay {
         let bounds: NSRect = msg_send![self.view, bounds];
         let screen_width = (bounds.size.width as f32 * d.dpi_scale) as i32;
         let screen_height = (bounds.size.height as f32 * d.dpi_scale) as i32;
+
+        if !d.high_dpi && self.gfx_api == AppleGfxApi::Metal {
+            // Without high DPI, the view leaves its drawable's size to us.
+            let drawable_size: CGSize = msg_send![self.view, drawableSize];
+            if drawable_size.width != screen_width as f64
+                || drawable_size.height != screen_height as f64
+            {
+                let size = CGSize {
+                    width: screen_width as f64,
+                    height: screen_height as f64,
+                };
+                msg_send_![self.view, setDrawableSize: size];
+            }
+        }
 
         let dim_changed = screen_width != d.screen_width || screen_height != d.screen_height;
 
@@ -992,7 +1008,7 @@ fn get_window_payload(this: &Object) -> &mut MacosDisplay {
     }
 }
 
-unsafe fn create_metal_view(_: &mut MacosDisplay, sample_count: i32, _: bool) -> ObjcId {
+unsafe fn create_metal_view(_: &mut MacosDisplay, sample_count: i32, high_dpi: bool) -> ObjcId {
     let mtl_device_obj = MTLCreateSystemDefaultDevice();
     let view_class = define_metal_view_class();
     let view: ObjcId = msg_send![view_class, alloc];
@@ -1006,6 +1022,9 @@ unsafe fn create_metal_view(_: &mut MacosDisplay, sample_count: i32, _: bool) ->
     ];
     let () = msg_send![view, setSampleCount: sample_count];
     let () = msg_send![view, setPaused: true];
+    // Without high DPI, `update_dimensions` sizes the drawable in points
+    // rather than for the screen's backing scale.
+    let () = msg_send![view, setAutoResizeDrawable: high_dpi];
 
     view
 }
