@@ -240,14 +240,103 @@ struct RenderPassInternal {
     _depth_texture: Option<TextureId>,
 }
 
+/// The pixel formats and sample count of a render pass's attachments.
+/// Metal only draws with a pipeline state built for exactly these.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct AttachmentFormats {
+    color: MTLPixelFormat,
+    depth: MTLPixelFormat,
+    stencil: MTLPixelFormat,
+    sample_count: u64,
+}
+
+impl AttachmentFormats {
+    /// The formats of the view's own render passes.
+    unsafe fn of_view(view: ObjcId) -> Self {
+        // `Invalid` when the view has no depth/stencil buffer.
+        let depth_stencil_format: MTLPixelFormat = msg_send![view, depthStencilPixelFormat];
+        AttachmentFormats {
+            color: msg_send![view, colorPixelFormat],
+            depth: depth_stencil_format,
+            stencil: depth_stencil_format,
+            sample_count: msg_send![view, sampleCount],
+        }
+    }
+
+    unsafe fn of_pass(render_pass_desc: ObjcId) -> Self {
+        let format_of = |attachment: ObjcId| {
+            let texture: ObjcId = msg_send![attachment, texture];
+            if texture.is_null() {
+                MTLPixelFormat::Invalid
+            } else {
+                msg_send![texture, pixelFormat]
+            }
+        };
+        let color_attachment = msg_send_![
+            msg_send_![render_pass_desc, colorAttachments],
+            objectAtIndexedSubscript: 0usize
+        ];
+        let color_texture: ObjcId = msg_send![color_attachment, texture];
+        AttachmentFormats {
+            color: format_of(color_attachment),
+            depth: format_of(msg_send_![render_pass_desc, depthAttachment]),
+            stencil: format_of(msg_send_![render_pass_desc, stencilAttachment]),
+            sample_count: msg_send![color_texture, sampleCount],
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct PipelineInternal {
-    pipeline_state: ObjcId,
+    /// Everything but the attachment formats, which each pipeline state
+    /// fills in with its own.
+    descriptor: ObjcId,
+    /// The view's, built with the pipeline, then one for each other set
+    /// of formats a render pass has applied it with.
+    pipeline_states: Vec<(AttachmentFormats, ObjcId)>,
     depth_stencil_state: ObjcId,
     //layout: Vec<BufferLayout>,
     //attributes: Vec<VertexAttributeInternal>,
     _shader: ShaderId,
     //params: PipelineParams,
+}
+
+impl PipelineInternal {
+    /// The pipeline state for `formats`, built the first time they're
+    /// asked for.
+    fn pipeline_state(&mut self, device: ObjcId, formats: AttachmentFormats) -> ObjcId {
+        if let Some(&(_, pipeline_state)) = self
+            .pipeline_states
+            .iter()
+            .find(|(built_for, _)| *built_for == formats)
+        {
+            return pipeline_state;
+        }
+        unsafe {
+            let color_attachment = msg_send_![
+                msg_send_![self.descriptor, colorAttachments],
+                objectAtIndexedSubscript: 0usize
+            ];
+            msg_send_![color_attachment, setPixelFormat: formats.color];
+            msg_send_![self.descriptor, setDepthAttachmentPixelFormat: formats.depth];
+            msg_send_![self.descriptor, setStencilAttachmentPixelFormat: formats.stencil];
+            msg_send_![self.descriptor, setSampleCount: formats.sample_count];
+
+            let mut error: ObjcId = nil;
+            let pipeline_state: ObjcId = msg_send![
+                device,
+                newRenderPipelineStateWithDescriptor: self.descriptor
+                error: &mut error
+            ];
+            if pipeline_state.is_null() {
+                let description: ObjcId = msg_send![error, localizedDescription];
+                let string = apple_util::nsstring_to_string(description);
+                panic!("newRenderPipelineStateWithDescriptor error: {}", string);
+            }
+            self.pipeline_states.push((formats, pipeline_state));
+            pipeline_state
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -289,6 +378,7 @@ pub struct MetalContext {
     /// for `apply_scissor_rect`'s Y-flip + clamp.
     current_pass_width: u32,
     current_pass_height: u32,
+    current_pass_formats: Option<AttachmentFormats>,
     // Bookkeeping for the deferred-end pass-merge in `begin_pass`
     // / `end_render_pass`.
     current_pass_target: Option<Option<RenderPass>>,
@@ -386,6 +476,7 @@ impl MetalContext {
                 render_encoder: None,
                 current_pass_width: 0,
                 current_pass_height: 0,
+                current_pass_formats: None,
                 current_pass_target: None,
                 pending_end_encoder: false,
                 view,
@@ -1054,8 +1145,6 @@ impl RenderingBackend for MetalContext {
             let color_attachments = msg_send_![descriptor, colorAttachments];
             for i in 0..1usize {
                 let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: i];
-                let view_pixel_format: MTLPixelFormat = msg_send![self.view, colorPixelFormat];
-                msg_send_![color_attachment, setPixelFormat: view_pixel_format];
                 if let Some(color_blend) = params.color_blend {
                     msg_send_![color_attachment, setBlendingEnabled: true];
 
@@ -1099,40 +1188,6 @@ impl RenderingBackend for MetalContext {
                     ];
                 }
             }
-            // Pipeline depth/stencil formats must match whatever
-            // render pass uses this pipeline. MTKView reports
-            // `Invalid` when no depth/stencil is configured —
-            // leave the descriptor's defaults (also `Invalid`)
-            // alone in that case; otherwise mirror the view.
-            let view_depth_stencil_format: MTLPixelFormat =
-                msg_send![self.view, depthStencilPixelFormat];
-            if view_depth_stencil_format != MTLPixelFormat::Invalid {
-                msg_send_![
-                    descriptor,
-                    setDepthAttachmentPixelFormat: view_depth_stencil_format
-                ];
-                msg_send_![
-                    descriptor,
-                    setStencilAttachmentPixelFormat: view_depth_stencil_format
-                ];
-            }
-            // Pipeline sampleCount must match every render-pass
-            // color attachment it binds to; use the view's as the
-            // canonical app-wide value.
-            let view_sample_count: u64 = msg_send![self.view, sampleCount];
-            msg_send_![descriptor, setSampleCount: view_sample_count];
-
-            let mut error: ObjcId = nil;
-            let pipeline_state: ObjcId = msg_send![
-                self.device,
-                newRenderPipelineStateWithDescriptor: descriptor
-                error: &mut error
-            ];
-            if pipeline_state.is_null() {
-                let description: ObjcId = msg_send![error, localizedDescription];
-                let string = apple_util::nsstring_to_string(description);
-                panic!("newRenderPipelineStateWithDescriptor error: {}", string);
-            }
 
             let depth_stencil_desc = msg_send_![class!(MTLDepthStencilDescriptor), new];
             msg_send_![depth_stencil_desc, setDepthWriteEnabled: BOOL::from(params.depth_write)];
@@ -1167,14 +1222,19 @@ impl RenderingBackend for MetalContext {
                 newDepthStencilStateWithDescriptor: depth_stencil_desc
             ];
 
-            let pipeline = PipelineInternal {
-                pipeline_state,
+            let mut pipeline = PipelineInternal {
+                descriptor,
+                pipeline_states: vec![],
                 depth_stencil_state,
                 //layout: buffer_layout.to_vec(),
                 //attributes: vertex_layout,
                 _shader: shader,
                 //params,
             };
+            // Compiling a pipeline state takes milliseconds, so the view's
+            // is built now rather than mid-frame. A render target's formats
+            // aren't known until a pass draws into it.
+            pipeline.pipeline_state(self.device, AttachmentFormats::of_view(self.view));
 
             self.pipelines.push(pipeline);
 
@@ -1191,9 +1251,11 @@ impl RenderingBackend for MetalContext {
 
         unsafe {
             self.current_pipeline = Some(*pipeline);
-            let pipeline = &self.pipelines[pipeline.0];
+            let pipeline = &mut self.pipelines[pipeline.0];
+            let formats = self.current_pass_formats.unwrap();
+            let pipeline_state = pipeline.pipeline_state(self.device, formats);
 
-            msg_send_![render_encoder, setRenderPipelineState: pipeline.pipeline_state];
+            msg_send_![render_encoder, setRenderPipelineState: pipeline_state];
             msg_send_![render_encoder, setDepthStencilState:pipeline.depth_stencil_state];
             // render_encoder.set_front_facing_winding(pipeline.params.front_face_order.into());
             // render_encoder.set_cull_mode(pipeline.params.cull_face.into());
@@ -1349,6 +1411,7 @@ impl RenderingBackend for MetalContext {
             assert!(!descriptor.is_null());
             self.current_pass_width = width_px;
             self.current_pass_height = height_px;
+            self.current_pass_formats = Some(AttachmentFormats::of_pass(descriptor));
 
             let color_attachments = msg_send_![descriptor, colorAttachments];
             let color_attachment = msg_send_![color_attachments, objectAtIndexedSubscript: 0];
