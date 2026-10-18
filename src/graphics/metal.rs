@@ -545,8 +545,69 @@ impl RenderingBackend for MetalContext {
     ) {
         unimplemented!()
     }
-    fn texture_read_pixels(&mut self, _texture: TextureId, _bytes: &mut [u8]) {
-        unimplemented!()
+    fn texture_read_pixels(&mut self, texture: TextureId, bytes: &mut [u8]) {
+        let texture = self.textures.get(texture);
+        let TextureParams {
+            width,
+            height,
+            format,
+            sample_count,
+            ..
+        } = texture.params;
+        assert!(
+            sample_count <= 1,
+            "texture_read_pixels not yet implemented for multisampled textures"
+        );
+        let bytes_per_row = format.size(width, 1) as u64;
+        let length = bytes_per_row * height as u64;
+        let origin = MTLOrigin { x: 0, y: 0, z: 0 };
+        let size = MTLSize {
+            width: width as u64,
+            height: height as u64,
+            depth: 1,
+        };
+        // Render targets live in private storage, out of the CPU's reach,
+        // so the pixels go through a shared buffer. The blit has to run
+        // after whatever this frame already drew into the texture, so it
+        // joins the frame's command buffer, which is committed early and
+        // replaced for the rest of the frame.
+        self.really_end_encoder();
+        unsafe {
+            let buffer: ObjcId = msg_send![self.device,
+                                           newBufferWithLength:length
+                                           options:MTLResourceOptions::StorageModeShared];
+            let command_buffer = self
+                .command_buffer
+                .unwrap_or_else(|| msg_send![self.command_queue, commandBuffer]);
+            let encoder = msg_send_![command_buffer, blitCommandEncoder];
+            msg_send_![encoder,
+                       copyFromTexture:texture.texture
+                       sourceSlice:0u64
+                       sourceLevel:0u64
+                       sourceOrigin:origin
+                       sourceSize:size
+                       toBuffer:buffer
+                       destinationOffset:0u64
+                       destinationBytesPerRow:bytes_per_row
+                       destinationBytesPerImage:length];
+            msg_send_![encoder, endEncoding];
+            msg_send_![command_buffer, commit];
+            msg_send_![command_buffer, waitUntilCompleted];
+            self.command_buffer = Some(msg_send![self.command_queue, commandBuffer]);
+
+            let contents: *const u8 = msg_send![buffer, contents];
+            let pixels = &mut bytes[..length as usize];
+            std::ptr::copy_nonoverlapping(contents, pixels.as_mut_ptr(), pixels.len());
+            msg_send_![buffer, release];
+
+            // Render targets take the view's pixel format, which is BGRA.
+            let pixel_format: MTLPixelFormat = msg_send![texture.texture, pixelFormat];
+            if pixel_format == MTLPixelFormat::BGRA8Unorm {
+                for pixel in pixels.chunks_exact_mut(4) {
+                    pixel.swap(0, 2);
+                }
+            }
+        }
     }
     fn texture_generate_mipmaps(&mut self, texture: TextureId) {
         let texture = self.textures.get(texture);
