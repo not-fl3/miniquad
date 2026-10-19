@@ -7,9 +7,14 @@ use crate::native::apple::{
 
 use super::*;
 
+use std::collections::VecDeque;
+
 // https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
 const MAX_UNIFORM_BUFFER_SIZE: u64 = 4 * 1024 * 1024;
-const NUM_INFLIGHT_FRAMES: usize = 3;
+/// How many frames there can be at once between the CPU encoding one
+/// and the GPU finishing it: the CPU encodes the next frame while the
+/// GPU draws the last.
+const MAX_FRAMES_IN_FLIGHT: usize = 2;
 // iOS simulator on Apple Silicon Macs (`target_abi = "sim"`) runs
 // iOS arm64 code but issues Metal commands against the host Mac's
 // GPU — which validates with the 256-byte rule, not iOS arm64's
@@ -202,27 +207,31 @@ impl From<TextureFormat> for MTLPixelFormat {
 //     }
 // }
 
+unsafe fn store_length(store: ObjcId) -> usize {
+    let length: u64 = msg_send![store, length];
+    length as usize
+}
+
 #[inline]
 fn roundup_ub_buffer(current_buffer: u64) -> u64 {
     ((current_buffer) + ((UNIFORM_BUFFER_ALIGN) - 1)) & !((UNIFORM_BUFFER_ALIGN) - 1)
 }
 
-// Per-buffer rotation pool for the within-frame update-draw-update-draw
-// pattern. Metal's `update` doesn't synchronously claim ownership, so
-// each within-frame update needs its own backing `MTLBuffer` to keep
-// the previous update's data alive until the draw consumes it. `raw`
-// grows on demand, so memory tracks actual per-frame usage rather
-// than a fixed worst-case ceiling.
+// Draws read a buffer when the GPU runs them, after the CPU has moved
+// on, so each update writes a store of its own and the one it replaces
+// is only reused once the frames that may read it are drawn.
 #[derive(Clone, Debug)]
 pub struct Buffer {
-    raw: Vec<ObjcId>,
+    /// The store the next draws read.
+    raw: ObjcId,
+    /// Stores updates replaced, oldest first, each with the last frame
+    /// that may read it.
+    replaced: VecDeque<(ObjcId, u64)>,
     //buffer_type: BufferType,
     size: usize,
-    /// Cached `MTLResourceOptions` for grow-on-demand allocations.
+    /// Cached `MTLResourceOptions` for the stores `buffer_update` adds.
     options: u64,
     //index_type: Option<IndexType>,
-    value: usize,
-    next_value: usize,
 }
 
 #[derive(Debug)]
@@ -256,6 +265,8 @@ struct Texture {
     sampler: ObjcId,
     sampler_descriptor: ObjcId,
     params: TextureParams,
+    /// The last frame a draw sampled the texture in.
+    last_sampled_in: Option<u64>,
 }
 struct Textures(Vec<Texture>);
 
@@ -276,6 +287,14 @@ impl Textures {
         }
     }
 }
+/// A frame committed to the GPU, which may still be drawing it.
+struct FrameInFlight {
+    frame: u64,
+    command_buffer: ObjcId,
+    /// What the frame deleted or replaced, released once it's drawn.
+    releases: Vec<ObjcId>,
+}
+
 pub struct MetalContext {
     buffers: Vec<Buffer>,
     shaders: Vec<ShaderInternal>,
@@ -295,13 +314,22 @@ pub struct MetalContext {
     pending_end_encoder: bool,
     view: ObjcId,
     device: ObjcId,
-    current_frame_index: usize,
-    uniform_buffers: [ObjcId; 3],
+    /// The frame being encoded, counting from 0.
+    frame: u64,
+    /// Committed frames the GPU may still be drawing, oldest first.
+    frames_in_flight: VecDeque<FrameInFlight>,
+    /// One for each frame in flight, since a frame's draws read their
+    /// uniforms when the GPU runs them.
+    uniform_buffers: [ObjcId; MAX_FRAMES_IN_FLIGHT],
     // cached index_buffer from apply_bindings
     index_buffer: Option<ObjcId>,
     // cached pipeline from apply_pipeline
     current_pipeline: Option<Pipeline>,
     current_ub_offset: u64,
+    // Objects deleted or replaced during the frame, released once it's
+    // drawn: draws queued earlier in the frame may still be encoded with
+    // them, and frames in flight drawn with them.
+    pending_releases: Vec<ObjcId>,
 }
 
 impl Default for MetalContext {
@@ -371,14 +399,10 @@ impl MetalContext {
             #[cfg(any(target_os = "ios", target_os = "tvos"))]
             let options = { MTLResourceOptions::CPUCacheModeWriteCombined };
 
-            let uniform_buffers = [
+            let uniform_buffers = std::array::from_fn(|_| {
                 msg_send![device, newBufferWithLength:MAX_UNIFORM_BUFFER_SIZE
-                          options:options],
-                msg_send![device, newBufferWithLength:MAX_UNIFORM_BUFFER_SIZE
-                          options:options],
-                msg_send![device, newBufferWithLength:MAX_UNIFORM_BUFFER_SIZE
-                          options:options],
-            ];
+                          options:options]
+            });
 
             MetalContext {
                 command_queue,
@@ -398,8 +422,10 @@ impl MetalContext {
                 index_buffer: None,
                 current_pipeline: None,
                 uniform_buffers,
-                current_frame_index: 1,
+                frame: 0,
+                frames_in_flight: VecDeque::new(),
                 current_ub_offset: 0,
+                pending_releases: vec![],
             }
         }
     }
@@ -413,6 +439,32 @@ impl MetalContext {
         }
         self.current_pass_target = None;
         self.pending_end_encoder = false;
+    }
+
+    /// Waits until the GPU has drawn every frame before `frame`, and
+    /// releases what they deleted.
+    fn finish_frames_before(&mut self, frame: u64) {
+        while self
+            .frames_in_flight
+            .front()
+            .is_some_and(|in_flight| in_flight.frame < frame)
+        {
+            let finished = self.frames_in_flight.pop_front().unwrap();
+            unsafe {
+                msg_send_![finished.command_buffer, waitUntilCompleted];
+                msg_send_![finished.command_buffer, release];
+                for object in finished.releases {
+                    msg_send_![object, release];
+                }
+            }
+        }
+    }
+
+    /// The first frame the GPU may not have finished drawing.
+    fn oldest_frame_in_flight(&self) -> u64 {
+        self.frames_in_flight
+            .front()
+            .map_or(self.frame, |in_flight| in_flight.frame)
     }
 }
 
@@ -433,18 +485,18 @@ impl RenderingBackend for MetalContext {
         buffer.size
     }
     fn delete_buffer(&mut self, buffer: BufferId) {
-        let buffer = &self.buffers[buffer.0];
-        unsafe {
-            for buffer in &buffer.raw {
-                msg_send_![*buffer, release];
-            }
-        }
+        let buffer = &mut self.buffers[buffer.0];
+        self.pending_releases.push(buffer.raw);
+        self.pending_releases
+            .extend(buffer.replaced.drain(..).map(|(store, _)| store));
     }
     fn delete_texture(&mut self, texture: TextureId) {
         let texture = self.textures.get(texture);
-        unsafe {
-            msg_send_![texture.texture, release];
-        }
+        self.pending_releases.extend([
+            texture.texture,
+            texture.sampler,
+            texture.sampler_descriptor,
+        ]);
     }
     fn apply_viewport(&mut self, _x: i32, _y: i32, _w: i32, _h: i32) {}
     fn apply_scissor_rect(&mut self, x: i32, y: i32, w: i32, h: i32) {
@@ -491,15 +543,18 @@ impl RenderingBackend for MetalContext {
             MipmapFilterMode::Linear => MTLSamplerMipFilter::Linear,
         };
 
-        texture.sampler = unsafe {
+        unsafe {
             let sampler_descriptor = msg_send_![class!(MTLSamplerDescriptor), new];
             msg_send_![sampler_descriptor, setMinFilter: filter];
             msg_send_![sampler_descriptor, setMipFilter: mipmap_filter];
-            msg_send_![
+            let sampler = msg_send_![
                 self.device,
                 newSamplerStateWithDescriptor: sampler_descriptor
-            ]
-        };
+            ];
+            msg_send_![sampler_descriptor, release];
+            self.pending_releases.push(texture.sampler);
+            texture.sampler = sampler;
+        }
     }
     fn texture_set_mag_filter(&mut self, texture: TextureId, filter: FilterMode) {
         let texture = self.textures.get_mut(texture);
@@ -509,10 +564,13 @@ impl RenderingBackend for MetalContext {
             FilterMode::Linear => MTLSamplerMinMagFilter::Linear,
         };
 
-        texture.sampler = unsafe {
+        unsafe {
             msg_send_![texture.sampler_descriptor, setMagFilter: filter];
-            msg_send_![self.device, newSamplerStateWithDescriptor: texture.sampler_descriptor]
-        };
+            let sampler =
+                msg_send_![self.device, newSamplerStateWithDescriptor: texture.sampler_descriptor];
+            self.pending_releases.push(texture.sampler);
+            texture.sampler = sampler;
+        }
     }
     fn texture_set_wrap(&mut self, texture: TextureId, wrap_x: TextureWrap, wrap_y: TextureWrap) {
         let texture = self.textures.get_mut(texture);
@@ -529,12 +587,15 @@ impl RenderingBackend for MetalContext {
             TextureWrap::Clamp => MTLSamplerAddressMode::ClampToEdge,
         };
 
-        texture.sampler = unsafe {
+        unsafe {
             //msg_send_![texture.sampler_descriptor, setRAddressMode: wrap];
             msg_send_![texture.sampler_descriptor, setSAddressMode: wrap_s];
             msg_send_![texture.sampler_descriptor, setTAddressMode: wrap_t];
-            msg_send_![self.device, newSamplerStateWithDescriptor: texture.sampler_descriptor]
-        };
+            let sampler =
+                msg_send_![self.device, newSamplerStateWithDescriptor: texture.sampler_descriptor];
+            self.pending_releases.push(texture.sampler);
+            texture.sampler = sampler;
+        }
     }
     fn texture_resize(
         &mut self,
@@ -673,8 +734,8 @@ impl RenderingBackend for MetalContext {
             BufferSource::Slice(data) => data.size,
             BufferSource::Empty { size, .. } => *size,
         };
-        // Cached on the `Buffer` so grow-on-demand allocations in
-        // `buffer_update` match the original storage mode.
+        // Cached on the `Buffer` so the stores `buffer_update` adds match
+        // the original storage mode.
         let options = if matches!(data, BufferSource::Slice(_)) {
             MTLResourceOptions::StorageModeShared
         } else {
@@ -704,15 +765,11 @@ impl RenderingBackend for MetalContext {
                           options:options]
             }
         };
-        unsafe {
-            msg_send_![buffer, retain];
-        }
         let buffer = Buffer {
-            raw: vec![buffer],
+            raw: buffer,
+            replaced: VecDeque::new(),
             size,
             options,
-            value: 0,
-            next_value: 0,
         };
         self.buffers.push(buffer);
         BufferId(self.buffers.len() - 1)
@@ -723,30 +780,40 @@ impl RenderingBackend for MetalContext {
             BufferSource::Slice(data) => data,
             _ => panic!("buffer_update expects BufferSource::slice"),
         };
+        let oldest_frame_in_flight = self.oldest_frame_in_flight();
         let buffer = &mut self.buffers[buffer.0];
         assert!(data.size <= buffer.size);
 
-        // Grow `raw` lazily on first hit of a new per-frame max.
-        if buffer.next_value >= buffer.raw.len() {
-            let new_slot: ObjcId = unsafe {
-                msg_send![self.device,
-                          newBufferWithLength:buffer.size
-                          options:buffer.options]
-            };
-            unsafe {
-                msg_send_![new_slot, retain];
+        let free = match buffer.replaced.front() {
+            Some(&(store, last_read_in)) if last_read_in < oldest_frame_in_flight => {
+                buffer.replaced.pop_front();
+                Some(store)
             }
-            buffer.raw.push(new_slot);
-        }
-
+            _ => None,
+        };
+        let store = match free {
+            Some(store) if unsafe { store_length(store) } >= data.size => store,
+            _ => unsafe {
+                if let Some(store) = free {
+                    msg_send_![store, release];
+                }
+                // Sized for the data rather than the whole buffer, which
+                // an update rarely fills.
+                let length = data.size.next_power_of_two().min(buffer.size);
+                msg_send![self.device,
+                          newBufferWithLength:length as u64
+                          options:buffer.options]
+            },
+        };
         unsafe {
-            let dest: *mut std::ffi::c_void = msg_send![buffer.raw[buffer.next_value], contents];
+            let dest: *mut std::ffi::c_void = msg_send![store, contents];
             std::ptr::copy(data.ptr, dest, data.size);
 
             #[cfg(target_os = "macos")]
-            msg_send_![buffer.raw[buffer.next_value], didModifyRange:NSRange::new(0, data.size as u64)];
+            msg_send_![store, didModifyRange:NSRange::new(0, data.size as u64)];
         }
-        buffer.value = buffer.next_value;
+        let replaced = std::mem::replace(&mut buffer.raw, store);
+        buffer.replaced.push_back((replaced, self.frame));
     }
 
     fn new_shader(
@@ -872,7 +939,6 @@ impl RenderingBackend for MetalContext {
 
         let texture = unsafe {
             let sampler_descriptor = msg_send_![class!(MTLSamplerDescriptor), new];
-            msg_send_![sampler_descriptor, retain];
             let min_filter = match params.min_filter {
                 FilterMode::Nearest => MTLSamplerMinMagFilter::Nearest,
                 FilterMode::Linear => MTLSamplerMinMagFilter::Linear,
@@ -897,12 +963,12 @@ impl RenderingBackend for MetalContext {
                 newSamplerStateWithDescriptor: sampler_descriptor
             ];
             let raw_texture = msg_send_![self.device, newTextureWithDescriptor: descriptor];
-            msg_send_![raw_texture, retain];
             self.textures.0.push(Texture {
                 sampler: sampler_state,
                 texture: raw_texture,
                 sampler_descriptor,
                 params,
+                last_sampled_in: None,
             });
             TextureId(TextureIdInner::Managed(self.textures.0.len() - 1))
         };
@@ -966,7 +1032,16 @@ impl RenderingBackend for MetalContext {
         height: i32,
         bytes: &[u8],
     ) {
-        let raw_texture = self.textures.get(texture).texture;
+        let Texture {
+            texture: raw_texture,
+            last_sampled_in,
+            ..
+        } = self.textures.get(texture);
+        // The CPU writes the texture at once, so a frame in flight that
+        // samples it would draw with the new pixels.
+        if let Some(frame) = last_sampled_in {
+            self.finish_frames_before(frame + 1);
+        }
         let region = MTLRegion {
             origin: MTLOrigin {
                 x: x_offset as u64,
@@ -1214,23 +1289,22 @@ impl RenderingBackend for MetalContext {
         unsafe {
             let render_encoder = self.render_encoder.unwrap();
             for (index, vertex_buffer) in vertex_buffers.iter().enumerate() {
-                let buffer = &mut self.buffers[vertex_buffer.0];
+                let buffer = &self.buffers[vertex_buffer.0];
                 let () = msg_send![render_encoder,
-                                   setVertexBuffer:buffer.raw[buffer.value]
+                                   setVertexBuffer:buffer.raw
                                    offset:0
                                    atIndex:(index + 1) as u64];
-                buffer.next_value = buffer.value + 1;
             }
-            let index_buffer = &mut self.buffers[index_buffer.0];
-            self.index_buffer = Some(index_buffer.raw[index_buffer.value]);
-            index_buffer.next_value = index_buffer.value + 1;
+            self.index_buffer = Some(self.buffers[index_buffer.0].raw);
 
             let img_count = textures.len();
             if img_count > 0 {
                 for (n, img) in textures.iter().enumerate() {
+                    let texture = self.textures.get_mut(*img);
+                    texture.last_sampled_in = Some(self.frame);
                     let Texture {
                         sampler, texture, ..
-                    } = self.textures.get(*img);
+                    } = *texture;
                     msg_send_![render_encoder, setFragmentSamplerState:sampler
                                atIndex:n
                     ];
@@ -1254,13 +1328,11 @@ impl RenderingBackend for MetalContext {
 
         let render_encoder = self.render_encoder.unwrap();
 
-        self.current_frame_index = (self.current_frame_index + 1) % NUM_INFLIGHT_FRAMES;
-
         assert!(size < MAX_UNIFORM_BUFFER_SIZE as usize);
 
         assert!(self.current_ub_offset < MAX_UNIFORM_BUFFER_SIZE);
 
-        let buffer = self.uniform_buffers[self.current_frame_index];
+        let buffer = self.uniform_buffers[self.frame as usize % MAX_FRAMES_IN_FLIGHT];
         unsafe {
             let dest: *mut std::ffi::c_void = msg_send![buffer, contents];
             std::ptr::copy(
@@ -1270,7 +1342,7 @@ impl RenderingBackend for MetalContext {
             );
 
             #[cfg(target_os = "macos")]
-            msg_send_![buffer, didModifyRange:NSRange::new(0, size as u64)];
+            msg_send_![buffer, didModifyRange:NSRange::new(self.current_ub_offset, size as u64)];
 
             msg_send_![render_encoder,
                        setVertexBuffer:buffer
@@ -1454,20 +1526,24 @@ impl RenderingBackend for MetalContext {
         }
         unsafe {
             assert!(!self.command_queue.is_null());
+            let command_buffer = self.command_buffer.take().unwrap();
             let drawable: ObjcId = msg_send!(self.view, currentDrawable);
             //msg_send_![drawable, retain];
-            msg_send_![self.command_buffer.unwrap(), presentDrawable: drawable];
-            msg_send_![self.command_buffer.unwrap(), commit];
-            msg_send_![self.command_buffer.unwrap(), waitUntilCompleted];
+            msg_send_![command_buffer, presentDrawable: drawable];
+            msg_send_![command_buffer, commit];
+            // Kept past the autorelease pool it came from, until it's run.
+            msg_send_![command_buffer, retain];
+            self.frames_in_flight.push_back(FrameInFlight {
+                frame: self.frame,
+                command_buffer,
+                releases: std::mem::take(&mut self.pending_releases),
+            });
         }
-        for buffer in &mut self.buffers {
-            buffer.next_value = 0;
-        }
+        self.frame += 1;
+        // The CPU encodes the next frame while the GPU draws this one, and
+        // gets no further ahead.
+        self.finish_frames_before(self.frame.saturating_sub(MAX_FRAMES_IN_FLIGHT as u64 - 1));
         self.current_ub_offset = 0;
         self.current_pipeline = None;
-        self.command_buffer = None;
-        if (self.current_frame_index + 1) >= 3 {
-            self.current_frame_index = 0;
-        }
     }
 }
