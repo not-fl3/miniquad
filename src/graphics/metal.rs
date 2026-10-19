@@ -293,6 +293,9 @@ pub struct MetalContext {
     // / `end_render_pass`.
     current_pass_target: Option<Option<RenderPass>>,
     pending_end_encoder: bool,
+    /// Whether this frame drew to the screen, which takes one of the
+    /// view's drawables, so `commit_frame` presents it.
+    drew_to_screen: bool,
     view: ObjcId,
     device: ObjcId,
     current_frame_index: usize,
@@ -388,6 +391,7 @@ impl MetalContext {
                 current_pass_height: 0,
                 current_pass_target: None,
                 pending_end_encoder: false,
+                drew_to_screen: false,
                 view,
                 device,
                 buffers: vec![],
@@ -1312,6 +1316,7 @@ impl RenderingBackend for MetalContext {
 
             let (descriptor, width_px, height_px) = match pass {
                 None => {
+                    self.drew_to_screen = true;
                     // Read dimensions from the actual pass attachment
                     // texture, not `screen_size()`. MTKView's
                     // `drawableSize` and our cached screen size can
@@ -1454,12 +1459,18 @@ impl RenderingBackend for MetalContext {
         }
         unsafe {
             assert!(!self.command_queue.is_null());
-            let drawable: ObjcId = msg_send!(self.view, currentDrawable);
-            //msg_send_![drawable, retain];
-            msg_send_![self.command_buffer.unwrap(), presentDrawable: drawable];
-            msg_send_![self.command_buffer.unwrap(), commit];
-            msg_send_![self.command_buffer.unwrap(), waitUntilCompleted];
+            if let Some(command_buffer) = self.command_buffer {
+                // A frame drawn only off-screen leaves the drawables alone:
+                // `currentDrawable` waits until the display is done with one.
+                if self.drew_to_screen {
+                    let drawable: ObjcId = msg_send!(self.view, currentDrawable);
+                    msg_send_![command_buffer, presentDrawable: drawable];
+                }
+                msg_send_![command_buffer, commit];
+                msg_send_![command_buffer, waitUntilCompleted];
+            }
         }
+        self.drew_to_screen = false;
         for buffer in &mut self.buffers {
             buffer.next_value = 0;
         }
