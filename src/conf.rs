@@ -138,6 +138,10 @@ pub struct Platform {
     /// There is no guarantee the FPS will match the specified `swap_interval`.
     /// In other words, `swap_interval` is only a hint to the GPU driver and
     /// not a reliable way to limit the game's FPS.
+    ///
+    /// On macOS, `Some(0)` draws each frame as soon as the last one is done,
+    /// even while the window is hidden, and any other value keeps to the
+    /// display's refresh rate.
     pub swap_interval: Option<i32>,
 
     /// If `true`, the event loop will block until [`schedule_update`] is called.
