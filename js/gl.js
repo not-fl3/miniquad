@@ -1308,20 +1308,26 @@ var importObject = {
             window.onresize = function () {
                 resize(canvas, wasm_exports.resize);
             };
+            // Only while the canvas has the focus, so a text field on the page
+            // keeps its own. Browsers can send these to the body or to the
+            // page's selection rather than the focused canvas.
             window.addEventListener("copy", function (e) {
-                if (clipboard != null) {
-                    event.clipboardData.setData('text/plain', clipboard);
-                    event.preventDefault();
+                if (document.activeElement == canvas && clipboard != null) {
+                    e.clipboardData.setData('text/plain', clipboard);
+                    e.preventDefault();
                 }
             });
             window.addEventListener("cut", function (e) {
-                if (clipboard != null) {
-                    event.clipboardData.setData('text/plain', clipboard);
-                    event.preventDefault();
+                if (document.activeElement == canvas && clipboard != null) {
+                    e.clipboardData.setData('text/plain', clipboard);
+                    e.preventDefault();
                 }
             });
 
             window.addEventListener("paste", function (e) {
+                if (document.activeElement != canvas) {
+                    return;
+                }
                 e.stopPropagation();
                 e.preventDefault();
                 var clipboardData = e.clipboardData || window.clipboardData;
