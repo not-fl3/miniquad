@@ -25,6 +25,7 @@ pub mod raw_gl {
 struct Buffer {
     gl_buf: GLuint,
     buffer_type: BufferType,
+    usage: BufferUsage,
     size: usize,
     // Dimension of the indices for this buffer,
     // used only as a type argument for glDrawElements and can be
@@ -1376,6 +1377,7 @@ impl RenderingBackend for GlContext {
         let buffer = Buffer {
             gl_buf,
             buffer_type: type_,
+            usage,
             size,
             index_type,
         };
@@ -1404,7 +1406,16 @@ impl RenderingBackend for GlContext {
         self.cache.store_buffer_binding(gl_target);
         self.cache
             .bind_buffer(gl_target, buffer.gl_buf, buffer.index_type);
-        unsafe { glBufferSubData(gl_target, 0, size as _, data.ptr as _) };
+        if buffer.usage == BufferUsage::Stream {
+            // The GPU may still be reading this buffer from an earlier draw. A
+            // glBufferSubData would then make mobile drivers (Adreno) copy the whole
+            // buffer before the write. glBufferData with the new data instead hands
+            // the driver fresh storage of just the bytes written: no copy, and no
+            // reallocation of the full capacity either.
+            unsafe { glBufferData(gl_target, size as _, data.ptr as _, gl_usage(&buffer.usage)) };
+        } else {
+            unsafe { glBufferSubData(gl_target, 0, size as _, data.ptr as _) };
+        }
         self.cache.restore_buffer_binding(gl_target);
     }
 
