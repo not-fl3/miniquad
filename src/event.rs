@@ -181,7 +181,27 @@ pub trait EventHandler {
 
     fn char_event(&mut self, _character: char, _keymods: KeyMods, _repeat: bool) {}
 
+    /// `keycode` is the key's place on the keyboard, on most platforms: the key
+    /// in that place on a US QWERTY layout. See
+    /// [`key_down_with_character_event`](Self::key_down_with_character_event)
+    /// for what the key types on the user's layout.
     fn key_down_event(&mut self, _keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {}
+
+    /// A key went down, with `character`, what it types on the keyboard's
+    /// current layout as Shift, and Command on macOS, change it, but not
+    /// Control: `'z'` for Ctrl+Z, and for Cmd+Z on a French AZERTY layout, whose
+    /// Z is where QWERTY has W. It's `None` when the key types no character, or
+    /// several, or the platform doesn't say. Unless implemented, it hands the
+    /// key on to [`key_down_event`](Self::key_down_event).
+    fn key_down_with_character_event(
+        &mut self,
+        keycode: KeyCode,
+        _character: Option<char>,
+        keymods: KeyMods,
+        repeat: bool,
+    ) {
+        self.key_down_event(keycode, keymods, repeat);
+    }
 
     /// Note: you are not always guaranteed to receive a key_up event. For example on
     /// Wayland when leaving the focused window, the key_up event will not be caught.

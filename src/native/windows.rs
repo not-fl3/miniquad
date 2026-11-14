@@ -371,6 +371,35 @@ unsafe fn key_mods() -> KeyMods {
     mods
 }
 
+/// The one character the virtual key `vk` types on the current layout, with
+/// Shift held or not and no other modifier.
+unsafe fn key_character(vk: UINT, scancode: UINT, shift: bool) -> Option<char> {
+    let mut state = [0u8; 256];
+    if shift {
+        state[VK_SHIFT as usize] = 0x80;
+    }
+    let mut typed = [0u16; 8];
+    // Leaves the keyboard's state alone, so a dead key still reaches WM_CHAR.
+    const KEEP_KEYBOARD_STATE: UINT = 0x4;
+    let length = ToUnicodeEx(
+        vk,
+        scancode,
+        state.as_ptr(),
+        typed.as_mut_ptr(),
+        typed.len() as _,
+        KEEP_KEYBOARD_STATE,
+        GetKeyboardLayout(0),
+    );
+    if length <= 0 {
+        return None;
+    }
+    let mut chars = char::decode_utf16(typed[..length as usize].iter().copied());
+    match (chars.next(), chars.next()) {
+        (Some(Ok(character)), None) => Some(character),
+        _ => None,
+    }
+}
+
 unsafe extern "system" fn win32_wndproc(
     hwnd: HWND,
     umsg: UINT,
@@ -695,7 +724,8 @@ unsafe extern "system" fn win32_wndproc(
             let keycode = keycodes::translate_keycode(keycode_raw);
             let mods = key_mods();
             let repeat = !!(lparam & 0x40000000) != 0;
-            event_handler.key_down_event(keycode, mods, repeat);
+            let character = key_character(wparam as UINT, keycode_raw, mods.shift);
+            event_handler.key_down_with_character_event(keycode, character, mods, repeat);
             // Pass to DefWindowProc for IME to work properly
             return DefWindowProcW(hwnd, umsg, wparam, lparam);
         }

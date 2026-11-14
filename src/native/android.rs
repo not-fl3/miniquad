@@ -220,8 +220,12 @@ impl MainThreadState {
                     KeyCode::LeftSuper | KeyCode::RightSuper => self.keymods.logo = true,
                     _ => {}
                 }
-                self.event_handler
-                    .key_down_event(keycode, self.keymods, false);
+                self.event_handler.key_down_with_character_event(
+                    keycode,
+                    None,
+                    self.keymods,
+                    false,
+                );
             }
             Message::KeyUp { keycode } => {
                 match keycode {

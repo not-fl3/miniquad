@@ -137,7 +137,7 @@ fn dispatch_message(payload: &mut IosDisplay, msg: Message) {
                 state.keymods
             };
             if let Some(ref mut event_handler) = payload.event_handler {
-                event_handler.key_down_event(keycode, keymods, false);
+                event_handler.key_down_with_character_event(keycode, None, keymods, false);
             }
         }
         Message::KeyUp { keycode } => {

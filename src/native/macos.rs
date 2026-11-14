@@ -634,8 +634,9 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
         let mods = get_event_key_modifier(event);
         let repeat: bool = unsafe { msg_send!(event, isARepeat) };
         if let Some(key) = get_event_keycode(event) {
+            let character = get_event_key_character(event);
             if let Some(event_handler) = payload.context() {
-                event_handler.key_down_event(key, mods, repeat);
+                event_handler.key_down_with_character_event(key, character, mods, repeat);
             }
         }
 
@@ -736,7 +737,7 @@ unsafe fn view_base_decl(decl: &mut ClassDecl) {
             if new_pressed ^ old_pressed {
                 if new_pressed {
                     if let Some(event_handler) = payload.context() {
-                        event_handler.key_down_event(keycode, mods, false);
+                        event_handler.key_down_with_character_event(keycode, None, mods, false);
                     }
                 } else {
                     if let Some(event_handler) = payload.context() {
