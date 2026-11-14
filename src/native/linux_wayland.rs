@@ -298,15 +298,14 @@ impl KeyboardContext {
         // The keycodes in Miniquad are obtained without modifiers
         let keysym = libxkb.keymap_key_get_sym_without_mod(keymap.xkb_keymap, key + 8);
         let keycode = keycodes::translate_keysym(keysym);
-        events.push(WaylandEvent::KeyDown(keycode, keymods, repeat));
 
         // To obtain the underlying character, we do need to provide the modifiers
         let keysym = (libxkb.xkb_state_key_get_one_sym)(xkb_state, key + 8);
         let chr = (libxkb.xkb_keysym_to_utf32)(keysym);
-        if chr > 0 {
-            if let Some(chr) = char::from_u32(chr) {
-                events.push(WaylandEvent::Char(chr, keymods, repeat));
-            }
+        let character = char::from_u32(chr).filter(|_| chr > 0);
+        events.push(WaylandEvent::KeyDown(keycode, character, keymods, repeat));
+        if let Some(chr) = character {
+            events.push(WaylandEvent::Char(chr, keymods, repeat));
         }
     }
 }
@@ -530,7 +529,7 @@ unsafe extern "C" fn seat_handle_capabilities(
 }
 
 enum WaylandEvent {
-    KeyDown(KeyCode, KeyMods, bool),
+    KeyDown(KeyCode, Option<char>, KeyMods, bool),
     KeyUp(KeyCode, KeyMods),
     Char(char, KeyMods, bool),
     PointerMotion(f32, f32),
@@ -1258,9 +1257,8 @@ where
 
             for event in display.events.drain(..) {
                 match event {
-                    WaylandEvent::KeyDown(keycode, keymods, repeat) => {
-                        event_handler.key_down_event(keycode, keymods, repeat)
-                    }
+                    WaylandEvent::KeyDown(keycode, character, keymods, repeat) => event_handler
+                        .key_down_with_character_event(keycode, character, keymods, repeat),
                     WaylandEvent::KeyUp(keycode, keymods) => {
                         event_handler.key_up_event(keycode, keymods)
                     }

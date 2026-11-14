@@ -282,12 +282,13 @@ pub extern "C" fn mouse_wheel(dx: i32, dy: i32) {
 }
 
 #[no_mangle]
-pub extern "C" fn key_down(key: u32, modifiers: u32, repeat: bool) {
+pub extern "C" fn key_down(key: u32, modifiers: u32, repeat: bool, character: u32) {
     let key = keycodes::translate_keycode(key as _);
     let mods = keycodes::translate_mod(modifiers as _);
+    let character = char::from_u32(character).filter(|_| character > 0);
 
     tl_event_handler(|event_handler| {
-        event_handler.key_down_event(key, mods, repeat);
+        event_handler.key_down_with_character_event(key, character, mods, repeat);
     });
 }
 

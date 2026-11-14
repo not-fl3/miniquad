@@ -143,6 +143,31 @@ pub fn get_event_char(event: ObjcId) -> Option<char> {
     }
 }
 
+/// The one character `event`'s key types on the current layout with the event's
+/// Shift and Command, as macOS matches menu shortcuts, so that a layout that
+/// types QWERTY's letters while Command is held is followed.
+pub fn get_event_key_character(event: ObjcId) -> Option<char> {
+    unsafe {
+        let applies_modifiers: bool =
+            msg_send![event, respondsToSelector: sel!(charactersByApplyingModifiers:)];
+        let characters: ObjcId = if applies_modifiers {
+            let flags: u64 = msg_send![event, modifierFlags];
+            let kept = NSEventModifierFlags::NSShiftKeyMask as u64
+                | NSEventModifierFlags::NSCommandKeyMask as u64;
+            msg_send![event, charactersByApplyingModifiers: flags & kept]
+        } else {
+            // Before macOS 10.15.
+            msg_send![event, charactersIgnoringModifiers]
+        };
+        if characters == nil {
+            return None;
+        }
+        let characters = nsstring_to_string(characters);
+        let mut chars = characters.chars();
+        chars.next().filter(|_| chars.next().is_none())
+    }
+}
+
 pub fn get_event_key_modifier(event: ObjcId) -> KeyMods {
     let flags: u64 = unsafe { msg_send![event, modifierFlags] };
     KeyMods {
