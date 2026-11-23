@@ -412,9 +412,6 @@ pub fn define_cocoa_window_delegate() -> *const Class {
             // Startup: the gl_context has not yet been created.
             return;
         }
-        if let Some(event_handler) = payload.context() {
-            event_handler.window_minimized_event();
-        }
         unsafe {
             msg_send_![payload.gl_context, update];
         }
