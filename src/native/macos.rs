@@ -91,13 +91,20 @@ impl MacosDisplay {
         }
     }
     fn set_window_size(&mut self, new_width: u32, new_height: u32) {
+        // The requested size is the content size, as in Conf::window_width/
+        // window_height and the other backends; the frame adds the title bar.
+        let content = NSRect {
+            origin: NSPoint { x: 0., y: 0. },
+            size: NSSize {
+                width: new_width as f64,
+                height: new_height as f64,
+            },
+        };
+        let new_frame: NSRect = unsafe { msg_send![self.window, frameRectForContentRect: content] };
         let mut frame: NSRect = unsafe { msg_send![self.window, frame] };
         frame.origin.y += frame.size.height;
-        frame.origin.y -= new_height as f64;
-        frame.size = NSSize {
-            width: new_width as f64,
-            height: new_height as f64,
-        };
+        frame.origin.y -= new_frame.size.height;
+        frame.size = new_frame.size;
         let () = unsafe { msg_send![self.window, setFrame:frame display:true animate:true] };
     }
     fn set_fullscreen(&mut self, fullscreen: bool) {
