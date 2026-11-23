@@ -155,7 +155,7 @@ impl MacosDisplay {
     fn transform_mouse_point(&self, point: &NSPoint) -> (f32, f32) {
         let d = native_display().lock().unwrap();
         let new_x = point.x as f32 * d.dpi_scale;
-        let new_y = d.screen_height as f32 - (point.y as f32 * d.dpi_scale) - 1.;
+        let new_y = d.screen_height as f32 - (point.y as f32 * d.dpi_scale);
 
         (new_x, new_y)
     }
