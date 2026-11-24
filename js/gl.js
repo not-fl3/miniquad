@@ -420,18 +420,36 @@ function _webglGet(name_, p, type) {
 var Module;
 var wasm_exports;
 
+// The `dpi_scale` the canvas was last sized at, which the wasm side reads
+// again on every `resize`.
+var sized_dpi_scale;
+
 function resize(canvas, on_resize) {
     var dpr = dpi_scale();
     var displayWidth = canvas.clientWidth * dpr;
     var displayHeight = canvas.clientHeight * dpr;
 
+    // Zooming changes the ratio and the canvas's size in CSS pixels
+    // together, and can leave its size in pixels as it was.
     if (canvas.width != displayWidth ||
-        canvas.height != displayHeight) {
+        canvas.height != displayHeight ||
+        dpr != sized_dpi_scale) {
         canvas.width = displayWidth;
         canvas.height = displayHeight;
+        sized_dpi_scale = dpr;
         if (on_resize != undefined)
             on_resize(Math.floor(displayWidth), Math.floor(displayHeight))
     }
+}
+
+// Moving the window to a display with another pixel ratio changes it
+// without resizing the window.
+function on_device_pixel_ratio_change(f) {
+    var query = window.matchMedia("(resolution: " + window.devicePixelRatio + "dppx)");
+    query.addEventListener("change", function () {
+        f();
+        on_device_pixel_ratio_change(f);
+    }, { once: true });
 }
 
 function animation() {
@@ -1308,6 +1326,9 @@ var importObject = {
             window.onresize = function () {
                 resize(canvas, wasm_exports.resize);
             };
+            on_device_pixel_ratio_change(function () {
+                resize(canvas, wasm_exports.resize);
+            });
             window.addEventListener("copy", function (e) {
                 if (clipboard != null) {
                     event.clipboardData.setData('text/plain', clipboard);
