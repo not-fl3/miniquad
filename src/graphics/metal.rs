@@ -10,7 +10,7 @@ use super::*;
 // https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
 const MAX_UNIFORM_BUFFER_SIZE: u64 = 4 * 1024 * 1024;
 const NUM_INFLIGHT_FRAMES: usize = 3;
-// iOS simulator on Apple Silicon Macs (`target_abi = "sim"`) runs
+// iOS simulator on Apple Silicon Macs (`miniquad_apple_sim`) runs
 // iOS arm64 code but issues Metal commands against the host Mac's
 // GPU — which validates with the 256-byte rule, not iOS arm64's
 // 16-byte. Without breaking the simulator out of the iOS-arm64
@@ -20,14 +20,14 @@ const NUM_INFLIGHT_FRAMES: usize = 3;
     target_os = "macos",
     all(
         any(target_os = "ios", target_os = "tvos"),
-        any(target_arch = "x86_64", target_abi = "sim"),
+        any(target_arch = "x86_64", miniquad_apple_sim),
     ),
 ))]
 const UNIFORM_BUFFER_ALIGN: u64 = 256;
 #[cfg(all(
     any(target_os = "ios", target_os = "tvos"),
     target_arch = "aarch64",
-    not(target_abi = "sim"),
+    not(miniquad_apple_sim),
 ))]
 const UNIFORM_BUFFER_ALIGN: u64 = 16;
 

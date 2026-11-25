@@ -72,8 +72,12 @@ jobs:
           cargo quad-apk build 
 
   msrv:
-    name: MSRV Check
-    runs-on: ubuntu-latest
+    name: MSRV Check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # metal.rs and the macOS backend only compile on Apple targets.
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
