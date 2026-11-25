@@ -140,6 +140,21 @@ cat > MyGame.app/Info.plist << EOF
 <string>1</string>
 <key>CFBundleShortVersionString</key>
 <string>1.0</string>
+<key>UIApplicationSceneManifest</key>
+<dict>
+<key>UIApplicationSupportsMultipleScenes</key>
+<false/>
+<key>UISceneConfigurations</key>
+<dict>
+<key>UIWindowSceneSessionRoleApplication</key>
+<array>
+<dict>
+<key>UISceneConfigurationName</key>
+<string>Default Configuration</string>
+</dict>
+</array>
+</dict>
+</dict>
 </dict>
 </plist>
 EOF
@@ -147,6 +162,8 @@ EOF
 xcrun simctl install booted MyGame.app/
 xcrun simctl launch booted com.mygame
 ```
+
+Apps built with the iOS 27 SDK need the `UIApplicationSceneManifest` entry, or iOS refuses to launch them. miniquad creates the window itself, so the manifest doesn't need a `UISceneDelegateClassName`.
 
 For details and instructions on provisioning for real iphone, check [https://macroquad.rs/articles/ios/](https://macroquad.rs/articles/ios/)
 

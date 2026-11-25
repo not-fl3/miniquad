@@ -25,12 +25,34 @@ use {
 
 // iOS 27 / TN3187: windows must be created via `initWithWindowScene:`
 // or they stay invisible. Window creation defers to the
-// `UISceneWillConnectNotification` observer below; both that and
-// `did_finish_launching_with_options` run on the main thread, so
+// `UISceneWillConnectNotification` observer below, or to the end of
+// `did_finish_launching_with_options` when the scene is already
+// connected; both run on the main thread, so
 // `thread_local` storage is sound.
 thread_local! {
     static PENDING_SCENE_VIEW_AND_CTRL: RefCell<Option<(ObjcId, ObjcId)>> =
         RefCell::new(None);
+}
+
+/// Puts the pending view and view controller in a new window on `scene`.
+/// Runs once: whichever caller sees the scene first takes the pair.
+unsafe fn attach_to_scene(scene: ObjcId) {
+    let is_window_scene: BOOL = msg_send![scene, isKindOfClass: class!(UIWindowScene)];
+    if is_window_scene == NO {
+        return;
+    }
+
+    let (view, view_ctrl) = match PENDING_SCENE_VIEW_AND_CTRL.with(|cell| cell.borrow_mut().take())
+    {
+        Some(pair) => pair,
+        None => return,
+    };
+
+    let window: ObjcId = msg_send![class!(UIWindow), alloc];
+    let window: ObjcId = msg_send![window, initWithWindowScene: scene];
+    msg_send_![window, addSubview: view];
+    msg_send_![window, setRootViewController: view_ctrl];
+    msg_send_![window, makeKeyAndVisible];
 }
 
 struct MainThreadState {
@@ -694,6 +716,16 @@ pub fn define_app_delegate() -> *const Class {
                 name: scene_did_activate_name
                 object: nil];
 
+            // Without `UIApplicationSceneManifest` in Info.plist, UIKit
+            // connects the scene before this method runs, so the
+            // notification above was already posted. Attach to it here.
+            let app: ObjcId = msg_send![class!(UIApplication), sharedApplication];
+            let scenes: ObjcId = msg_send![app, connectedScenes];
+            let scene: ObjcId = msg_send![scenes, anyObject];
+            if !scene.is_null() {
+                attach_to_scene(scene);
+            }
+
             // No background render thread — `CADisplayLink` drives
             // `drawInMTKView:` directly.
         }
@@ -711,23 +743,7 @@ pub fn define_app_delegate() -> *const Class {
     extern "C" fn scene_will_connect(_: &Object, _: Sel, notification: ObjcId) {
         unsafe {
             let scene: ObjcId = msg_send![notification, object];
-            let is_window_scene: BOOL =
-                msg_send![scene, isKindOfClass: class!(UIWindowScene)];
-            if is_window_scene == NO {
-                return;
-            }
-
-            let (view, view_ctrl) =
-                match PENDING_SCENE_VIEW_AND_CTRL.with(|cell| cell.borrow_mut().take()) {
-                    Some(pair) => pair,
-                    None => return,
-                };
-
-            let window: ObjcId = msg_send![class!(UIWindow), alloc];
-            let window: ObjcId = msg_send![window, initWithWindowScene: scene];
-            msg_send_![window, addSubview: view];
-            msg_send_![window, setRootViewController: view_ctrl];
-            msg_send_![window, makeKeyAndVisible];
+            attach_to_scene(scene);
         }
     }
 
