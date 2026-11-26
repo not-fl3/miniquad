@@ -1152,7 +1152,8 @@ unsafe fn perform_redraw(
     }
 }
 
-pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
+/// The display `conf` asks for, with no view or window yet, set up to run `f`.
+unsafe fn new_display<F>(conf: &crate::conf::Conf, f: F) -> MacosDisplay
 where
     F: 'static + FnOnce() -> Box<dyn EventHandler>,
 {
@@ -1165,7 +1166,7 @@ where
         ..NativeDisplayData::new(conf.window_width, conf.window_height, tx, clipboard)
     });
 
-    let mut display = MacosDisplay {
+    MacosDisplay {
         view: std::ptr::null_mut(),
         window: std::ptr::null_mut(),
         gl_context: std::ptr::null_mut(),
@@ -1182,7 +1183,254 @@ where
         modifiers: Modifiers::default(),
         update_requested: true,
         last_paint_start_time: Instant::now(),
+    }
+}
+
+/// A stand-in for the `MTKView` [`run`] draws into, as big as `conf`'s
+/// window, for a headless run.
+unsafe fn create_headless_view(conf: &crate::conf::Conf) -> ObjcId {
+    let size = NSSize {
+        width: conf.window_width as f64,
+        height: conf.window_height as f64,
     };
+    let layer: ObjcId = msg_send![class!(CAMetalLayer), new];
+    let () = msg_send![layer, setDevice: MTLCreateSystemDefaultDevice()];
+    let () = msg_send![layer, setPixelFormat: MTLPixelFormat::BGRA8Unorm];
+    let () = msg_send![layer, setFrame: NSRect { origin: NSPoint { x: 0., y: 0. }, size }];
+    let () = msg_send![layer, setDrawableSize: size];
+    let view: ObjcId = msg_send![define_headless_view_class(), new];
+    (*view).set_ivar("layer", layer);
+    (*view).set_ivar("sample_count", conf.sample_count.max(1) as u64);
+    view
+}
+
+/// Answers what the Metal backend asks of an `MTKView` from a `CAMetalLayer`
+/// nothing shows, for a headless run: an `NSView`'s layer would start
+/// `NSApplication`, making the process a running app.
+fn define_headless_view_class() -> *const Class {
+    if let Some(class) = Class::get("HeadlessRenderView") {
+        return class;
+    }
+    let mut decl = ClassDecl::new("HeadlessRenderView", class!(NSObject)).unwrap();
+    decl.add_ivar::<ObjcId>("layer");
+    decl.add_ivar::<u64>("sample_count");
+    // The frame's, until `draw` ends it.
+    decl.add_ivar::<ObjcId>("drawable");
+    decl.add_ivar::<ObjcId>("descriptor");
+    // Kept from frame to frame, until the drawable's size changes.
+    decl.add_ivar::<ObjcId>("multisample_texture");
+    decl.add_ivar::<ObjcId>("depth_stencil_texture");
+
+    unsafe fn layer(this: &Object) -> ObjcId {
+        *this.get_ivar("layer")
+    }
+
+    unsafe fn release_ivar(this: &mut Object, name: &str) {
+        let object: ObjcId = *this.get_ivar(name);
+        if !object.is_null() {
+            let () = msg_send![object, release];
+            this.set_ivar(name, nil);
+        }
+    }
+
+    /// The render target `name`, the drawable's size, made the first time
+    /// it's needed at that size.
+    unsafe fn render_target(this: &mut Object, name: &str, format: MTLPixelFormat) -> ObjcId {
+        let texture: ObjcId = *this.get_ivar(name);
+        if !texture.is_null() {
+            return texture;
+        }
+        let size: NSSize = msg_send![layer(this), drawableSize];
+        let sample_count: u64 = *this.get_ivar("sample_count");
+        let descriptor: ObjcId = msg_send![
+            class!(MTLTextureDescriptor),
+            texture2DDescriptorWithPixelFormat: format
+            width: size.width as u64
+            height: size.height as u64
+            mipmapped: NO
+        ];
+        if sample_count > 1 {
+            let () = msg_send![descriptor, setTextureType: MTLTextureType::D2Multisample];
+            let () = msg_send![descriptor, setSampleCount: sample_count];
+        }
+        let () = msg_send![descriptor, setUsage: MTLTextureUsage::RenderTarget];
+        let () = msg_send![descriptor, setStorageMode: MTLStorageMode::Private];
+        let device: ObjcId = msg_send![layer(this), device];
+        let texture: ObjcId = msg_send![device, newTextureWithDescriptor: descriptor];
+        this.set_ivar(name, texture);
+        texture
+    }
+
+    extern "C" fn device(this: &Object, _: Sel) -> ObjcId {
+        unsafe { msg_send![layer(this), device] }
+    }
+    extern "C" fn color_pixel_format(_: &Object, _: Sel) -> u64 {
+        MTLPixelFormat::BGRA8Unorm as u64
+    }
+    extern "C" fn depth_stencil_pixel_format(_: &Object, _: Sel) -> u64 {
+        MTLPixelFormat::Depth32Float_Stencil8 as u64
+    }
+    extern "C" fn sample_count(this: &Object, _: Sel) -> u64 {
+        unsafe { *this.get_ivar("sample_count") }
+    }
+    extern "C" fn bounds(this: &Object, _: Sel) -> NSRect {
+        unsafe { msg_send![layer(this), bounds] }
+    }
+    extern "C" fn drawable_size(this: &Object, _: Sel) -> NSSize {
+        unsafe { msg_send![layer(this), drawableSize] }
+    }
+    extern "C" fn set_drawable_size(this: &mut Object, _: Sel, size: NSSize) {
+        unsafe {
+            let () = msg_send![layer(this), setDrawableSize: size];
+            release_ivar(this, "multisample_texture");
+            release_ivar(this, "depth_stencil_texture");
+        }
+    }
+    extern "C" fn current_drawable(this: &mut Object, _: Sel) -> ObjcId {
+        unsafe {
+            if (*this.get_ivar::<ObjcId>("drawable")).is_null() {
+                let drawable: ObjcId = msg_send![layer(this), nextDrawable];
+                let drawable: ObjcId = msg_send![drawable, retain];
+                this.set_ivar("drawable", drawable);
+            }
+            *this.get_ivar("drawable")
+        }
+    }
+    extern "C" fn current_render_pass_descriptor(this: &mut Object, selector: Sel) -> ObjcId {
+        unsafe {
+            let cached: ObjcId = *this.get_ivar("descriptor");
+            if !cached.is_null() {
+                return cached;
+            }
+            let drawable = current_drawable(this, selector);
+            if drawable.is_null() {
+                return nil;
+            }
+            let drawn: ObjcId = msg_send![drawable, texture];
+            let descriptor: ObjcId =
+                msg_send![class!(MTLRenderPassDescriptor), renderPassDescriptor];
+            let color_attachments: ObjcId = msg_send![descriptor, colorAttachments];
+            let color: ObjcId = msg_send![color_attachments, objectAtIndexedSubscript: 0u64];
+            if *this.get_ivar::<u64>("sample_count") > 1 {
+                let samples =
+                    render_target(this, "multisample_texture", MTLPixelFormat::BGRA8Unorm);
+                let () = msg_send![color, setTexture: samples];
+                let () = msg_send![color, setResolveTexture: drawn];
+            } else {
+                let () = msg_send![color, setTexture: drawn];
+            }
+            let depth_stencil = render_target(
+                this,
+                "depth_stencil_texture",
+                MTLPixelFormat::Depth32Float_Stencil8,
+            );
+            for attachment in [
+                msg_send_![descriptor, depthAttachment],
+                msg_send_![descriptor, stencilAttachment],
+            ] {
+                let () = msg_send![attachment, setTexture: depth_stencil];
+                let () = msg_send![attachment, setLoadAction: MTLLoadAction::Clear];
+                let () = msg_send![attachment, setStoreAction: MTLStoreAction::DontCare];
+            }
+            let descriptor: ObjcId = msg_send![descriptor, retain];
+            this.set_ivar("descriptor", descriptor);
+            descriptor
+        }
+    }
+    // As `MTKView`'s ends a frame, with no view to draw it into.
+    extern "C" fn draw(this: &mut Object, _: Sel) {
+        unsafe {
+            release_ivar(this, "descriptor");
+            release_ivar(this, "drawable");
+        }
+    }
+
+    unsafe {
+        decl.add_method(
+            sel!(device),
+            device as extern "C" fn(&Object, Sel) -> ObjcId,
+        );
+        decl.add_method(
+            sel!(colorPixelFormat),
+            color_pixel_format as extern "C" fn(&Object, Sel) -> u64,
+        );
+        decl.add_method(
+            sel!(depthStencilPixelFormat),
+            depth_stencil_pixel_format as extern "C" fn(&Object, Sel) -> u64,
+        );
+        decl.add_method(
+            sel!(sampleCount),
+            sample_count as extern "C" fn(&Object, Sel) -> u64,
+        );
+        decl.add_method(
+            sel!(bounds),
+            bounds as extern "C" fn(&Object, Sel) -> NSRect,
+        );
+        decl.add_method(
+            sel!(drawableSize),
+            drawable_size as extern "C" fn(&Object, Sel) -> NSSize,
+        );
+        decl.add_method(
+            sel!(setDrawableSize:),
+            set_drawable_size as extern "C" fn(&mut Object, Sel, NSSize),
+        );
+        decl.add_method(
+            sel!(currentDrawable),
+            current_drawable as extern "C" fn(&mut Object, Sel) -> ObjcId,
+        );
+        decl.add_method(
+            sel!(currentRenderPassDescriptor),
+            current_render_pass_descriptor as extern "C" fn(&mut Object, Sel) -> ObjcId,
+        );
+        decl.add_method(sel!(draw), draw as extern "C" fn(&mut Object, Sel));
+    }
+    decl.register()
+}
+
+/// [`run`] with no `NSApplication` and no window, as
+/// [`Platform::macos_headless`](crate::conf::Platform::macos_headless) has it.
+unsafe fn run_headless<F>(conf: crate::conf::Conf, f: F)
+where
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
+{
+    assert!(
+        conf.platform.apple_gfx_api == AppleGfxApi::Metal,
+        "a headless run only draws with Metal"
+    );
+    let mut display = new_display(&conf, f);
+    let view = create_headless_view(&conf);
+    native_display().lock().unwrap().view = view;
+    display.view = view;
+    let _ = display.update_dimensions();
+
+    loop {
+        // Nothing drains an autorelease pool for it, as `[NSApp run]` would.
+        let pool = objc::runtime::objc_autoreleasePoolPush();
+        while let Ok(request) = display.native_requests.try_recv() {
+            display.process_request(request);
+        }
+        let quitting = {
+            let d = native_display().lock().unwrap();
+            d.quit_requested || d.quit_ordered
+        };
+        if !quitting {
+            perform_redraw(&mut display, AppleGfxApi::Metal, false);
+        }
+        objc::runtime::objc_autoreleasePoolPop(pool);
+        if quitting {
+            break;
+        }
+    }
+}
+
+pub unsafe fn run<F>(conf: crate::conf::Conf, f: F)
+where
+    F: 'static + FnOnce() -> Box<dyn EventHandler>,
+{
+    if conf.platform.macos_headless {
+        return run_headless(conf, f);
+    }
+    let mut display = new_display(&conf, f);
 
     let app_delegate_class = define_app_delegate();
     let app_delegate_instance: ObjcId = msg_send![app_delegate_class, new];

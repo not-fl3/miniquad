@@ -181,6 +181,12 @@ pub struct Platform {
     /// Whether to automatically setup the panic hook for Android.
     /// Set this to false if your app does its own panic_hook setup to avoid conflicts.
     pub android_panic_hook: bool,
+
+    /// If `true`, on macOS the app runs with no window, Dock icon or menu bar, and
+    /// never registers as a running app: only its view draws, sized as the window
+    /// would be, frame after frame until it quits. Metal only. Meant for tools that
+    /// draw into render targets and read them back.
+    pub macos_headless: bool,
 }
 
 impl Default for Platform {
@@ -197,6 +203,7 @@ impl Default for Platform {
             wayland_decorations: WaylandDecorations::default(),
             linux_wm_class: "miniquad-application",
             android_panic_hook: true,
+            macos_headless: false,
         }
     }
 }
