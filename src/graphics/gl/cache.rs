@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use crate::graphics::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
@@ -26,13 +28,14 @@ pub struct CachedTexture {
 }
 
 pub struct GlCache {
-    pub stored_index_buffer: GLuint,
-    pub stored_index_type: Option<u32>,
-    pub stored_vertex_buffer: GLuint,
     pub stored_target: GLuint,
     pub stored_texture: GLuint,
+    /// The index buffer draws read, as the bindings last applied it.
     pub index_buffer: GLuint,
     pub index_type: Option<u32>,
+    /// Another index buffer, bound since to upload into it, which the next
+    /// draw binds `index_buffer` back over.
+    pub index_buffer_uploading: Cell<Option<GLuint>>,
     pub vertex_buffer: GLuint,
     pub textures: [CachedTexture; MAX_SHADERSTAGE_IMAGES],
     pub cur_pipeline: Option<Pipeline>,
@@ -42,6 +45,10 @@ pub struct GlCache {
     pub stencil: Option<StencilState>,
     pub color_write: ColorMask,
     pub cull_face: CullFace,
+    pub program: GLuint,
+    /// `None` while the depth test is off.
+    pub depth_test: Option<Comparison>,
+    pub front_face: FrontFaceOrder,
     pub attributes: [Option<CachedAttribute>; MAX_VERTEX_ATTRIBUTES],
 }
 
@@ -55,34 +62,48 @@ impl GlCache {
                 }
             }
         } else {
-            if self.index_buffer != buffer {
-                self.index_buffer = buffer;
+            let bound = self
+                .index_buffer_uploading
+                .take()
+                .unwrap_or(self.index_buffer);
+            if bound != buffer {
                 unsafe {
                     glBindBuffer(target, buffer);
                 }
             }
+            self.index_buffer = buffer;
             self.index_type = index_type;
         }
     }
 
-    pub fn store_buffer_binding(&mut self, target: GLenum) {
+    /// Binds `buffer` to upload into it, without binding back what was
+    /// bound: draws don't read the vertex buffer binding, and the next draw
+    /// binds back the index buffer the bindings applied.
+    pub fn bind_buffer_to_upload(&mut self, target: GLenum, buffer: GLuint) {
         if target == GL_ARRAY_BUFFER {
-            self.stored_vertex_buffer = self.vertex_buffer;
+            self.bind_buffer(target, buffer, None);
         } else {
-            self.stored_index_buffer = self.index_buffer;
-            self.stored_index_type = self.index_type;
+            let bound = self
+                .index_buffer_uploading
+                .get()
+                .unwrap_or(self.index_buffer);
+            if bound != buffer {
+                unsafe {
+                    glBindBuffer(target, buffer);
+                }
+            }
+            self.index_buffer_uploading
+                .set((buffer != self.index_buffer).then_some(buffer));
         }
     }
 
-    pub fn restore_buffer_binding(&mut self, target: GLenum) {
-        if target == GL_ARRAY_BUFFER {
-            if self.stored_vertex_buffer != 0 {
-                self.bind_buffer(target, self.stored_vertex_buffer, None);
-                self.stored_vertex_buffer = 0;
+    /// Binds back the index buffer the bindings applied, if an upload has
+    /// bound another since.
+    pub fn bind_index_buffer_to_draw(&self) {
+        if self.index_buffer_uploading.take().is_some() {
+            unsafe {
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.index_buffer);
             }
-        } else if self.stored_index_buffer != 0 {
-            self.bind_buffer(target, self.stored_index_buffer, self.stored_index_type);
-            self.stored_index_buffer = 0;
         }
     }
 
