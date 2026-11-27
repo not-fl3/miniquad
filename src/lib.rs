@@ -12,7 +12,6 @@ mod event;
 pub mod fs;
 pub mod graphics;
 pub mod native;
-use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
 #[cfg(feature = "log-impl")]
@@ -26,44 +25,44 @@ mod default_icon;
 
 pub use native::gl;
 
+/// Resources by id, an id being its resource's index. A deleted resource's
+/// id isn't handed out again, so using it still panics rather than reaching
+/// another resource.
 #[derive(Clone)]
 pub(crate) struct ResourceManager<T> {
-    id: usize,
-    resources: HashMap<usize, T>,
+    resources: Vec<Option<T>>,
 }
 
 impl<T> Default for ResourceManager<T> {
     fn default() -> Self {
         Self {
-            id: 0,
-            resources: HashMap::new(),
+            resources: Vec::new(),
         }
     }
 }
 
 impl<T> ResourceManager<T> {
     pub fn add(&mut self, resource: T) -> usize {
-        self.resources.insert(self.id, resource);
-        self.id += 1;
-        self.id - 1
+        self.resources.push(Some(resource));
+        self.resources.len() - 1
     }
 
     pub fn remove(&mut self, id: usize) -> T {
         // Let it crash if the resource is not found
-        self.resources.remove(&id).unwrap()
+        self.resources[id].take().unwrap()
     }
 }
 
 impl<T> Index<usize> for ResourceManager<T> {
     type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
-        &self.resources[&index]
+        self.resources[index].as_ref().unwrap()
     }
 }
 
 impl<T> IndexMut<usize> for ResourceManager<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.resources.get_mut(&index).unwrap()
+        self.resources[index].as_mut().unwrap()
     }
 }
 
