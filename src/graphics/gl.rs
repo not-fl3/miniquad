@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::{cell::Cell, ffi::CString};
 
 use crate::{window, ResourceManager};
 
@@ -549,11 +549,9 @@ impl GlContext {
                 textures: Textures(vec![]),
                 info,
                 cache: GlCache {
-                    stored_index_buffer: 0,
-                    stored_index_type: None,
-                    stored_vertex_buffer: 0,
                     index_buffer: 0,
                     index_type: None,
+                    index_buffer_uploading: Cell::new(None),
                     vertex_buffer: 0,
                     cur_pipeline: None,
                     cur_pass: None,
@@ -562,6 +560,9 @@ impl GlContext {
                     stencil: None,
                     color_write: (true, true, true, true),
                     cull_face: CullFace::Nothing,
+                    program: 0,
+                    depth_test: None,
+                    front_face: FrontFaceOrder::CounterClockwise,
                     stored_texture: 0,
                     stored_target: 0,
                     textures: [CachedTexture {
@@ -896,6 +897,8 @@ impl RenderingBackend for GlContext {
             _ => panic!("Metal source on OpenGl context"),
         };
         let shader = load_shader_internal(vertex, fragment, meta)?;
+        // Loading it left its program in use.
+        self.cache.program = shader.program;
         Ok(ShaderId(self.shaders.add(shader)))
     }
 
@@ -925,8 +928,11 @@ impl RenderingBackend for GlContext {
     }
 
     fn delete_shader(&mut self, program: ShaderId) {
-        unsafe { glDeleteProgram(self.shaders[program.0].program) };
-        self.shaders.remove(program.0);
+        let program = self.shaders.remove(program.0).program;
+        unsafe { glDeleteProgram(program) };
+        if self.cache.program == program {
+            self.cache.program = 0;
+        }
         self.cache.cur_pipeline = None;
     }
 
@@ -1295,46 +1301,44 @@ impl RenderingBackend for GlContext {
     fn apply_pipeline(&mut self, pipeline: &Pipeline) {
         self.cache.cur_pipeline = Some(*pipeline);
 
-        {
-            let pipeline = &self.pipelines[pipeline.0];
-            let shader = &self.shaders[pipeline.shader.0];
-            unsafe {
-                glUseProgram(shader.program);
+        let pipeline = &self.pipelines[pipeline.0];
+        let program = self.shaders[pipeline.shader.0].program;
+        let params = pipeline.params;
+        unsafe {
+            if self.cache.program != program {
+                glUseProgram(program);
+                self.cache.program = program;
             }
 
-            unsafe {
-                glEnable(GL_SCISSOR_TEST);
-            }
+            glEnable(GL_SCISSOR_TEST);
 
-            if pipeline.params.depth_write {
-                unsafe {
-                    glEnable(GL_DEPTH_TEST);
-                    glDepthFunc(pipeline.params.depth_test.into())
+            let depth_test = params.depth_write.then_some(params.depth_test);
+            if self.cache.depth_test != depth_test {
+                match depth_test {
+                    Some(depth_test) => {
+                        if self.cache.depth_test.is_none() {
+                            glEnable(GL_DEPTH_TEST);
+                        }
+                        glDepthFunc(depth_test.into());
+                    }
+                    None => glDisable(GL_DEPTH_TEST),
                 }
-            } else {
-                unsafe {
-                    glDisable(GL_DEPTH_TEST);
-                }
+                self.cache.depth_test = depth_test;
             }
 
-            match pipeline.params.front_face_order {
-                FrontFaceOrder::Clockwise => unsafe {
-                    glFrontFace(GL_CW);
-                },
-                FrontFaceOrder::CounterClockwise => unsafe {
-                    glFrontFace(GL_CCW);
-                },
+            if self.cache.front_face != params.front_face_order {
+                match params.front_face_order {
+                    FrontFaceOrder::Clockwise => glFrontFace(GL_CW),
+                    FrontFaceOrder::CounterClockwise => glFrontFace(GL_CCW),
+                }
+                self.cache.front_face = params.front_face_order;
             }
         }
 
-        self.set_cull_face(self.pipelines[pipeline.0].params.cull_face);
-        self.set_blend(
-            self.pipelines[pipeline.0].params.color_blend,
-            self.pipelines[pipeline.0].params.alpha_blend,
-        );
-
-        self.set_stencil(self.pipelines[pipeline.0].params.stencil_test);
-        self.set_color_write(self.pipelines[pipeline.0].params.color_write);
+        self.set_cull_face(params.cull_face);
+        self.set_blend(params.color_blend, params.alpha_blend);
+        self.set_stencil(params.stencil_test);
+        self.set_color_write(params.color_write);
     }
 
     fn new_buffer(
@@ -1362,15 +1366,13 @@ impl RenderingBackend for GlContext {
 
         unsafe {
             glGenBuffers(1, &mut gl_buf as *mut _);
-            self.cache.store_buffer_binding(gl_target);
-            self.cache.bind_buffer(gl_target, gl_buf, index_type);
+            self.cache.bind_buffer_to_upload(gl_target, gl_buf);
 
             glBufferData(gl_target, size as _, std::ptr::null() as *const _, gl_usage);
             if let BufferSource::Slice(data) = data {
                 debug_assert!(data.is_slice);
                 glBufferSubData(gl_target, 0, size as _, data.ptr as _);
             }
-            self.cache.restore_buffer_binding(gl_target);
         }
 
         let buffer = Buffer {
@@ -1401,11 +1403,8 @@ impl RenderingBackend for GlContext {
         assert!(size <= buffer.size);
 
         let gl_target = gl_buffer_target(&buffer.buffer_type);
-        self.cache.store_buffer_binding(gl_target);
-        self.cache
-            .bind_buffer(gl_target, buffer.gl_buf, buffer.index_type);
+        self.cache.bind_buffer_to_upload(gl_target, buffer.gl_buf);
         unsafe { glBufferSubData(gl_target, 0, size as _, data.ptr as _) };
-        self.cache.restore_buffer_binding(gl_target);
     }
 
     /// Size of buffer in bytes
@@ -1478,7 +1477,7 @@ impl RenderingBackend for GlContext {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
 
         for attr_index in 0..MAX_VERTEX_ATTRIBUTES {
-            let cached_attr = &mut self.cache.attributes[attr_index];
+            let cached_attr = self.cache.attributes[attr_index];
 
             let pip_attribute = pip.layout.get(attr_index).copied();
 
@@ -1519,14 +1518,21 @@ impl RenderingBackend for GlContext {
                                 attribute.offset as *mut _,
                             ),
                         }
-                        if self.info.features.instancing {
+                        // An attribute in the cache is enabled, with its
+                        // divisor set.
+                        if self.info.features.instancing
+                            && cached_attr.map_or(true, |cached_attr| {
+                                cached_attr.attribute.divisor != attribute.divisor
+                            })
+                        {
                             glVertexAttribDivisor(attr_index as GLuint, attribute.divisor as u32);
                         }
-                        glEnableVertexAttribArray(attr_index as GLuint);
+                        if cached_attr.is_none() {
+                            glEnableVertexAttribArray(attr_index as GLuint);
+                        }
                     };
 
-                    let cached_attr = &mut self.cache.attributes[attr_index];
-                    *cached_attr = Some(CachedAttribute {
+                    self.cache.attributes[attr_index] = Some(CachedAttribute {
                         attribute,
                         gl_vbuf: vb.gl_buf,
                     });
@@ -1535,7 +1541,7 @@ impl RenderingBackend for GlContext {
                 unsafe {
                     glDisableVertexAttribArray(attr_index as GLuint);
                 }
-                *cached_attr = None;
+                self.cache.attributes[attr_index] = None;
             }
         }
     }
@@ -1707,8 +1713,8 @@ impl RenderingBackend for GlContext {
                 }
             }
             glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
-            self.cache.bind_buffer(GL_ARRAY_BUFFER, 0, None);
-            self.cache.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0, None);
+            // The buffers stay bound, for the next pass's bindings to skip
+            // binding them again.
 
             // On Android when resizing the screen, visual tearing may occur
             // on some devices since clearing the screen is clipped by scissor.
@@ -1737,6 +1743,7 @@ impl RenderingBackend for GlContext {
         let pip = &self.pipelines[self.cache.cur_pipeline.unwrap().0];
         let primitive_type = pip.params.primitive_type.into();
         let index_type = self.cache.index_type.expect("Unset index buffer type");
+        self.cache.bind_index_buffer_to_draw();
 
         unsafe {
             glDrawElementsInstanced(
